@@ -7,6 +7,7 @@ public static class BlockColorUtil
     // 2つの色が一致しているか判定
     public static bool IsMatch(BlockColor color1, BlockColor color2)
     {
+        // 両方の色のタグが一致または片方が全ての色かで判断する
         return color1 == BlockColor.All || color2 == BlockColor.All || color1 == color2;
     }
 }

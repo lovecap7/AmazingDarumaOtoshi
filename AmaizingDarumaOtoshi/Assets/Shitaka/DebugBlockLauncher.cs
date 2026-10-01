@@ -4,7 +4,7 @@ using UnityEngine.InputSystem;
 
 // プロト確認用のテスト入力。テンキー(5を除く1~9)を押した方向へ、発射する
 // BlockControllerのLaunchを呼ぶ
-// プレイヤー担当のハンマーの処理が完成したら不要になるため、本実装時に削除
+// プレイヤー担当のハンマーの処理が完成したら不要になる
 public class DebugBlockLauncher:MonoBehaviour
 {
     BlockController controller;

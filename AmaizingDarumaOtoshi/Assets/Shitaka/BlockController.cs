@@ -1,7 +1,6 @@
 using System;
 using UnityEngine;
 
-[RequireComponent(typeof(Rigidbody), typeof(BlockInfo))] // RigidbodyやBlockInfoがオブジェクトに設定されていない場合は自動で追加する
 public class BlockController : MonoBehaviour 
 {
     [SerializeField] float speed = 2.0f;
@@ -11,6 +10,8 @@ public class BlockController : MonoBehaviour
     // 開始時点で飛行中だったかを記録する
     // (衝突処理の途中でisFlyingが書き換わっても、判定がブレないようにするため)
     bool wasFlyingThisStep;
+
+    bool hasHit; // 一度攻撃したら以降の衝突は無視する
 
     Rigidbody rb;
     BlockInfo info;
@@ -28,7 +29,7 @@ public class BlockController : MonoBehaviour
     }
 
     // 積み木を飛ばす処理
-    public void Launch(Vector3 dir)
+    public void Launch(Vector3 dir, bool useBurst = false)
     {
         direction = new Vector3(dir.x,0.0f,dir.z).normalized;
         isFlying = true;
@@ -43,11 +44,16 @@ public class BlockController : MonoBehaviour
         {
             return;
         }
-        rb.linearVelocity = direction * speed;
+
+        // Y方向(重力)は維持して、水平方向だけ上書きする
+        Vector3 v = direction * speed;
+        v.y = rb.linearVelocity.y;
+        rb.linearVelocity = v;
     }
 
     private void OnCollisionEnter(Collision collision)
     {
+        if (!wasFlyingThisStep || hasHit) return;
         // このステップの開始時点で飛んでいないなら、
         // 衝突処理の途中でisFlyingがtrueになっていても攻撃側として扱わない
         if (!wasFlyingThisStep)
@@ -62,16 +68,25 @@ public class BlockController : MonoBehaviour
         }
         else if(collision.gameObject.CompareTag("Block"))
         {
-            var other = collision.gameObject.GetComponent<BlockController>(); // 相手が飛行中かを確認するためBlockControlerを取得
+            // 衝突相手の高さを取得
+            float halfHeight = collision.collider.bounds.extents.y;
+            // 自分と相手の中心位置の高さの差を計算
+            float dy = Mathf.Abs(collision.collider.bounds.center.y - GetComponent<Collider>().bounds.center.y);
+
+            // 高さが半ブロック以上ずれている相手(上に乗っているもの等)は攻撃対象にしない
+            if (dy > halfHeight)
+            {
+                return;
+            }
+
+            var other = collision.gameObject.GetComponent<BlockController>();
             if (other != null)
             {
-                // どちらの挙動がいいかは検討中
-                //other.Launch(direction); // 相手を自分と同じ方向へ飛ばす
-                other.Launch(other.transform.position - transform.position); // 自分から相手への向きへ飛ばす
-
+                hasHit = true;
+                other.Launch(other.transform.position - transform.position, true);
             }
             Debug.Log($"攻撃ヒット 色:{info.Color}");
-            Break(); // 打ち出した自分は破壊される
+            Break(); // 他のブロックを打ち出した自分は破壊される
         }
     }
 

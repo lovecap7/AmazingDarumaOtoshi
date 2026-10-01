@@ -205,7 +205,7 @@ Transform:
   m_GameObject: {fileID: 193937656}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: -3.0084002}
+  m_LocalPosition: {x: 0, y: -0.04, z: -3.0084002}
   m_LocalScale: {x: 1, y: 1, z: 1.2342}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -345,13 +345,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 351700431}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.5008339, y: -0, z: -0, w: 0.8655434}
-  m_LocalPosition: {x: 0, y: 11.21, z: -9.75}
+  m_LocalRotation: {x: 0.5304807, y: -0, z: -0, w: 0.8476971}
+  m_LocalPosition: {x: -0.35, y: 12.2, z: -8.84}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 60.11, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 64.076, y: 0, z: 0}
 --- !u!114 &351700435
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -408,10 +408,10 @@ GameObject:
   - component: {fileID: 557762071}
   - component: {fileID: 557762070}
   - component: {fileID: 557762073}
-  - component: {fileID: 557762074}
   - component: {fileID: 557762075}
   - component: {fileID: 557762076}
   - component: {fileID: 557762077}
+  - component: {fileID: 557762078}
   m_Layer: 0
   m_Name: RedBlock
   m_TagString: Block
@@ -485,7 +485,7 @@ Transform:
   m_GameObject: {fileID: 557762068}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.1, y: 0.17, z: -1.71}
+  m_LocalPosition: {x: 2.38, y: 0.24, z: -6.85}
   m_LocalScale: {x: 1, y: 0.1341, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -504,27 +504,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BlockInfo
   color: 0
---- !u!65 &557762074
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 557762068}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 1.0000001, y: 2, z: 1.0000002}
-  m_Center: {x: 0.000000059604645, y: 0, z: -0.00000008940697}
 --- !u!54 &557762075
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -564,7 +543,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c7b9f655dbe622a4bb305eae7fcdb5b4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Blockcontroler
-  speed: 5
+  speed: 10
 --- !u!114 &557762077
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -577,6 +556,27 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f2c73a86cb38db247a625a76e41dac73, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DebugBlockLauncher
+--- !u!65 &557762078
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 557762068}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1.0000001, y: 2, z: 1.0000002}
+  m_Center: {x: 0.000000059604645, y: 0, z: -0.00000008940697}
 --- !u!1 &596670937
 GameObject:
   m_ObjectHideFlags: 0
@@ -684,7 +684,7 @@ Transform:
   m_GameObject: {fileID: 596670937}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0.7071068, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: 0, y: 0.34, z: -8.9672}
+  m_LocalPosition: {x: -0, y: 0.34, z: -8.99}
   m_LocalScale: {x: 0.3931, y: 0.73045576, z: 9.902038}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -729,9 +729,9 @@ GameObject:
   - component: {fileID: 792966890}
   - component: {fileID: 792966889}
   - component: {fileID: 792966892}
-  - component: {fileID: 792966893}
   - component: {fileID: 792966894}
   - component: {fileID: 792966895}
+  - component: {fileID: 792966896}
   m_Layer: 0
   m_Name: YellowBlock
   m_TagString: Block
@@ -805,7 +805,7 @@ Transform:
   m_GameObject: {fileID: 792966887}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.36, y: 0.12, z: 1}
+  m_LocalPosition: {x: 0.14, y: 0.86, z: -0.1}
   m_LocalScale: {x: 1, y: 0.1341, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -824,27 +824,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BlockInfo
   color: 3
---- !u!65 &792966893
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 792966887}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 1.0000001, y: 2, z: 1.0000002}
-  m_Center: {x: 0.000000059604645, y: 0, z: -0.00000008940697}
 --- !u!54 &792966894
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -884,7 +863,28 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c7b9f655dbe622a4bb305eae7fcdb5b4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Blockcontroler
-  speed: 5
+  speed: 10
+--- !u!65 &792966896
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 792966887}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1.0000001, y: 2, z: 1.0000002}
+  m_Center: {x: 0.000000059604645, y: 0, z: -0.00000008940697}
 --- !u!1 &1141642611
 GameObject:
   m_ObjectHideFlags: 0
@@ -897,9 +897,9 @@ GameObject:
   - component: {fileID: 1141642614}
   - component: {fileID: 1141642613}
   - component: {fileID: 1141642616}
-  - component: {fileID: 1141642617}
   - component: {fileID: 1141642618}
   - component: {fileID: 1141642619}
+  - component: {fileID: 1141642620}
   m_Layer: 0
   m_Name: BlueBlock
   m_TagString: Block
@@ -973,7 +973,7 @@ Transform:
   m_GameObject: {fileID: 1141642611}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 3, y: 0.16, z: -1.71}
+  m_LocalPosition: {x: 0.1439997, y: 0.15000004, z: -0.07199955}
   m_LocalScale: {x: 1, y: 0.1341, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -992,27 +992,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BlockInfo
   color: 1
---- !u!65 &1141642617
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1141642611}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 1.0000001, y: 2, z: 1.0000002}
-  m_Center: {x: 0.000000059604645, y: 0, z: -0.00000008940697}
 --- !u!54 &1141642618
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -1052,7 +1031,28 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c7b9f655dbe622a4bb305eae7fcdb5b4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Blockcontroler
-  speed: 5
+  speed: 10
+--- !u!65 &1141642620
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1141642611}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1.0000001, y: 2, z: 1.0000002}
+  m_Center: {x: 0.000000059604645, y: 0, z: -0.00000008940697}
 --- !u!1 &1291388730
 GameObject:
   m_ObjectHideFlags: 0
@@ -1612,9 +1612,9 @@ GameObject:
   - component: {fileID: 2023414656}
   - component: {fileID: 2023414655}
   - component: {fileID: 2023414658}
-  - component: {fileID: 2023414659}
   - component: {fileID: 2023414660}
   - component: {fileID: 2023414661}
+  - component: {fileID: 2023414662}
   m_Layer: 0
   m_Name: GreenBlock
   m_TagString: Block
@@ -1688,7 +1688,7 @@ Transform:
   m_GameObject: {fileID: 2023414653}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -3.47, y: 0.24, z: -1.48}
+  m_LocalPosition: {x: 0.13, y: 0.56000006, z: -0.10999966}
   m_LocalScale: {x: 1, y: 0.1341, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1707,27 +1707,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BlockInfo
   color: 2
---- !u!65 &2023414659
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2023414653}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 1.0000001, y: 2, z: 1.0000002}
-  m_Center: {x: 0.000000059604645, y: 0, z: -0.00000008940697}
 --- !u!54 &2023414660
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -1767,7 +1746,28 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c7b9f655dbe622a4bb305eae7fcdb5b4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Blockcontroler
-  speed: 5
+  speed: 10
+--- !u!65 &2023414662
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2023414653}
+  m_Material: {fileID: 13400000, guid: 0fe0b3307959b9b49a76f558d9251a5f, type: 2}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1.0000001, y: 2, z: 1.0000002}
+  m_Center: {x: 0.000000059604645, y: 0, z: -0.00000008940697}
 --- !u!1 &2112996084
 GameObject:
   m_ObjectHideFlags: 0
@@ -1780,9 +1780,9 @@ GameObject:
   - component: {fileID: 2112996087}
   - component: {fileID: 2112996086}
   - component: {fileID: 2112996089}
-  - component: {fileID: 2112996090}
   - component: {fileID: 2112996091}
   - component: {fileID: 2112996092}
+  - component: {fileID: 2112996093}
   m_Layer: 0
   m_Name: AllColorBlock
   m_TagString: Block
@@ -1856,7 +1856,7 @@ Transform:
   m_GameObject: {fileID: 2112996084}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.23, y: 0.3, z: -6.14}
+  m_LocalPosition: {x: 0.09399974, y: 0.14, z: -3.08}
   m_LocalScale: {x: 1, y: 0.1341, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1875,27 +1875,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BlockInfo
   color: 4
---- !u!65 &2112996090
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2112996084}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 1.0000001, y: 2, z: 1.0000002}
-  m_Center: {x: 0.000000059604645, y: 0, z: -0.00000008940697}
 --- !u!54 &2112996091
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -1935,7 +1914,28 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c7b9f655dbe622a4bb305eae7fcdb5b4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Blockcontroler
-  speed: 5
+  speed: 10
+--- !u!65 &2112996093
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2112996084}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1.0000001, y: 2, z: 1.0000002}
+  m_Center: {x: 0.000000059604645, y: 0, z: -0.00000008940697}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
