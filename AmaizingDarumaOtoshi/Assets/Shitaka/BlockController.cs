@@ -17,6 +17,9 @@ public class BlockController : MonoBehaviour
     BlockInfo info;
     Vector3 direction;
 
+    // 現在の飛行方向。IBlockBehavior実装クラス(別スクリプト)から参照するための公開プロパティ
+    public Vector3 Direction => direction;
+
     private void Awake()
     {
         rb = GetComponent<Rigidbody>();
