@@ -17,6 +17,9 @@ public class BlockController : MonoBehaviour
     BlockInfo info;
     Vector3 direction;
 
+    // キャラクターごとの挙動を差し替えるための参照。デフォルトはNormalBehavior
+    IBlockBehavior behavior = new NormalBehavior();
+
     // 現在の飛行方向。IBlockBehavior実装クラス(別スクリプト)から参照するための公開プロパティ
     public Vector3 Direction => direction;
 
@@ -31,8 +34,14 @@ public class BlockController : MonoBehaviour
         
     }
 
+    // behaviorを外部(生成担当側)から差し替えるための窓口
+    public void SetBehavior(IBlockBehavior newBehavior)
+    {
+        behavior = newBehavior;
+    }
+
     // 積み木を飛ばす処理
-    public void Launch(Vector3 dir, bool useBurst = false)
+    public void Launch(Vector3 dir)
     {
         direction = new Vector3(dir.x,0.0f,dir.z).normalized;
         isFlying = true;
@@ -48,6 +57,9 @@ public class BlockController : MonoBehaviour
             return;
         }
 
+        // behaviorに方向の更新を委譲する(曲がるキャラ等はここで方向が変化する)
+        direction = behavior.UpdateDirection(direction, Time.fixedDeltaTime);
+
         // Y方向(重力)は維持して、水平方向だけ上書きする
         Vector3 v = direction * speed;
         v.y = rb.linearVelocity.y;
@@ -61,15 +73,26 @@ public class BlockController : MonoBehaviour
         // 衝突処理の途中でisFlyingがtrueになっていても攻撃側として扱わない
         if (!wasFlyingThisStep)
         {
-            return; 
+            return;
         }
 
         // 壁に当たったら積み木を反射させる
         if (collision.gameObject.CompareTag("Wall"))
         {
-            direction = Vector3.Reflect(direction, collision.contacts[0].normal);
+            // direction = Vector3.Reflect(direction, collision.contacts[0].normal); // behaviorに委譲したため不要
+
+            hasHit = true; // 壁ヒットでも二重判定を防ぐため統一して立てる
+            if (behavior.OnWallHit(direction, collision.contacts[0].normal, out var newDirection))
+            {
+                direction = newDirection; // 反射するキャラ(Normal等)
+                hasHit = false; // 反射の場合は引き続き攻撃判定を持たせるため戻す
+            }
+            else
+            {
+                Break(); // 壁で砕けるキャラ(いわだる等)
+            }
         }
-        else if(collision.gameObject.CompareTag("Block"))
+        else if (collision.gameObject.CompareTag("Block"))
         {
             // 衝突相手の高さを取得
             float halfHeight = collision.collider.bounds.extents.y;
@@ -86,14 +109,20 @@ public class BlockController : MonoBehaviour
             if (other != null)
             {
                 hasHit = true;
-                other.Launch(other.transform.position - transform.position, true);
+                // other.Launch(other.transform.position - transform.position); // behaviorに委譲したため不要
+
+                Debug.Log($"攻撃ヒット 色:{info.Color}");
+
+                if (behavior.OnBlockHit(this, other))
+                {
+                    Break(); // 自分が壊れるキャラ(Normal等)
+                }
+                // falseの場合、自分は壊れない(いわだる等)。相手の処理はOnBlockHit内で完結させる
             }
-            Debug.Log($"攻撃ヒット 色:{info.Color}");
-            Break(); // 他のブロックを打ち出した自分は破壊される
         }
     }
 
-    void Break()
+    public void Break()
     {
         Destroy(gameObject);
     }

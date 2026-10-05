@@ -485,7 +485,7 @@ Transform:
   m_GameObject: {fileID: 557762068}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 2.38, y: 0.24, z: -6.85}
+  m_LocalPosition: {x: 7.69, y: 0.24, z: -6.85}
   m_LocalScale: {x: 1, y: 0.1341, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -504,6 +504,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BlockInfo
   color: 0
+  attackPower: 0
 --- !u!54 &557762075
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -805,7 +806,7 @@ Transform:
   m_GameObject: {fileID: 792966887}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 8.08, y: 0.18, z: -0.1}
+  m_LocalPosition: {x: -6.6699996, y: 0.95, z: -2.98}
   m_LocalScale: {x: 1, y: 0.1341, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -824,6 +825,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BlockInfo
   color: 3
+  attackPower: 0
 --- !u!54 &792966894
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -973,7 +975,7 @@ Transform:
   m_GameObject: {fileID: 1141642611}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.7339997, y: 0.25, z: 1.348}
+  m_LocalPosition: {x: -6.666, y: 0.25, z: -2.992}
   m_LocalScale: {x: 1, y: 0.1341, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -992,6 +994,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BlockInfo
   color: 1
+  attackPower: 0
 --- !u!54 &1141642618
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -1688,7 +1691,7 @@ Transform:
   m_GameObject: {fileID: 2023414653}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.72, y: 0.56, z: 1.31}
+  m_LocalPosition: {x: -6.68, y: 0.56, z: -3.03}
   m_LocalScale: {x: 1, y: 0.1341, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1707,6 +1710,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BlockInfo
   color: 2
+  attackPower: 0
 --- !u!54 &2023414660
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -1874,7 +1878,7 @@ Transform:
   m_GameObject: {fileID: 2078948303}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.0977, y: -0.04, z: -2.6724}
+  m_LocalPosition: {x: 0.0977, y: 0.41, z: -2.6724}
   m_LocalScale: {x: 5.977833, y: 1, z: 3.152542}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1968,7 +1972,7 @@ Transform:
   m_GameObject: {fileID: 2112996084}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -7.18, y: 0.17, z: -4.45}
+  m_LocalPosition: {x: -6.6399994, y: 1.38, z: -3.0800002}
   m_LocalScale: {x: 1, y: 0.1341, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1987,6 +1991,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BlockInfo
   color: 4
+  attackPower: 0
 --- !u!54 &2112996091
 Rigidbody:
   m_ObjectHideFlags: 0
