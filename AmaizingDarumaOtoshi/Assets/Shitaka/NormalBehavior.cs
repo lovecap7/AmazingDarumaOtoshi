@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.UIElements;
 
 // 基本の積み木の動き
 public class NormalBehavior:IBlockBehavior
@@ -13,7 +14,7 @@ public class NormalBehavior:IBlockBehavior
     // 他の積み木に当たった時の処理
     public virtual bool OnBlockHit(BlockController self, BlockController other)
     {
-        other.Launch(self.Direction); // 相手を飛ばす
+        other.Launch(other.transform.position - self.transform.position); // 相手を飛ばす
         return true; // 自分は壊れる
     }
 
