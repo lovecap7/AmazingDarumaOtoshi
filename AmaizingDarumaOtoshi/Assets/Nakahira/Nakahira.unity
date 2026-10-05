@@ -562,6 +562,7 @@ GameObject:
   - component: {fileID: 1714609267}
   - component: {fileID: 1714609266}
   - component: {fileID: 1714609269}
+  - component: {fileID: 1714609270}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -687,6 +688,27 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
+--- !u!114 &1714609270
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1714609265}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f097116ac64ab204fa7a0034bbf9ba3d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GlitchEffect
+  m_shader: {fileID: 4800000, guid: f75a1361f4694b0458a07a2a3bbaa809, type: 3}
+  m_intensity: 0.6
+  m_speed: 12
+  m_blockCount: {x: 6, y: 14}
+  m_blockAmount: 0.3
+  m_blockShift: 0.1
+  m_jitter: 0.01
+  m_colorShift: 0.01
+  m_scanline: 0.2
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
