@@ -9,8 +9,10 @@ namespace Nakahira
     {
         [Tooltip("飛んでいるときの減速度(1秒あたりに落ちる速さ)。弾速10・減速度5なら約10m進んで止まる")]
         [Min(0.0f)] public float Deceleration = 5.0f;
-        [Tooltip("これ未満の速さになったら弾ではなくなる(無害になり、拾える)")]
+        [Tooltip("これ未満の速さになったら攻撃判定がなくなる(連鎖・ダメージなし。壁での反射や減速は続く)")]
         [Min(0.0f)] public float HarmlessSpeed = 3.0f;
+        [Tooltip("これ未満の速さになったら止まって落ちている積み木に戻る")]
+        [Min(0.0f)] public float StopSpeed = 0.5f;
 
         [Header("衝突の手ごたえ(ヒットストップ)。速い積み木ほど長く強く止まる")]
         [Tooltip("この速さ以下で当たったときに最小の値になる")]

@@ -6,8 +6,9 @@ namespace Nakahira
     // 積み木
     // Loose  : ステージに落ちている。上に乗ると拾える
     // Stacked: プレイヤーに積まれている。当たり判定はプレイヤー側のコライダーが担当する
-    // Flying : 弾として地面を滑るように直進し、次第に減速する。壁で反射し、他の積み木に当たると連鎖する
-    //           一定速度を下回るとLooseに戻る(無害になり、拾える)
+    // Flying : 地面を滑るように直進し、次第に減速する。壁で反射する。止まる速さを下回るとLooseに戻る
+    //           ・攻撃判定あり(HarmlessSpeed以上): 他の積み木に当たると連鎖し、キャラクターにダメージを与える
+    //           ・攻撃判定なし(HarmlessSpeed未満): 積み木同士は弾き合い、キャラクターには跳ね返される
     [RequireComponent(typeof(Rigidbody), typeof(HitStop))]
     public class TumikiBlock : MonoBehaviour
     {
@@ -25,7 +26,7 @@ namespace Nakahira
         [SerializeField] float m_killY = -10.0f;
         // 発射直後、撃った本人などと当たらないようにする時間
         [SerializeField] float m_ignoreTime = 0.3f;
-        // 減速度・無害になる速さ(ScriptableObjectから毎回読む)
+        // 減速度・攻撃判定がなくなる速さ・止まる速さ(ScriptableObjectから毎回読む)
         [SerializeField] TumikiParams m_params;
 
         [Header("エフェクト")]
@@ -51,9 +52,6 @@ namespace Nakahira
         bool m_isBreaking;
         Vector3 m_breakVelocity;
 
-        // ヒットストップ中に押された(弾にならない速さの)ときは、明けてから動き出す
-        bool m_hasPendingPush;
-        Vector3 m_pendingPushVelocity;
 
         // 一時的に衝突を無視している相手
         readonly List<Collider> m_ignored = new List<Collider>();
@@ -67,6 +65,8 @@ namespace Nakahira
         public IDarumaAttacker Owner { get; private set; }
         // ハンマーで打ち返された回数(打ち返しの弾速に使う)。連鎖した先にも引き継がれる
         public int ReturnCount { get; private set; }
+        // 攻撃判定があるか(連鎖・ダメージが起きる速さで動いている)
+        public bool IsHarmful => CurrentState == State.Flying && !m_isConsumed && Speed >= m_params.HarmlessSpeed;
 
         private void Awake()
         {
@@ -106,17 +106,11 @@ namespace Nakahira
 
             UpdateIgnore(dt);
 
-            if (m_hasPendingPush && !m_hitStop.IsActive)
-            {
-                m_hasPendingPush = false;
-                if (CurrentState == State.Loose) m_rb.linearVelocity = m_pendingPushVelocity;
-            }
-
             if (CurrentState != State.Flying) return;
 
-            // 次第に減速し、遅くなったら落ちている積み木に戻る(残りの勢いは物理に任せる)
+            // 次第に減速し(HarmlessSpeedを下回ると攻撃判定がなくなる)、ほぼ止まったら落ちている積み木に戻る
             Speed = Mathf.Max(0.0f, Speed - m_params.Deceleration * dt);
-            if (Speed < m_params.HarmlessSpeed)
+            if (Speed < m_params.StopSpeed)
             {
                 SetLoose();
                 return;
@@ -148,7 +142,7 @@ namespace Nakahira
                 moving = v.magnitude > m_smokeMinSpeed;
             }
             SetEmission(m_smokeTrail, moving);
-            SetEmission(m_fireAura, CurrentState == State.Flying && !m_isBreaking);
+            SetEmission(m_fireAura, IsHarmful);
         }
 
         private static void SetEmission(ParticleSystem ps, bool enabled)
@@ -207,32 +201,81 @@ namespace Nakahira
             EnablePhysics();
         }
 
-        // ぶつかられて押し出される。弾になるほど速くなければ、落ちている積み木のまま押されるだけ
+        // ぶつかられて押し出される。速さに応じて攻撃判定の有無が決まる。ほとんど動かないなら落ちている積み木のまま
         public void Push(Vector3 dir, float speed, IDarumaAttacker owner, int returnCount, DarumaCharacter alsoIgnore = null)
         {
             if (m_isConsumed) return;
 
-            if (speed >= m_params.HarmlessSpeed)
+            if (speed >= m_params.StopSpeed)
             {
                 Launch(dir, speed, owner, alsoIgnore, returnCount);
                 return;
             }
 
-            dir.y = 0.0f;
             SetLoose();
             if (alsoIgnore != null) IgnoreTemporarily(alsoIgnore.Body);
-            Vector3 velocity = dir.normalized * speed;
-            if (m_hitStop.IsActive)
+        }
+
+        // 水平方向の今の速度(落ちている積み木は物理の速度)
+        public Vector3 HorizontalVelocity
+        {
+            get
             {
-                // ヒットストップが明けてから動き出す
-                m_hasPendingPush = true;
-                m_pendingPushVelocity = velocity;
-                m_rb.linearVelocity = Vector3.zero;
+                if (CurrentState == State.Flying) return Direction * Speed;
+                Vector3 v = m_rb.linearVelocity;
+                v.y = 0.0f;
+                return v;
             }
-            else
+        }
+
+        // 攻撃判定のない積み木同士が弾き合う(同じ重さの弾性衝突。どちらも壊れない)
+        private void BounceWith(TumikiBlock other)
+        {
+            Vector3 n = other.transform.position - transform.position;
+            n.y = 0.0f;
+            if (n.sqrMagnitude < 0.0001f) return;
+            n.Normalize();
+
+            Vector3 v1 = HorizontalVelocity;
+            // 落ちている積み木は止まっていたとみなす(衝突の通知時点では物理が既に少し押してしまっているため)
+            Vector3 v2 = other.CurrentState == State.Flying ? other.HorizontalVelocity : Vector3.zero;
+            // 近づいているときだけ(両方の積み木から通知が来ても1回だけ弾き合う)
+            float approach = Vector3.Dot(v1 - v2, n);
+            if (approach <= 0.0f) return;
+
+            SetHorizontalVelocity(v1 - n * approach);
+            Vector3 v2After = v2 + n * approach;
+            other.Push(v2After, v2After.magnitude, Owner, 0);
+        }
+
+        // 攻撃判定のない積み木がキャラクターに当たったら、キャラクターを押さずに壁のように跳ね返る
+        private void ReflectFrom(Vector3 targetPos)
+        {
+            Vector3 normal = transform.position - targetPos;
+            normal.y = 0.0f;
+            if (normal.sqrMagnitude < 0.0001f) return;
+            normal.Normalize();
+            if (Vector3.Dot(Direction, normal) < 0.0f)
             {
-                m_rb.linearVelocity = velocity;
+                Direction = Vector3.Reflect(Direction, normal).normalized;
+                SetHorizontalVelocity(Direction * Speed);
             }
+        }
+
+        private void SetHorizontalVelocity(Vector3 v)
+        {
+            v.y = 0.0f;
+            float speed = v.magnitude;
+            if (speed < m_params.StopSpeed)
+            {
+                SetLoose();
+                return;
+            }
+            Direction = v / speed;
+            Speed = speed;
+            Vector3 rv = Direction * (Speed * m_hitStop.TimeScale);
+            rv.y = m_rb.linearVelocity.y;
+            m_rb.linearVelocity = rv;
         }
 
         // 弾として飛ばす
@@ -281,11 +324,20 @@ namespace Nakahira
             // 壁で反射
             if (TryReflect(collision)) return;
 
-            // 他の積み木に当たったら、相手を飛ばして自分は崩れる(連鎖)
+            // 他の積み木に当たった
             var other = collision.collider.GetComponentInParent<TumikiBlock>();
             if (other != null && other != this)
             {
                 if (other.m_isConsumed || other.CurrentState == State.Stacked) return;
+
+                if (!IsHarmful)
+                {
+                    // 攻撃判定のある相手なら、相手側の連鎖の処理に任せる
+                    if (!other.IsHarmful) BounceWith(other);
+                    return;
+                }
+
+                // 攻撃判定あり: 相手を飛ばして自分は崩れる(連鎖)
                 if (requireApproach && !IsApproaching(other.transform.position)) return;
 
                 ComputeImpact(other.transform.position, out Vector3 dir, out float speed);
@@ -306,6 +358,14 @@ namespace Nakahira
 
                 Vector3 hitPos = character.transform.position;
                 hitPos.y = transform.position.y;
+
+                // 攻撃判定なし: キャラクターを押さずに跳ね返る
+                if (!IsHarmful)
+                {
+                    ReflectFrom(hitPos);
+                    return;
+                }
+
                 if (requireApproach && !IsApproaching(hitPos)) return;
 
                 // キャラクターは動かない相手として、ぶつかった方向の成分を失った残りの速度で割れる

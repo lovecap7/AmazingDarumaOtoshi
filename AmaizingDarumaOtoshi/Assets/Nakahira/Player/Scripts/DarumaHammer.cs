@@ -210,7 +210,8 @@ namespace Nakahira
             float speed = m_params.SweepLaunchSpeed;
             int returnCount = 0;
 
-            if (block.CurrentState == TumikiBlock.State.Flying)
+            // 攻撃判定のある積み木だけ「打ち返し」。攻撃判定のない動いている積み木は落ちている積み木と同じ扱い
+            if (block.IsHarmful)
             {
                 // 飛んできた積み木: ハンマーの先端で捉える(早振り)ほど左へ引っ張り、根元(振り遅れ)ほど右へ流す
                 float near = DarumaCharacter.kBodyRadius + TumikiBlock.kRadius;
