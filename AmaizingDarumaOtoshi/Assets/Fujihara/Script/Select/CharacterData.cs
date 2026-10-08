@@ -10,7 +10,7 @@ public class CharacterData : ScriptableObject
     public string displayName;
     [Tooltip("アイコンの画像が無いときの色")]
     public Color color = Color.white;
-    [Tooltip("セレクト画面のアイコン（未設定なら色と頭文字で仮表示）")]
+    [Tooltip("セレクト画面のアイコン。画像の Texture Type を「Sprite (2D and UI)」にしてここへドラッグ（未設定なら色と頭文字で仮表示）")]
     public Sprite portrait;
     [Tooltip("ゲーム本編で生成するプレハブ（未設定でも可）")]
     public GameObject prefab;

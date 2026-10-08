@@ -14,7 +14,7 @@ using UnityEngine.UI;
 //   - 参加者全員が選ぶと「じゅんびOK！」。Start / Enter でステージセレクトへ
 // ・ステージセレクト：プレイヤー（CPU 以外）が自分のカーソルでステージ（またはおまかせ）に投票する
 //   全員が投票したら、マリオカートのように全員の票の中から1つを抽選する。おまかせ票は当たったときにめくれる
-// ・決まった内容は MatchSetup に入れてゲーム本編へ渡す。キャラクターセレクトに戻ってきたときは MatchSetup から選択を復元する
+// ・決まった内容は MatchSetup に入れてゲーム本編へ渡す。キャラクターセレクトに入るたびに選択はまっさらに戻る
 // キャラとステージは SelectRoster に足すだけで増やせる（並びは数に合わせて自動で調整）。
 //
 // ■ プレイヤーとキャラの取り違えを防ぐために
@@ -34,8 +34,10 @@ public class MatchSelect : MonoBehaviour
 
     [Header("ルール")]
     [SerializeField, Range(1, 8)] int maxPlayers = 4;
-    [Tooltip("CPU を含めてこの人数がそろって全員選んだら次へ進める（テスト中は1、本番は2がおすすめ）")]
-    [SerializeField, Range(1, 8)] int minPlayers = 1;
+    [Tooltip("コントローラーで参加しているプレイヤーが最低何人必要か")]
+    [SerializeField, Range(1, 8)] int minHumans = 1;
+    [Tooltip("CPU を含めた参加者が最低何人必要か（1人プレイなら CPU を足して2人以上にする）")]
+    [SerializeField, Range(1, 8)] int minParticipants = 2;
     [SerializeField, Range(1, 9)] int defaultCpuLevel = 3;
     [SerializeField] float cursorSpeed = 1300f;
     [Tooltip("全員が投票してから抽選が始まるまでの時間（この間なら取り消せる）")]
@@ -129,7 +131,7 @@ public class MatchSelect : MonoBehaviour
     // ---- UI ----
     RectTransform canvas, charRoot, stageRoot, lotteryRoot, cursorLayer, readyBanner;
     CanvasGroup charGroup, stageGroup, readyGroup, lotteryGroup;
-    TextMeshProUGUI hint, stageStatus;
+    TextMeshProUGUI hint, stageStatus, needMoreText;
     Image fade;
     Material letterMat, popMat;
     float readyAmount;
@@ -150,9 +152,11 @@ public class MatchSelect : MonoBehaviour
         letterMat = ToyKit.LetterMaterial(font);
         popMat = ToyKit.PopMaterial(letterMat);
 
+        // 毎回まっさらな状態から選び直す（前回の試合の選択は引き継がない）
+        MatchSetup.Clear();
+
         BuildBackground();
         BuildUI();
-        RestoreFromMatchSetup();
         InputSystem.onDeviceChange += OnDeviceChange;
     }
 
@@ -165,25 +169,6 @@ public class MatchSelect : MonoBehaviour
         if (phase != Phase.Character && phase != Phase.Stage) return;
         var p = FindPlayer(device);
         if (p != null) Remove(p);
-    }
-
-    // 試合から戻ってきたときは、前回の選択（番号・機器・キャラ・CPU）をそのまま並べ直す
-    void RestoreFromMatchSetup()
-    {
-        foreach (var e in MatchSetup.Players)
-        {
-            if (e.playerIndex < 0 || e.playerIndex >= slots.Length || slots[e.playerIndex] != null) continue;
-            Player p;
-            if (e.isCpu) p = AddCpu(e.playerIndex, e.cpuLevel);
-            else
-            {
-                var device = e.Device;
-                if (device == null || FindPlayer(device) != null) continue;   // そのコントローラーが今はつながっていない
-                p = AddHuman(e.playerIndex, device);
-            }
-            var tile = charTiles.Find(t => t.character == e.character);
-            if (tile != null) SetCharacter(p, tile);
-        }
     }
 
     // ================= 毎フレーム =================
@@ -251,6 +236,11 @@ public class MatchSelect : MonoBehaviour
         float e = 1f - Mathf.Pow(1f - readyAmount, 3f);
         readyBanner.anchoredPosition = new Vector2(Mathf.Lerp(-2200f, 0f, e), readyBanner.anchoredPosition.y);
         readyGroup.alpha = readyAmount;
+
+        // 全員選んだのに人数が足りない（1人だけ）ときは、相手を足すよう案内する
+        bool needMore = !ready && EveryoneChose() && ParticipantCount() < minParticipants;
+        needMoreText.alpha = Mathf.MoveTowards(needMoreText.alpha, needMore ? 1f : 0f, dt * 5f);
+        needMoreText.rectTransform.localScale = Vector3.one * (1f + 0.03f * Mathf.Sin(Time.unscaledTime * 4f));
     }
 
     // A ボタン：掴んでいるコインを置く → 枠のボタン → CPU のコインを掴む → キャラを選ぶ、の順に調べる
@@ -395,16 +385,25 @@ public class MatchSelect : MonoBehaviour
         token.localScale = Vector3.one * 1.4f;
     }
 
-    bool AllChoseCharacter()
+    // 次へ進めるか：参加者全員がキャラを決めていて、プレイヤーと参加者（CPU 含む）の人数が足りている
+    bool AllChoseCharacter() => EveryoneChose() && ParticipantCount() >= minParticipants;
+
+    // 参加しているプレイヤーと CPU が全員キャラを決めたか（人数が足りているかは見ない）
+    bool EveryoneChose()
     {
-        int total = 0;
         foreach (var p in slots)
         {
             if (p == null) continue;
-            total++;
             if (!p.HasCharacter || p.holding != null || p.heldBy != null) return false;
         }
-        return HumanCount() > 0 && total >= minPlayers;
+        return HumanCount() >= minHumans;
+    }
+
+    int ParticipantCount()
+    {
+        int n = 0;
+        foreach (var p in slots) if (p != null) n++;
+        return n;
     }
 
     int HumanCount()
@@ -532,7 +531,7 @@ public class MatchSelect : MonoBehaviour
             var pos = new Vector2((i - (n - 1) * 0.5f) * (cardSize.x + gap), 0f);
             bool hidden = p.randomStage;
             var card = MakeTile(lotteryRoot, pos, cardSize, hidden ? RandomColor : votes[i].color, hidden ? null : votes[i].preview,
-                                hidden ? "おまかせ" : votes[i].displayName, hidden ? "？" : "");
+                                hidden ? "おまかせ" : votes[i].displayName, hidden ? "？" : Initial(votes[i].displayName));
             cards.Add(card);
 
             // 札の上に投票した人
@@ -619,7 +618,7 @@ public class MatchSelect : MonoBehaviour
     {
         card.rect.GetComponent<Image>().color = stage.color;
         var letter = card.rect.Find("Letter");
-        if (letter != null) letter.GetComponent<TextMeshProUGUI>().text = "";
+        if (letter != null) letter.GetComponent<TextMeshProUGUI>().text = stage.preview != null ? "" : Initial(stage.displayName);
         var name = card.rect.Find("NameStrip/Name");
         if (name != null) name.GetComponent<TextMeshProUGUI>().text = stage.displayName;
         if (stage.preview != null && card.rect.Find("Image") == null)
@@ -865,6 +864,11 @@ public class MatchSelect : MonoBehaviour
         var rs = ToyKit.UIText("Sub", readyBanner, font, "Start / Enter でステージセレクトへ", 38f, Color.white);
         ToyKit.Anchor(rs.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(520f, -10f), new Vector2(700f, 60f));
 
+        needMoreText = ToyKit.UIText("NeedMore", charRoot, font, "あいて（CPU か ほかのプレイヤー）を くわえてね！\n<size=60%>枠の右上のボタンで CPU にできます</size>", 54f, ToyKit.Palette[0]);
+        needMoreText.fontSharedMaterial = popMat;
+        ToyKit.Anchor(needMoreText.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, -120f), new Vector2(1600f, 150f));
+        needMoreText.alpha = 0f;
+
         // ---- ステージセレクト ----
         stageRoot = Layer("StageSelect", canvas);
         stageRoot.anchoredPosition = new Vector2(2200f, 0f);
@@ -879,7 +883,7 @@ public class MatchSelect : MonoBehaviour
             bool random = i == roster.stages.Count;
             var st = random ? null : roster.stages[i];
             var tile = MakeTile(stageRoot, sgrid[i].pos, sgrid[i].size, random ? RandomColor : st.color,
-                                random ? null : st.preview, random ? "おまかせ" : st.displayName, random ? "？" : "");
+                                random ? null : st.preview, random ? "おまかせ" : st.displayName, random ? "？" : Initial(st.displayName));
             tile.stage = st;
             tile.random = random;
             stageTiles.Add(tile);

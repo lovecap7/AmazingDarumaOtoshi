@@ -10,7 +10,7 @@ public class StageData : ScriptableObject
     public string displayName;
     [Tooltip("プレビュー画像が無いときの色")]
     public Color color = Color.white;
-    [Tooltip("セレクト画面のプレビュー（未設定なら色で仮表示）")]
+    [Tooltip("セレクト画面のプレビュー。画像の Texture Type を「Sprite (2D and UI)」にしてここへドラッグ（未設定なら色と頭文字で仮表示）")]
     public Sprite preview;
     [Tooltip("このステージで遊ぶシーン名（未設定なら MatchSelect の gameSceneName を使う）")]
     public string sceneName;
