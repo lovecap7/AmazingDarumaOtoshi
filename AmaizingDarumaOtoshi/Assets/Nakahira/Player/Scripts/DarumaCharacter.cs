@@ -3,11 +3,33 @@ using UnityEngine;
 
 namespace Nakahira
 {
+    // ギミック(風・バンパー・回転台・重力エリア等)から影響を受けるもの
+    // ギミックは影響を毎ステップ要求し直す。要求は溜めておき、受ける側の次のFixedUpdateでまとめて反映する
+    // (新しいギミックはこれらの組み合わせで作れるので、キャラクター・積み木側を変更する必要はない)
+    public interface IGimmickAffectable
+    {
+        Rigidbody Rigidbody { get; }
+        // 影響を受けられる状態か(積まれている積み木・脱落済みなどはfalse)
+        bool CanBeAffected { get; }
+        // 足場ごと運ぶ(回転台など)。今の移動方向・速さはそのままに、このステップだけ足場の動きを加算する
+        // 溜め込まれず、要求をやめると足場の動きの分だけ止まる
+        void AddCarryVelocity(Vector3 velocity);
+        // 足場ごと回す(回転台など)。このステップで足場が水平に回った角度(度。上から見て時計回りが正)
+        // 向きをどう扱うかは受ける側が決める(積み木は向きと進む方向が回る。プレイヤーは入力で向きを決めるので回らない)
+        void AddCarryRotation(float yawDegrees);
+        // 力を加える(加速度 m/s²。風など)。今の速度に加算され続け、慣性が残る
+        void AddForce(Vector3 acceleration);
+        // はじく(瞬間的に速度を与える)
+        void AddKnockback(Vector3 velocity);
+        // このステップの重力の倍率。複数のギミックから要求されたら一番小さい値を使う
+        void RequestGravityScale(float scale);
+    }
+
     // 生存キャラクター(だるま)。移動・ジャンプ・積み木の取得・被弾・脱落を担当する
     // 操作は IDarumaCommandSource(同じGameObjectに付いていれば自動取得、SetCommandSourceで差し替え可)
     // または ApplyCommand で渡す
     [RequireComponent(typeof(Rigidbody), typeof(CapsuleCollider), typeof(HitStop))]
-    public class DarumaCharacter : MonoBehaviour, IDarumaAttacker
+    public class DarumaCharacter : MonoBehaviour, IDarumaAttacker, IGimmickAffectable
     {
         [Header("移動")]
         [SerializeField] float m_baseMoveSpeed = 6.0f;
@@ -26,6 +48,10 @@ namespace Nakahira
         [SerializeField] float m_killY = -5.0f;
         // 無敵中の点滅間隔
         [SerializeField] float m_blinkInterval = 0.1f;
+
+        [Header("ギミック")]
+        // はじかれた・力で押された速度が減衰する速さ(大きいほどすぐ止まる。一定の力を受け続けると 力/この値 の速さで流される)
+        [SerializeField] float m_knockbackDamping = 5.0f;
 
         [Header("参照")]
         [SerializeField] DarumaStack m_stack;
@@ -49,6 +75,14 @@ namespace Nakahira
         bool m_isEliminated;
         float m_invincibleTimer;
         readonly RaycastHit[] m_groundHits = new RaycastHit[8];
+
+        // ギミックからの影響(IGimmickAffectable)
+        Vector3 m_carryVelocity;      // 次のステップで上乗せする運搬速度
+        Vector3 m_appliedExternal;    // 前のステップで上乗せした速度(本来の速度を復元するのに使う)
+        Vector3 m_knockback;          // はじかれた・力で押された水平方向の速度(減衰する)
+        Vector3 m_force;              // 次のステップで加える力(加速度)
+        float m_knockbackUp;          // はじかれた上向きの速度(次のステップで1回だけ反映)
+        float m_gravityScale = 1.0f;  // 次のステップの重力の倍率
 
         public DarumaStack Stack => m_stack;
         public Collider Body => m_body;
@@ -103,16 +137,7 @@ namespace Nakahira
             m_moveDirection = new Vector3(move.x, 0.0f, move.y);
             if (command.Jump) m_jumpRequested = true;
             if (command.Sweep) m_hammer.TrySweep();
-            if (command.Shot && m_hammer.TryShot()) FaceMoveDirection();
-        }
-
-        // 振り向きの途中でも、スティックの方向へ即座に向きを合わせる(ニュートラルなら今の向きのまま)
-        private void FaceMoveDirection()
-        {
-            if (m_moveDirection.sqrMagnitude <= 0.0001f) return;
-            Quaternion target = Quaternion.LookRotation(m_moveDirection, Vector3.up);
-            m_rb.rotation = target;
-            transform.rotation = target;
+            if (command.Shot) m_hammer.TryShot();
         }
 
         private void FixedUpdate()
@@ -129,13 +154,14 @@ namespace Nakahira
             // 本来の速度で計算し、最後に時間の倍率を掛けてRigidbodyに渡す(ヒットストップ中はスローになる)
             float timeScale = LocalTimeScale;
             float dt = Time.fixedDeltaTime * timeScale;
-            Vector3 v = m_rb.linearVelocity / m_appliedTimeScale;
+            Vector3 v = m_rb.linearVelocity / m_appliedTimeScale - m_appliedExternal;
 
             UpdateMove(ref v, dt);
             UpdateGravity(ref v, dt);
             UpdateJump(ref v);
+            Vector3 external = UpdateExternal(ref v, dt);
 
-            m_rb.linearVelocity = v * timeScale;
+            m_rb.linearVelocity = (v + external) * timeScale;
             m_appliedTimeScale = timeScale;
 
             // 地上でも自前の重力で速度は負になるので、空中にいることも条件にする
@@ -145,9 +171,35 @@ namespace Nakahira
         // 上昇中は通常の重力、落下中は倍率を掛けた重力
         private void UpdateGravity(ref Vector3 v, float dt)
         {
-            float gravity = m_jumpParams.Gravity;
+            float gravity = m_jumpParams.Gravity * m_gravityScale;
             if (v.y < 0.0f) gravity *= m_jumpParams.FallGravityMultiplier;
             v.y -= gravity * dt;
+            m_gravityScale = 1.0f;
+        }
+
+        // ギミックからの影響を反映し、このステップだけ上乗せする速度を返す
+        // (移動入力で毎ステップ上書きされる水平速度とは別に持ち、次のステップの最初に取り除く)
+        private Vector3 UpdateExternal(ref Vector3 v, float dt)
+        {
+            if (m_knockbackUp > 0.0f)
+            {
+                v.y = Mathf.Max(v.y, m_knockbackUp);
+                m_isGrounded = false;
+                m_knockbackUp = 0.0f;
+            }
+
+            // 力は水平方向を慣性として溜め(移動入力とは別に持つ)、上下方向は今の速度に加える
+            m_knockback += new Vector3(m_force.x, 0.0f, m_force.z) * dt;
+            v.y += m_force.y * dt;
+            m_force = Vector3.zero;
+
+            Vector3 external = m_carryVelocity + m_knockback;
+            m_carryVelocity = Vector3.zero;
+            m_knockback *= Mathf.Exp(-m_knockbackDamping * dt);
+            if (m_knockback.sqrMagnitude < 0.01f) m_knockback = Vector3.zero;
+
+            m_appliedExternal = external;
+            return external;
         }
 
         private void UpdateMove(ref Vector3 v, float dt)
@@ -158,9 +210,7 @@ namespace Nakahira
             v.z = horizontal.z;
 
             // ハンマーを振っている間は向きを固定(打ち返しの方向がブレないように)
-            // ただし股抜きショットは弾が出るまで向きを変えて狙える
-            bool canTurn = !m_hammer.IsBusy || m_hammer.IsAimingShot;
-            if (moveDir.sqrMagnitude > 0.0001f && canTurn)
+            if (moveDir.sqrMagnitude > 0.0001f && !m_hammer.IsBusy)
             {
                 Quaternion target = Quaternion.LookRotation(moveDir, Vector3.up);
                 m_rb.MoveRotation(Quaternion.Slerp(m_rb.rotation, target, m_turnSpeed * dt));
@@ -223,7 +273,8 @@ namespace Nakahira
         // 速い積み木でも拾いやすいよう、当たった場所は問わない
         // 衝突はキャラクター側・積み木側のどちらからも通知されるため、両方から呼ばれても1回だけ拾う
         public bool TryPickupFromAbove(TumikiBlock block)
-        {            if (m_isEliminated || !m_isFallingInAir) return false;
+        {
+            if (m_isEliminated || !m_isFallingInAir) return false;
             if (block.CurrentState == TumikiBlock.State.Stacked) return false;
 
             Pickup(block);
@@ -333,8 +384,40 @@ namespace Nakahira
         public void Eliminate()
         {
             if (m_isEliminated) return;
-            m_isEliminated = true;            Eliminated?.Invoke(this);
+            m_isEliminated = true; Eliminated?.Invoke(this);
             Destroy(gameObject);
+        }
+
+        //========================================
+        // ギミックからの影響(IGimmickAffectable)
+        //========================================
+
+        public bool CanBeAffected => !m_isEliminated;
+
+        public void AddCarryVelocity(Vector3 velocity)
+        {
+            m_carryVelocity += velocity;
+        }
+
+        // 向きは移動入力で決める(止まっているときに照準が流れないように)ので、足場が回っても向きは変えない
+        public void AddCarryRotation(float yawDegrees)
+        {
+        }
+
+        public void AddForce(Vector3 acceleration)
+        {
+            m_force += acceleration;
+        }
+
+        public void AddKnockback(Vector3 velocity)
+        {
+            m_knockback += new Vector3(velocity.x, 0.0f, velocity.z);
+            m_knockbackUp = Mathf.Max(m_knockbackUp, velocity.y);
+        }
+
+        public void RequestGravityScale(float scale)
+        {
+            m_gravityScale = Mathf.Min(m_gravityScale, scale);
         }
 
         //========================================

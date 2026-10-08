@@ -10,7 +10,7 @@ namespace Nakahira
     //           ・攻撃判定あり(HarmlessSpeed以上): 他の積み木に当たると連鎖し、キャラクターにダメージを与える
     //           ・攻撃判定なし(HarmlessSpeed未満): 積み木同士は弾き合い、キャラクターには跳ね返される
     [RequireComponent(typeof(Rigidbody), typeof(HitStop))]
-    public class TumikiBlock : MonoBehaviour
+    public class TumikiBlock : MonoBehaviour, IGimmickAffectable
     {
         public enum State { Loose, Stacked, Flying }
 
@@ -51,6 +51,13 @@ namespace Nakahira
         // 崩れる途中(ヒットストップが明けるまで、当たり判定なしで残りの速度で進む)
         bool m_isBreaking;
         Vector3 m_breakVelocity;
+
+        // ギミックからの影響(IGimmickAffectable)
+        Vector3 m_carryVelocity;      // 次のステップで上乗せする運搬速度
+        Vector3 m_appliedCarry;       // 前のステップで上乗せした運搬速度
+        Vector3 m_force;              // 次のステップで加える力(加速度)
+        float m_carryYaw;             // 次のステップで足場ごと回る角度(度)
+        float m_gravityScale = 1.0f;  // 次のステップの重力の倍率
 
 
         // 一時的に衝突を無視している相手
@@ -105,9 +112,12 @@ namespace Nakahira
             float dt = Time.fixedDeltaTime * timeScale;
 
             UpdateIgnore(dt);
+            if (CurrentState == State.Flying) UpdateFlying(dt, timeScale);
+            UpdateGimmickEffects();
+        }
 
-            if (CurrentState != State.Flying) return;
-
+        private void UpdateFlying(float dt, float timeScale)
+        {
             // 次第に減速し(HarmlessSpeedを下回ると攻撃判定がなくなる)、ほぼ止まったら落ちている積み木に戻る
             Speed = Mathf.Max(0.0f, Speed - m_params.Deceleration * dt);
             if (Speed < m_params.StopSpeed)
@@ -120,6 +130,72 @@ namespace Nakahira
             Vector3 v = Direction * (Speed * timeScale);
             v.y = m_rb.linearVelocity.y;
             m_rb.linearVelocity = v;
+        }
+
+        // ギミックからの影響を反映する。運搬は溜め込まない(要求をやめるとすぐ止まる)
+        private void UpdateGimmickEffects()
+        {
+            Vector3 carry = m_carryVelocity;
+            Vector3 force = m_force;
+            float yaw = m_carryYaw;
+            float gravityScale = m_gravityScale;
+            m_carryVelocity = Vector3.zero;
+            m_force = Vector3.zero;
+            m_carryYaw = 0.0f;
+            m_gravityScale = 1.0f;
+
+            if (!CanBeAffected || m_rb.isKinematic)
+            {
+                m_appliedCarry = Vector3.zero;
+                return;
+            }
+
+            // 足場ごと回る: 向きを回す(進む方向も下で同じだけ回す)
+            Quaternion turn = Quaternion.Euler(0.0f, yaw, 0.0f);
+            if (yaw != 0.0f) m_rb.rotation = turn * m_rb.rotation;
+
+            if (CurrentState == State.Flying)
+            {
+                // 足場の回転・力は進む向き・速さそのものを変える(弾道が曲がり、速さに応じて攻撃判定も変わる)
+                if (yaw != 0.0f || force != Vector3.zero)
+                {
+                    float dt = Time.fixedDeltaTime * m_hitStop.TimeScale;
+                    Vector3 h = turn * Direction * Speed + new Vector3(force.x, 0.0f, force.z) * dt;
+                    Speed = h.magnitude;
+                    if (Speed > 0.0001f) Direction = h / Speed;
+                    Vector3 fv = Direction * (Speed * m_hitStop.TimeScale);
+                    fv.y = m_rb.linearVelocity.y + force.y * dt;
+                    m_rb.linearVelocity = fv;
+                }
+
+                // 飛んでいる間は水平速度が毎ステップ上書きされるので、前のステップの分を取り除くのは上下方向だけ
+                Vector3 v = m_rb.linearVelocity;
+                v.y -= m_appliedCarry.y;
+                m_rb.linearVelocity = v + carry;
+                m_appliedCarry = carry;
+            }
+            else
+            {
+                // 落ちている積み木は床との摩擦で速度が削られるので、位置で運ぶ
+                // (飛んでいる途中で止まった場合は、上乗せしていた速度を取り除く)
+                if (m_appliedCarry != Vector3.zero) m_rb.linearVelocity -= m_appliedCarry;
+                m_appliedCarry = Vector3.zero;
+                // 滑っている場合は、進む方向も向きと同じだけ回す
+                if (yaw != 0.0f)
+                {
+                    Vector3 v = m_rb.linearVelocity;
+                    Vector3 h = turn * new Vector3(v.x, 0.0f, v.z);
+                    m_rb.linearVelocity = new Vector3(h.x, v.y, h.z);
+                }
+                m_rb.position += carry * Time.fixedDeltaTime;
+                // 力は物理に任せる(床との摩擦より強ければ動き出し、慣性が残る)
+                if (force != Vector3.zero) m_rb.AddForce(force, ForceMode.Acceleration);
+            }
+
+            if (gravityScale < 1.0f && m_rb.useGravity)
+            {
+                m_rb.AddForce(Physics.gravity * (gravityScale - 1.0f), ForceMode.Acceleration);
+            }
         }
 
         private void Update()
@@ -214,6 +290,48 @@ namespace Nakahira
 
             SetLoose();
             if (alsoIgnore != null) IgnoreTemporarily(alsoIgnore.Body);
+        }
+
+        //========================================
+        // ギミックからの影響(IGimmickAffectable)
+        //========================================
+
+        public Rigidbody Rigidbody => m_rb;
+        // 積まれている間はキャラクターがまとめて影響を受ける
+        public bool CanBeAffected => CurrentState != State.Stacked && !m_isConsumed && !m_isBreaking;
+
+        public void AddCarryVelocity(Vector3 velocity)
+        {
+            m_carryVelocity += velocity;
+        }
+
+        public void AddCarryRotation(float yawDegrees)
+        {
+            m_carryYaw += yawDegrees;
+        }
+
+        public void AddForce(Vector3 acceleration)
+        {
+            m_force += acceleration;
+        }
+
+        // 水平方向は弾と同じ仕組みで押し出す(速ければ攻撃判定を持ち、最後の持ち主を引き継ぐ)
+        public void AddKnockback(Vector3 velocity)
+        {
+            if (!CanBeAffected) return;
+            Vector3 h = new Vector3(velocity.x, 0.0f, velocity.z);
+            Push(h, h.magnitude, Owner, ReturnCount);
+            if (velocity.y > 0.0f && !m_rb.isKinematic)
+            {
+                Vector3 v = m_rb.linearVelocity;
+                v.y = Mathf.Max(v.y, velocity.y);
+                m_rb.linearVelocity = v;
+            }
+        }
+
+        public void RequestGravityScale(float scale)
+        {
+            m_gravityScale = Mathf.Min(m_gravityScale, scale);
         }
 
         // 水平方向の今の速度(落ちている積み木は物理の速度)
