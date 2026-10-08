@@ -53,6 +53,11 @@ namespace Nakahira
         readonly Collider[] m_overlaps = new Collider[32];
 
         public bool IsBusy => m_action != Action.None;
+        // 当たり判定が届く距離(見た目のハンマーの長さ × 倍率)
+        float HitReach => (m_armLength + m_hammerHalfWidth) * m_params.HitReachScale;
+        public bool IsShooting => m_action == Action.Shot;
+        // 股抜きショットを振り始めてから弾が出るまでの間(持ち主は向きを変えて狙いを調整できる)
+        public bool IsAimingShot => m_action == Action.Shot && !m_shotFired;
 
         private void Awake()
         {
@@ -74,6 +79,8 @@ namespace Nakahira
         public bool TryShot()
         {
             if (IsBusy || m_character == null || m_character.Stack.Count == 0) return false;
+            // ジャンプ中(空中)・ジャンプの実行待ちの間は撃てない
+            if (!m_character.CanStartShot) return false;
             m_action = Action.Shot;
             m_time = 0.0f;
             m_shotFired = false;
@@ -84,7 +91,8 @@ namespace Nakahira
         {
             if (m_action == Action.None) return;
 
-            m_time += Time.fixedDeltaTime;
+            // 持ち主がヒットストップ中ならハンマーもスローになる
+            m_time += Time.fixedDeltaTime * m_owner.LocalTimeScale;
 
             if (m_action == Action.Sweep)
             {
@@ -153,7 +161,7 @@ namespace Nakahira
             m_prevSweepYaw = yaw;
 
             Vector3 pivot = m_root.TransformPoint(new Vector3(0.0f, m_sweepHeight, 0.0f));
-            float maxReach = m_armLength + m_hammerHalfWidth + Mathf.Max(TumikiBlock.kRadius, DarumaCharacter.kBodyRadius);
+            float maxReach = HitReach + Mathf.Max(TumikiBlock.kRadius, DarumaCharacter.kBodyRadius);
 
             int count = Physics.OverlapSphereNonAlloc(pivot, maxReach, m_overlaps, ~0, QueryTriggerInteraction.Ignore);
             for (int i = 0; i < count; i++)
@@ -191,7 +199,7 @@ namespace Nakahira
             dist = new Vector2(local.x, local.z).magnitude;
 
             if (Mathf.Abs(local.y - m_sweepHeight) > m_hitHeightRange) return false;
-            if (dist > m_armLength + m_hammerHalfWidth + targetRadius) return false;
+            if (dist > HitReach + targetRadius) return false;
 
             // ハンマーの太さの分だけ角度に余裕を持たせる
             float pad = Mathf.Atan2(m_hammerHalfWidth, Mathf.Max(dist, 0.01f)) * Mathf.Rad2Deg;
@@ -204,11 +212,12 @@ namespace Nakahira
             float speed = m_params.SweepLaunchSpeed;
             int returnCount = 0;
 
-            if (block.CurrentState == TumikiBlock.State.Flying)
+            // 攻撃判定のある積み木だけ「打ち返し」。攻撃判定のない動いている積み木は落ちている積み木と同じ扱い
+            if (block.IsHarmful)
             {
                 // 飛んできた積み木: ハンマーの先端で捉える(早振り)ほど左へ引っ張り、根元(振り遅れ)ほど右へ流す
                 float near = DarumaCharacter.kBodyRadius + TumikiBlock.kRadius;
-                float far = m_armLength + m_hammerHalfWidth + TumikiBlock.kRadius;
+                float far = HitReach + TumikiBlock.kRadius;
                 float t = Mathf.InverseLerp(near, far, dist);
                 angle += Mathf.Lerp(m_returnSpreadAngle, -m_returnSpreadAngle, t);
                 // 打ち返すほど速くなる
@@ -217,6 +226,9 @@ namespace Nakahira
             }
 
             block.Launch(ToWorldDirection(angle), speed, m_owner, null, returnCount);
+            // 打ち返した積み木はしばらく自分に当たらない(壁や連鎖で跳ね返ってきても安全)
+            if (returnCount > 0) block.ExtendIgnore(m_params.ReturnImmunityTime);
+            BeginHitStop(block, null, returnCount);
         }
 
         private void HitCharacter(DarumaCharacter other, float bearing)
@@ -225,9 +237,28 @@ namespace Nakahira
             {
                 // 直接攻撃でダメージを与えた(幽霊なら復活する)
                 m_owner.OnDealtDamage();
+                BeginHitStop(knocked, other);
             }
             // 弾き出した積み木を同じスイングで二重に打たないようにする
             if (knocked != null) m_hitThisSwing.Add(knocked);
+        }
+
+        // 手ごたえ: 自分と、弾いた積み木・叩いた相手だけスローになって震える(相手側を強めに)
+        // returnCount: 打ち返し回数。打ち返すたびにヒットストップが倍々で長くなる
+        // 長いほど時間の倍率を小さくして、スロー中に進む量は通常のヒットストップと同じにする(長い間ほぼ止まって見える)
+        private void BeginHitStop(TumikiBlock block, DarumaCharacter victim, int returnCount = 0)
+        {
+            float baseDuration = m_params.HitStopDuration;
+            float duration = baseDuration;
+            if (returnCount > 0)
+            {
+                duration = Mathf.Min(baseDuration * Mathf.Pow(m_params.ReturnHitStopGrowth, returnCount),
+                    Mathf.Max(baseDuration, m_params.ReturnHitStopMax));
+            }
+            float scale = duration > 0.0f ? m_params.HitStopTimeScale * baseDuration / duration : m_params.HitStopTimeScale;
+            m_owner.StartHitStop(duration, scale, m_params.SelfShake);
+            if (block != null) block.StartHitStop(duration, scale, m_params.TargetShake);
+            if (victim != null) victim.StartHitStop(duration, scale, m_params.TargetShake);
         }
 
         // 持ち主の正面からの角度 → ワールド方向(最大角度で制限)
@@ -251,6 +282,7 @@ namespace Nakahira
                 + root.forward * (DarumaCharacter.kBodyRadius + TumikiBlock.kRadius + 0.05f)
                 + Vector3.up * (TumikiBlock.kHeight * 0.5f);
             block.Launch(root.forward, m_params.ShotSpeed, m_owner);
+            BeginHitStop(block, null);
         }
     }
 }
