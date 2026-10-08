@@ -5,6 +5,12 @@ public class BlockController : MonoBehaviour
 {
     [SerializeField] float speed = 2.0f;
 
+    // テスト用：インスペクターで挙動を選べるようにする
+    public enum BehaviorType { Normal, Iwa,HebiLeft, HebiRight }
+    [SerializeField] BehaviorType behaviorType = BehaviorType.Normal;
+    // テスト用：へびだるの曲がる強さ(度/秒)。大きいほど急カーブになる
+    [SerializeField] float hebiTurnSpeed = 60.0f;
+
     public bool isFlying {  get; private set; } // 現在飛行中かどうか trueの場合は攻撃判定が発生する
 
     // 開始時点で飛行中だったかを記録する
@@ -18,7 +24,8 @@ public class BlockController : MonoBehaviour
     Vector3 direction;
 
     // キャラクターごとの挙動を差し替えるための参照。デフォルトはNormalBehavior
-    IBlockBehavior behavior = new NormalBehavior();
+    //IBlockBehavior behavior = new NormalBehavior();
+    IBlockBehavior behavior;
 
     // 現在の飛行方向。IBlockBehavior実装クラス(別スクリプト)から参照するための公開プロパティ
     public Vector3 Direction => direction;
@@ -27,11 +34,27 @@ public class BlockController : MonoBehaviour
     {
         rb = GetComponent<Rigidbody>();
         info = rb.GetComponent<BlockInfo>();
+
+        // インスペクターで選んだ種類に応じてbehaviorを生成する
+        behavior = CreateBehavior(behaviorType);
     }
 
     private void Start()
     {
         
+    }
+
+    // テスト用：選択された種類からbehaviorを生成する
+    IBlockBehavior CreateBehavior(BehaviorType type)
+    {
+        switch (type)
+        {
+            case BehaviorType.Iwa: return new IwaBehavior();
+            case BehaviorType.HebiLeft: return new HebiBehavior(HebiBehavior.CurveSide.Left, hebiTurnSpeed);
+            case BehaviorType.HebiRight: return new HebiBehavior(HebiBehavior.CurveSide.Right, hebiTurnSpeed);
+            case BehaviorType.Normal:
+            default: return new NormalBehavior();
+        }
     }
 
     // behaviorを外部(生成担当側)から差し替えるための窓口
@@ -117,7 +140,11 @@ public class BlockController : MonoBehaviour
                 {
                     Break(); // 自分が壊れるキャラ(Normal等)
                 }
-                // falseの場合、自分は壊れない(いわだる等)。相手の処理はOnBlockHit内で完結させる
+                else
+                {
+                    // 自分が壊れないキャラ(いわだる等)は、次の積み木にも攻撃できるよう判定を戻す
+                    hasHit = false;
+                }
             }
         }
     }
