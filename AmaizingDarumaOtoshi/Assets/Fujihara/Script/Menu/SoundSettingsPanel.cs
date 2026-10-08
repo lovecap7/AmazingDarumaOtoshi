@@ -13,8 +13,24 @@ public class SoundSettingsPanel : MonoBehaviour
     [SerializeField] TMP_Text bgmValue;
     [SerializeField] TMP_Text seValue;
 
+    bool bound;
+
+    // コードから組み立てるときに部品を渡す
+    public void Setup(Slider master, Slider bgm, Slider se, TMP_Text masterLabel, TMP_Text bgmLabel, TMP_Text seLabel)
+    {
+        masterSlider = master; bgmSlider = bgm; seSlider = se;
+        masterValue = masterLabel; bgmValue = bgmLabel; seValue = seLabel;
+        BindAll();
+    }
+
     void Start()
     {
+        if (!bound) BindAll();
+    }
+
+    void BindAll()
+    {
+        bound = true;
         Bind(masterSlider, masterValue, GameSettings.MasterVolume, GameSettings.SetMasterVolume);
         Bind(bgmSlider, bgmValue, GameSettings.BgmVolume, GameSettings.SetBgmVolume);
         Bind(seSlider, seValue, GameSettings.SeVolume, GameSettings.SetSeVolume);

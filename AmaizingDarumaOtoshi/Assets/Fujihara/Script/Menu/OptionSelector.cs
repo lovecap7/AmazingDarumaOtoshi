@@ -25,7 +25,21 @@ public class OptionSelector : Selectable
     protected override void Awake()
     {
         base.Awake();
-        if (!Application.isPlaying) return;
+        if (Application.isPlaying) HookButtons();
+    }
+
+    // コードから組み立てるときに部品を渡す
+    public void Bind(TMP_Text label, Button prev, Button next)
+    {
+        valueLabel = label;
+        prevButton = prev;
+        nextButton = next;
+        HookButtons();
+        Refresh();
+    }
+
+    void HookButtons()
+    {
         if (prevButton != null) prevButton.onClick.AddListener(() => { Select(); Step(-1); });
         if (nextButton != null) nextButton.onClick.AddListener(() => { Select(); Step(+1); });
     }

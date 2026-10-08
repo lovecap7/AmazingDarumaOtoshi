@@ -9,7 +9,7 @@ using UnityEngine.EventSystems;
 // ・パネルを持つ項目（サウンド/ビデオ）は積み木が右へ飛んでパネルに着地し、上の積み木が落ちてくる
 //   パネルが明るくなって操作できるようになり、左の積み木は暗くなる。キャンセルで元に戻る
 // ・パネルを持たない項目（対戦/クレジット/ゲーム終了）は積み木がぐらつき、onSubmit を呼ぶ
-public class MenuController : MonoBehaviour
+public class MenuController : MonoBehaviour, IBlockListOwner
 {
     [Serializable]
     public class Entry

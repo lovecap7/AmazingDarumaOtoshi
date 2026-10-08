@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cd1fc8fea39e08b4fb8b9620002445c6, type: 3}
+  m_Name: SelectRoster
+  m_EditorClassIdentifier: Assembly-CSharp::SelectRoster
+  characters:
+  - {fileID: 11400000, guid: 7ffcf080adad0f64380e6846824a2978, type: 2}
+  - {fileID: 11400000, guid: 880980730b0e8834b8ebf9e6632fbe19, type: 2}
+  - {fileID: 11400000, guid: 71657a46d7c144e46b8edf12b17924eb, type: 2}
+  - {fileID: 11400000, guid: 131e300f47642b649a73e705bc310b6e, type: 2}
+  - {fileID: 11400000, guid: 6861391686e2281499c7e378c84ec6e1, type: 2}
+  - {fileID: 11400000, guid: 30b06d92798c28b4698825cb71668ff9, type: 2}
+  stages:
+  - {fileID: 11400000, guid: 7c46d780fc548cc42aa7b0cd7b5bf81d, type: 2}
+  - {fileID: 11400000, guid: 83ee2522e645edf4682448bdea3442cc, type: 2}
+  - {fileID: 11400000, guid: e06a01083964b54419d26b70eebd2f5f, type: 2}
+  - {fileID: 11400000, guid: 163bf8c02997eb74c8f058e2503d86f7, type: 2}

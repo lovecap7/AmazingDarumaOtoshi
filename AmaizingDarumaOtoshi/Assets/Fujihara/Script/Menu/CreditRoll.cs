@@ -26,6 +26,9 @@ public class CreditRoll : MonoBehaviour
         Apply();
     }
 
+    // コードから組み立てるときに部品を渡す
+    public void Setup(RectTransform scrollContent) => content = scrollContent;
+
     public void Play()
     {
         if (playing) return;

@@ -10,9 +10,25 @@ public class VideoSettingsPanel : MonoBehaviour
     [SerializeField] OptionSelector vSyncSelector;
 
     readonly List<Vector2Int> resolutions = new List<Vector2Int>();
+    bool bound;
+
+    // コードから組み立てるときに部品を渡す
+    public void Setup(OptionSelector screenMode, OptionSelector resolution, OptionSelector vSync)
+    {
+        screenModeSelector = screenMode;
+        resolutionSelector = resolution;
+        vSyncSelector = vSync;
+        BindAll();
+    }
 
     void Start()
     {
+        if (!bound) BindAll();
+    }
+
+    void BindAll()
+    {
+        bound = true;
         if (screenModeSelector != null)
         {
             screenModeSelector.SetOptions(new[] { "フルスクリーン", "ウィンドウ" }, GameSettings.FullScreen ? 0 : 1);

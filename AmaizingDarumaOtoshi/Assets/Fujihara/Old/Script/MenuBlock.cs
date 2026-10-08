@@ -9,7 +9,7 @@ public class MenuBlock : MonoBehaviour, IPointerEnterHandler, IPointerClickHandl
     [Tooltip("暗くするための黒い Image（ブロックの子で最前面、Raycast Target OFF）")]
     [SerializeField] Image dimOverlay;
 
-    public MenuController Owner { get; set; }
+    public IBlockListOwner Owner { get; set; }
     public int Index { get; set; }
     public RectTransform Rect => (RectTransform)transform;
 
