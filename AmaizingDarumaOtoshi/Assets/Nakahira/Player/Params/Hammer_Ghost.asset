@@ -14,7 +14,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Nakahira.HammerParams
   SweepDuration: 0.5
   ShotDuration: 0.3
-  ShotSpeed: 10
-  SweepLaunchSpeed: 10
-  ReturnSpeedRate: 1.25
+  ShotSpeed: 20
+  SweepLaunchSpeed: 15
+  ReturnSpeedRate: 1
   MaxProjectileSpeed: 30
+  HitStopDuration: 0.07
+  HitStopTimeScale: 0.1
+  SelfShake: 0.028
+  TargetShake: 0.07

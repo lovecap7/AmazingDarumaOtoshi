@@ -13,5 +13,5 @@ MonoBehaviour:
   m_Name: Jump_Common
   m_EditorClassIdentifier: Assembly-CSharp::Nakahira.JumpParams
   Height: 1.8
-  TimeToApex: 0.6
+  TimeToApex: 0.15
   FallGravityMultiplier: 1

@@ -180,6 +180,39 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!1 &3069037084433943789
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5188801061679567072}
+  m_Layer: 0
+  m_Name: Visual
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &5188801061679567072
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3069037084433943789}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 748567900878152610}
+  - {fileID: 1430667137896082868}
+  m_Father: {fileID: 3477987109110462397}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &3178815778768379145
 GameObject:
   m_ObjectHideFlags: 0
@@ -303,7 +336,7 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 8883883981710442450}
-  m_Father: {fileID: 3477987109110462397}
+  m_Father: {fileID: 5188801061679567072}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &2571967404481166860
 MonoBehaviour:
@@ -533,7 +566,7 @@ Transform:
   m_Children:
   - {fileID: 3390106464520997170}
   - {fileID: 3002677236763379409}
-  m_Father: {fileID: 3477987109110462397}
+  m_Father: {fileID: 5188801061679567072}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &8881484477479271174
 MonoBehaviour:
@@ -573,6 +606,7 @@ GameObject:
   - component: {fileID: 3576510642960601832}
   - component: {fileID: 1950766249364129809}
   - component: {fileID: 6242312641939630888}
+  - component: {fileID: 1611246128041429823}
   m_Layer: 0
   m_Name: DarumaCharacter
   m_TagString: Untagged
@@ -593,8 +627,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 748567900878152610}
-  - {fileID: 1430667137896082868}
+  - {fileID: 5188801061679567072}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!54 &3576510642960601832
@@ -671,3 +704,16 @@ MonoBehaviour:
   m_blinkInterval: 0.1
   m_stack: {fileID: 2571967404481166860}
   m_hammer: {fileID: 8881484477479271174}
+--- !u!114 &1611246128041429823
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9069936943766670842}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5f7325f6550d404aa46f07f5539cc64, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Nakahira.HitStop
+  m_visual: {fileID: 5188801061679567072}

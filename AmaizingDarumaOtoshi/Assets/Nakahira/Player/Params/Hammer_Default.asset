@@ -18,3 +18,7 @@ MonoBehaviour:
   SweepLaunchSpeed: 30
   ReturnSpeedRate: 1.25
   MaxProjectileSpeed: 30
+  HitStopDuration: 0.1
+  HitStopTimeScale: 0.1
+  SelfShake: 0.04
+  TargetShake: 0.1

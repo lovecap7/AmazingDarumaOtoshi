@@ -13,4 +13,11 @@ MonoBehaviour:
   m_Name: Tumiki_Common
   m_EditorClassIdentifier: Assembly-CSharp::Nakahira.TumikiParams
   Deceleration: 5
-  HarmlessSpeed: 3
+  HarmlessSpeed: 15
+  ImpactMinSpeed: 5
+  ImpactMaxSpeed: 30
+  ImpactMinDuration: 0.04
+  ImpactMaxDuration: 0.12
+  ImpactMinShake: 0.04
+  ImpactMaxShake: 0.12
+  ImpactTimeScale: 0.1

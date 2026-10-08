@@ -6,7 +6,7 @@ namespace Nakahira
     // 生存キャラクター(だるま)。移動・ジャンプ・積み木の取得・被弾・脱落を担当する
     // 操作は IDarumaCommandSource(同じGameObjectに付いていれば自動取得、SetCommandSourceで差し替え可)
     // または ApplyCommand で渡す
-    [RequireComponent(typeof(Rigidbody), typeof(CapsuleCollider))]
+    [RequireComponent(typeof(Rigidbody), typeof(CapsuleCollider), typeof(HitStop))]
     public class DarumaCharacter : MonoBehaviour, IDarumaAttacker
     {
         [Header("移動")]
@@ -36,11 +36,16 @@ namespace Nakahira
 
         Rigidbody m_rb;
         CapsuleCollider m_body;
+        HitStop m_hitStop;
         IDarumaCommandSource m_commandSource;
+        // 前のステップでRigidbodyの速度に掛けた時間の倍率(本来の速度を復元するのに使う)
+        float m_appliedTimeScale = 1.0f;
 
         Vector3 m_moveDirection; // ワールド空間の移動方向(XZ)
         bool m_jumpRequested;
         bool m_isGrounded;
+        // 物理計算の直前に空中で落下中だったか(衝突の通知時点では落下速度が打ち消されているため記録しておく)
+        bool m_isFallingInAir;
         bool m_isEliminated;
         float m_invincibleTimer;
         readonly RaycastHit[] m_groundHits = new RaycastHit[8];
@@ -49,8 +54,12 @@ namespace Nakahira
         public Collider Body => m_body;
         public Rigidbody Rigidbody => m_rb;
         public bool IsGrounded => m_isGrounded;
+        // 股抜きショットを始められるか。地上にいて、先に押されたジャンプが実行待ちでないこと
+        public bool CanStartShot => m_isGrounded && !m_jumpRequested;
         public bool IsInvincible => m_invincibleTimer > 0.0f;
         public float MoveSpeed => Mathf.Max(m_minMoveSpeed, m_baseMoveSpeed - m_stack.Count * m_speedLossPerBlock);
+        // ヒットストップ中は1未満(移動・落下・ハンマーがスローになる)
+        public float LocalTimeScale => Mathf.Max(0.01f, m_hitStop.TimeScale);
 
         // 脱落した(この直後にGameObjectは破棄される)
         public event Action<DarumaCharacter> Eliminated;
@@ -63,6 +72,7 @@ namespace Nakahira
             // 重力はJumpParamsから計算して自前で掛ける
             m_rb.useGravity = false;
             m_body = GetComponent<CapsuleCollider>();
+            m_hitStop = GetComponent<HitStop>();
             m_commandSource = GetComponent<IDarumaCommandSource>();
             m_stack.Changed += UpdateBodyCollider;
             UpdateBodyCollider();
@@ -106,46 +116,59 @@ namespace Nakahira
             }
 
             m_isGrounded = CheckGrounded();
-            UpdateMove();
-            UpdateGravity();
-            UpdateJump();
+
+            // 本来の速度で計算し、最後に時間の倍率を掛けてRigidbodyに渡す(ヒットストップ中はスローになる)
+            float timeScale = LocalTimeScale;
+            float dt = Time.fixedDeltaTime * timeScale;
+            Vector3 v = m_rb.linearVelocity / m_appliedTimeScale;
+
+            UpdateMove(ref v, dt);
+            UpdateGravity(ref v, dt);
+            UpdateJump(ref v);
+
+            m_rb.linearVelocity = v * timeScale;
+            m_appliedTimeScale = timeScale;
+
+            // 地上でも自前の重力で速度は負になるので、空中にいることも条件にする
+            m_isFallingInAir = !m_isGrounded && v.y < 0.0f;
         }
 
         // 上昇中は通常の重力、落下中は倍率を掛けた重力
-        private void UpdateGravity()
+        private void UpdateGravity(ref Vector3 v, float dt)
         {
-            Vector3 v = m_rb.linearVelocity;
             float gravity = m_jumpParams.Gravity;
             if (v.y < 0.0f) gravity *= m_jumpParams.FallGravityMultiplier;
-            v.y -= gravity * Time.fixedDeltaTime;
-            m_rb.linearVelocity = v;
+            v.y -= gravity * dt;
         }
 
-        private void UpdateMove()
+        private void UpdateMove(ref Vector3 v, float dt)
         {
             Vector3 moveDir = m_moveDirection;
-
-            Vector3 v = moveDir * MoveSpeed;
-            v.y = m_rb.linearVelocity.y;
-            m_rb.linearVelocity = v;
+            Vector3 horizontal = moveDir * MoveSpeed;
+            v.x = horizontal.x;
+            v.z = horizontal.z;
 
             // ハンマーを振っている間は向きを固定(打ち返しの方向がブレないように)
             if (moveDir.sqrMagnitude > 0.0001f && !m_hammer.IsBusy)
             {
                 Quaternion target = Quaternion.LookRotation(moveDir, Vector3.up);
-                m_rb.MoveRotation(Quaternion.Slerp(m_rb.rotation, target, m_turnSpeed * Time.fixedDeltaTime));
+                m_rb.MoveRotation(Quaternion.Slerp(m_rb.rotation, target, m_turnSpeed * dt));
             }
         }
 
-        private void UpdateJump()
+        private void UpdateJump(ref Vector3 v)
         {
             if (!m_jumpRequested) return;
+            // ヒットストップ中に押されたジャンプは、明けてから反映する
+            if (m_hitStop.IsActive) return;
             m_jumpRequested = false;
             if (!m_isGrounded) return;
+            // 股抜きショットを振っている間はジャンプできない(空中で弾が出ないように)
+            if (m_hammer.IsShooting) return;
 
-            Vector3 v = m_rb.linearVelocity;
             v.y = m_jumpParams.JumpSpeed;
-            m_rb.linearVelocity = v;
+            // 次の接地判定を待たずに空中扱いにする(直後のショットを防ぐ)
+            m_isGrounded = false;
         }
 
         private bool CheckGrounded()
@@ -157,7 +180,11 @@ namespace Nakahira
                 0.15f, m_groundMask, QueryTriggerInteraction.Ignore);
             for (int i = 0; i < count; i++)
             {
-                if (m_groundHits[i].collider.attachedRigidbody != m_rb) return true;
+                Collider col = m_groundHits[i].collider;
+                if (col.attachedRigidbody == m_rb) continue;
+                // 積み木は地面扱いしない(真下に来た積み木で接地扱いになると、踏んで拾う判定が外れるため)
+                if (col.GetComponentInParent<TumikiBlock>() != null) continue;
+                return true;
             }
             return false;
         }
@@ -178,17 +205,20 @@ namespace Nakahira
         private void OnCollisionEnter(Collision collision)
         {
             var block = collision.collider.GetComponentInParent<TumikiBlock>();
-            if (block == null || block.CurrentState != TumikiBlock.State.Loose) return;
+            if (block != null) TryPickupFromAbove(block);
+        }
 
-            // 上から乗ったときだけ拾う
-            for (int i = 0; i < collision.contactCount; i++)
-            {
-                if (collision.GetContact(i).normal.y > 0.7f)
-                {
-                    Pickup(block);
-                    return;
-                }
-            }
+        // 空中で落下中に触れた積み木を拾う(踏んだ扱い)。飛んでいる積み木もどんな速さでも拾え、被弾しない
+        // 速い積み木でも拾いやすいよう、当たった場所は問わない
+        // 衝突はキャラクター側・積み木側のどちらからも通知されるため、両方から呼ばれても1回だけ拾う
+        public bool TryPickupFromAbove(TumikiBlock block)
+        {            if (m_isEliminated || !m_isFallingInAir) return false;
+            if (block.CurrentState == TumikiBlock.State.Stacked) return false;
+
+            Pickup(block);
+            // 同じステップで複数の積み木に触れても1つだけ拾う
+            m_isFallingInAir = false;
+            return true;
         }
 
         private void Pickup(TumikiBlock block)
@@ -222,6 +252,11 @@ namespace Nakahira
         public void OnDealtDamage()
         {
             DealtDamage?.Invoke(this);
+        }
+
+        public void StartHitStop(float duration, float timeScale, float shake)
+        {
+            m_hitStop.Begin(duration, timeScale, shake);
         }
 
         //========================================
@@ -271,8 +306,13 @@ namespace Nakahira
                 return true;
             }
 
-            // 当たった段が抜けて、当たった角度に応じた速さで飛ぶ(連鎖)
+            // 手ごたえ: 自分と抜けた段も、当たった積み木の速さに応じてヒットストップ
+            projectile.GetImpactHitStop(out float duration, out float timeScale, out float shake);
+            StartHitStop(duration, timeScale, shake);
+
+            // 当たった段が抜けて、当たった角度に応じた速さで飛ぶ(連鎖)。ヒットストップが明けてから飛び出す
             TumikiBlock block = m_stack.RemoveAt(index);
+            block.StartHitStop(duration, timeScale, shake);
             projectile.ComputeImpact(block.transform.position, out Vector3 dir, out float speed);
             block.Push(dir, speed, projectile.Owner, projectile.ReturnCount, this);
             return true;

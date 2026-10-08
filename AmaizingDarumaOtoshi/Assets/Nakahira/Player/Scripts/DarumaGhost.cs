@@ -8,6 +8,7 @@ namespace Nakahira
     // ・ジャンプ・積み木を積む・股抜きショットはできない
     // ・当たり判定を持たないので、攻撃を受けず、生存者や積み木もすり抜ける
     // ・遅いハンマーで薙ぎ払いができ、生存者にダメージを与えると復活を要求する
+    [RequireComponent(typeof(HitStop))]
     public class DarumaGhost : MonoBehaviour, IDarumaAttacker
     {
         // 移動速度など(ScriptableObjectから毎回読む)。ハンマーの性能はハンマー側のHammerParams
@@ -19,11 +20,23 @@ namespace Nakahira
 
         IDarumaCommandSource m_commandSource;
         StageArea m_stageArea;
+        HitStop m_hitStop;
         Vector3 m_moveDirection;
         bool m_reviveRequested;
         readonly RaycastHit[] m_wallHits = new RaycastHit[8];
 
         public Collider Body => null;
+        public float LocalTimeScale => Mathf.Max(0.01f, m_hitStop.TimeScale);
+
+        private void Awake()
+        {
+            m_hitStop = GetComponent<HitStop>();
+        }
+
+        public void StartHitStop(float duration, float timeScale, float shake)
+        {
+            m_hitStop.Begin(duration, timeScale, shake);
+        }
 
         // 生存者にダメージを与えたので復活したい
         public event Action<DarumaGhost> ReviveRequested;
@@ -54,7 +67,8 @@ namespace Nakahira
 
         private void UpdateMove()
         {
-            Vector3 delta = m_moveDirection * (m_params.MoveSpeed * Time.deltaTime);
+            float dt = Time.deltaTime * LocalTimeScale;
+            Vector3 delta = m_moveDirection * (m_params.MoveSpeed * dt);
             delta = SlideAlongWalls(delta);
 
             Vector3 pos = transform.position + delta;
@@ -65,7 +79,7 @@ namespace Nakahira
             if (m_moveDirection.sqrMagnitude > 0.0001f && !m_hammer.IsBusy)
             {
                 Quaternion target = Quaternion.LookRotation(m_moveDirection, Vector3.up);
-                transform.rotation = Quaternion.Slerp(transform.rotation, target, m_turnSpeed * Time.deltaTime);
+                transform.rotation = Quaternion.Slerp(transform.rotation, target, m_turnSpeed * dt);
             }
         }
 
