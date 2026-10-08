@@ -137,7 +137,16 @@ namespace Nakahira
             m_moveDirection = new Vector3(move.x, 0.0f, move.y);
             if (command.Jump) m_jumpRequested = true;
             if (command.Sweep) m_hammer.TrySweep();
-            if (command.Shot) m_hammer.TryShot();
+            if (command.Shot && m_hammer.TryShot()) FaceMoveDirection();
+        }
+
+        // 振り向きの途中でも、スティックの方向へ即座に向きを合わせる(ニュートラルなら今の向きのまま)
+        private void FaceMoveDirection()
+        {
+            if (m_moveDirection.sqrMagnitude <= 0.0001f) return;
+            Quaternion target = Quaternion.LookRotation(m_moveDirection, Vector3.up);
+            m_rb.rotation = target;
+            transform.rotation = target;
         }
 
         private void FixedUpdate()
@@ -210,6 +219,8 @@ namespace Nakahira
             v.z = horizontal.z;
 
             // ハンマーを振っている間は向きを固定(打ち返しの方向がブレないように)
+            // ただし股抜きショットは弾が出るまで向きを変えて狙える
+            bool canTurn = !m_hammer.IsBusy || m_hammer.IsAimingShot;
             if (moveDir.sqrMagnitude > 0.0001f && !m_hammer.IsBusy)
             {
                 Quaternion target = Quaternion.LookRotation(moveDir, Vector3.up);
