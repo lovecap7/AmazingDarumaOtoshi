@@ -4,6 +4,10 @@ using UnityEngine;
 public class BlockController : MonoBehaviour 
 {
     [SerializeField] float speed = 2.0f;
+    [SerializeField] float deceleration = 0.2f;          // 減速量(単位/秒)。大きいほど早く止まる
+    [SerializeField] float stopThreshold = 0.05f;         // この速度を下回ったら停止とみなす
+
+    float currentSpeed; // 現在の速度(毎ステップ減衰する)
 
     // テスト用：インスペクターで挙動を選べるようにする
     public enum BehaviorType { Normal, Iwa,HebiLeft, HebiRight }
@@ -67,6 +71,7 @@ public class BlockController : MonoBehaviour
     public void Launch(Vector3 dir)
     {
         direction = new Vector3(dir.x,0.0f,dir.z).normalized;
+        currentSpeed = speed;
         isFlying = true;
     }
 
@@ -80,24 +85,47 @@ public class BlockController : MonoBehaviour
             return;
         }
 
+        // 速度を減衰させる(0未満にならないようにする)
+        currentSpeed *= Mathf.Exp(-deceleration * Time.fixedDeltaTime);
+
+        // 十分遅くなったら停止して、飛行状態を終了する
+        if (currentSpeed <= stopThreshold)
+        {
+            StopFlying();
+            return;
+        }
+
         // behaviorに方向の更新を委譲する(曲がるキャラ等はここで方向が変化する)
         direction = behavior.UpdateDirection(direction, Time.fixedDeltaTime);
 
         // Y方向(重力)は維持して、水平方向だけ上書きする
-        Vector3 v = direction * speed;
+        Vector3 v = direction * currentSpeed;
         v.y = rb.linearVelocity.y;
+        rb.linearVelocity = v;
+    }
+
+    void StopFlying()
+    {
+        isFlying = false;
+        hasHit = false;
+        currentSpeed = 0f;
+
+        // 水平方向の速度だけ止める(Yは重力のまま)
+        Vector3 v = rb.linearVelocity;
+        v.x = 0f;
+        v.z = 0f;
         rb.linearVelocity = v;
     }
 
     private void OnCollisionEnter(Collision collision)
     {
-        if (!wasFlyingThisStep || hasHit) return;
         // このステップの開始時点で飛んでいないなら、
         // 衝突処理の途中でisFlyingがtrueになっていても攻撃側として扱わない
-        if (!wasFlyingThisStep)
+        if (!wasFlyingThisStep || hasHit)
         {
             return;
         }
+       
 
         // 壁に当たったら積み木を反射させる
         if (collision.gameObject.CompareTag("Wall"))
