@@ -56,6 +56,8 @@ namespace Nakahira
         // 当たり判定が届く距離(見た目のハンマーの長さ × 倍率)
         float HitReach => (m_armLength + m_hammerHalfWidth) * m_params.HitReachScale;
         public bool IsShooting => m_action == Action.Shot;
+        // 股抜きショットを振り始めてから弾が出るまでの間(持ち主は向きを変えて狙いを調整できる)
+        public bool IsAimingShot => m_action == Action.Shot && !m_shotFired;
 
         private void Awake()
         {
