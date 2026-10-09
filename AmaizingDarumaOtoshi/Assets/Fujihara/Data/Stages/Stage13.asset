@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9bc7d20817a22f54b80f1965aafc188c, type: 3}
+  m_Name: Stage13
+  m_EditorClassIdentifier: Assembly-CSharp::StageData
+  id: Stage13
+  displayName: "\u98A8\u306E\u8981\u585E"
+  description: "\u56DB\u9685\u306E\u6247\u98A8\u6A5F\u304C\u58C1\u6CBF\u3044\u306B\u98A8\u3092\u9001\u308A\u3001\u5916\u5468\u3092\u3050\u308B\u308A\u3068\u56DE\u308B\u98A8\u306E\u74B0\u304C\u3067\u304D\u305F\u95D8\u6280\u5834\u3002"
+  color: {r: 0.95, g: 0.75, b: 0.6, a: 1}
+  preview: {fileID: 0}
+  sceneName: Stage13

@@ -8,7 +8,8 @@ using UnityEngine.UI;
 // キャラクターセレクト → ステージセレクト → ステージ抽選。
 // ・キャラクターセレクト（スマブラ風）
 //   - つながっているコントローラー（とキーボード）で A / Start を押すと、空いている一番小さい番号の枠にプレイヤーとして参加する
-//   - 各枠の右上のボタンをカーソルで押すと「プレイヤー → CPU → なし → CPU …」と切り替わる
+//     空きが無いときは、一番左の CPU の枠を上書きして参加する
+//   - 各枠の右上のボタンをカーソルで押すと「CPU → なし → CPU …」と切り替わる。プレイヤーの枠は本人だけが CPU にできる
 //   - 各プレイヤーは自分のカーソルでキャラ（またはランダム）を選ぶ。B で取り消し、何も選んでいなければ B で抜ける
 //   - CPU のコインはプレイヤーがカーソルで掴んで（A）キャラの上に置く（A）と、その CPU のキャラになる。CPU の強さは枠の －／＋
 //   - 参加者全員が選ぶと「じゅんびOK！」。Start / Enter でステージセレクトへ
@@ -117,6 +118,9 @@ public class MatchSelect : MonoBehaviour
     {
         public RectTransform rect;
         public TextMeshProUGUI text;
+        public Image icon, iconImage;           // 投票したステージのアイコン（CPU はキャラ）
+        public TextMeshProUGUI iconLetter, ok;
+        public object shown;                    // いま出しているもの（変わったらアイコンを弾ませる）
     }
 
     Phase phase = Phase.Character;
@@ -131,7 +135,7 @@ public class MatchSelect : MonoBehaviour
     // ---- UI ----
     RectTransform canvas, charRoot, stageRoot, lotteryRoot, cursorLayer, readyBanner;
     CanvasGroup charGroup, stageGroup, readyGroup, lotteryGroup;
-    TextMeshProUGUI hint, stageStatus, needMoreText;
+    TextMeshProUGUI hint, stageStatus, stageDescription, needMoreText;
     Image fade;
     Material letterMat, popMat;
     float readyAmount;
@@ -189,6 +193,7 @@ public class MatchSelect : MonoBehaviour
         stageGroup.alpha = Mathf.MoveTowards(stageGroup.alpha, showChar ? 0f : 1f, dt * 4f);
         cursorLayer.gameObject.SetActive(phase == Phase.Character || phase == Phase.Stage);
         stageStatus.gameObject.SetActive(phase == Phase.Stage);
+        stageDescription.gameObject.SetActive(phase == Phase.Stage);
 
         UpdateCursors();
         UpdatePanels();
@@ -258,7 +263,7 @@ public class MatchSelect : MonoBehaviour
         for (int i = 0; i < panels.Length; i++)
         {
             var ui = panels[i];
-            if (Hit(ui.typeButton.rectTransform, p.cursor)) { ToggleSlot(i); return; }
+            if (Hit(ui.typeButton.rectTransform, p.cursor)) { ToggleSlot(p, i); return; }
             var cpu = slots[i];
             if (cpu != null && cpu.IsCpu && ui.levelRow.gameObject.activeSelf)
             {
@@ -294,14 +299,16 @@ public class MatchSelect : MonoBehaviour
         if (tile != null) PlaceToken(cpu, cpu.charToken, tile);
     }
 
-    // 枠の種類を切り替える：プレイヤー → CPU、CPU → なし、なし → CPU
-    void ToggleSlot(int i)
+    // 枠の種類を切り替える：CPU → なし、なし → CPU（スマブラと同じく、だれでも切り替えられる）
+    // プレイヤーの枠は、そのプレイヤー本人だけが CPU にできる（ほかの人が勝手に CPU に変えることはできない）
+    void ToggleSlot(Player by, int i)
     {
         var p = slots[i];
         if (p == null) { AddCpu(i, defaultCpuLevel); return; }
         if (p.IsCpu) { Remove(p); return; }
+        if (p != by) { ShakeTypeButton(i); return; }
 
-        // プレイヤーの枠を CPU にする（選んでいたキャラは引き継ぐ）
+        // 自分の枠を CPU にする（選んでいたキャラは引き継ぐ。もう一度 A / Start を押せば参加し直せる）
         var character = p.character;
         bool random = p.randomCharacter;
         Remove(p);
@@ -317,14 +324,33 @@ public class MatchSelect : MonoBehaviour
         p.cursor.y = Mathf.Clamp(p.cursor.y, -510f, 510f);
     }
 
+    // 空いている一番小さい番号の枠に参加する。空きが無ければ、一番左の CPU の枠を上書きして参加する
     void Join(InputDevice device)
     {
-        for (int i = 0; i < slots.Length; i++)
+        int target = -1;
+        for (int i = 0; i < slots.Length && target < 0; i++) if (slots[i] == null) target = i;
+        for (int i = 0; i < slots.Length && target < 0; i++) if (slots[i].IsCpu) target = i;
+        if (target < 0) return;   // 全員プレイヤーで満員
+
+        if (slots[target] != null) Remove(slots[target]);
+        AddHuman(target, device);
+    }
+
+    // ほかの人の枠のボタンを押したとき：切り替えられないことを、ボタンを揺らして伝える
+    void ShakeTypeButton(int i)
+    {
+        StartCoroutine(Shake(panels[i].typeButton.rectTransform));
+    }
+
+    static IEnumerator Shake(RectTransform r)
+    {
+        var basePos = new Vector2(-95f, -38f);
+        for (float t = 0f; t < 0.3f; t += Time.unscaledDeltaTime)
         {
-            if (slots[i] != null) continue;
-            AddHuman(i, device);
-            return;
+            r.anchoredPosition = basePos + new Vector2(Mathf.Sin(t * 70f) * 10f * (1f - t / 0.3f), 0f);
+            yield return null;
         }
+        r.anchoredPosition = basePos;
     }
 
     Player AddHuman(int i, InputDevice device)
@@ -477,6 +503,13 @@ public class MatchSelect : MonoBehaviour
         else if (Time.unscaledTime - allVotedTime >= lotteryDelay) StartCoroutine(Lottery());
 
         stageStatus.text = all ? "ちゅうせん するよ！" : $"とうひょう　{voted} / {humans}";
+
+        // 番号の小さいプレイヤーのカーソルが乗っているステージの説明を出す
+        Tile hovered = null;
+        foreach (var p in Humans()) { hovered = TileAt(stageTiles, p.cursor); if (hovered != null) break; }
+        stageDescription.text = hovered == null ? ""
+            : hovered.random ? "<b>おまかせ</b>　どのステージになるかは抽選まで分からない"
+            : "<b>" + hovered.stage.displayName + "</b>　" + hovered.stage.description;
     }
 
     void Vote(Player p)
@@ -725,19 +758,66 @@ public class MatchSelect : MonoBehaviour
         ui.portraitLetter.text = sprite != null ? "" : letter;
     }
 
-    // ステージセレクトの下の「1P あかだる → 仮ステージ2」
+    // ステージセレクトの下の札：左に投票したステージのアイコン、右に「1P あかだる / 回る中心」
+    // （キャラクターセレクトの枠と同じく、まだ選んでいなければカーソルが乗っているステージを薄く見せる）
     void UpdateChips()
     {
+        float k = 1f - Mathf.Exp(-14f * Time.unscaledDeltaTime);
         for (int i = 0; i < chips.Length; i++)
         {
+            var chip = chips[i];
             var p = slots[i];
-            chips[i].rect.gameObject.SetActive(p != null && phase != Phase.Lottery);   // 抽選中は隠す
-            if (p == null) continue;
-            chips[i].rect.GetComponent<Image>().color = p.Color;
+            chip.rect.gameObject.SetActive(p != null && phase != Phase.Lottery);   // 抽選中は隠す
+            if (p == null) { chip.shown = null; continue; }
+            chip.rect.GetComponent<Image>().color = p.Color;
             string chara = p.randomCharacter ? "ランダム" : p.character != null ? p.character.displayName : "-";
-            string vote = p.IsCpu ? "（CPU Lv" + p.cpuLevel + "）" : "→ " + (p.randomStage ? "おまかせ" : p.stage != null ? p.stage.displayName : "えらんでね");
-            chips[i].text.text = (p.IsCpu ? "CPU" : p.Label) + "　" + chara + "\n<size=70%>" + vote + "</size>";
+
+            object shown;
+            string sub;
+            if (p.IsCpu)
+            {
+                // CPU は投票しないので、キャラを出す
+                if (p.character != null) SetChipIcon(chip, p.character.portrait, p.character.color, Initial(p.character.displayName), true);
+                else SetChipIcon(chip, null, RandomColor, "？", true);
+                chip.ok.gameObject.SetActive(false);
+                shown = p.character;
+                sub = "CPU Lv" + p.cpuLevel;
+            }
+            else if (p.HasVote)
+            {
+                if (p.randomStage) SetChipIcon(chip, null, RandomColor, "？", true);
+                else SetChipIcon(chip, p.stage.preview, p.stage.color, Initial(p.stage.displayName), true);
+                chip.ok.gameObject.SetActive(true);
+                shown = p.randomStage ? (object)"random" : p.stage;
+                sub = p.randomStage ? "おまかせ" : p.stage.displayName;
+            }
+            else
+            {
+                var hover = phase == Phase.Stage ? TileAt(stageTiles, p.cursor) : null;
+                if (hover == null) SetChipIcon(chip, null, new Color(0.92f, 0.9f, 0.88f), "", false);
+                else if (hover.random) SetChipIcon(chip, null, RandomColor * 0.8f, "？", false);
+                else SetChipIcon(chip, hover.stage.preview, hover.stage.color * 0.8f, Initial(hover.stage.displayName), false);
+                chip.ok.gameObject.SetActive(false);
+                shown = null;
+                sub = "えらんでね";
+            }
+
+            // 投票した（変えた）瞬間にアイコンを弾ませる
+            if (shown != null && shown != chip.shown) chip.icon.rectTransform.localScale = Vector3.one * 1.3f;
+            chip.shown = shown;
+            chip.icon.rectTransform.localScale = Vector3.Lerp(chip.icon.rectTransform.localScale, Vector3.one, k);
+
+            chip.text.text = (p.IsCpu ? "CPU" : p.Label) + "　" + chara + "\n<size=75%>" + sub + "</size>";
         }
+    }
+
+    static void SetChipIcon(Chip chip, Sprite sprite, Color color, string letter, bool chosen)
+    {
+        chip.icon.color = new Color(color.r, color.g, color.b, chosen ? 1f : 0.75f);
+        chip.iconImage.sprite = sprite;
+        chip.iconImage.enabled = sprite != null;
+        chip.iconImage.color = new Color(1f, 1f, 1f, chosen ? 1f : 0.6f);
+        chip.iconLetter.text = sprite != null ? "" : letter;
     }
 
     void UpdateTiles(float dt)
@@ -877,7 +957,7 @@ public class MatchSelect : MonoBehaviour
         Header(stageRoot, "ステージセレクト", ToyKit.Palette[4]);
 
         int sc = roster.stages.Count + 1;   // 最後におまかせ
-        var sgrid = GridLayout(sc, 4, new Vector2(1700f, 520f), new Vector2(380f, 240f), 26f, 340f);
+        var sgrid = GridLayout(sc, 7, new Vector2(1760f, 470f), new Vector2(380f, 240f), 18f, 345f);
         for (int i = 0; i < sc; i++)
         {
             bool random = i == roster.stages.Count;
@@ -889,20 +969,49 @@ public class MatchSelect : MonoBehaviour
             stageTiles.Add(tile);
         }
 
-        stageStatus = ToyKit.UIText("Status", stageRoot, font, "", 54f, ToyKit.Ink);
-        ToyKit.Anchor(stageStatus.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, -260f), new Vector2(1200f, 80f));
+        stageStatus = ToyKit.UIText("Status", stageRoot, font, "", 46f, ToyKit.Ink);
+        ToyKit.Anchor(stageStatus.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, -285f), new Vector2(1200f, 70f));
+
+        // カーソルを合わせたステージの説明
+        stageDescription = ToyKit.UIText("Description", stageRoot, font, "", 32f, ToyKit.Ink);
+        stageDescription.textWrappingMode = TextWrappingModes.Normal;
+        ToyKit.Anchor(stageDescription.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, -195f), new Vector2(1700f, 110f));
 
         chips = new Chip[maxPlayers];
         for (int i = 0; i < maxPlayers; i++)
         {
             var c = ToyKit.UIImage("Chip" + (i + 1), stageRoot, PlayerColors[i % PlayerColors.Length], uiSprite);
-            float w = Mathf.Min(400f, 1800f / maxPlayers - 20f);
-            ToyKit.Anchor(c, new Vector2(0.5f, 0.5f), new Vector2(PanelPosition(i).x, -400f), new Vector2(w, 120f));
+            float w = Mathf.Min(420f, 1800f / maxPlayers - 20f);
+            const float h = 140f;
+            ToyKit.Anchor(c, new Vector2(0.5f, 0.5f), new Vector2(PanelPosition(i).x, -400f), new Vector2(w, h));
+            var col = c.gameObject.AddComponent<Outline>(); col.effectColor = ToyKit.Ink; col.effectDistance = new Vector2(3f, -3f);
+
+            // 左：ステージのアイコン（ステージのマスと同じ横長）
+            float iw = Mathf.Min(170f, w * 0.42f), ih = Mathf.Min(h - 24f, iw * 0.63f);
+            var icon = ToyKit.UIImage("Icon", c, Color.white, uiSprite).GetComponent<Image>();
+            icon.pixelsPerUnitMultiplier = 0.5f;
+            ToyKit.Anchor(icon.rectTransform, new Vector2(0f, 0.5f), new Vector2(14f + iw * 0.5f, 0f), new Vector2(iw, ih));
+            var iol = icon.gameObject.AddComponent<Outline>(); iol.effectColor = ToyKit.Ink; iol.effectDistance = new Vector2(2f, -2f);
+            var iconImage = ToyKit.UIImage("Image", icon.rectTransform, Color.white).GetComponent<Image>();
+            iconImage.preserveAspect = true;
+            ToyKit.Stretch(iconImage.rectTransform);
+            iconImage.rectTransform.offsetMin = new Vector2(4f, 4f);
+            iconImage.rectTransform.offsetMax = new Vector2(-4f, -4f);
+            var letter = ToyKit.UIText("Letter", icon.rectTransform, font, "", ih * 0.6f, Color.white);
+            letter.fontSharedMaterial = letterMat;
+            ToyKit.Stretch(letter.rectTransform);
+            var ok = ToyKit.UIText("OK", icon.rectTransform, font, "OK!", 44f, ToyKit.Palette[0]);
+            ok.fontSharedMaterial = popMat;
+            ok.rectTransform.localRotation = Quaternion.Euler(0f, 0f, -12f);
+            ToyKit.Anchor(ok.rectTransform, new Vector2(1f, 1f), Vector2.zero, new Vector2(120f, 60f));
+
+            // 右：名前と投票先
+            float tw = w - iw - 36f;
             var t = ToyKit.UIText("Text", c, font, "", 40f, Color.white);
             t.fontSharedMaterial = letterMat;
             t.enableAutoSizing = true; t.fontSizeMin = 14f; t.fontSizeMax = 40f;
-            ToyKit.Stretch(t.rectTransform);
-            chips[i] = new Chip { rect = c, text = t };
+            ToyKit.Anchor(t.rectTransform, new Vector2(1f, 0.5f), new Vector2(-12f - tw * 0.5f, 0f), new Vector2(tw, h - 16f));
+            chips[i] = new Chip { rect = c, text = t, icon = icon, iconImage = iconImage, iconLetter = letter, ok = ok };
         }
 
         cursorLayer = Layer("Cursors", canvas);

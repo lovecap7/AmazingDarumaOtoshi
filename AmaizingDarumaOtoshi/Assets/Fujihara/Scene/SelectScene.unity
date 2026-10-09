@@ -153,12 +153,13 @@ MonoBehaviour:
   knobSprite: {fileID: 10913, guid: 0000000000000000f000000000000000, type: 0}
   roster: {fileID: 11400000, guid: 0aaf3a65396bc1940a8bcd03c495c9f0, type: 2}
   maxPlayers: 4
-  minPlayers: 1
+  minHumans: 1
+  minParticipants: 2
   defaultCpuLevel: 3
   cursorSpeed: 1300
   lotteryDelay: 0.8
   backSceneName: MenuScene
-  gameSceneName: MatchCheckScene
+  gameSceneName: PlayerTest
 --- !u!4 &1972834343
 Transform:
   m_ObjectHideFlags: 0

@@ -13,3 +13,4 @@ MonoBehaviour:
   m_Name: PresentationSettings
   m_EditorClassIdentifier: Assembly-CSharp::PresentationSettings
   showOnomatopoeia: 1
+  defaultFont: {fileID: 11400000, guid: 592b5fa8a1edc6d45a548c6775102e91, type: 2}
