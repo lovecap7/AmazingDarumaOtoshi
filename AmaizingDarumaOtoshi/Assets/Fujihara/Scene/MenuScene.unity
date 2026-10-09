@@ -130,7 +130,7 @@ GameObject:
   - component: {fileID: 2041404170}
   - component: {fileID: 2041404169}
   m_Layer: 0
-  m_Name: MenuAAA
+  m_Name: Menu
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

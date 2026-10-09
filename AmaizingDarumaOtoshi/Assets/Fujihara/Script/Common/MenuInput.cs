@@ -22,6 +22,34 @@ public static class MenuInput
         return false;
     }
 
+    public static bool Left()
+    {
+        var k = Keyboard.current;
+        if (k != null && (k.leftArrowKey.wasPressedThisFrame || k.aKey.wasPressedThisFrame)) return true;
+        foreach (var g in Gamepad.all)
+            if (g.dpad.left.wasPressedThisFrame || g.leftStick.left.wasPressedThisFrame) return true;
+        return false;
+    }
+
+    public static bool Right()
+    {
+        var k = Keyboard.current;
+        if (k != null && (k.rightArrowKey.wasPressedThisFrame || k.dKey.wasPressedThisFrame)) return true;
+        foreach (var g in Gamepad.all)
+            if (g.dpad.right.wasPressedThisFrame || g.leftStick.right.wasPressedThisFrame) return true;
+        return false;
+    }
+
+    // Start ボタン / Enter（「決定して次へ」）
+    public static bool Start()
+    {
+        var k = Keyboard.current;
+        if (k != null && (k.enterKey.wasPressedThisFrame || k.numpadEnterKey.wasPressedThisFrame)) return true;
+        foreach (var g in Gamepad.all)
+            if (g.startButton.wasPressedThisFrame) return true;
+        return false;
+    }
+
     public static bool Submit()
     {
         var k = Keyboard.current;

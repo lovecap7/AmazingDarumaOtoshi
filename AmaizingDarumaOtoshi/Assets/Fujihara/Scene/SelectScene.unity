@@ -130,7 +130,7 @@ GameObject:
   - component: {fileID: 1972834343}
   - component: {fileID: 1972834342}
   m_Layer: 0
-  m_Name: SelectAAA
+  m_Name: Select
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -156,6 +156,7 @@ MonoBehaviour:
   minHumans: 1
   minParticipants: 2
   defaultCpuLevel: 3
+  timeLimitSeconds: 10
   cursorSpeed: 1300
   lotteryDelay: 0.8
   backSceneName: MenuScene

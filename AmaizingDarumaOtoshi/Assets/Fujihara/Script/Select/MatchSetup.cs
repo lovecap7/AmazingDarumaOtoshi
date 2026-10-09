@@ -24,9 +24,20 @@ public static class MatchSetup
         public int deviceId = -1;       // InputDevice.deviceId（CPU は -1）
         public string deviceName;
         public CharacterData character;
+        public int cpuNumber;           // CPU が複数いるときの番号（1〜）。CPU が1人だけなら 0
 
         public InputDevice Device => isCpu ? null : InputSystem.GetDeviceById(deviceId);
         public string PlayerLabel => (playerIndex + 1) + "P";
+        // 画面に出す名前：「1P」、CPU は「CPU」（複数いるときは「CPU1」「CPU2」）
+        public string DisplayLabel => !isCpu ? PlayerLabel : cpuNumber > 0 ? "CPU" + cpuNumber : "CPU";
+    }
+
+    // ルールセレクトで決めたルール。キャラクターセレクトと違い、次の試合にも引き継ぐ（Clear では消さない）
+    public class MatchRules
+    {
+        public bool ghost = true;               // 脱落したら幽霊になれるか
+        public bool timeLimit = false;          // 時間制限があるか
+        public float timeLimitSeconds = 180f;   // 時間制限の長さ（秒）
     }
 
     static readonly List<Entry> players = new List<Entry>();
@@ -34,6 +45,7 @@ public static class MatchSetup
     // プレイヤー番号の小さい順
     public static IReadOnlyList<Entry> Players => players;
     public static StageData Stage { get; private set; }
+    public static MatchRules Rules { get; } = new MatchRules();
 
     public static void Set(IEnumerable<Entry> entries, StageData stage)
     {
@@ -55,9 +67,11 @@ public static class MatchSetup
     {
         var sb = new StringBuilder();
         foreach (var e in players)
-            sb.Append(e.PlayerLabel).Append(' ').Append(e.character != null ? e.character.displayName : "(なし)")
-              .Append(" (").Append(e.isCpu ? "CPU Lv" + e.cpuLevel : e.deviceName).Append(")  ");
+            sb.Append(e.DisplayLabel).Append(' ').Append(e.character != null ? e.character.displayName : "(なし)")
+              .Append(" (").Append(e.isCpu ? "Lv" + e.cpuLevel : e.deviceName).Append(")  ");
         sb.Append("ステージ：").Append(Stage != null ? Stage.displayName : "(なし)");
+        sb.Append("  ゴースト：").Append(Rules.ghost ? "あり" : "なし");
+        sb.Append("  時間制限：").Append(Rules.timeLimit ? Mathf.RoundToInt(Rules.timeLimitSeconds) + "秒" : "なし");
         return sb.ToString();
     }
 }

@@ -16,6 +16,9 @@ using UnityEngine.UI;
 //  ・プレイヤーの番号はセレクトの番号（1P〜）に揃える（本編は登録順で番号を振るため、空き番があるとずれる）
 //  ・頭の上に「1P」の名札を出し、頭の色をキャラの色にする（キャラごとのモデルができるまでの目印）
 //  ・試合が終わったら勝者を出して、キャラクターセレクトへ戻る
+//  ・ルールセレクトの内容（MatchSetup.Rules）を反映する
+//      ゴーストなし：脱落したプレイヤーの幽霊を出さない（本編は必ず幽霊を出すので、出てきたらすぐ隠す）
+//      時間制限あり：画面上に残り時間を出し、0 になったら試合終了。生き残っている中で積み木が一番多い人の勝ち（同じなら引き分け）
 public class MatchBridge : MonoBehaviour
 {
     const string SelectSceneName = "SelectScene";
@@ -42,10 +45,12 @@ public class MatchBridge : MonoBehaviour
     readonly List<Slot> m_slots = new List<Slot>();
     RectTransform m_canvas;
     CanvasGroup m_finishGroup;
-    TextMeshProUGUI m_finishText;
+    TextMeshProUGUI m_finishText, m_timerText;
     TMP_FontAsset m_font;
     Material m_letterMat, m_popMat;
     float m_finishTime = -1f;
+    float m_timeLeft = -1f;     // 時間制限の残り（時間制限なしなら -1）
+    bool m_timeUp;
     bool m_leaving;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
@@ -75,6 +80,7 @@ public class MatchBridge : MonoBehaviour
         m_font = PresentationSettings.DefaultFont;
         m_letterMat = ToyKit.LetterMaterial(m_font);
         m_popMat = ToyKit.PopMaterial(m_letterMat);
+        if (MatchSetup.Rules.timeLimit) m_timeLeft = MatchSetup.Rules.timeLimitSeconds;
         BuildUI();
 
         // プレイヤー番号の小さい順に出す
@@ -94,7 +100,7 @@ public class MatchBridge : MonoBehaviour
             var slot = new Slot { player = player, entry = e };
             slot.tag = MakeTag(e);
             m_slots.Add(slot);
-            Debug.Log($"[MatchBridge] {e.PlayerLabel} {(e.character != null ? e.character.displayName : "-")} ({(e.isCpu ? "CPU Lv" + e.cpuLevel : e.deviceName + " #" + e.deviceId)}) → {player.name}");
+            Debug.Log($"[MatchBridge] {e.DisplayLabel} {(e.character != null ? e.character.displayName : "-")} ({(e.isCpu ? "CPU Lv" + e.cpuLevel : e.deviceName + " #" + e.deviceId)}) → {player.name}");
         }
     }
 
@@ -129,14 +135,30 @@ public class MatchBridge : MonoBehaviour
     {
         foreach (var s in m_slots)
         {
+            if (!MatchSetup.Rules.ghost) HideGhost(s);
             TintHead(s);
             UpdateTag(s);
         }
 
         if (m_leaving) return;
 
+        // 時間制限
+        if (m_timeLeft >= 0f && m_finishTime < 0f)
+        {
+            m_timeLeft = Mathf.Max(0f, m_timeLeft - Time.deltaTime);
+            int sec = Mathf.CeilToInt(m_timeLeft);
+            m_timerText.text = $"{sec / 60}:{sec % 60:00}";
+            m_timerText.color = sec <= 10 ? ToyKit.Palette[0] : Color.white;
+            m_timerText.rectTransform.localScale = Vector3.one * (sec <= 10 ? 1f + 0.12f * Mathf.Pow(1f - (m_timeLeft % 1f), 4f) : 1f);
+            if (m_timeLeft <= 0f) TimeUp();
+        }
+
         // 試合終了 → 勝者を出して、しばらくしたらキャラクターセレクトへ
-        if (m_match.IsFinished && m_finishTime < 0f) ShowFinish();
+        if (m_match.IsFinished && m_finishTime < 0f)
+        {
+            Slot winner = m_slots.Find(s => s.player != null && s.player.IsSurvivor);
+            ShowFinish("しあい しゅうりょう！", winner);
+        }
         if (m_finishTime >= 0f)
         {
             m_finishGroup.alpha = Mathf.MoveTowards(m_finishGroup.alpha, 1f, Time.unscaledDeltaTime * 3f);
@@ -146,19 +168,53 @@ public class MatchBridge : MonoBehaviour
         else if (PressedBack()) BackToSelect();   // テスト用：途中でもセレクトへ戻れる
     }
 
-    void ShowFinish()
+    void ShowFinish(string title, Slot winner)
     {
         m_finishTime = Time.unscaledTime;
-        Slot winner = m_slots.Find(s => s.player != null && s.player.IsSurvivor);
         m_finishText.text = winner != null
-            ? $"しあい しゅうりょう！\n<size=70%>しょうしゃ：{winner.entry.PlayerLabel}　{CharaName(winner.entry)}</size>"
-            : "しあい しゅうりょう！\n<size=70%>ひきわけ</size>";
+            ? $"{title}\n<size=70%>しょうしゃ：{winner.entry.DisplayLabel}　{CharaName(winner.entry)}</size>"
+            : $"{title}\n<size=70%>ひきわけ</size>";
+    }
+
+    // 時間切れ：その場で止めて、生き残っている中で積み木が一番多い人を勝ちにする
+    void TimeUp()
+    {
+        m_timeUp = true;
+        foreach (var s in m_slots) if (s.player != null) s.player.StopControl();
+        Time.timeScale = 0f;   // 本編の試合は時間制限を知らないので、止めておく（セレクトへ戻るときに戻す）
+
+        Slot winner = null;
+        int best = -1;
+        bool tie = false;
+        foreach (var s in m_slots)
+        {
+            if (s.player == null || !s.player.IsSurvivor) continue;
+            int count = s.player.Character.Stack.Count;
+            if (count > best) { best = count; winner = s; tie = false; }
+            else if (count == best) tie = true;
+        }
+        if (tie) winner = null;
+        Debug.Log($"[MatchBridge] 時間切れ：{(winner != null ? winner.entry.DisplayLabel + " の勝ち（積み木 " + best + " 個）" : "引き分け")}");
+        ShowFinish("タイムアップ！", winner);
+    }
+
+    // ゴーストなし：本編が出した幽霊をすぐ隠す（隠れた幽霊は動かず、叩けないので復活もしない）
+    static void HideGhost(Slot s)
+    {
+        var ghost = s.player != null ? s.player.Ghost : null;
+        if (ghost != null && ghost.gameObject.activeSelf) ghost.gameObject.SetActive(false);
     }
 
     void BackToSelect()
     {
         m_leaving = true;
+        Time.timeScale = 1f;
         Fader.Load(SelectSceneName);
+    }
+
+    void OnDestroy()
+    {
+        if (m_timeUp) Time.timeScale = 1f;
     }
 
     static bool PressedStart()
@@ -198,7 +254,7 @@ public class MatchBridge : MonoBehaviour
     {
         Transform body = s.player != null ? s.player.CurrentBody : null;
         var cam = Camera.main;
-        if (body == null || cam == null) { s.tag.gameObject.SetActive(false); return; }
+        if (body == null || !body.gameObject.activeInHierarchy || cam == null) { s.tag.gameObject.SetActive(false); return; }
 
         float height = s.player.Character != null ? s.player.Character.Stack.Height + 0.6f : 1.8f;
         Vector3 sp = cam.WorldToScreenPoint(body.position + Vector3.up * height);
@@ -221,6 +277,12 @@ public class MatchBridge : MonoBehaviour
         hint.fontSharedMaterial = m_letterMat;
         ToyKit.Anchor(hint.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, 24f), new Vector2(1800f, 40f));
 
+        // 残り時間（時間制限ありのときだけ）
+        m_timerText = ToyKit.UIText("Timer", m_canvas, m_font, "", 72f, Color.white);
+        m_timerText.fontSharedMaterial = m_popMat;
+        ToyKit.Anchor(m_timerText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -60f), new Vector2(400f, 100f));
+        m_timerText.gameObject.SetActive(m_timeLeft >= 0f);
+
         var finish = ToyKit.UIImage("Finish", m_canvas, new Color(0f, 0f, 0f, 0.45f));
         ToyKit.Stretch(finish);
         m_finishGroup = finish.gameObject.AddComponent<CanvasGroup>();
@@ -231,15 +293,16 @@ public class MatchBridge : MonoBehaviour
         ToyKit.Stretch(m_finishText.rectTransform);
     }
 
-    // 「1P」の名札（CPU は灰色で「CPU」）
+    // 「1P」の名札（CPU は灰色で「CPU」、複数いるときは「CPU1」「CPU2」）
     RectTransform MakeTag(MatchSetup.Entry e)
     {
         var color = e.isCpu ? CpuColor : PlayerColors[e.playerIndex % PlayerColors.Length];
-        var bg = ToyKit.UIImage("Tag" + e.PlayerLabel, m_canvas, color);
-        ToyKit.Anchor(bg, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(e.isCpu ? 76f : 60f, 36f));
+        string label = e.DisplayLabel;
+        var bg = ToyKit.UIImage("Tag" + label, m_canvas, color);
+        ToyKit.Anchor(bg, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(24f + label.Length * 16f, 36f));
         bg.gameObject.AddComponent<Outline>().effectColor = ToyKit.Ink;
         bg.gameObject.AddComponent<CanvasGroup>();
-        var t = ToyKit.UIText("Text", bg, m_font, e.isCpu ? "CPU" : e.PlayerLabel, 24f, Color.white);
+        var t = ToyKit.UIText("Text", bg, m_font, label, 24f, Color.white);
         t.fontSharedMaterial = m_letterMat;
         ToyKit.Stretch(t.rectTransform);
         return bg;
