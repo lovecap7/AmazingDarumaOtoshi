@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9bc7d20817a22f54b80f1965aafc188c, type: 3}
+  m_Name: Stage07
+  m_EditorClassIdentifier: Assembly-CSharp::StageData
+  id: Stage07
+  displayName: "\u53CC\u5B50\u306E\u6E26"
+  description: "\u6771\u897F\u306B\u9006\u56DE\u308A\u306E\u56DE\u8EE2\u53F0\u3092\u4E8C\u3064\u4E26\u3079\u305F\u95D8\u6280\u5834\u3002\u88DC\u7D66\u6240\u306F\u5404\u56DE\u8EE2\u53F0\u306E\u4E2D\u5FC3\u3068\u3001\u4E8C\u3064\u306E\u9593\u3002"
+  color: {r: 0.95, g: 0.75, b: 0.6, a: 1}
+  preview: {fileID: 0}
+  sceneName: Stage07

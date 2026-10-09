@@ -92,7 +92,7 @@ public class MatchCheck : MonoBehaviour
         ToyKit.Anchor(stage.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, -320f), new Vector2(1500f, 90f));
 
         var hint = ToyKit.UIText("Hint", canvas, font,
-            "自分のコントローラーで A（キーボードは Space）を押すと、自分の行が光ります　　Start / Enter：キャラクターセレクトにもどる", 30f, ToyKit.Ink);
+            "自分のコントローラーで A を押すと、自分の行が光ります　　Start：キャラクターセレクトにもどる", 30f, ToyKit.Ink);
         ToyKit.Anchor(hint.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, 60f), new Vector2(1800f, 60f));
     }
 

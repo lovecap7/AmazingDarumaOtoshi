@@ -8,6 +8,8 @@ public class StageData : ScriptableObject
     [Tooltip("保存や通信で使う、変わらない名前（英数字）")]
     public string id;
     public string displayName;
+    [Tooltip("ステージセレクトでカーソルを合わせたときに出す説明")]
+    [TextArea(2, 5)] public string description;
     [Tooltip("プレビュー画像が無いときの色")]
     public Color color = Color.white;
     [Tooltip("セレクト画面のプレビュー。画像の Texture Type を「Sprite (2D and UI)」にしてここへドラッグ（未設定なら色と頭文字で仮表示）")]

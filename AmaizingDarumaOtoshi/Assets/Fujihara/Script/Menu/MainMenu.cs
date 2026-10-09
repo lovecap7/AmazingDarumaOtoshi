@@ -355,7 +355,8 @@ public class MainMenu : MonoBehaviour
 
         overlay = ToyKit.CreateOverlayCanvas("UI", 10);
 
-        var title = ToyKit.UIText("Title", overlay, font, "MENU", 90f, ToyKit.Ink);
+        // 左上の見出し（今は出さない。文字を入れれば出る）
+        var title = ToyKit.UIText("Title", overlay, font, "", 90f, ToyKit.Ink);
         title.characterSpacing = 20f;
         ToyKit.Anchor(title.rectTransform, new Vector2(0f, 1f), new Vector2(330f, -90f), new Vector2(500f, 120f));
         titleGroup = title.gameObject.AddComponent<CanvasGroup>();
@@ -758,8 +759,8 @@ public class MainMenu : MonoBehaviour
     void UpdateUI()
     {
         titleGroup.alpha = 1f - dim;
-        hintText.text = phase == Phase.Panel ? "上下：えらぶ　左右：かえる　B / Esc：もどる"
-                      : phase == Phase.Credits ? "" : "上下：えらぶ　A / Enter：けってい";
+        hintText.text = phase == Phase.Panel ? "上下：えらぶ　左右：かえる　B：もどる"
+                      : phase == Phase.Credits ? "" : "上下：えらぶ　A：けってい";
     }
 
     void Pop(string text, Vector3 world, float size, Color color, float angle)

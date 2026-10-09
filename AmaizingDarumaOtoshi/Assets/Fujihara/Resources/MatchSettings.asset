@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f6e06823d5a0f9c41b10a79e76a34e7b, type: 3}
+  m_Name: MatchSettings
+  m_EditorClassIdentifier: Assembly-CSharp::MatchSettings
+  characterPrefab: {fileID: 6242312641939630888, guid: 98dfe1d631da6fc429ba3618bb53aa46, type: 3}
+  ghostPrefab: {fileID: 8875810368968693823, guid: f0f050629671f114096c296b81b42a53, type: 3}
+  gamepadInputPrefab: {fileID: 5892873720667531287, guid: 300128965eb4d164e83f73f763787500, type: 3}
+  respawnDelay: 1.5
+  respawnInvincibleTime: 2
+  resultTime: 4
