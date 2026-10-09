@@ -131,14 +131,14 @@ public partial class TitleScreen
         barBottom.anchorMin = Vector2.zero; barBottom.anchorMax = new Vector2(1f, 0f); barBottom.pivot = new Vector2(0.5f, 0f);
         SetLetterbox(1f);
 
-        var skip = UIText("Skip", uiRoot, "A / Enter　スキップ", 26f, new Color(1f, 1f, 1f, 0.7f));
+        var skip = UIText("Skip", uiRoot, "A　スキップ", 26f, new Color(1f, 1f, 1f, 0.7f));
         Anchor(skip.rectTransform, new Vector2(1f, 0f), new Vector2(-60f, 22f), new Vector2(500f, 50f));
         skip.rectTransform.pivot = new Vector2(1f, 0f);
         skip.alignment = TextAlignmentOptions.Right;
         skipGroup = skip.gameObject.AddComponent<CanvasGroup>();
         skipGroup.alpha = 0f;
 
-        var hint = UIText("Hint", uiRoot, "上下：えらぶ　A / Enter：けってい", 32f, Ink);
+        var hint = UIText("Hint", uiRoot, "上下：えらぶ　A：けってい", 32f, Ink);
         Anchor(hint.rectTransform, new Vector2(1f, 0f), new Vector2(-70f, 40f), new Vector2(700f, 50f));
         hint.rectTransform.pivot = new Vector2(1f, 0f);
         hint.alignment = TextAlignmentOptions.Right;

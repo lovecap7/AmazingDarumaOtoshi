@@ -5,9 +5,13 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
-// ルールセレクト → キャラクターセレクト → ステージセレクト → ステージ抽選。
-// ・ルールセレクト：ゴーストの有無・時間制限（なし / 1分 / 2分 / 3分）を選ぶ（どのコントローラーでも操作できる）。ルールは次の試合にも引き継ぐ
-//   ↑↓：項目　←→ / A：切り替え　Start / Enter：キャラクターセレクトへ　B：メニューへ戻る
+// モードセレクト → ルールセレクト → キャラクターセレクト → ステージセレクト → ステージ抽選。
+// ・モードセレクト：ストック / タイム / ゴースト を選ぶ（←→ / A。B でメニューへ）
+// ・ルールセレクト：選んだモードの詳細設定（↑↓：項目　←→ / A：切り替え　Start：キャラクターセレクトへ　B：モードセレクトへ）
+//     ストック：ストック数（1〜3）と時間制限（なし / 1分 / 2分 / 3分）
+//     タイム　：試合時間（1分 / 2分 / 3分）。点数（崩す +1・崩される -1・顔を飛ばす +1）は Inspector で変えられる
+//     ゴースト：時間制限（なし / 1分 / 2分 / 3分）。最後の1人になるまで戦う。やられても幽霊になって復活できる
+//   モードとルールはまだだれも参加していないので、どのコントローラーでも操作できる。次の試合にも引き継ぎ、試合後はキャラクターセレクトから
 // ・キャラクターセレクト（スマブラ風）
 //   - つながっているコントローラー（とキーボード）で A / Start を押すと、空いている一番小さい番号の枠にプレイヤーとして参加する
 //     空きが無いときは、一番左の CPU の枠を上書きして参加する
@@ -42,8 +46,20 @@ public class MatchSelect : MonoBehaviour
     [Tooltip("CPU を含めた参加者が最低何人必要か（1人プレイなら CPU を足して2人以上にする）")]
     [SerializeField, Range(1, 8)] int minParticipants = 2;
     [SerializeField, Range(1, 9)] int defaultCpuLevel = 3;
-    [Tooltip("ルールセレクトで選べる制限時間（秒）。「なし」→ 並び順に切り替わる")]
+    [Tooltip("ルールセレクトで選べる時間（秒）。ストックの時間制限は「なし」→ 並び順、タイムの試合時間は並び順に切り替わる")]
     [SerializeField] float[] timeLimitChoices = { 60f, 120f, 180f };
+    [Tooltip("ストックで選べる最大のストック数（1〜この数）")]
+    [SerializeField, Range(1, 9)] int maxStocks = 3;
+
+    [Header("タイムの点数")]
+    [Tooltip("相手の積み木を崩したとき")]
+    [SerializeField] int knockPoints = 1;
+    [Tooltip("自分の積み木を崩されたとき")]
+    [SerializeField] int knockedPoints = -1;
+    [Tooltip("相手の顔を飛ばしたとき（3 や 5 にするかも）")]
+    [SerializeField] int headPoints = 1;
+    [Tooltip("相手なしでやられたとき（自分から場外に落ちた など）")]
+    [SerializeField] int selfOutPoints = -1;
     [SerializeField] float cursorSpeed = 1300f;
     [Tooltip("全員が投票してから抽選が始まるまでの時間（この間なら取り消せる）")]
     [SerializeField] float lotteryDelay = 0.8f;
@@ -68,7 +84,7 @@ public class MatchSelect : MonoBehaviour
     static readonly Color CpuColor = new Color(0.55f, 0.55f, 0.58f);
     static readonly Color RandomColor = new Color(0.7f, 0.7f, 0.72f);
 
-    enum Phase { Rule, Character, Stage, Lottery, Leaving }
+    enum Phase { Mode, Rule, Character, Stage, Lottery, Leaving }
 
     struct PadState
     {
@@ -127,19 +143,33 @@ public class MatchSelect : MonoBehaviour
         public object shown;                    // いま出しているもの（変わったらアイコンを弾ませる）
     }
 
+    // モードセレクトのカード1枚
+    class ModeCard
+    {
+        public MatchSetup.MatchMode mode;
+        public Color color;
+        public RectTransform rect;
+        public Image bg;
+        public TextMeshProUGUI title, desc;
+    }
+
+    // ルールセレクトの行の種類
+    enum RuleKind { Stocks, StockTime, TimeLength, GhostTime, Info, Next }
+
     // ルールセレクトの1行
     class RuleRow
     {
+        public RuleKind kind;
         public RectTransform rect;
         public Image bg;
         public TextMeshProUGUI label, value, desc;
     }
 
-    const int RuleGhost = 0, RuleTime = 1, RuleNext = 2;
-
-    Phase phase = Phase.Rule;
+    Phase phase = Phase.Mode;
     Player[] slots;
-    RuleRow[] ruleRows;
+    ModeCard[] modeCards;
+    int modeIndex;
+    readonly List<RuleRow> ruleRows = new List<RuleRow>();
     int ruleIndex;
     readonly List<Tile> charTiles = new List<Tile>();
     readonly List<Tile> stageTiles = new List<Tile>();
@@ -149,9 +179,9 @@ public class MatchSelect : MonoBehaviour
     float allVotedTime = -1f;
 
     // ---- UI ----
-    RectTransform canvas, ruleRoot, charRoot, stageRoot, lotteryRoot, cursorLayer, readyBanner;
-    CanvasGroup ruleGroup, charGroup, stageGroup, readyGroup, lotteryGroup;
-    TextMeshProUGUI hint, stageStatus, stageDescription, needMoreText, ruleSummary;
+    RectTransform canvas, modeRoot, ruleRoot, charRoot, stageRoot, lotteryRoot, cursorLayer, readyBanner;
+    CanvasGroup modeGroup, ruleGroup, charGroup, stageGroup, readyGroup, lotteryGroup;
+    TextMeshProUGUI hint, stageStatus, stageDescription, needMoreText, ruleSummary, ruleHeader;
     Image fade;
     Material letterMat, popMat;
     float readyAmount;
@@ -177,17 +207,18 @@ public class MatchSelect : MonoBehaviour
 
         // 毎回まっさらな状態から選び直す（前回の試合の選択は引き継がない。ルールだけは引き継ぐ）
         MatchSetup.Clear();
+        var rules = MatchSetup.Rules;
+        rules.knockPoints = knockPoints;
+        rules.knockedPoints = knockedPoints;
+        rules.headPoints = headPoints;
+        rules.selfOutPoints = selfOutPoints;
+        rules.stocks = Mathf.Clamp(rules.stocks, 1, maxStocks);
 
         BuildBackground();
         BuildUI();
-        if (fromMatch)
-        {
-            GoToCharacterSelect();
-            ruleRoot.anchoredPosition = new Vector2(-2200f, 0f);
-            charRoot.anchoredPosition = Vector2.zero;
-            ruleGroup.alpha = 0f;
-            charGroup.alpha = 1f;
-        }
+        if (fromMatch) GoToCharacterSelect();
+        else GoToModeSelect();
+        SnapScreens();
         InputSystem.onDeviceChange += OnDeviceChange;
     }
 
@@ -208,19 +239,21 @@ public class MatchSelect : MonoBehaviour
         float dt = Time.unscaledDeltaTime;
         if (fade.color.a > 0f) fade.color = new Color(1f, 1f, 1f, Mathf.MoveTowards(fade.color.a, 0f, dt * 2f));
 
-        if (phase == Phase.Rule) UpdateRuleSelect(dt);
+        if (phase == Phase.Mode) UpdateModeSelect(dt);
+        else if (phase == Phase.Rule) UpdateRuleSelect(dt);
         else if (phase == Phase.Character) UpdateCharacterSelect(dt);
         else if (phase == Phase.Stage) UpdateStageSelect(dt);
 
-        // 画面の切り替え（ルール ←→ キャラ ←→ ステージ）。左から順に並んでいて、横にすべって切り替わる
+        // 画面の切り替え（モード → ルール → キャラ → ステージ）。左から順に並んでいて、横にすべって切り替わる
         float k = 1f - Mathf.Exp(-10f * dt);
-        int screen = phase == Phase.Rule ? 0 : phase == Phase.Character ? 1 : 2;
-        ruleRoot.anchoredPosition = Vector2.Lerp(ruleRoot.anchoredPosition, new Vector2((0 - screen) * 2200f, 0f), k);
-        charRoot.anchoredPosition = Vector2.Lerp(charRoot.anchoredPosition, new Vector2((1 - screen) * 2200f, 0f), k);
-        stageRoot.anchoredPosition = Vector2.Lerp(stageRoot.anchoredPosition, new Vector2((2 - screen) * 2200f, 0f), k);
-        ruleGroup.alpha = Mathf.MoveTowards(ruleGroup.alpha, screen == 0 ? 1f : 0f, dt * 4f);
-        charGroup.alpha = Mathf.MoveTowards(charGroup.alpha, screen == 1 ? 1f : 0f, dt * 4f);
-        stageGroup.alpha = Mathf.MoveTowards(stageGroup.alpha, screen == 2 ? 1f : 0f, dt * 4f);
+        int screen = Screen();
+        var roots = new[] { modeRoot, ruleRoot, charRoot, stageRoot };
+        var groups = new[] { modeGroup, ruleGroup, charGroup, stageGroup };
+        for (int i = 0; i < roots.Length; i++)
+        {
+            roots[i].anchoredPosition = Vector2.Lerp(roots[i].anchoredPosition, new Vector2((i - screen) * 2200f, 0f), k);
+            groups[i].alpha = Mathf.MoveTowards(groups[i].alpha, i == screen ? 1f : 0f, dt * 4f);
+        }
         cursorLayer.gameObject.SetActive(phase == Phase.Character || phase == Phase.Stage);
         stageStatus.gameObject.SetActive(phase == Phase.Stage);
         stageDescription.gameObject.SetActive(phase == Phase.Stage);
@@ -231,49 +264,137 @@ public class MatchSelect : MonoBehaviour
         UpdateTiles(dt);
         UpdateBackground();
 
-        hint.text = phase == Phase.Rule
-            ? "↑↓：項目をえらぶ　←→ / A：切り替え　Start：キャラクターセレクトへ　B：メニューへ　（キーボード：WASD / Space / Enter / Esc）"
+        hint.text = phase == Phase.Mode
+            ? "←→：モードをえらぶ　A / Start：決定　B：メニューへ"
+            : phase == Phase.Rule
+            ? "↑↓：項目をえらぶ　←→ / A：切り替え　Start：キャラクターセレクトへ　B：モードセレクトへ"
             : phase == Phase.Character
             ? "A：参加・えらぶ・CPUのコインをつかむ　B：取り消し・抜ける（だれもいなければルールセレクトへ）　Start：次へ"
             : phase == Phase.Stage ? "A：投票　B：取り消し（投票していなければキャラクターセレクトへ）　全員が投票したら抽選！"
             : "";
     }
 
-    // ---------------- ルールセレクト ----------------
-    // まだだれも参加していないので、キーボードとどのコントローラーでも操作できる
+    // いま見せている画面（0 = モード, 1 = ルール, 2 = キャラ, 3 = ステージ）
+    int Screen() => phase == Phase.Mode ? 0 : phase == Phase.Rule ? 1 : phase == Phase.Character ? 2 : 3;
+
+    // 画面をすべらせずに、いまの画面へ一気に切り替える
+    void SnapScreens()
+    {
+        var roots = new[] { modeRoot, ruleRoot, charRoot, stageRoot };
+        var groups = new[] { modeGroup, ruleGroup, charGroup, stageGroup };
+        for (int i = 0; i < roots.Length; i++)
+        {
+            roots[i].anchoredPosition = new Vector2((i - Screen()) * 2200f, 0f);
+            groups[i].alpha = i == Screen() ? 1f : 0f;
+        }
+    }
+
+    // ---------------- モードセレクト ----------------
+    // まだだれも参加していないので、モード・ルールはキーボードとどのコントローラーでも操作できる
+    void UpdateModeSelect(float dt)
+    {
+        if (phaseFrame != Time.frameCount)
+        {
+            int n = modeCards.Length;
+            if (MenuInput.Left()) modeIndex = (modeIndex + n - 1) % n;
+            else if (MenuInput.Right()) modeIndex = (modeIndex + 1) % n;
+            else if (MenuInput.Submit() || MenuInput.Start())
+            {
+                MatchSetup.Rules.mode = modeCards[modeIndex].mode;
+                GoToRuleSelect();
+                return;
+            }
+            else if (MenuInput.Cancel()) { Back(); return; }
+        }
+
+        // 選んでいるカードは色を付けて大きく
+        float k = 1f - Mathf.Exp(-14f * dt);
+        for (int i = 0; i < modeCards.Length; i++)
+        {
+            var c = modeCards[i];
+            bool sel = i == modeIndex;
+            c.bg.color = Color.Lerp(c.bg.color, sel ? c.color : Color.white, k);
+            c.rect.localScale = Vector3.Lerp(c.rect.localScale, Vector3.one * (sel ? 1.08f : 0.94f), k);
+            c.title.color = sel ? Color.white : ToyKit.Ink;
+            c.desc.color = sel ? Color.white : new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.75f);
+        }
+    }
+
+    void GoToModeSelect()
+    {
+        phase = Phase.Mode;
+        phaseFrame = Time.frameCount;
+        modeIndex = Mathf.Max(0, System.Array.FindIndex(modeCards, c => c.mode == MatchSetup.Rules.mode));
+    }
+
+    // ---------------- ルールセレクト（選んだモードの詳細設定） ----------------
+    void GoToRuleSelect()
+    {
+        phase = Phase.Rule;
+        phaseFrame = Time.frameCount;
+        BuildRuleRows();
+        ruleHeader.text = "ルール：" + MatchSetup.Rules.ModeName;
+        ruleIndex = ruleRows.FindIndex(r => r.kind != RuleKind.Info);
+    }
+
     void UpdateRuleSelect(float dt)
     {
         var rules = MatchSetup.Rules;
         if (phaseFrame != Time.frameCount)
         {
-            if (MenuInput.Up()) ruleIndex = (ruleIndex + ruleRows.Length - 1) % ruleRows.Length;
-            else if (MenuInput.Down()) ruleIndex = (ruleIndex + 1) % ruleRows.Length;
+            if (MenuInput.Up()) ruleIndex = NextRuleRow(-1);
+            else if (MenuInput.Down()) ruleIndex = NextRuleRow(1);
             else if (MenuInput.Start()) { GoToCharacterSelect(); return; }
-            else if (MenuInput.Cancel()) { Back(); return; }
+            else if (MenuInput.Cancel()) { GoToModeSelect(); return; }
             else if (MenuInput.Left() || MenuInput.Right() || MenuInput.Submit())
             {
                 int dir = MenuInput.Left() ? -1 : 1;   // ← で戻る、→ / A で進む
-                if (ruleIndex == RuleGhost) { rules.ghost = !rules.ghost; Bounce(ruleRows[ruleIndex].value); }
-                else if (ruleIndex == RuleTime) { StepTimeLimit(dir); Bounce(ruleRows[ruleIndex].value); }
-                else if (MenuInput.Submit()) { GoToCharacterSelect(); return; }
+                var row = ruleRows[ruleIndex];
+                switch (row.kind)
+                {
+                    case RuleKind.Stocks: rules.stocks = (rules.stocks - 1 + dir + maxStocks) % maxStocks + 1; break;
+                    case RuleKind.StockTime: rules.stockTimeLimit = StepTime(rules.stockTimeLimit, true, dir); break;
+                    case RuleKind.TimeLength: rules.timeLength = StepTime(rules.timeLength, false, dir); break;
+                    case RuleKind.GhostTime: rules.ghostTimeLimit = StepTime(rules.ghostTimeLimit, true, dir); break;
+                    case RuleKind.Next: if (MenuInput.Submit()) { GoToCharacterSelect(); return; } break;
+                }
+                if (row.value != null) Bounce(row.value);
             }
         }
 
-        SetRule(ruleRows[RuleGhost], rules.ghost ? "あり" : "なし",
-            rules.ghost ? "脱落しても幽霊になって動ける。生き残っている相手を叩けば復活！" : "脱落したらそこでおしまい。最後まで残った人の勝ち");
-        SetRule(ruleRows[RuleTime], rules.timeLimit ? TimeText(rules.timeLimitSeconds) : "なし",
-            rules.timeLimit ? "時間切れになったら、生き残っている中で積み木を一番多く積んでいる人の勝ち" : "最後の1人になるまで続ける");
+        foreach (var row in ruleRows)
+        {
+            switch (row.kind)
+            {
+                case RuleKind.Stocks:
+                    SetRule(row, rules.stocks + " ストック", "やられるとストックが1つ減る。無くなったら脱落、最後まで残った人の勝ち");
+                    break;
+                case RuleKind.StockTime:
+                    SetRule(row, rules.stockTimeLimit > 0f ? TimeText(rules.stockTimeLimit) : "なし",
+                        rules.stockTimeLimit > 0f ? "時間切れになったら、残りストックが一番多い人の勝ち" : "最後の1人になるまで続ける");
+                    break;
+                case RuleKind.TimeLength:
+                    SetRule(row, TimeText(rules.timeLength), "決めた時間いっぱい戦う。やられても何度でも復活できる");
+                    break;
+                case RuleKind.GhostTime:
+                    SetRule(row, rules.ghostTimeLimit > 0f ? TimeText(rules.ghostTimeLimit) : "なし",
+                        rules.ghostTimeLimit > 0f ? "時間切れになったら、生き残っている中で積み木が一番多い人の勝ち" : "最後の1人になるまで続ける");
+                    break;
+            }
+        }
 
-        // 選んでいる行は色を付けて少し大きく
+        // 選んでいる行は色を付けて少し大きく（説明だけの行は選べない）
         float k = 1f - Mathf.Exp(-14f * dt);
-        for (int i = 0; i < ruleRows.Length; i++)
+        for (int i = 0; i < ruleRows.Count; i++)
         {
             var row = ruleRows[i];
             bool sel = i == ruleIndex;
-            row.bg.color = Color.Lerp(row.bg.color, sel ? (i == RuleNext ? ToyKit.Palette[0] : ToyKit.Palette[2]) : Color.white, k);
+            var on = row.kind == RuleKind.Next ? ToyKit.Palette[0] : ToyKit.Palette[2];
+            var off = row.kind == RuleKind.Info ? new Color(1f, 1f, 1f, 0.75f) : Color.white;
+            row.bg.color = Color.Lerp(row.bg.color, sel ? on : off, k);
             row.rect.localScale = Vector3.Lerp(row.rect.localScale, Vector3.one * (sel ? 1.05f : 1f), k);
             row.label.color = sel ? Color.white : ToyKit.Ink;
-            if (row.desc != null) row.desc.color = sel ? Color.white : new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.7f);
+            if (row.desc != null) row.desc.color = sel ? Color.white : new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, row.kind == RuleKind.Info ? 0.9f : 0.7f);
             if (row.value != null)
             {
                 row.value.color = sel ? Color.white : ToyKit.Ink;
@@ -282,20 +403,27 @@ public class MatchSelect : MonoBehaviour
         }
     }
 
-    // 制限時間を「なし → 1分 → 2分 → 3分 → なし …」と切り替える（dir = -1 で逆回り）
-    void StepTimeLimit(int dir)
+    // 上下で次に選べる行（説明だけの行は飛ばす）
+    int NextRuleRow(int dir)
     {
-        var rules = MatchSetup.Rules;
-        int count = timeLimitChoices.Length + 1;   // 0 = なし
-        int current = 0;
-        if (rules.timeLimit)
+        int n = ruleRows.Count, i = ruleIndex;
+        for (int step = 0; step < n; step++)
         {
-            current = System.Array.IndexOf(timeLimitChoices, rules.timeLimitSeconds) + 1;
-            if (current <= 0) current = count - 1;
+            i = (i + dir + n) % n;
+            if (ruleRows[i].kind != RuleKind.Info) return i;
         }
-        int next = (current + dir + count) % count;
-        rules.timeLimit = next > 0;
-        if (next > 0) rules.timeLimitSeconds = timeLimitChoices[next - 1];
+        return ruleIndex;
+    }
+
+    // 時間を「（なし →）1分 → 2分 → 3分 → …」と切り替える（dir = -1 で逆回り）。0 = なし
+    float StepTime(float current, bool allowNone, int dir)
+    {
+        int offset = allowNone ? 1 : 0;
+        int count = timeLimitChoices.Length + offset;
+        int index = System.Array.IndexOf(timeLimitChoices, current);
+        int at = index >= 0 ? index + offset : allowNone && current <= 0f ? 0 : count - 1;
+        int next = (at + dir + count) % count;
+        return next < offset ? 0f : timeLimitChoices[next - offset];
     }
 
     static string TimeText(float seconds) =>
@@ -309,19 +437,27 @@ public class MatchSelect : MonoBehaviour
 
     static void Bounce(TextMeshProUGUI t) => t.rectTransform.localScale = Vector3.one * 1.25f;
 
+    // キャラクターセレクトの右上に出すルールの説明
+    static string RuleSummaryText()
+    {
+        var r = MatchSetup.Rules;
+        switch (r.mode)
+        {
+            case MatchSetup.MatchMode.Stock:
+                return "モード：ストック（" + r.stocks + "ストック　時間制限 " + (r.stockTimeLimit > 0f ? TimeText(r.stockTimeLimit) : "なし") + "）";
+            case MatchSetup.MatchMode.Time:
+                return "モード：タイム（" + TimeText(r.timeLength) + "）";
+            default:
+                return "モード：ゴースト（時間制限 " + (r.ghostTimeLimit > 0f ? TimeText(r.ghostTimeLimit) : "なし") + "）";
+        }
+    }
+
     void GoToCharacterSelect()
     {
         phase = Phase.Character;
         phaseFrame = Time.frameCount;
-        var r = MatchSetup.Rules;
-        ruleSummary.text = "ルール：ゴースト " + (r.ghost ? "あり" : "なし") + "　/　時間制限 " + (r.timeLimit ? TimeText(r.timeLimitSeconds) : "なし");
+        ruleSummary.text = RuleSummaryText();
         Debug.Log(ruleSummary.text);
-    }
-
-    void BackToRuleSelect()
-    {
-        phase = Phase.Rule;
-        phaseFrame = Time.frameCount;
     }
 
     // ---------------- キャラクターセレクト ----------------
@@ -333,7 +469,7 @@ public class MatchSelect : MonoBehaviour
             if (FindPlayer(device) != null) continue;
             var s = Read(device);
             if (s.a || s.start) Join(device);
-            else if (s.b && HumanCount() == 0) { BackToRuleSelect(); return; }
+            else if (s.b && HumanCount() == 0) { GoToRuleSelect(); return; }
         }
 
         bool ready = AllChoseCharacter();
@@ -1061,20 +1197,28 @@ public class MatchSelect : MonoBehaviour
     {
         canvas = ToyKit.CreateOverlayCanvas("UI", 10);
 
-        // ---- ルールセレクト ----
+        // ---- モードセレクト ----
+        modeRoot = Layer("ModeSelect", canvas);
+        modeGroup = modeRoot.gameObject.AddComponent<CanvasGroup>();
+        Header(modeRoot, "モードセレクト", ToyKit.Palette[1]);
+        modeCards = new[]
+        {
+            MakeModeCard(MatchSetup.MatchMode.Stock, "ストック", ToyKit.Palette[1], new Vector2(-580f, -10f),
+                "ストックが無くなるまで\n戦う。最後まで\n残った人の勝ち！"),
+            MakeModeCard(MatchSetup.MatchMode.Time, "タイム", ToyKit.Palette[4], new Vector2(0f, -10f),
+                "時間いっぱい戦って\n点をかせぐ。\n一番点が多い人の勝ち！"),
+            MakeModeCard(MatchSetup.MatchMode.Ghost, "ゴースト", ToyKit.Palette[3], new Vector2(580f, -10f),
+                "やられても幽霊になって\n相手を叩けば復活！\n最後の1人まで戦う"),
+        };
+
+        // ---- ルールセレクト（行はモードを選んだときに作る） ----
         ruleRoot = Layer("RuleSelect", canvas);
         ruleGroup = ruleRoot.gameObject.AddComponent<CanvasGroup>();
-        Header(ruleRoot, "ルールセレクト", ToyKit.Palette[2]);
-        ruleRows = new RuleRow[3];
-        ruleRows[RuleGhost] = MakeRuleRow("ゴースト", new Vector2(0f, 170f), 190f);
-        ruleRows[RuleTime] = MakeRuleRow("時間制限", new Vector2(0f, -40f), 190f);
-        ruleRows[RuleNext] = MakeRuleRow("キャラクターセレクトへ", new Vector2(0f, -240f), 120f);
+        ruleHeader = Header(ruleRoot, "ルール", ToyKit.Palette[2]);
 
         // ---- キャラクターセレクト ----
         charRoot = Layer("CharacterSelect", canvas);
-        charRoot.anchoredPosition = new Vector2(2200f, 0f);
         charGroup = charRoot.gameObject.AddComponent<CanvasGroup>();
-        charGroup.alpha = 0f;
         Header(charRoot, "キャラクターセレクト", ToyKit.Palette[0]);
 
         // 決めたルール（右上）
@@ -1110,7 +1254,7 @@ public class MatchSelect : MonoBehaviour
         var rt = ToyKit.UIText("Text", readyBanner, font, "じゅんびOK！", 96f, Color.white);
         rt.fontSharedMaterial = popMat;
         ToyKit.Anchor(rt.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(-150f, 8f), new Vector2(900f, 140f));
-        var rs = ToyKit.UIText("Sub", readyBanner, font, "Start / Enter でステージセレクトへ", 38f, Color.white);
+        var rs = ToyKit.UIText("Sub", readyBanner, font, "Start でステージセレクトへ", 38f, Color.white);
         ToyKit.Anchor(rs.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(520f, -10f), new Vector2(700f, 60f));
 
         needMoreText = ToyKit.UIText("NeedMore", charRoot, font, "あいて（CPU か ほかのプレイヤー）を くわえてね！\n<size=60%>枠の右上のボタンで CPU にできます</size>", 54f, ToyKit.Palette[0]);
@@ -1120,9 +1264,7 @@ public class MatchSelect : MonoBehaviour
 
         // ---- ステージセレクト ----
         stageRoot = Layer("StageSelect", canvas);
-        stageRoot.anchoredPosition = new Vector2(4400f, 0f);
         stageGroup = stageRoot.gameObject.AddComponent<CanvasGroup>();
-        stageGroup.alpha = 0f;
         Header(stageRoot, "ステージセレクト", ToyKit.Palette[4]);
 
         int sc = roster.stages.Count + 1;   // 最後におまかせ
@@ -1200,11 +1342,75 @@ public class MatchSelect : MonoBehaviour
         ToyKit.Stretch(fade.rectTransform);
     }
 
-    // ルールセレクトの1行。height が小さい行はボタン（値と説明なし）
-    RuleRow MakeRuleRow(string label, Vector2 pos, float height)
+    // モードセレクトのカード（モード名・説明）
+    ModeCard MakeModeCard(MatchSetup.MatchMode mode, string title, Color color, Vector2 pos, string desc)
     {
-        var row = new RuleRow();
-        bool button = height < 150f;
+        var c = new ModeCard { mode = mode, color = color };
+        var size = new Vector2(520f, 600f);
+        c.rect = ToyKit.UIImage("Mode_" + title, modeRoot, Color.white, uiSprite);
+        ToyKit.Anchor(c.rect, new Vector2(0.5f, 0.5f), pos, size);
+        c.bg = c.rect.GetComponent<Image>();
+        c.bg.pixelsPerUnitMultiplier = 0.3f;
+        var ol = c.rect.gameObject.AddComponent<Outline>(); ol.effectColor = ToyKit.Ink; ol.effectDistance = new Vector2(4f, -4f);
+
+        c.title = ToyKit.UIText("Title", c.rect, font, title, 96f, ToyKit.Ink);
+        c.title.fontSharedMaterial = letterMat;
+        ToyKit.Anchor(c.title.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -190f), new Vector2(size.x - 40f, 130f));
+
+        c.desc = ToyKit.UIText("Desc", c.rect, font, desc, 34f, ToyKit.Ink);
+        c.desc.enableAutoSizing = true; c.desc.fontSizeMin = 20f; c.desc.fontSizeMax = 34f;   // 改行は文章側で入れる
+        c.desc.lineSpacing = 10f;
+        ToyKit.Anchor(c.desc.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, 110f), new Vector2(size.x - 50f, 180f));
+        return c;
+    }
+
+    // 選んだモードに合わせて、ルールセレクトの行を作り直す
+    void BuildRuleRows()
+    {
+        foreach (var r in ruleRows) Destroy(r.rect.gameObject);
+        ruleRows.Clear();
+
+        var rules = MatchSetup.Rules;
+        var rows = new List<KeyValuePair<RuleKind, string>>();
+        switch (rules.mode)
+        {
+            case MatchSetup.MatchMode.Stock:
+                rows.Add(new KeyValuePair<RuleKind, string>(RuleKind.Stocks, "ストック数"));
+                rows.Add(new KeyValuePair<RuleKind, string>(RuleKind.StockTime, "時間制限"));
+                break;
+            case MatchSetup.MatchMode.Time:
+                rows.Add(new KeyValuePair<RuleKind, string>(RuleKind.TimeLength, "試合時間"));
+                break;
+            default:
+                rows.Add(new KeyValuePair<RuleKind, string>(RuleKind.GhostTime, "時間制限"));
+                break;
+        }
+        rows.Add(new KeyValuePair<RuleKind, string>(RuleKind.Next, "キャラクターセレクトへ"));
+
+        // 上から順に、全体が画面の中央に来るように並べる
+        const float gap = 22f;
+        float total = -gap;
+        foreach (var r in rows) total += RowHeight(r.Key) + gap;
+        float y = 30f + total * 0.5f;
+        foreach (var r in rows)
+        {
+            float h = RowHeight(r.Key);
+            var row = MakeRuleRow(r.Key, r.Value, new Vector2(0f, y - h * 0.5f), h);
+            y -= h + gap;
+            ruleRows.Add(row);
+        }
+    }
+
+    static float RowHeight(RuleKind kind) => kind == RuleKind.Next ? 120f : kind == RuleKind.Info ? 210f : 190f;
+
+
+    // ルールセレクトの1行
+    //   設定の行：左に項目名、右に「＜ 値 ＞」、下に説明
+    //   説明の行：左上に項目名、下に2行の説明（選べない）
+    //   ボタン　：真ん中に文字だけ
+    RuleRow MakeRuleRow(RuleKind kind, string label, Vector2 pos, float height)
+    {
+        var row = new RuleRow { kind = kind };
         const float w = 1300f;
         row.rect = ToyKit.UIImage("Rule_" + label, ruleRoot, Color.white, uiSprite);
         ToyKit.Anchor(row.rect, new Vector2(0.5f, 0.5f), pos, new Vector2(w, height));
@@ -1212,17 +1418,26 @@ public class MatchSelect : MonoBehaviour
         row.bg.pixelsPerUnitMultiplier = 0.4f;
         var ol = row.rect.gameObject.AddComponent<Outline>(); ol.effectColor = ToyKit.Ink; ol.effectDistance = new Vector2(3f, -3f);
 
-        row.label = ToyKit.UIText("Label", row.rect, font, label, button ? 56f : 60f, ToyKit.Ink);
+        row.label = ToyKit.UIText("Label", row.rect, font, label, kind == RuleKind.Next ? 56f : 60f, ToyKit.Ink);
         row.label.fontSharedMaterial = letterMat;
-        if (button) { ToyKit.Stretch(row.label.rectTransform); return row; }
+        if (kind == RuleKind.Next) { ToyKit.Stretch(row.label.rectTransform); return row; }
 
         row.label.alignment = TextAlignmentOptions.Left;
+        row.desc = ToyKit.UIText("Desc", row.rect, font, "", 32f, ToyKit.Ink);
+        row.desc.alignment = TextAlignmentOptions.Left;
+        if (kind == RuleKind.Info)
+        {
+            row.label.fontSize = 48f;
+            ToyKit.Anchor(row.label.rectTransform, new Vector2(0f, 1f), new Vector2(60f + 220f, -45f), new Vector2(440f, 70f));
+            row.desc.lineSpacing = 8f;
+            ToyKit.Anchor(row.desc.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, -30f), new Vector2(w - 120f, 120f));
+            return row;
+        }
+
         ToyKit.Anchor(row.label.rectTransform, new Vector2(0f, 0.5f), new Vector2(60f + 220f, 30f), new Vector2(440f, 90f));
         row.value = ToyKit.UIText("Value", row.rect, font, "", 60f, ToyKit.Ink);
         row.value.fontSharedMaterial = letterMat;
         ToyKit.Anchor(row.value.rectTransform, new Vector2(1f, 0.5f), new Vector2(-60f - 280f, 30f), new Vector2(560f, 90f));
-        row.desc = ToyKit.UIText("Desc", row.rect, font, "", 32f, ToyKit.Ink);
-        row.desc.alignment = TextAlignmentOptions.Left;
         ToyKit.Anchor(row.desc.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, -48f), new Vector2(w - 120f, 60f));
         return row;
     }
@@ -1235,7 +1450,7 @@ public class MatchSelect : MonoBehaviour
         return r;
     }
 
-    void Header(Transform parent, string text, Color accent)
+    TextMeshProUGUI Header(Transform parent, string text, Color accent)
     {
         var bar = ToyKit.UIImage("HeaderBar", parent, accent, uiSprite);
         bar.anchorMin = bar.anchorMax = new Vector2(0f, 1f);
@@ -1246,6 +1461,7 @@ public class MatchSelect : MonoBehaviour
         t.fontSharedMaterial = popMat;
         t.alignment = TextAlignmentOptions.Left;
         ToyKit.Anchor(t.rectTransform, new Vector2(0f, 0.5f), new Vector2(400f, 0f), new Vector2(700f, 110f));
+        return t;
     }
 
     struct Cell { public Vector2 pos, size; }

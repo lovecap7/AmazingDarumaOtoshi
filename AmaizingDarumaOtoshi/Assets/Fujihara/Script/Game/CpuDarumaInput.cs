@@ -11,7 +11,7 @@ public class CpuDarumaInput : MonoBehaviour, IDarumaCommandSource
 {
     [Range(1, 9)] public int level = 3;
 
-    DarumaPlayer m_player;
+    MatchPlayer m_player;
     float m_thinkTimer, m_sweepCooldown, m_shotCooldown, m_jumpCooldown;
     Vector2 m_move;
     Transform m_target;
@@ -23,10 +23,10 @@ public class CpuDarumaInput : MonoBehaviour, IDarumaCommandSource
     public DarumaCommand ReadCommand()
     {
         var cmd = new DarumaCommand();
-        // DarumaPlayer より先に付けるので、使うときに取る
-        if (m_player == null) m_player = GetComponent<DarumaPlayer>();
+        // MatchPlayer より先に付けるので、使うときに取る
+        if (m_player == null) m_player = GetComponent<MatchPlayer>();
         if (m_player == null) return cmd;
-        Transform body = m_player.CurrentBody;
+        Transform body = m_player.Body;
         if (body == null) return cmd;
 
         float dt = Time.deltaTime;
@@ -119,7 +119,9 @@ public class CpuDarumaInput : MonoBehaviour, IDarumaCommandSource
     {
         Transform best = null;
         float bestD = float.MaxValue;
-        foreach (var p in FindObjectsByType<DarumaPlayer>(FindObjectsSortMode.None))
+        var director = MatchDirector.Current;
+        if (director == null) return null;
+        foreach (var p in director.Players)
         {
             if (p == m_player || p.Character == null) continue;   // 狙うのは生存者だけ
             float d = Vector3.Distance(from, p.Character.transform.position);
