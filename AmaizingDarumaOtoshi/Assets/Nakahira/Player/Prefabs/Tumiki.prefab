@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 4273198007405502968}
   - component: {fileID: 3841633084211777074}
   - component: {fileID: 8403237043251477910}
+  - component: {fileID: 5114245874740468188}
   m_Layer: 0
   m_Name: Tumiki
   m_TagString: Untagged
@@ -121,6 +122,24 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakahira.HitStop
   m_visual: {fileID: 8829922984425693284}
+--- !u!114 &5114245874740468188
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4710477447778846597}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4e41303c5ea1dd418f036c1c274ba83, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiEdgeSlip
+  m_slipAcceleration: 25
+  m_rimSamples: 8
+  m_probeDepth: 0.15
+  m_floorMask:
+    serializedVersion: 2
+    m_Bits: 4294967291
 --- !u!1 &5134043105676288420
 GameObject:
   m_ObjectHideFlags: 0

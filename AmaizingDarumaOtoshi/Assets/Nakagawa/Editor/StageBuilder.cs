@@ -24,6 +24,7 @@ namespace Nakagawa.EditorTools
         const string kMaterialDir = "Assets/Nakagawa/Materials";
         const string kRandomPatternPath = "Assets/Nakagawa/SpawnPatterns/SpawnPattern_Random.asset";
         const string kEqualPatternPath = "Assets/Nakagawa/SpawnPatterns/SpawnPattern_Equal.asset";
+        const string kBounceImpactPath = "Assets/Nakagawa/TumikiImpacts/TumikiImpact_Bounce.asset";
 
         const string kNakahira = "Assets/Nakahira/Player";
         const string kCharacterPrefab = kNakahira + "/Prefabs/DarumaCharacter.prefab";
@@ -602,6 +603,7 @@ namespace Nakagawa.EditorTools
             SetupSpawner(spawnerGo.AddComponent<TumikiSpawner>(), c.AreaList, def.MaxBlocks, match);
 
             BuildLightAndCamera(bounds);
+            SetupCameraAndDebugTools(scene);
 
             string layout = Layout(c, bounds, def.MaxBlocks);
             def.Layout = layout;
@@ -650,9 +652,7 @@ namespace Nakagawa.EditorTools
             patterns.arraySize = 2;
             patterns.GetArrayElementAtIndex(0).objectReferenceValue = Load<TumikiSpawnPattern>(kRandomPatternPath);
             patterns.GetArrayElementAtIndex(1).objectReferenceValue = Load<TumikiSpawnPattern>(kEqualPatternPath);
-            var areaProp = so.FindProperty("m_areas");
-            areaProp.arraySize = areas.Count;
-            for (int i = 0; i < areas.Count; i++) areaProp.GetArrayElementAtIndex(i).objectReferenceValue = areas[i];
+            // 生成エリアは TumikiSpawner がゲーム開始時に盤面から探す
             so.FindProperty("m_maxBlocksOnBoard").intValue = maxBlocks;
             so.FindProperty("m_match").objectReferenceValue = match;
             so.ApplyModifiedPropertiesWithoutUndo();
@@ -696,6 +696,70 @@ namespace Nakagawa.EditorTools
                 if (fits) break;
             }
             camera.ResetAspect();
+        }
+
+        // プレイヤーを追うカメラと、デバッグ用の切り替え(積み木の衝突の振る舞い)を付ける。付いていれば何もしない
+        public static void SetupCameraAndDebugTools(Scene scene)
+        {
+            foreach (var root in scene.GetRootGameObjects())
+            {
+                var camera = root.GetComponent<Camera>();
+                if (camera != null && root.CompareTag("MainCamera") && root.GetComponent<MatchCamera>() == null)
+                {
+                    root.AddComponent<MatchCamera>();
+                }
+            }
+
+            bool hasToggle = false;
+            foreach (var root in scene.GetRootGameObjects())
+            {
+                if (root.GetComponentInChildren<TumikiImpactModeToggle>(true) != null) hasToggle = true;
+            }
+            if (hasToggle) return;
+
+            var go = new GameObject("DebugTools");
+            SceneManager.MoveGameObjectToScene(go, scene);
+            var toggle = go.AddComponent<TumikiImpactModeToggle>();
+            var so = new SerializedObject(toggle);
+            var modes = so.FindProperty("m_modes");
+            modes.arraySize = 1;
+            modes.GetArrayElementAtIndex(0).objectReferenceValue = BounceImpactAsset();
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        // 既存のステージのシーンに、プレイヤーを追うカメラとデバッグ用の切り替えを付ける(ステージは作り直さない)
+        [MenuItem("Nakagawa/Stages/Add Camera & Debug Tools To Existing Stages")]
+        public static void UpdateExistingStages()
+        {
+            if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
+            Scene original = SceneManager.GetActiveScene();
+            int count = 0;
+            foreach (var file in Directory.GetFiles(kStageDir, "Stage*.unity"))
+            {
+                string path = file.Replace('\\', '/');
+                Scene loaded = SceneManager.GetSceneByPath(path);
+                bool wasLoaded = loaded.IsValid() && loaded.isLoaded;
+                Scene scene = wasLoaded ? loaded : EditorSceneManager.OpenScene(path, OpenSceneMode.Additive);
+                SetupCameraAndDebugTools(scene);
+                EditorSceneManager.SaveScene(scene);
+                if (!wasLoaded) EditorSceneManager.CloseScene(scene, true);
+                count++;
+            }
+            if (original.IsValid()) SceneManager.SetActiveScene(original);
+            Debug.Log($"[StageBuilder] {count}ステージにカメラとデバッグ用の切り替えを付けました");
+        }
+
+        static TumikiImpactAsset BounceImpactAsset()
+        {
+            var asset = Load<TumikiBounceImpact>(kBounceImpactPath);
+            if (asset != null) return asset;
+            EnsureFolder(Path.GetDirectoryName(kBounceImpactPath).Replace('\\', '/'));
+            asset = ScriptableObject.CreateInstance<TumikiBounceImpact>();
+            var so = new SerializedObject(asset);
+            so.FindProperty("m_displayName").stringValue = "非破壊(跳ね返る)";
+            so.ApplyModifiedPropertiesWithoutUndo();
+            AssetDatabase.CreateAsset(asset, kBounceImpactPath);
+            return asset;
         }
 
         //========================================

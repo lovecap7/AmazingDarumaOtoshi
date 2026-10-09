@@ -1,0 +1,18 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7d83d5cd28bffbb45b92ad6edaf576c3, type: 3}
+  m_Name: TumikiImpact_Bounce
+  m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiBounceImpact
+  m_displayName: "\u975E\u7834\u58CA(\u8DF3\u306D\u8FD4\u308B)"
+  m_restitution: 0.9
+  m_otherMassRatio: 2
+  m_hitStop: 1

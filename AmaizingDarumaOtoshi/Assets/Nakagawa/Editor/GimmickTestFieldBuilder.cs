@@ -274,9 +274,7 @@ namespace Nakagawa.EditorTools
             patterns.arraySize = 2;
             patterns.GetArrayElementAtIndex(0).objectReferenceValue = Load<TumikiSpawnPattern>(kRandomPatternPath);
             patterns.GetArrayElementAtIndex(1).objectReferenceValue = Load<TumikiSpawnPattern>(kEqualPatternPath);
-            var areaProp = so.FindProperty("m_areas");
-            areaProp.arraySize = areas.Length;
-            for (int i = 0; i < areas.Length; i++) areaProp.GetArrayElementAtIndex(i).objectReferenceValue = areas[i];
+            // 生成エリアは TumikiSpawner がゲーム開始時に盤面から探す
             so.FindProperty("m_match").objectReferenceValue = Object.FindAnyObjectByType<DarumaMatch>();
             so.ApplyModifiedPropertiesWithoutUndo();
 

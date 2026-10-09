@@ -20,6 +20,11 @@ namespace Nakagawa
         // 円形の半径
         [SerializeField] float m_radius = 3.0f;
 
+        [Header("排出量(1回の生成命令で割り振られる数)")]
+        // 生成予定数がすべてのエリアの最小の合計より少ない / 最大の合計より多い場合は、TumikiSpawner が生成予定数を調整する
+        [SerializeField, Min(0)] int m_minAmount = 0;
+        [SerializeField, Min(0)] int m_maxAmount = 10;
+
         [Header("配置")]
         // 積み木同士・障害物との最低限の隙間
         [SerializeField] float m_spacing = 0.1f;
@@ -42,6 +47,8 @@ namespace Nakagawa
 
         public Shape AreaShape => m_shape;
         public float FloorY => transform.position.y;
+        public int MinAmount => m_minAmount;
+        public int MaxAmount => Mathf.Max(m_minAmount, m_maxAmount);
 
         private void Awake()
         {
@@ -53,6 +60,7 @@ namespace Nakagawa
             m_size = Vector2.Max(m_size, new Vector2(0.1f, 0.1f));
             m_radius = Mathf.Max(0.1f, m_radius);
             m_maxAttempts = Mathf.Max(1, m_maxAttempts);
+            m_maxAmount = Mathf.Max(m_minAmount, m_maxAmount);
             ApplyShape();
         }
 

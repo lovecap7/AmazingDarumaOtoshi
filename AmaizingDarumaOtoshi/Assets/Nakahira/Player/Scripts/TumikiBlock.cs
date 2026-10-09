@@ -3,11 +3,35 @@ using UnityEngine;
 
 namespace Nakahira
 {
+    // 攻撃判定のある積み木が、他の積み木にぶつかったときの振る舞い
+    // 積み木ごとに差し替えられる(TumikiBlock.ImpactBehavior)。新しい振る舞いはこのインターフェースを実装して作る
+    public interface ITumikiImpactBehavior
+    {
+        // self: ぶつかった攻撃判定のある積み木 / other: ぶつかられた積み木(崩れる途中・積まれているものは除く)
+        void OnHitBlock(TumikiBlock self, TumikiBlock other);
+    }
+
+    // 既定の振る舞い: 相手を飛ばして自分は崩れる(連鎖)
+    public sealed class TumikiBreakImpact : ITumikiImpactBehavior
+    {
+        public static readonly TumikiBreakImpact Instance = new TumikiBreakImpact();
+
+        public void OnHitBlock(TumikiBlock self, TumikiBlock other)
+        {
+            self.ComputeImpact(other.transform.position, out Vector3 dir, out float speed);
+            self.GetImpactHitStop(out float duration, out float timeScale, out float shake);
+            // 両方がヒットストップ。相手は明けてから飛び出し、自分は残りの速度でゆっくり進みながら耐えて、明けたら割れる
+            other.StartHitStop(duration, timeScale, shake);
+            other.Push(dir, speed, self.Owner, self.ReturnCount);
+            self.Break(self.Direction * self.Speed - dir * speed, duration, shake);
+        }
+    }
+
     // 積み木
     // Loose  : ステージに落ちている。上に乗ると拾える
     // Stacked: プレイヤーに積まれている。当たり判定はプレイヤー側のコライダーが担当する
     // Flying : 地面を滑るように直進し、次第に減速する。壁で反射する。止まる速さを下回るとLooseに戻る
-    //           ・攻撃判定あり(HarmlessSpeed以上): 他の積み木に当たると連鎖し、キャラクターにダメージを与える
+    //           ・攻撃判定あり(HarmlessSpeed以上): 他の積み木に当たると ImpactBehavior に従い(既定は連鎖)、キャラクターにダメージを与える
     //           ・攻撃判定なし(HarmlessSpeed未満): 積み木同士は弾き合い、キャラクターには跳ね返される
     [RequireComponent(typeof(Rigidbody), typeof(HitStop))]
     public class TumikiBlock : MonoBehaviour, IGimmickAffectable
@@ -74,6 +98,22 @@ namespace Nakahira
         public int ReturnCount { get; private set; }
         // 攻撃判定があるか(連鎖・ダメージが起きる速さで動いている)
         public bool IsHarmful => CurrentState == State.Flying && !m_isConsumed && Speed >= m_params.HarmlessSpeed;
+
+        // 攻撃判定があるときに他の積み木にぶつかったときの振る舞い。積み木ごとに設定がなければ DefaultImpactBehavior を使う
+        // nullを設定すると既定に戻る
+        public ITumikiImpactBehavior ImpactBehavior
+        {
+            get => m_impactBehavior ?? DefaultImpactBehavior ?? TumikiBreakImpact.Instance;
+            set => m_impactBehavior = value;
+        }
+        ITumikiImpactBehavior m_impactBehavior;
+
+        // 全積み木の既定の振る舞い(デバッグでの切り替えや、ルールによる変更用)
+        public static ITumikiImpactBehavior DefaultImpactBehavior { get; set; } = TumikiBreakImpact.Instance;
+
+        // ドメインの再読み込みをしない設定でも、再生のたびに既定に戻す
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetStatics() => DefaultImpactBehavior = TumikiBreakImpact.Instance;
 
         private void Awake()
         {
@@ -380,6 +420,13 @@ namespace Nakahira
             }
         }
 
+        // 飛んでいる積み木の水平速度を変える(遅すぎれば止まって落ちている積み木に戻る)。振る舞いの差し替え用
+        public void SetFlyingVelocity(Vector3 v)
+        {
+            if (CurrentState != State.Flying || m_isConsumed) return;
+            SetHorizontalVelocity(v);
+        }
+
         private void SetHorizontalVelocity(Vector3 v)
         {
             v.y = 0.0f;
@@ -455,15 +502,9 @@ namespace Nakahira
                     return;
                 }
 
-                // 攻撃判定あり: 相手を飛ばして自分は崩れる(連鎖)
+                // 攻撃判定あり: 振る舞い(既定は相手を飛ばして自分は崩れる連鎖)に任せる
                 if (requireApproach && !IsApproaching(other.transform.position)) return;
-
-                ComputeImpact(other.transform.position, out Vector3 dir, out float speed);
-                GetImpactHitStop(out float duration, out float timeScale, out float shake);
-                // 両方がヒットストップ。相手は明けてから飛び出し、自分は残りの速度でゆっくり進みながら耐えて、明けたら割れる
-                other.StartHitStop(duration, timeScale, shake);
-                other.Push(dir, speed, Owner, ReturnCount);
-                Break(Direction * Speed - dir * speed, duration, shake);
+                ImpactBehavior.OnHitBlock(this, other);
                 return;
             }
 

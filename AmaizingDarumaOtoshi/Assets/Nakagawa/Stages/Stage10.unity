@@ -1228,8 +1228,6 @@ MonoBehaviour:
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
-  m_areas:
-  - {fileID: 1588862484}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
   m_match: {fileID: 516624190}
@@ -1445,6 +1443,55 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1310774689}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1384845094
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1384845096}
+  - component: {fileID: 1384845095}
+  m_Layer: 0
+  m_Name: DebugTools
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1384845095
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1384845094}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe57d5abcb550d44baa9e3b408eb5b44, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiImpactModeToggle
+  m_key: 27
+  m_modes:
+  - {fileID: 11400000, guid: 91dafaed1e7af82419e79df695282b1c, type: 2}
+  m_showLabel: 1
+  m_log: 1
+--- !u!4 &1384845096
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1384845094}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1448761317
 GameObject:
   m_ObjectHideFlags: 0
@@ -1772,17 +1819,6 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 27c031d383e21e547bd97944a25903ed, type: 3}
---- !u!114 &1588862484 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 1066249348272886078, guid: 27c031d383e21e547bd97944a25903ed, type: 3}
-  m_PrefabInstance: {fileID: 1588862483}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2c1ba6ba27a42a34f8326c0e607340a6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawnArea
 --- !u!4 &1588862485 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 5861964853675047080, guid: 27c031d383e21e547bd97944a25903ed, type: 3}
@@ -1869,6 +1905,7 @@ GameObject:
   - component: {fileID: 1822184975}
   - component: {fileID: 1822184974}
   - component: {fileID: 1822184973}
+  - component: {fileID: 1822184976}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -1950,6 +1987,29 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1822184976
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1822184972}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 799ced551b436e145b2a16d0163d798a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.MatchCamera
+  m_match: {fileID: 0}
+  m_followRatio: 0.25
+  m_maxOffset: 3
+  m_moveSmoothTime: 0.4
+  m_minFov: 30
+  m_nearDistance: 3
+  m_farDistance: 14
+  m_fovSmoothTime: 0.5
+  m_keepPlayersInView: 1
+  m_viewMargin: 0.1
+  m_bodyHeight: 2
 --- !u!1001 &1913091917
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -2183,3 +2243,4 @@ SceneRoots:
   - {fileID: 636025295}
   - {fileID: 1822184975}
   - {fileID: 2100171153}
+  - {fileID: 1384845096}

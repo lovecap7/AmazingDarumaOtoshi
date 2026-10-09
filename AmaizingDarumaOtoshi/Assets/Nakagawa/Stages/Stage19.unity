@@ -360,17 +360,6 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 27c031d383e21e547bd97944a25903ed, type: 3}
---- !u!114 &679034145 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 1066249348272886078, guid: 27c031d383e21e547bd97944a25903ed, type: 3}
-  m_PrefabInstance: {fileID: 679034144}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2c1ba6ba27a42a34f8326c0e607340a6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawnArea
 --- !u!4 &679034146 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 5861964853675047080, guid: 27c031d383e21e547bd97944a25903ed, type: 3}
@@ -531,17 +520,6 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 27c031d383e21e547bd97944a25903ed, type: 3}
---- !u!114 &761835530 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 1066249348272886078, guid: 27c031d383e21e547bd97944a25903ed, type: 3}
-  m_PrefabInstance: {fileID: 761835529}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2c1ba6ba27a42a34f8326c0e607340a6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawnArea
 --- !u!4 &761835531 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 5861964853675047080, guid: 27c031d383e21e547bd97944a25903ed, type: 3}
@@ -1062,11 +1040,6 @@ MonoBehaviour:
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
-  m_areas:
-  - {fileID: 1231642709}
-  - {fileID: 761835530}
-  - {fileID: 1464406308}
-  - {fileID: 679034145}
   m_maxBlocksOnBoard: 26
   m_firstDelay: 3
   m_match: {fileID: 1943285658}
@@ -1237,6 +1210,7 @@ GameObject:
   - component: {fileID: 1022462418}
   - component: {fileID: 1022462417}
   - component: {fileID: 1022462416}
+  - component: {fileID: 1022462419}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -1318,6 +1292,29 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1022462419
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1022462415}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 799ced551b436e145b2a16d0163d798a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.MatchCamera
+  m_match: {fileID: 0}
+  m_followRatio: 0.25
+  m_maxOffset: 3
+  m_moveSmoothTime: 0.4
+  m_minFov: 30
+  m_nearDistance: 3
+  m_farDistance: 14
+  m_fovSmoothTime: 0.5
+  m_keepPlayersInView: 1
+  m_viewMargin: 0.1
+  m_bodyHeight: 2
 --- !u!1001 &1231642708
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1403,22 +1400,60 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 27c031d383e21e547bd97944a25903ed, type: 3}
---- !u!114 &1231642709 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 1066249348272886078, guid: 27c031d383e21e547bd97944a25903ed, type: 3}
-  m_PrefabInstance: {fileID: 1231642708}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2c1ba6ba27a42a34f8326c0e607340a6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawnArea
 --- !u!4 &1231642710 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 5861964853675047080, guid: 27c031d383e21e547bd97944a25903ed, type: 3}
   m_PrefabInstance: {fileID: 1231642708}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &1384845094
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1384845096}
+  - component: {fileID: 1384845095}
+  m_Layer: 0
+  m_Name: DebugTools
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1384845095
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1384845094}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe57d5abcb550d44baa9e3b408eb5b44, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiImpactModeToggle
+  m_key: 27
+  m_modes:
+  - {fileID: 11400000, guid: 91dafaed1e7af82419e79df695282b1c, type: 2}
+  m_showLabel: 1
+  m_log: 1
+--- !u!4 &1384845096
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1384845094}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &1464406307
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1504,17 +1539,6 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 27c031d383e21e547bd97944a25903ed, type: 3}
---- !u!114 &1464406308 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 1066249348272886078, guid: 27c031d383e21e547bd97944a25903ed, type: 3}
-  m_PrefabInstance: {fileID: 1464406307}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2c1ba6ba27a42a34f8326c0e607340a6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawnArea
 --- !u!4 &1464406309 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 5861964853675047080, guid: 27c031d383e21e547bd97944a25903ed, type: 3}
@@ -2535,3 +2559,4 @@ SceneRoots:
   - {fileID: 1529058733}
   - {fileID: 1022462418}
   - {fileID: 872151567}
+  - {fileID: 1384845096}
