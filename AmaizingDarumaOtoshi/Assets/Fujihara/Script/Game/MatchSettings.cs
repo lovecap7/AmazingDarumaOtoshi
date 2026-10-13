@@ -24,6 +24,14 @@ public class MatchSettings : ScriptableObject
     [Tooltip("試合が終わってから、結果を見せてセレクトへ戻るまでの時間（秒）")]
     public float resultTime = 4f;
 
+    [Header("リザルト（表彰）")]
+    [Tooltip("試合が終わったら、セレクトへ戻る前にリザルト画面（1位の表彰）を見せる")]
+    public bool useResultScene = true;
+    [Tooltip("リザルト画面のシーン名")]
+    public string resultSceneName = "ResultScene";
+    [Tooltip("試合が終わってから、リザルト画面へ移るまでの時間（秒）。「しあい しゅうりょう！」を見せる間")]
+    public float resultSceneDelay = 2f;
+
     static MatchSettings s_instance;
     public static MatchSettings Instance
     {
