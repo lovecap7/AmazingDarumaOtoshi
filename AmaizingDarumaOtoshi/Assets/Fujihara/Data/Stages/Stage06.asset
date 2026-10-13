@@ -16,5 +16,5 @@ MonoBehaviour:
   displayName: "\u98A8\u306E\u56DE\u5ECA"
   description: "\u6771\u897F\u306B\u9577\u3044\u56DE\u5ECA\u3002\u897F\u306E\u58C1\u969B\u3092\u6247\u98A8\u6A5F\u304C\u5F80\u5FA9\u3057\u3001\u6771\u3078\u5411\u304B\u3063\u3066\u98A8\u3092\u9001\u308A\u7D9A\u3051\u308B\u3002"
   color: {r: 0.95, g: 0.65, b: 0.7, a: 1}
-  preview: {fileID: 0}
-  sceneName: Stage06
+  preview: {fileID: 21300000, guid: 2818366e040f20c4f894b1abcde629aa, type: 3}
+  sceneName: AllStages

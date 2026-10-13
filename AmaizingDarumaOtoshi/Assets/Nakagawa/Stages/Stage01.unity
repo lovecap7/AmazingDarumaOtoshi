@@ -191,7 +191,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: cedfd8eb22975404f8c6b4f6d395bc42, type: 2}
+  - {fileID: 2100000, guid: 36bb6bdc280b7764ba703f26b38cbd94, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -279,6 +279,65 @@ Transform:
   - {fileID: 964047259}
   - {fileID: 2139257777}
   - {fileID: 491179845}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &347125690
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 347125692}
+  - component: {fileID: 347125691}
+  m_Layer: 0
+  m_Name: Effects
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &347125691
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 347125690}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 352796de3daee634f87b2c9ead452f38, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiCatchEffect
+  m_onlyHarmful: 1
+  m_effectPrefab: {fileID: 707267398864012128, guid: df4223e4940405f4cb962c34c14cb84e, type: 3}
+  m_prefabLifetime: 3
+  m_heightOffset: 0.4
+  m_particleMaterial: {fileID: 2100000, guid: 866d62c0f41925e4080138e8dc45389c, type: 2}
+  m_color: {r: 1, g: 0.85, b: 0.25, a: 1}
+  m_sparkCount: 28
+  m_sparkSpeed: 6
+  m_sparkSize: 0.22
+  m_lifetime: 0.55
+  m_flashSize: 2.2
+  m_shakeCamera: 1
+  m_shake:
+    Amplitude: 0.12
+    Duration: 0.15
+--- !u!4 &347125692
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 347125690}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &491179844
@@ -527,7 +586,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: cedfd8eb22975404f8c6b4f6d395bc42, type: 2}
+  - {fileID: 2100000, guid: 36bb6bdc280b7764ba703f26b38cbd94, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -749,7 +808,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: cedfd8eb22975404f8c6b4f6d395bc42, type: 2}
+  - {fileID: 2100000, guid: 36bb6bdc280b7764ba703f26b38cbd94, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -832,8 +891,20 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiImpactModeToggle
   m_key: 27
-  m_modes:
-  - {fileID: 11400000, guid: 91dafaed1e7af82419e79df695282b1c, type: 2}
+  m_modeList:
+  - Name: "1\u56DE\u30D2\u30C3\u30C8\u3067\u7834\u58CA"
+    Impact: {fileID: 11400000, guid: 7b7fb6a71946c8d458b6cea72dd4a7e0, type: 2}
+    Durability: 1
+  - Name: "2\u56DE\u30D2\u30C3\u30C8\u3067\u7834\u58CA"
+    Impact: {fileID: 11400000, guid: 7b7fb6a71946c8d458b6cea72dd4a7e0, type: 2}
+    Durability: 2
+  - Name: "3\u56DE\u30D2\u30C3\u30C8\u3067\u7834\u58CA"
+    Impact: {fileID: 11400000, guid: 7b7fb6a71946c8d458b6cea72dd4a7e0, type: 2}
+    Durability: 3
+  - Name: "\u975E\u7834\u58CA"
+    Impact: {fileID: 11400000, guid: 7b7fb6a71946c8d458b6cea72dd4a7e0, type: 2}
+    Durability: 0
+  m_startIndex: 0
   m_showLabel: 1
   m_log: 1
 --- !u!4 &970866684
@@ -1078,6 +1149,9 @@ GameObject:
   - component: {fileID: 1298081246}
   - component: {fileID: 1298081245}
   - component: {fileID: 1298081248}
+  - component: {fileID: 1298081250}
+  - component: {fileID: 1298081249}
+  - component: {fileID: 1298081251}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -1182,6 +1256,94 @@ MonoBehaviour:
   m_keepPlayersInView: 1
   m_viewMargin: 0.1
   m_bodyHeight: 2
+--- !u!114 &1298081249
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1298081244}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7df945352c882624fad69d3f78c60eca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.SeeThroughTargets
+  m_enabled: 1
+  m_includePlayers: 1
+  m_playerRadius: 1.3
+  m_playerCenterHeight: 1
+  m_includeBlocks: 1
+  m_blockRadius: 0.7
+  m_feather: 0.3
+  m_depthMargin: 0.6
+  m_match: {fileID: 0}
+--- !u!114 &1298081250
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1298081244}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 93428639a3a21ca49baff3fdfb304976, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.CameraShake
+  m_enabled: 1
+  m_shakeOnBlockHit: 1
+  m_shakeOnCharacterHit: 1
+  m_minSpeed: 6
+  m_maxSpeed: 30
+  m_weakHit:
+    Amplitude: 0.05
+    Duration: 0.12
+  m_strongHit:
+    Amplitude: 0.3
+    Duration: 0.25
+  m_characterHitMultiplier: 1.3
+  m_shakeOnHammerHitCharacter: 1
+  m_hammerHitCharacter:
+    Amplitude: 0.25
+    Duration: 0.2
+  m_shakeOnHammerHitBlock: 0
+  m_hammerHitBlock:
+    Amplitude: 0.08
+    Duration: 0.1
+  m_elimination:
+    Amplitude: 0.6
+    Duration: 0.45
+  m_shakeOnFall: 0
+  m_fall:
+    Amplitude: 0.2
+    Duration: 0.25
+  m_frequency: 25
+  m_falloff: 2
+--- !u!114 &1298081251
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1298081244}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cbb36ef857696284e85e30a97fdf26b1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.EliminationCinematic
+  m_enabled: 1
+  m_onAttack: 1
+  m_onFall: 0
+  m_onOther: 1
+  m_slowTimeScale: 0.15
+  m_slowDuration: 0.7
+  m_recoverDuration: 0.35
+  m_closeDistance: 9
+  m_closeFov: 26
+  m_focusHeight: 0.8
+  m_zoomInTime: 0.12
+  m_zoomOutTime: 0.4
+  m_effectPrefab: {fileID: 1591408826500524615, guid: 4e33a5eeed145b942ba33351faa8e400, type: 3}
+  m_effectLifetime: 3
 --- !u!1 &1487875429
 GameObject:
   m_ObjectHideFlags: 0
@@ -1609,7 +1771,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: cedfd8eb22975404f8c6b4f6d395bc42, type: 2}
+  - {fileID: 2100000, guid: 36bb6bdc280b7764ba703f26b38cbd94, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -1676,3 +1838,4 @@ SceneRoots:
   - {fileID: 1298081247}
   - {fileID: 1487875431}
   - {fileID: 970866684}
+  - {fileID: 347125692}

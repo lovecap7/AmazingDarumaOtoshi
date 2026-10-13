@@ -18,6 +18,11 @@ namespace Nakagawa.EditorTools
     {
         const string kStageDir = "Assets/Nakagawa/Stages";
         const string kCombinedPath = kStageDir + "/AllStages.unity";
+        public const string kPreviewDir = "Assets/Nakagawa/StagePreviews";
+        const int kPreviewWidth = 760;
+        const int kPreviewHeight = 480;
+        // まとめたシーンの壁の高さ(Yスケール)
+        const float kWallHeight = 5.0f;
 
         [MenuItem("Nakagawa/Stages/Build Combined Scene (AllStages)")]
         public static void Build()
@@ -42,6 +47,7 @@ namespace Nakagawa.EditorTools
             Camera camera = null;
             Light light = null;
             TumikiImpactModeToggle toggle = null;
+            TumikiCatchEffect catchEffect = null;
             int spawnPointCount = 0;
 
             foreach (var path in stagePaths)
@@ -90,6 +96,14 @@ namespace Nakagawa.EditorTools
                     if (srcToggle != null)
                     {
                         if (toggle == null) toggle = MoveToRoot(srcToggle, combined);
+                        else Object.DestroyImmediate(go);
+                        continue;
+                    }
+                    // 演出(成功エフェクト)も全ステージで1つ
+                    var srcEffect = go.GetComponent<TumikiCatchEffect>();
+                    if (srcEffect != null)
+                    {
+                        if (catchEffect == null) catchEffect = MoveToRoot(srcEffect, combined);
                         else Object.DestroyImmediate(go);
                         continue;
                     }
@@ -169,10 +183,90 @@ namespace Nakagawa.EditorTools
             ApplySharedToStage(stages[0], sharedPoints, sharedArea, camera);
             // ステージのシーンに付いていなければ、プレイヤーを追うカメラとデバッグ用の切り替えを付ける
             StageBuilder.SetupCameraAndDebugTools(combined);
+            ApplyWallHeight(stages);
+
+            // ステージセレクト用の写真を撮る(撮り終わったら最初のステージに戻す)
+            CapturePreviews(stages, sharedPoints, sharedArea, camera);
+            for (int i = 0; i < stages.Count; i++) stages[i].gameObject.SetActive(i == 0);
+            ApplySharedToStage(stages[0], sharedPoints, sharedArea, camera);
 
             EditorSceneManager.SaveScene(combined, kCombinedPath);
             AssetDatabase.Refresh();
             Debug.Log($"[StageCombiner] {stages.Count}ステージを {kCombinedPath} にまとめました\n" + string.Join("\n", report));
+        }
+
+        // まとめたシーンの壁(ReflectWall)の高さを変える。底は床の高さのまま、上に伸ばす
+        // (各ステージのシーンの壁はそのまま)
+        static void ApplyWallHeight(List<StageEntry> stages)
+        {
+            int count = 0;
+            foreach (var stage in stages)
+            {
+                foreach (var wall in stage.GetComponentsInChildren<ReflectWall>(true))
+                {
+                    Transform t = wall.transform;
+                    Vector3 scale = t.localScale;
+                    Vector3 pos = t.localPosition;
+                    float bottom = pos.y - scale.y * 0.5f;
+                    scale.y = kWallHeight;
+                    pos.y = bottom + kWallHeight * 0.5f;
+                    t.localScale = scale;
+                    t.localPosition = pos;
+                    count++;
+                }
+            }
+            Debug.Log($"[StageCombiner] 壁 {count} 枚の高さ(Yスケール)を {kWallHeight} にしました");
+        }
+
+        // 各ステージを、そのステージのカメラ位置から撮って PNG で保存し、スプライトとして読み込めるようにする
+        // (ステージセレクトの StageData.preview に使う。Fujihara > ステージ一覧を更新 で設定される)
+        public static void CapturePreviews(List<StageEntry> stages, Transform[] sharedPoints, StageArea sharedArea, Camera camera)
+        {
+            if (!AssetDatabase.IsValidFolder(kPreviewDir)) AssetDatabase.CreateFolder(Path.GetDirectoryName(kPreviewDir).Replace('\\', '/'), Path.GetFileName(kPreviewDir));
+
+            var rt = new RenderTexture(kPreviewWidth, kPreviewHeight, 24, RenderTextureFormat.ARGB32) { antiAliasing = 4 };
+            var tex = new Texture2D(kPreviewWidth, kPreviewHeight, TextureFormat.RGB24, false);
+            var prevTarget = camera.targetTexture;
+            var prevActive = RenderTexture.active;
+            var paths = new List<string>();
+            try
+            {
+                for (int i = 0; i < stages.Count; i++)
+                {
+                    for (int j = 0; j < stages.Count; j++) stages[j].gameObject.SetActive(j == i);
+                    ApplySharedToStage(stages[i], sharedPoints, sharedArea, camera);
+
+                    camera.targetTexture = rt;
+                    camera.Render();
+                    RenderTexture.active = rt;
+                    tex.ReadPixels(new Rect(0, 0, kPreviewWidth, kPreviewHeight), 0, 0);
+                    tex.Apply();
+
+                    string id = stages[i].Info != null && !string.IsNullOrEmpty(stages[i].Info.Id) ? stages[i].Info.Id : stages[i].name;
+                    string path = $"{kPreviewDir}/{id}.png";
+                    File.WriteAllBytes(path, tex.EncodeToPNG());
+                    paths.Add(path);
+                }
+            }
+            finally
+            {
+                camera.targetTexture = prevTarget;
+                RenderTexture.active = prevActive;
+                Object.DestroyImmediate(rt);
+                Object.DestroyImmediate(tex);
+            }
+
+            AssetDatabase.Refresh();
+            foreach (var path in paths)
+            {
+                var importer = (TextureImporter)AssetImporter.GetAtPath(path);
+                if (importer == null || importer.textureType == TextureImporterType.Sprite) continue;
+                importer.textureType = TextureImporterType.Sprite;
+                importer.spriteImportMode = SpriteImportMode.Single;
+                importer.mipmapEnabled = false;
+                importer.SaveAndReimport();
+            }
+            Debug.Log($"[StageCombiner] ステージの写真を {paths.Count} 枚撮りました({kPreviewDir})");
         }
 
         static T MoveToRoot<T>(T component, Scene scene) where T : Component

@@ -2,7 +2,7 @@ using System;
 using Nakahira;
 using UnityEngine;
 
-// 試合に出ている1人分（プレイヤーまたは CPU）。MatchDirector が作り、状態を書き換える。
+// 試合に出ている1人分（プレイヤーまたは CPU）。DarumaMatch（セレクトから始めた試合）が作り、状態を書き換える。
 // ゲーム画面の UI（HUD）はここを読むだけでよい。値が変わったときはイベントで知らせる。
 //
 //   誰か　　　：Entry（セレクトで決めた内容）・Index・Label（1P / CPU1）・Color・CharacterData（名前・顔の画像）
@@ -14,7 +14,7 @@ using UnityEngine;
 //   結果　　　：Rank（試合が終わったら 1〜。それまでは 0）
 //
 // 例）HUD で積み木の数を出す
-//   foreach (var p in MatchDirector.Current.Players)
+//   foreach (var p in DarumaMatch.Current.Players)
 //       p.StackChanged += () => label.text = p.StackCount.ToString();
 public class MatchPlayer : MonoBehaviour
 {

@@ -2,31 +2,28 @@ using UnityEngine;
 
 namespace Nakahira
 {
-    // プレイヤー(操作者)。操作命令の供給元を持ち、今操作しているキャラクターに渡す
-    //  生存キャラクター ─(脱落)→ 幽霊 ─(生存者にダメージ)→ 生存キャラクター(首だけで復活)
-    // 同じGameObjectの IDarumaCommandSource(DarumaInputHandler等)を使う。無ければ操作なし(ダミー)
+    // ボタンを押して試合に参加する人(ステージのシーンを直接再生したとき。PlayerInputManager が出す)
+    // 同じGameObjectの IDarumaCommandSource(DarumaInputHandler等)が操作の供給元になる
+    // 参加すると DarumaMatch が同じGameObjectに MatchPlayer を付け、キャラクター・幽霊・復活などはそちらで扱う
+    // (セレクト画面から始めた試合の人と同じ扱いになる)
     public class DarumaPlayer : MonoBehaviour
     {
-        IDarumaCommandSource m_commandSource;
         DarumaMatch m_match;
 
-        public int Index { get; private set; }
-        public DarumaCharacter Character { get; private set; }
-        public DarumaGhost Ghost { get; private set; }
+        // 試合での1人分(参加できたら設定される)
+        public MatchPlayer MatchPlayer { get; private set; }
+        public int Index => MatchPlayer != null ? MatchPlayer.Index : -1;
+        public DarumaCharacter Character => MatchPlayer != null ? MatchPlayer.Character : null;
+        public DarumaGhost Ghost => MatchPlayer != null ? MatchPlayer.Ghost : null;
         public bool IsSurvivor => Character != null;
         // 現在操作しているキャラクターのTransform(いなければnull)
-        public Transform CurrentBody => Character != null ? Character.transform : Ghost != null ? Ghost.transform : null;
-
-        private void Awake()
-        {
-            m_commandSource = GetComponent<IDarumaCommandSource>();
-        }
+        public Transform CurrentBody => MatchPlayer != null ? MatchPlayer.Body : null;
 
         private void Start()
         {
-            // PlayerInputManagerから参加した場合はここで試合に登録する
+            // PlayerInputManagerから参加した場合はここで試合に登録する(参加できなければ消える)
             if (m_match != null) return;
-            var match = FindFirstObjectByType<DarumaMatch>();
+            var match = FindAnyObjectByType<DarumaMatch>();
             if (match == null || !match.Register(this))
             {
                 Destroy(gameObject);
@@ -34,49 +31,10 @@ namespace Nakahira
         }
 
         // DarumaMatchから呼ばれる
-        public void OnRegistered(DarumaMatch match, int index)
+        public void OnRegistered(DarumaMatch match, MatchPlayer player)
         {
             m_match = match;
-            Index = index;
-            name = $"Player{index + 1}";
-        }
-
-        public void Possess(DarumaCharacter character)
-        {
-            Character = character;
-            character.name = $"{name}_Character";
-            character.SetCommandSource(m_commandSource);
-            character.Eliminated += OnCharacterEliminated;
-        }
-
-        // 試合終了などで操作を止める
-        public void StopControl()
-        {
-            if (Character != null) Character.SetCommandSource(null);
-            if (Ghost != null) Ghost.SetCommandSource(null);
-        }
-
-        private void OnCharacterEliminated(DarumaCharacter character)
-        {
-            Character = null;
-            m_match.NotifyEliminated(this);
-            if (m_match.IsFinished) return;
-
-            // 脱落した場所に幽霊として出現
-            Ghost = m_match.SpawnGhost(character.transform.position);
-            Ghost.name = $"{name}_Ghost";
-            Ghost.SetCommandSource(m_commandSource);
-            Ghost.ReviveRequested += OnGhostReviveRequested;
-        }
-
-        private void OnGhostReviveRequested(DarumaGhost ghost)
-        {
-            if (m_match.IsFinished) return;
-
-            Ghost = null;
-            Destroy(ghost.gameObject);
-            Possess(m_match.SpawnCharacter(this, true));
+            MatchPlayer = player;
         }
     }
 }
- 

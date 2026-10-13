@@ -6,14 +6,18 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-// Nakagawa のステージ（Assets/Nakagawa/Stages の各シーン）から、ステージセレクトの一覧（SelectRoster.stages）を作り直す。
+// Nakagawa のステージ（Assets/Nakagawa/Stages の StageXX シーン）から、ステージセレクトの一覧（SelectRoster.stages）を作り直す。
 // メニュー「Fujihara > ステージ一覧を更新」。ステージが増えたら実行し直す。
 //  ・各シーンの StageInfo から id・名前・コンセプトを読み、StageData（Assets/Fujihara/Data/Stages/<id>.asset）を作る / 更新する
-//  ・シーン名を StageData.sceneName に入れる（ステージセレクトで決まったらそのシーンへ移動する）
-//  ・既にある StageData の色・プレビュー画像はそのまま残す
+//  ・遊ぶシーンは全ステージをまとめた AllStages（StageData.sceneName）。ステージセレクトで決まったら AllStages へ移動し、
+//    StageSwitcher が id のステージに切り替える
+//  ・Nakagawa が撮ったステージの写真（Assets/Nakagawa/StagePreviews/<id>.png）があれば、プレビュー画像にする
+//    （手で別の画像を設定していればそのまま残す）。色はそのまま残す
 public static class StageRosterSync
 {
     const string StageFolder = "Assets/Nakagawa/Stages";
+    const string CombinedSceneName = "AllStages";
+    const string PreviewFolder = "Assets/Nakagawa/StagePreviews";
     const string DataFolder = "Assets/Fujihara/Data/Stages";
     const string RosterPath = "Assets/Fujihara/Data/SelectRoster.asset";
 
@@ -36,7 +40,13 @@ public static class StageRosterSync
         var stages = new List<StageData>();
         var guids = AssetDatabase.FindAssets("t:Scene", new[] { StageFolder });
         var paths = new List<string>();
-        foreach (var g in guids) paths.Add(AssetDatabase.GUIDToAssetPath(g));
+        foreach (var g in guids)
+        {
+            // ステージ1つ分のシーン（StageXX）だけ。まとめたシーン（AllStages）は除く
+            var p = AssetDatabase.GUIDToAssetPath(g);
+            string name = Path.GetFileNameWithoutExtension(p);
+            if (name.StartsWith("Stage") && name != CombinedSceneName) paths.Add(p);
+        }
         paths.Sort();   // Stage01, Stage02, ... の順
 
         foreach (var path in paths)
@@ -49,13 +59,13 @@ public static class StageRosterSync
                 info = root.GetComponentInChildren<StageInfo>(true);
                 if (info != null) break;
             }
-            string sceneName = Path.GetFileNameWithoutExtension(path);
-            string id = info != null && !string.IsNullOrEmpty(info.Id) ? info.Id : sceneName;
-            string title = info != null && !string.IsNullOrEmpty(info.Title) ? info.Title : sceneName;
+            string stageSceneName = Path.GetFileNameWithoutExtension(path);
+            string id = info != null && !string.IsNullOrEmpty(info.Id) ? info.Id : stageSceneName;
+            string title = info != null && !string.IsNullOrEmpty(info.Title) ? info.Title : stageSceneName;
             string concept = info != null ? info.Concept : "";
             EditorSceneManager.CloseScene(scene, true);
 
-            stages.Add(CreateOrUpdate(id, title, concept, sceneName, stages.Count));
+            stages.Add(CreateOrUpdate(id, title, concept, CombinedSceneName, stages.Count));
         }
 
         roster.stages = stages;
@@ -79,6 +89,13 @@ public static class StageRosterSync
         data.displayName = title;
         data.description = concept;
         data.sceneName = sceneName;
+
+        // ステージの写真をプレビュー画像にする（未設定か、前に自動で設定した写真のときだけ）
+        var photo = AssetDatabase.LoadAssetAtPath<Sprite>($"{PreviewFolder}/{id}.png");
+        if (photo != null && (data.preview == null || AssetDatabase.GetAssetPath(data.preview).StartsWith(PreviewFolder)))
+        {
+            data.preview = photo;
+        }
         EditorUtility.SetDirty(data);
         return data;
     }

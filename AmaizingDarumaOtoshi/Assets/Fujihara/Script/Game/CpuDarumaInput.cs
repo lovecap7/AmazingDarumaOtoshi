@@ -119,7 +119,7 @@ public class CpuDarumaInput : MonoBehaviour, IDarumaCommandSource
     {
         Transform best = null;
         float bestD = float.MaxValue;
-        var director = MatchDirector.Current;
+        var director = DarumaMatch.Current;
         if (director == null) return null;
         foreach (var p in director.Players)
         {

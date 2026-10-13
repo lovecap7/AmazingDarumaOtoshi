@@ -25,6 +25,37 @@ namespace Nakahira
         void RequestGravityScale(float scale);
     }
 
+    // 脱落の原因(演出・ルールの分岐用)
+    public enum EliminationCause
+    {
+        Other,
+        // 奈落に落ちた
+        Fall,
+        // 飛んできた積み木が頭に当たった
+        Projectile,
+        // 首だけのときにハンマーで叩かれた
+        Hammer,
+    }
+
+    // 積み木に上から乗って拾ったときの情報(DarumaCharacter.AnyPickedUp)
+    public readonly struct TumikiPickupInfo
+    {
+        public readonly DarumaCharacter Character;
+        public readonly TumikiBlock Block;
+        // 拾う直前に攻撃判定があったか(飛んできた積み木を踏んで止めた)
+        public readonly bool WasHarmful;
+        // 拾う直前の積み木の速さ
+        public readonly float Speed;
+
+        public TumikiPickupInfo(DarumaCharacter character, TumikiBlock block, bool wasHarmful, float speed)
+        {
+            Character = character;
+            Block = block;
+            WasHarmful = wasHarmful;
+            Speed = speed;
+        }
+    }
+
     // 生存キャラクター(だるま)。移動・ジャンプ・積み木の取得・被弾・脱落を担当する
     // 操作は IDarumaCommandSource(同じGameObjectに付いていれば自動取得、SetCommandSourceで差し替え可)
     // または ApplyCommand で渡す
@@ -97,6 +128,14 @@ namespace Nakahira
 
         // 脱落した(この直後にGameObjectは破棄される)
         public event Action<DarumaCharacter> Eliminated;
+        // いずれかのキャラクターが脱落した(カメラの揺れ・効果音など、個々のキャラクターを知らない演出用)
+        public static event Action<DarumaCharacter> AnyEliminated;
+        // いずれかのキャラクターが積み木に上から乗って拾った(成功エフェクトなどの演出用)
+        public static event Action<TumikiPickupInfo> AnyPickedUp;
+        // 脱落の原因(脱落していなければOther)
+        public EliminationCause EliminationCause { get; private set; }
+        // 攻撃(積み木・ハンマー)で脱落したか
+        public bool IsEliminatedByAttack => EliminationCause == EliminationCause.Projectile || EliminationCause == EliminationCause.Hammer;
         // 他の生存者にダメージを与えた
         public event Action<DarumaCharacter> DealtDamage;
 
@@ -154,7 +193,7 @@ namespace Nakahira
             // 奈落に落ちた
             if (m_rb.position.y < m_killY)
             {
-                Eliminate();
+                Eliminate(EliminationCause.Fall);
                 return;
             }
 
@@ -288,7 +327,9 @@ namespace Nakahira
             if (m_isEliminated || !m_isFallingInAir) return false;
             if (block.CurrentState == TumikiBlock.State.Stacked) return false;
 
+            var info = new TumikiPickupInfo(this, block, block.IsHarmful, block.HorizontalVelocity.magnitude);
             Pickup(block);
+            AnyPickedUp?.Invoke(info);
             // 同じステップで複数の積み木に触れても1つだけ拾う
             m_isFallingInAir = false;
             return true;
@@ -349,7 +390,7 @@ namespace Nakahira
             if (m_stack.Count == 0)
             {
                 // 首だけ
-                Eliminate();
+                Eliminate(EliminationCause.Hammer);
                 return true;
             }
 
@@ -375,7 +416,7 @@ namespace Nakahira
             if (index >= m_stack.Count)
             {
                 // 頭に当たった
-                Eliminate();
+                Eliminate(EliminationCause.Projectile);
                 return true;
             }
 
@@ -392,10 +433,15 @@ namespace Nakahira
         }
 
         // 脱落。とりあえずキャラクターを消すだけ(演出は今後)
-        public void Eliminate()
+        public void Eliminate() => Eliminate(EliminationCause.Other);
+
+        public void Eliminate(EliminationCause cause)
         {
             if (m_isEliminated) return;
-            m_isEliminated = true; Eliminated?.Invoke(this);
+            m_isEliminated = true;
+            EliminationCause = cause;
+            Eliminated?.Invoke(this);
+            AnyEliminated?.Invoke(this);
             Destroy(gameObject);
         }
 

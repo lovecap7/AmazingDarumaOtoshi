@@ -1,0 +1,16 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 947c4d902e24b5a4cb47ea2ab43e13ad, type: 3}
+  m_Name: TumikiImpact_Durability
+  m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiDurabilityImpact
+  m_displayName: "\u8010\u4E45\u5EA6\u3064\u304D"
+  m_onSurvive: {fileID: 11400000, guid: 91dafaed1e7af82419e79df695282b1c, type: 2}

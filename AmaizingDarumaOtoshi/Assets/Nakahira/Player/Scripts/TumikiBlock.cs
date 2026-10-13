@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -27,8 +28,31 @@ namespace Nakahira
         }
     }
 
+    // 飛んでいる積み木が当たったときの情報(TumikiBlock.Hit)
+    public readonly struct TumikiHitInfo
+    {
+        // 当たった(飛んでいた)積み木
+        public readonly TumikiBlock Block;
+        // 当たった相手(TumikiBlock または DarumaCharacter)
+        public readonly Component Target;
+        public readonly Vector3 Point;
+        // 当たったときの速さ
+        public readonly float Speed;
+        // 攻撃判定があったか
+        public readonly bool IsHarmful;
+
+        public TumikiHitInfo(TumikiBlock block, Component target, Vector3 point, float speed, bool isHarmful)
+        {
+            Block = block;
+            Target = target;
+            Point = point;
+            Speed = speed;
+            IsHarmful = isHarmful;
+        }
+    }
+
     // 積み木
-    // Loose  : ステージに落ちている。上に乗ると拾える
+    // Loose : ステージに落ちている。上に乗ると拾える
     // Stacked: プレイヤーに積まれている。当たり判定はプレイヤー側のコライダーが担当する
     // Flying : 地面を滑るように直進し、次第に減速する。壁で反射する。止まる速さを下回るとLooseに戻る
     //           ・攻撃判定あり(HarmlessSpeed以上): 他の積み木に当たると ImpactBehavior に従い(既定は連鎖)、キャラクターにダメージを与える
@@ -88,7 +112,19 @@ namespace Nakahira
         readonly List<Collider> m_ignored = new List<Collider>();
         float m_ignoreTimer;
 
-        public State CurrentState { get; private set; } = State.Loose;
+        public State CurrentState
+        {
+            get => m_state;
+            private set
+            {
+                if (m_state == value) return;
+                m_state = value;
+                StateChanged?.Invoke(this);
+            }
+        }
+        State m_state = State.Loose;
+        // 状態(落ちている・積まれている・飛んでいる)が変わった(耐久度の回復・演出など、積み木に付ける機能の拡張用)
+        public event Action<TumikiBlock> StateChanged;
         public TumikiColor Color => m_color;
         public Vector3 Direction { get; private set; }
         public float Speed { get; private set; }
@@ -110,6 +146,9 @@ namespace Nakahira
 
         // 全積み木の既定の振る舞い(デバッグでの切り替えや、ルールによる変更用)
         public static ITumikiImpactBehavior DefaultImpactBehavior { get; set; } = TumikiBreakImpact.Instance;
+
+        // 飛んでいる積み木が他の積み木・キャラクターに当たった(カメラの揺れ・効果音など演出用。積み木側の処理の直前に呼ぶ)
+        public static event Action<TumikiHitInfo> Hit;
 
         // ドメインの再読み込みをしない設定でも、再生のたびに既定に戻す
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -401,23 +440,26 @@ namespace Nakahira
             float approach = Vector3.Dot(v1 - v2, n);
             if (approach <= 0.0f) return;
 
+            RaiseHit(other, (transform.position + other.transform.position) * 0.5f, v1.magnitude);
             SetHorizontalVelocity(v1 - n * approach);
             Vector3 v2After = v2 + n * approach;
             other.Push(v2After, v2After.magnitude, Owner, 0);
         }
 
-        // 攻撃判定のない積み木がキャラクターに当たったら、キャラクターを押さずに壁のように跳ね返る
-        private void ReflectFrom(Vector3 targetPos)
+        // 攻撃判定のない積み木がキャラクターに当たったら、キャラクターを押さずに壁のように跳ね返る。跳ね返ったらtrue
+        private bool ReflectFrom(Vector3 targetPos)
         {
             Vector3 normal = transform.position - targetPos;
             normal.y = 0.0f;
-            if (normal.sqrMagnitude < 0.0001f) return;
+            if (normal.sqrMagnitude < 0.0001f) return false;
             normal.Normalize();
             if (Vector3.Dot(Direction, normal) < 0.0f)
             {
                 Direction = Vector3.Reflect(Direction, normal).normalized;
                 SetHorizontalVelocity(Direction * Speed);
+                return true;
             }
+            return false;
         }
 
         // 飛んでいる積み木の水平速度を変える(遅すぎれば止まって落ちている積み木に戻る)。振る舞いの差し替え用
@@ -504,6 +546,7 @@ namespace Nakahira
 
                 // 攻撃判定あり: 振る舞い(既定は相手を飛ばして自分は崩れる連鎖)に任せる
                 if (requireApproach && !IsApproaching(other.transform.position)) return;
+                RaiseHit(other, ContactPoint(collision), Speed);
                 ImpactBehavior.OnHitBlock(this, other);
                 return;
             }
@@ -521,11 +564,13 @@ namespace Nakahira
                 // 攻撃判定なし: キャラクターを押さずに跳ね返る
                 if (!IsHarmful)
                 {
-                    ReflectFrom(hitPos);
+                    float before = Speed;
+                    if (ReflectFrom(hitPos)) RaiseHit(character, ContactPoint(collision), before);
                     return;
                 }
 
                 if (requireApproach && !IsApproaching(hitPos)) return;
+                RaiseHit(character, ContactPoint(collision), Speed);
 
                 // キャラクターは動かない相手として、ぶつかった方向の成分を失った残りの速度で割れる
                 ComputeImpact(hitPos, out Vector3 dir, out float speed);
@@ -538,6 +583,17 @@ namespace Nakahira
                 if (damaged && DarumaAttackerUtil.IsAlive(Owner)) Owner.OnDealtDamage();
                 if (consume) Break(remaining, duration, shake);
             }
+        }
+
+        // 当たったことを通知する(IsHarmful はこの時点の状態)
+        private void RaiseHit(Component target, Vector3 point, float speed)
+        {
+            Hit?.Invoke(new TumikiHitInfo(this, target, point, speed, IsHarmful));
+        }
+
+        private Vector3 ContactPoint(Collision collision)
+        {
+            return collision.contactCount > 0 ? collision.GetContact(0).point : transform.position;
         }
 
         // 今の速さでぶつかったときのヒットストップ(速いほど長く強い)

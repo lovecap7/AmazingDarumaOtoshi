@@ -44,13 +44,19 @@ namespace Nakagawa
 
         Vector3 m_offset;
         Vector3 m_offsetVelocity;
+        float m_fov;
         float m_fovVelocity;
+        Vector3 m_overridePosition;
+        float m_overrideFov;
+        float m_overrideWeight;
         readonly List<Vector3> m_bodies = new List<Vector3>();
+        readonly List<Transform> m_bodyTransforms = new List<Transform>();
 
         private void Awake()
         {
             m_camera = GetComponent<Camera>();
             m_baseFov = m_camera.fieldOfView;
+            m_fov = m_baseFov;
             SetBasePose(transform.position, transform.rotation);
         }
 
@@ -65,7 +71,11 @@ namespace Nakagawa
             m_offsetVelocity = Vector3.zero;
             m_fovVelocity = 0.0f;
             transform.SetPositionAndRotation(position, rotation);
-            if (m_baseFov > 0.0f) m_camera.fieldOfView = m_baseFov;
+            if (m_baseFov > 0.0f)
+            {
+                m_fov = m_baseFov;
+                m_camera.fieldOfView = m_baseFov;
+            }
         }
 
         private void LateUpdate()
@@ -96,10 +106,38 @@ namespace Nakagawa
                 if (m_keepPlayersInView) targetFov = Mathf.Clamp(Mathf.Max(targetFov, RequiredFov(m_basePosition + targetOffset)), 1.0f, m_baseFov);
             }
 
-            m_offset = Vector3.SmoothDamp(m_offset, targetOffset, ref m_offsetVelocity, m_moveSmoothTime);
-            transform.SetPositionAndRotation(m_basePosition + m_offset, m_baseRotation);
-            m_camera.fieldOfView = Mathf.SmoothDamp(m_camera.fieldOfView, targetFov, ref m_fovVelocity, m_fovSmoothTime);
+            // スロー演出中も実時間でなめらかに追う
+            float dt = Time.unscaledDeltaTime;
+            m_offset = Vector3.SmoothDamp(m_offset, targetOffset, ref m_offsetVelocity, m_moveSmoothTime, Mathf.Infinity, dt);
+            m_fov = Mathf.SmoothDamp(m_fov, targetFov, ref m_fovVelocity, m_fovSmoothTime, Mathf.Infinity, dt);
+
+            // 演出による寄りを重ねる(向きは変えない)
+            Vector3 position = m_basePosition + m_offset;
+            float fov = m_fov;
+            if (m_overrideWeight > 0.0f)
+            {
+                position = Vector3.Lerp(position, m_overridePosition, m_overrideWeight);
+                fov = Mathf.Lerp(fov, m_overrideFov, m_overrideWeight);
+            }
+            transform.SetPositionAndRotation(position, m_baseRotation);
+            m_camera.fieldOfView = fov;
         }
+
+        // 演出(EliminationCinematic など)で一時的に寄せる。weight: 0で通常、1で指定の位置・視野角
+        // 向きは基準のまま(BaseRotation)なので、寄せる位置は「見たい点 - BaseRotation の前方 × 距離」で求める
+        public void SetOverride(Vector3 position, float fov, float weight)
+        {
+            m_overridePosition = position;
+            m_overrideFov = fov;
+            m_overrideWeight = Mathf.Clamp01(weight);
+        }
+
+        public void ClearOverride()
+        {
+            m_overrideWeight = 0.0f;
+        }
+
+        public Quaternion BaseRotation => m_baseRotation;
 
         // 参加中のプレイヤーが操作している体(生存キャラクター・幽霊)の位置
         private void CollectBodies()
@@ -107,12 +145,9 @@ namespace Nakagawa
             m_bodies.Clear();
             if (m_match == null) m_match = FindAnyObjectByType<DarumaMatch>();
             if (m_match == null) return;
-            foreach (var player in m_match.Players)
-            {
-                if (player == null) continue;
-                Transform body = player.CurrentBody;
-                if (body != null) m_bodies.Add(body.position);
-            }
+            // 自由参加・セレクトから、どちらの試合でも全員の体を取れる
+            m_match.GetBodies(m_bodyTransforms);
+            foreach (var body in m_bodyTransforms) m_bodies.Add(body.position);
         }
 
         // この位置から、すべての体(足元〜頭)が余白付きで映る視野角

@@ -3,6 +3,31 @@ using UnityEngine;
 
 namespace Nakahira
 {
+    // ハンマーの薙ぎ払いが当たったときの情報(DarumaHammer.Hit)
+    public readonly struct HammerHitInfo
+    {
+        public readonly DarumaHammer Hammer;
+        // ハンマーの持ち主
+        public readonly IDarumaAttacker Owner;
+        // 当たった相手(TumikiBlock または DarumaCharacter)
+        public readonly Component Target;
+        public readonly Vector3 Point;
+        // 相手にダメージを与えたか(キャラクターのみ。無敵中はfalse)
+        public readonly bool Damaged;
+        // 飛んできた積み木を打ち返した回数(打ち返しでなければ0)
+        public readonly int ReturnCount;
+
+        public HammerHitInfo(DarumaHammer hammer, IDarumaAttacker owner, Component target, Vector3 point, bool damaged, int returnCount)
+        {
+            Hammer = hammer;
+            Owner = owner;
+            Target = target;
+            Point = point;
+            Damaged = damaged;
+            ReturnCount = returnCount;
+        }
+    }
+
     // ハンマー。このコンポーネントが付いたTransformを回転の支点として振る
     // 子に「前方(+Z)へ伸びる」ハンマーの見た目を置く
     //  ・薙ぎ払い     : 前方を右から左へ水平に振る。ハンマーが対象の位置を通過した瞬間に当たり、その角度へ飛ばす
@@ -51,6 +76,9 @@ namespace Nakahira
         bool m_shotFired;
         readonly HashSet<Object> m_hitThisSwing = new HashSet<Object>();
         readonly Collider[] m_overlaps = new Collider[32];
+
+        // 薙ぎ払いが積み木・キャラクターに当たった(カメラの揺れ・効果音など演出用)
+        public static event System.Action<HammerHitInfo> Hit;
 
         public bool IsBusy => m_action != Action.None;
         // 当たり判定が届く距離(見た目のハンマーの長さ × 倍率)
@@ -229,16 +257,20 @@ namespace Nakahira
             // 打ち返した積み木はしばらく自分に当たらない(壁や連鎖で跳ね返ってきても安全)
             if (returnCount > 0) block.ExtendIgnore(m_params.ReturnImmunityTime);
             BeginHitStop(block, null, returnCount);
+            Hit?.Invoke(new HammerHitInfo(this, m_owner, block, block.transform.position, false, returnCount));
         }
 
         private void HitCharacter(DarumaCharacter other, float bearing)
         {
-            if (other.KnockBottom(ToWorldDirection(bearing), m_params.SweepLaunchSpeed, m_owner, out TumikiBlock knocked))
+            Vector3 point = other.transform.position + Vector3.up * m_sweepHeight;
+            bool damaged = other.KnockBottom(ToWorldDirection(bearing), m_params.SweepLaunchSpeed, m_owner, out TumikiBlock knocked);
+            if (damaged)
             {
                 // 直接攻撃でダメージを与えた(幽霊なら復活する)
                 m_owner.OnDealtDamage();
                 BeginHitStop(knocked, other);
             }
+            Hit?.Invoke(new HammerHitInfo(this, m_owner, other, point, damaged, 0));
             // 弾き出した積み木を同じスイングで二重に打たないようにする
             if (knocked != null) m_hitThisSwing.Add(knocked);
         }

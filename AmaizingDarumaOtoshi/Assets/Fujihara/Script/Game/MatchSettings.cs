@@ -1,7 +1,7 @@
 using Nakahira;
 using UnityEngine;
 
-// 試合（MatchDirector）で使う部品と数値。Assets/Fujihara/Resources/MatchSettings.asset を Inspector で編集する。
+// 試合（セレクトから始めた DarumaMatch）で使う部品と数値。Assets/Fujihara/Resources/MatchSettings.asset を Inspector で編集する。
 // ステージ側（出現ポイント・ステージの範囲）は各ステージのシーンから読むので、ここには置かない。
 [CreateAssetMenu(menuName = "Daruma/Match Settings", fileName = "MatchSettings")]
 public class MatchSettings : ScriptableObject

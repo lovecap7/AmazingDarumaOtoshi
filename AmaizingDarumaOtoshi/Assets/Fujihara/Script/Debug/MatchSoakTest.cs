@@ -26,7 +26,7 @@ public class MatchSoakTest : MonoBehaviour
         public string stage;
         public int players;
         public float timeLimit, duration, firstKO = -1f;
-        public MatchDirector.FinishReason reason;
+        public DarumaMatch.FinishReason reason;
         public bool stalled, draw;
         public int winnerIndex = -1, winnerLevel;
         public float avgLevel;
@@ -40,7 +40,7 @@ public class MatchSoakTest : MonoBehaviour
     int m_modeIndex, m_done;
     readonly List<Record> m_records = new List<Record>();
     Record m_current;
-    MatchDirector m_director;
+    DarumaMatch m_director;
     SelectRoster m_roster;
     readonly Dictionary<string, string> m_scenePaths = new Dictionary<string, string>();
     readonly Dictionary<string, int> m_errors = new Dictionary<string, int>();
@@ -82,8 +82,8 @@ public class MatchSoakTest : MonoBehaviour
             var guid = AssetDatabase.FindAssets("t:Scene " + s.sceneName).FirstOrDefault(g => Path.GetFileNameWithoutExtension(AssetDatabase.GUIDToAssetPath(g)) == s.sceneName);
             if (guid != null) m_scenePaths[s.sceneName] = AssetDatabase.GUIDToAssetPath(guid);
         }
-        MatchDirector.AutoReturnToSelect = false;
-        MatchDirector.PlaySpeed = m_speed;
+        DarumaMatch.AutoReturnToSelect = false;
+        DarumaMatch.PlaySpeed = m_speed;
         Application.logMessageReceived += OnLog;
         SceneManager.sceneLoaded += OnSceneLoaded;
         m_realStart = Time.realtimeSinceStartup;
@@ -94,8 +94,8 @@ public class MatchSoakTest : MonoBehaviour
     {
         Application.logMessageReceived -= OnLog;
         SceneManager.sceneLoaded -= OnSceneLoaded;
-        MatchDirector.AutoReturnToSelect = true;
-        MatchDirector.PlaySpeed = 1f;
+        DarumaMatch.AutoReturnToSelect = true;
+        DarumaMatch.PlaySpeed = 1f;
         Time.timeScale = 1f;
         if (Instance == this) Instance = null;
     }
@@ -155,7 +155,7 @@ public class MatchSoakTest : MonoBehaviour
         m_current = new Record
         {
             mode = mode,
-            stage = stage.sceneName,
+            stage = stage.id,
             players = count,
             timeLimit = rules.TimeLimit,
             avgLevel = (float)entries.Average(e => e.cpuLevel),
@@ -164,14 +164,16 @@ public class MatchSoakTest : MonoBehaviour
         m_finished = false;
         m_loading = true;
         Time.timeScale = 1f;
+        // ステージをまとめたシーン（AllStages）では、読み込んだあとに決めたステージへ切り替える
+        Nakagawa.StageSwitcher.RequestStage(stage.id);
         EditorSceneManager.LoadSceneInPlayMode(m_scenePaths[stage.sceneName], new LoadSceneParameters(LoadSceneMode.Single));
     }
 
     void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
         m_loading = false;
-        m_director = MatchDirector.Current;
-        if (m_director == null) { m_current.problems.Add("MatchDirector が作られなかった"); return; }
+        m_director = DarumaMatch.Current;
+        if (m_director == null) { m_current.problems.Add("DarumaMatch が作られなかった"); return; }
         m_director.PlayerKO += OnKO;
         m_director.PlayerKnocked += (v, a) => m_current.knocks++;
         m_director.PlayerRespawned += p => { m_reviveFrame = Time.frameCount; m_revived = p; };
@@ -195,7 +197,7 @@ public class MatchSoakTest : MonoBehaviour
         }
     }
 
-    void OnFinished(MatchDirector.MatchResult result)
+    void OnFinished(DarumaMatch.MatchResult result)
     {
         m_finished = true;
         m_current.reason = result.Reason;
@@ -272,9 +274,9 @@ public class MatchSoakTest : MonoBehaviour
         var rules = d.Rules;
 
         // 終わり方
-        if (r.Reason == MatchDirector.FinishReason.TimeUp && (!d.HasTimeLimit || d.Elapsed + 0.05f < d.TimeLimit)) Problem("時間制限前にタイムアップした");
-        if (d.Mode == MatchSetup.MatchMode.Time && r.Reason != MatchDirector.FinishReason.TimeUp) Problem("タイムなのに時間切れ以外で終わった");
-        if (r.Reason == MatchDirector.FinishReason.LastOneStanding)
+        if (r.Reason == DarumaMatch.FinishReason.TimeUp && (!d.HasTimeLimit || d.Elapsed + 0.05f < d.TimeLimit)) Problem("時間制限前にタイムアップした");
+        if (d.Mode == MatchSetup.MatchMode.Time && r.Reason != DarumaMatch.FinishReason.TimeUp) Problem("タイムなのに時間切れ以外で終わった");
+        if (r.Reason == DarumaMatch.FinishReason.LastOneStanding)
         {
             int left = d.Mode == MatchSetup.MatchMode.Ghost
                 ? d.Players.Count(p => p.IsAlive)
@@ -291,10 +293,10 @@ public class MatchSoakTest : MonoBehaviour
         if (r.Ranking.Count != d.Players.Count) Problem("順位の人数が合わない");
         int firsts = r.Ranking.Count(p => p.Rank == 1);
         if (r.Winner != null && (firsts != 1 || r.Winner.Rank != 1)) Problem("勝者が1位ひとりになっていない");
-        if (r.Winner == null && firsts < 2 && r.Reason == MatchDirector.FinishReason.TimeUp) Problem("引き分けなのに1位がひとり");
+        if (r.Winner == null && firsts < 2 && r.Reason == DarumaMatch.FinishReason.TimeUp) Problem("引き分けなのに1位がひとり");
         for (int i = 1; i < r.Ranking.Count; i++)
             if (r.Ranking[i].Rank < r.Ranking[i - 1].Rank) Problem("順位の並びがおかしい");
-        if (r.Reason == MatchDirector.FinishReason.TimeUp && r.Winner != null)
+        if (r.Reason == DarumaMatch.FinishReason.TimeUp && r.Winner != null)
         {
             if (d.Mode == MatchSetup.MatchMode.Time && d.Players.Any(p => p != r.Winner && p.Score >= r.Winner.Score)) Problem("タイム：一番点が多い人が勝っていない");
             if (d.Mode == MatchSetup.MatchMode.Stock && d.Players.Any(p => p != r.Winner && p.State != MatchPlayer.PlayerState.Out && p.Stocks >= r.Winner.Stocks)) Problem("ストック：一番ストックが多い人が勝っていない");
@@ -356,7 +358,7 @@ public class MatchSoakTest : MonoBehaviour
             if (ok.Count == 0) continue;
             sb.AppendLine($"試合時間：平均 {ok.Average(r => r.duration):F1} 秒 / 最短 {ok.Min(r => r.duration):F1} / 最長 {ok.Max(r => r.duration):F1}");
             sb.AppendLine($"最初にやられるまで：平均 {ok.Where(r => r.firstKO >= 0).DefaultIfEmpty(new Record()).Average(r => r.firstKO):F1} 秒");
-            sb.AppendLine($"終わり方：最後の1人 {ok.Count(r => r.reason == MatchDirector.FinishReason.LastOneStanding)} / 時間切れ {ok.Count(r => r.reason == MatchDirector.FinishReason.TimeUp)} / 引き分け {ok.Count(r => r.draw)}（{100f * ok.Count(r => r.draw) / ok.Count:F1}%）");
+            sb.AppendLine($"終わり方：最後の1人 {ok.Count(r => r.reason == DarumaMatch.FinishReason.LastOneStanding)} / 時間切れ {ok.Count(r => r.reason == DarumaMatch.FinishReason.TimeUp)} / 引き分け {ok.Count(r => r.draw)}（{100f * ok.Count(r => r.draw) / ok.Count:F1}%）");
             int kos = ok.Sum(r => r.kos), att = ok.Sum(r => r.attributedKOs), self = ok.Sum(r => r.selfOuts);
             sb.AppendLine($"やられた回数：{kos}（相手あり {att} / 相手なし {self} = {(kos > 0 ? 100f * self / kos : 0f):F1}%）　崩した回数：{ok.Sum(r => r.knocks)}");
             if (mode == MatchSetup.MatchMode.Ghost)

@@ -1,144 +1,303 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
 namespace Nakahira
 {
-    // 試合の管理。プレイヤーの登録、キャラクター/幽霊の生成、試合終了判定を行う
-    // 同じGameObjectに PlayerInputManager があれば、ゲームパッドのボタンを押したプレイヤーが参加する
+    // 試合の管理。プレイヤーの登録、キャラクター/幽霊の生成、モードのルールでの勝ち負け、結果の表示を行う
+    // 始め方は2通り。どちらも同じ試合の進め方(モード・得点・復活・終わり方)で、出る人の決め方だけが違う
+    //  ・セレクトから: Fujihara のセレクト画面で決めた内容(MatchSetup)があるとき。決めた人数・キャラ・入力機器で全員を出し、
+    //                  結果を見せてセレクトへ戻る(ボタンを押した人の途中参加はしない)
+    //  ・直接再生    : ステージのシーンをそのまま再生したとき。同じGameObjectの PlayerInputManager で、ボタンを押した人が
+    //                  途中から参加する(DarumaPlayer)。ルールはインスペクターの「直接再生」で決める(既定はゴースト)。
+    //                  結果を見せたら、同じシーンをやり直す
+    //
+    // ■ モード
+    //   ストック：やられるとストックが1つ減り、少ししてから首だけで復活。0 になったら脱落。最後の1人が勝ち
+    //             時間制限ありなら、時間切れでストックが一番多い人の勝ち
+    //   タイム　：やられても少ししてから復活。崩す +1・崩される -1・顔を飛ばす +1・相手なしで落ちる -1(MatchSetup.Rules)。
+    //             時間切れで点が一番多い人の勝ち
+    //   ゴースト：やられると幽霊になり、生き残っている相手を叩くと復活(出現ポイントのどれかにランダムで)。生き残りが1人になったら終わり
+    //             時間制限ありなら、時間切れで生き残っている中で積み木が一番多い人の勝ち
+    //   同点(同じ数)のときは引き分け。
+    //
+    // ■ ゲーム画面の UI(HUD)を作るとき
+    //   DarumaMatch.Current から読む。値を毎フレーム読んでも、イベントで受け取ってもよい。
+    //     Players            ：出ている人(番号順)。1人分の中身は MatchPlayer を参照
+    //     Rules / Mode       ：モードとルール
+    //     HasTimeLimit / TimeLeft / Elapsed：時間
+    //     IsFinished / Result：結果(勝者・理由・順位)
+    //   イベント
+    //     Started                  ：試合が始まった(全員が出たあと。直接再生では、最初からいる人(ダミー)が出たあと)
+    //     PlayerJoined(人)         ：途中から参加した(直接再生)
+    //     PlayerKnocked(被害, 相手)：積み木を崩された(相手が分かったときだけ)
+    //     PlayerKO(被害, 相手)     ：顔を飛ばされた / 落ちた(相手は分からなければ null)
+    //     PlayerRespawned(人)      ：復活した(ストック・タイムの復活、幽霊からの復活)
+    //     PlayerOut(人)            ：脱落した(ストックが無くなった)
+    //     Scored(人, 点, 理由)      ：点が動いた(タイム)
+    //     Finished(結果)            ：試合が終わった
+    //   1人分の積み木・ストック・点数の変化は MatchPlayer のイベント(StackChanged など)でも受け取れる。
+    [DefaultExecutionOrder(-50)]   // HUD などより先にプレイヤーを出す
     public class DarumaMatch : MonoBehaviour
     {
+        public enum ScoreReason { Knock, Knocked, KO, SelfOut }
+        public enum FinishReason { LastOneStanding, TimeUp }
+
+        public class MatchResult
+        {
+            public FinishReason Reason;
+            public MatchPlayer Winner;                  // null = 引き分け
+            public List<MatchPlayer> Ranking = new List<MatchPlayer>();   // 1位から順(同じ順位の人もいる。Rank を見る)
+            public bool IsDraw => Winner == null;
+        }
+
         [Header("ステージ")]
         // 出現・復活ポイント。他のキャラクターすべてから最も遠い地点が選ばれる
         [SerializeField] Transform[] m_spawnPoints;
         [SerializeField] StageArea m_stageArea;
 
-        [Header("キャラクター")]
+        [Header("直接再生:キャラクター(未設定なら MatchSettings のもの)")]
         [SerializeField] DarumaCharacter m_characterPrefab;
         [SerializeField] DarumaGhost m_ghostPrefab;
+        // 復活したあとの無敵時間
         [SerializeField] float m_reviveInvincibleTime = 1.5f;
 
-        [Header("参加")]
+        [Header("直接再生:ルール")]
+        [SerializeField] MatchSetup.MatchMode m_directMode = MatchSetup.MatchMode.Ghost;
+        // ストックのストック数
+        [SerializeField, Min(1)] int m_directStocks = 3;
+        // 時間制限(秒)。0 = なし(タイムでは 0 のとき 120 秒)
+        [SerializeField, Min(0.0f)] float m_directTimeLimit = 0.0f;
         [SerializeField] int m_maxPlayers = 4;
 
-        [Header("デバッグ")]
+        [Header("直接再生:デバッグ")]
         // 開始時に置く操作なしのダミープレイヤーの数
         [SerializeField] int m_dummyCount = 1;
         // ダミーに最初から積んでおく積み木
         [SerializeField] TumikiBlock m_tumikiPrefab;
         [SerializeField] int m_dummyStartBlocks = 5;
 
-        readonly List<DarumaPlayer> m_players = new List<DarumaPlayer>();
-        PlayerInputManager m_inputManager;
+        [Header("表示")]
+        // 試合の仮の表示(名札・残り時間・結果)を付ける
+        [SerializeField] bool m_addDebugView = true;
 
-        public bool IsFinished { get; private set; }
-        public IReadOnlyList<DarumaPlayer> Players => m_players;
+        public static DarumaMatch Current { get; private set; }
+
+        // false にすると、試合が終わってもセレクトへ戻らない(自動テスト用)
+        public static bool AutoReturnToSelect = true;
+        // 試合中の速さ(自動テスト用。ふだんは 1)
+        public static float PlaySpeed = 1f;
+
+        const string SelectSceneName = "SelectScene";
+        static readonly Color[] PlayerColors =
+        {
+            new Color(0.93f, 0.27f, 0.25f), new Color(0.22f, 0.55f, 0.95f), new Color(0.98f, 0.76f, 0.12f), new Color(0.30f, 0.74f, 0.35f),
+            new Color(0.96f, 0.55f, 0.15f), new Color(0.40f, 0.85f, 0.85f), new Color(0.85f, 0.45f, 0.80f), new Color(0.55f, 0.45f, 0.35f),
+        };
+        static readonly Color CpuColor = new Color(0.55f, 0.55f, 0.58f);
+
+        public static Color ColorFor(MatchSetup.Entry e) => e.isCpu ? CpuColor : PlayerColors[e.playerIndex % PlayerColors.Length];
+
+        // 直接再生の試合をやり直す直前(ステージをまとめたシーンで、今のステージを覚えておく等)
+        public static event Action BeforeRestart;
+
+        // ---- 読むもの ----
+        // セレクト画面で決めた内容で始めた試合か(false なら直接再生)
+        public bool IsConfigured { get; private set; }
+        public bool IsFinished => Result != null;
+        public StageArea StageArea => m_stageArea;
+        public MatchSetup.MatchRules Rules => m_rules ?? MatchSetup.Rules;
+        public MatchSetup.MatchMode Mode => Rules.mode;
+        public IReadOnlyList<MatchPlayer> Players => m_players;
+        public bool HasTimeLimit => m_timeLimit > 0f;
+        public float TimeLimit => m_timeLimit;
+        public float TimeLeft => HasTimeLimit ? Mathf.Max(0f, m_timeLimit - Elapsed) : -1f;
+        public float Elapsed { get; private set; }
+        public MatchResult Result { get; private set; }
+
+        // ---- お知らせ ----
+        public event Action Started;
+        public event Action<MatchPlayer> PlayerJoined;
+        public event Action<MatchPlayer, MatchPlayer> PlayerKnocked;
+        public event Action<MatchPlayer, MatchPlayer> PlayerKO;
+        public event Action<MatchPlayer> PlayerRespawned;
+        public event Action<MatchPlayer> PlayerOut;
+        public event Action<MatchPlayer, int, ScoreReason> Scored;
+        public event Action<MatchResult> Finished;
+
+        // 崩した / 顔を飛ばした、の記録(同じフレームの「やられた」と「当てた」を組にする)
+        class Hit
+        {
+            public MatchPlayer victim, attacker;
+            public bool head;
+        }
+
+        MatchSettings m_settings;
+        MatchSetup.MatchRules m_rules;
+        PlayerInputManager m_inputManager;
+        float m_timeLimit;
+        readonly List<MatchPlayer> m_players = new List<MatchPlayer>();
+        readonly Dictionary<DarumaCharacter, MatchPlayer> m_owners = new Dictionary<DarumaCharacter, MatchPlayer>();
+        readonly List<Hit> m_hits = new List<Hit>();
+        int m_outCount, m_lastOutFrame = -1;
+        bool m_lastOnePending, m_timeUpFinish;
+        float m_finishTime = -1f;
+        bool m_leaving;
 
         private void Awake()
         {
+            Current = this;
             // 定員オーバーで参加したプレイヤーは Register で弾かれて破棄される
             m_inputManager = GetComponent<PlayerInputManager>();
+
+            // 部品・時間の設定(直接再生で MatchSettings が無くても、シーンに設定した部品で遊べるようにする)
+            m_settings = MatchSettings.Instance;
+            if (m_settings == null) m_settings = ScriptableObject.CreateInstance<MatchSettings>();
+
+            // セレクト画面で決めた内容があれば、その内容で試合をする(ボタンを押した人の途中参加は止める)
+            IsConfigured = MatchSetup.Players.Count > 0;
+            m_rules = IsConfigured ? MatchSetup.Rules : DirectRules();
+            m_timeLimit = Rules.TimeLimit;
+            if (IsConfigured && m_inputManager != null)
+            {
+                m_inputManager.DisableJoining();
+                m_inputManager.enabled = false;
+            }
+            if (m_addDebugView && GetComponent<MatchDebugView>() == null) gameObject.AddComponent<MatchDebugView>();
+        }
+
+        // 直接再生のルール(インスペクターの設定から作る)
+        MatchSetup.MatchRules DirectRules()
+        {
+            var rules = new MatchSetup.MatchRules
+            {
+                mode = m_directMode,
+                stocks = m_directStocks,
+                stockTimeLimit = m_directTimeLimit,
+                ghostTimeLimit = m_directTimeLimit,
+                timeLength = m_directTimeLimit > 0.0f ? m_directTimeLimit : 120.0f,
+            };
+            return rules;
+        }
+
+        private void OnDestroy()
+        {
+            if (Current == this) Current = null;
+            // 試合の速さ・終わったときの停止を元に戻す
+            if (IsConfigured || Result != null) Time.timeScale = 1f;
         }
 
         private void Start()
         {
-            for (int i = 0; i < m_dummyCount; i++)
-            {
-                var dummy = new GameObject("Dummy").AddComponent<DarumaPlayer>();
-                if (!Register(dummy))
-                {
-                    Destroy(dummy.gameObject);
-                    break;
-                }
-                dummy.name += "_Dummy";
-                StackDebugBlocks(dummy.Character);
-            }
+            if (IsConfigured) StartConfigured();
+            else StartDirect();
         }
 
-        // 試合に参加させ、キャラクターを出現させる。参加できなければfalse
-        public bool Register(DarumaPlayer player)
+        private void Update()
         {
-            if (IsFinished || m_players.Count >= m_maxPlayers) return false;
-
-            m_players.Add(player);
-            player.OnRegistered(this, m_players.Count - 1);
-            player.Possess(SpawnCharacter(player, false));
-            Debug.Log($"[DarumaMatch] {player.name} が参加 ({m_players.Count}/{m_maxPlayers})");
-            return true;
+            UpdateMatch();
         }
 
-        public DarumaCharacter SpawnCharacter(DarumaPlayer player, bool withInvincible)
+        private void LateUpdate()
         {
-            Vector3 pos = FindFarthestSpawnPoint(player);
-            Vector3 toCenter = m_stageArea.transform.position - pos;
-            toCenter.y = 0.0f;
-            Quaternion rot = toCenter.sqrMagnitude > 0.0001f ? Quaternion.LookRotation(toCenter) : Quaternion.identity;
-
-            DarumaCharacter character = Instantiate(m_characterPrefab, pos, rot);
-            if (withInvincible) character.SetInvincible(m_reviveInvincibleTime);
-            return character;
+            LateUpdateMatch();
         }
 
-        public DarumaGhost SpawnGhost(Vector3 position)
-        {
-            // 奈落に落ちた場合もステージ範囲内の床の高さに出す
-            Vector3 pos = m_stageArea.Clamp(position, 0.5f);
-            DarumaGhost ghost = Instantiate(m_ghostPrefab, pos, Quaternion.identity);
-            ghost.Init(m_stageArea);
-            return ghost;
-        }
+        //========================================
+        // 共通(カメラ・ステージ切り替えなどから使う)
+        //========================================
 
-        public void NotifyEliminated(DarumaPlayer player)
+        // 参加している全員の、いま動かしている体(生存キャラクター・幽霊)
+        public void GetBodies(List<Transform> results)
         {
-            Debug.Log($"[DarumaMatch] {player.name} が脱落");
-            CheckFinish();
-        }
-
-        // 生存者が1人以下になったら試合終了(2人以上参加している場合のみ)
-        private void CheckFinish()
-        {
-            if (IsFinished || m_players.Count < 2) return;
-
-            DarumaPlayer winner = null;
-            int survivors = 0;
+            results.Clear();
             foreach (var p in m_players)
             {
-                if (!p.IsSurvivor) continue;
-                survivors++;
-                winner = p;
+                if (p != null && p.Body != null) results.Add(p.Body);
             }
-            if (survivors > 1) return;
-
-            IsFinished = true;
-            if (m_inputManager != null) m_inputManager.DisableJoining();
-            foreach (var p in m_players) p.StopControl();
-
-            Debug.Log(survivors == 1
-                ? $"[DarumaMatch] 試合終了! 勝者: {winner.name}"
-                : "[DarumaMatch] 試合終了! 引き分け");
         }
 
-        // 他のキャラクター(生存者・幽霊)すべてから最も遠い出現ポイント
-        private Vector3 FindFarthestSpawnPoint(DarumaPlayer self)
+        // 全員の体(キャラクター・幽霊)を消す。消えるのはフレームの終わりなので、次のフレームで SpawnAllAtStart を呼ぶ
+        // (ステージの切り替えなどで、全員を出し直すときに使う)
+        public void ClearBodies()
         {
-            Vector3 best = m_spawnPoints[0].position;
-            float bestScore = float.MinValue;
-            foreach (var point in m_spawnPoints)
+            foreach (var p in m_players)
             {
-                // 一番近いキャラクターまでの距離が大きいほど安全
-                float nearest = float.MaxValue;
-                foreach (var p in m_players)
+                if (p.Character != null)
                 {
-                    if (p == self || p.CurrentBody == null) continue;
-                    nearest = Mathf.Min(nearest, Vector3.Distance(point.position, p.CurrentBody.position));
+                    m_owners.Remove(p.Character);
+                    Destroy(p.Character.gameObject);
                 }
-                if (nearest > bestScore)
-                {
-                    bestScore = nearest;
-                    best = point.position;
-                }
+                if (p.Ghost != null) Destroy(p.Ghost.gameObject);
             }
-            return best;
+            m_hits.Clear();
+        }
+
+        // 全員(脱落した人を除く)を出現ポイントに出し直す
+        public void SpawnAllAtStart()
+        {
+            for (int i = 0; i < m_players.Count; i++)
+            {
+                var p = m_players[i];
+                if (p.State == MatchPlayer.PlayerState.Out) continue;
+                SpawnMatchCharacter(p, InitialSpawnPoint(i), false);
+            }
+        }
+
+        //========================================
+        // 直接再生:参加
+        //========================================
+
+        // 最初からいるダミー(操作なし)を出して、試合を始める。人はボタンを押して途中から参加する(Register)
+        private void StartDirect()
+        {
+            for (int i = 0; i < m_dummyCount && m_players.Count < m_maxPlayers; i++)
+            {
+                var entry = new MatchSetup.Entry
+                {
+                    playerIndex = m_players.Count,
+                    isCpu = true,
+                    deviceName = "Dummy",
+                    cpuNumber = m_dummyCount > 1 ? i + 1 : 0,
+                };
+                var p = new GameObject().AddComponent<MatchPlayer>();
+                p.Setup(entry, ColorFor(entry), null, Mode == MatchSetup.MatchMode.Stock ? Mathf.Max(1, Rules.stocks) : -1);
+                p.name += "_Dummy";
+                m_players.Add(p);
+                SpawnMatchCharacter(p, InitialSpawnPoint(m_players.Count - 1), false);
+                StackDebugBlocks(p.Character);
+            }
+            Time.timeScale = PlaySpeed;
+            Started?.Invoke();
+        }
+
+        // ボタンを押した人(PlayerInputManager が出した DarumaPlayer)を試合に参加させ、キャラクターを出す。参加できなければfalse
+        // 参加した人も、セレクトから出た人と同じ MatchPlayer として扱う(同じ GameObject に付ける)
+        public bool Register(DarumaPlayer player)
+        {
+            if (IsConfigured || IsFinished || m_players.Count >= m_maxPlayers) return false;
+
+            var input = player.GetComponent<PlayerInput>();
+            InputDevice device = input != null && input.devices.Count > 0 ? input.devices[0] : null;
+            int humans = 0;
+            foreach (var other in m_players) if (!other.IsCpu) humans++;
+            var entry = new MatchSetup.Entry
+            {
+                playerIndex = humans,
+                isCpu = false,
+                deviceId = device != null ? device.deviceId : -1,
+                deviceName = device != null ? device.displayName : "",
+            };
+
+            var p = player.gameObject.AddComponent<MatchPlayer>();
+            p.Setup(entry, ColorFor(entry), player.GetComponent<IDarumaCommandSource>(), Mode == MatchSetup.MatchMode.Stock ? Mathf.Max(1, Rules.stocks) : -1);
+            player.OnRegistered(this, p);
+            m_players.Add(p);
+            SpawnMatchCharacter(p, FarthestSpawnPoint(p), false);
+            Debug.Log($"[DarumaMatch] {p.Label} が参加 ({m_players.Count}/{m_maxPlayers})");
+            PlayerJoined?.Invoke(p);
+            return true;
         }
 
         private void StackDebugBlocks(DarumaCharacter character)
@@ -150,6 +309,440 @@ namespace Nakahira
                 block.SetColor((TumikiColor)(i % 4));
                 character.Stack.AddBottom(block);
             }
+        }
+
+        // ステージの中心を向く向き
+        private Quaternion FacingCenter(Vector3 pos)
+        {
+            Vector3 toCenter = (m_stageArea != null ? m_stageArea.transform.position : Vector3.zero) - pos;
+            toCenter.y = 0.0f;
+            return toCenter.sqrMagnitude > 0.0001f ? Quaternion.LookRotation(toCenter) : Quaternion.identity;
+        }
+
+        //========================================
+        // セレクトから:始める
+        //========================================
+
+        private void StartConfigured()
+        {
+            if (m_settings == null || m_settings.characterPrefab == null)
+            {
+                Debug.LogError("[DarumaMatch] Resources/MatchSettings が無いか、characterPrefab が未設定です");
+                enabled = false;
+                return;
+            }
+
+            // プレイヤー番号の小さい順に出す
+            foreach (var e in MatchSetup.Players)
+            {
+                var p = CreatePlayer(e);
+                m_players.Add(p);
+                SpawnMatchCharacter(p, InitialSpawnPoint(m_players.Count - 1), false);
+                Debug.Log($"[DarumaMatch] {p.Label} {(e.character != null ? e.character.displayName : "-")} ({(e.isCpu ? "CPU Lv" + e.cpuLevel : e.deviceName + " #" + e.deviceId)})");
+            }
+            Debug.Log("[DarumaMatch] " + MatchSetup.Describe());
+            Time.timeScale = PlaySpeed;
+            Started?.Invoke();
+        }
+
+        MatchPlayer CreatePlayer(MatchSetup.Entry e)
+        {
+            GameObject go;
+            IDarumaCommandSource source = null;
+            var device = e.Device;
+            if (e.isCpu)
+            {
+                go = new GameObject();
+                var cpu = go.AddComponent<CpuDarumaInput>();
+                cpu.level = e.cpuLevel;
+                source = cpu;
+            }
+            else if (device is Gamepad && m_settings.gamepadInputPrefab != null)
+            {
+                // そのコントローラーと組にして、本編と同じ操作設定(DarumaInputHandler)で動かす
+                var input = PlayerInput.Instantiate(m_settings.gamepadInputPrefab, playerIndex: e.playerIndex, controlScheme: "Gamepad", pairWithDevice: device);
+                go = input.gameObject;
+                source = go.GetComponent<IDarumaCommandSource>();
+            }
+            else if (device is Keyboard)
+            {
+                go = new GameObject();
+                source = go.AddComponent<KeyboardDarumaInput>();
+            }
+            else
+            {
+                // コントローラーが抜けているなど:操作なしで出す(人数と番号はセレクトのまま)
+                Debug.LogWarning($"[DarumaMatch] {e.DisplayLabel} の入力機器({e.deviceName} #{e.deviceId})が見つからないので、操作なしで出します");
+                go = new GameObject();
+            }
+
+            var p = go.AddComponent<MatchPlayer>();
+            p.Setup(e, ColorFor(e), source, Mode == MatchSetup.MatchMode.Stock ? Mathf.Max(1, Rules.stocks) : -1);
+            return p;
+        }
+
+        void SpawnMatchCharacter(MatchPlayer p, Vector3 pos, bool invincible)
+        {
+            var c = Instantiate(CharacterPrefab(p), pos, FacingCenter(pos));
+            if (invincible) c.SetInvincible(IsConfigured ? m_settings.respawnInvincibleTime : m_reviveInvincibleTime);
+
+            m_owners[c] = p;
+            c.Eliminated += OnMatchCharacterEliminated;
+            c.DealtDamage += OnDealtDamage;
+            int last = 0;
+            c.Stack.Changed += () =>
+            {
+                // 積み木が減った:崩された(だれに崩されたかは、このあと同じフレームの DealtDamage で分かる)
+                int n = c.Stack.Count;
+                if (n < last) m_hits.Add(new Hit { victim = p });
+                last = n;
+            };
+            p.SetCharacter(c);
+        }
+
+        DarumaCharacter CharacterPrefab(MatchPlayer p)
+        {
+            var data = p.CharacterData;
+            if (data != null && data.prefab != null)
+            {
+                var custom = data.prefab.GetComponent<DarumaCharacter>();
+                if (custom != null) return custom;
+            }
+            // 直接再生ではシーンに設定したキャラクターを優先する
+            if (!IsConfigured && m_characterPrefab != null) return m_characterPrefab;
+            return m_settings.characterPrefab;
+        }
+
+        DarumaGhost GhostPrefab => !IsConfigured && m_ghostPrefab != null ? m_ghostPrefab : m_settings.ghostPrefab;
+
+        //========================================
+        // 毎フレーム(共通)
+        //========================================
+
+        void UpdateMatch()
+        {
+            if (Result != null) { UpdateResult(); return; }
+
+            Elapsed += Time.deltaTime;
+
+            // 復活待ち
+            foreach (var p in m_players)
+            {
+                if (p.State != MatchPlayer.PlayerState.Respawning) continue;
+                p.RespawnTimeLeft -= Time.deltaTime;
+                if (p.RespawnTimeLeft > 0f) continue;
+                SpawnMatchCharacter(p, FarthestSpawnPoint(p), true);
+                PlayerRespawned?.Invoke(p);
+            }
+
+            if (HasTimeLimit && Elapsed >= m_timeLimit) Finish(FinishReason.TimeUp);
+            else if (IsConfigured && AutoReturnToSelect && PressedBack()) BackToSelect();   // テスト用:途中でもセレクトへ戻れる
+        }
+
+        void LateUpdateMatch()
+        {
+            ProcessHits();
+            // 生き残りが1人になったあと、同じフレームで幽霊が復活していることがある(幽霊が生存者を倒した → 復活)。
+            // 復活を優先し、フレームの最後にもう一度数えてから終わる
+            if (m_lastOnePending && Result == null)
+            {
+                m_lastOnePending = false;
+                if (CountLeft() <= 1) Finish(FinishReason.LastOneStanding);
+            }
+        }
+
+        // 同じフレームの「やられた」と「当てた」を組にしてから、点数とお知らせを出す
+        // (当てた側の DealtDamage は、やられた側の処理が終わってから届くので、フレームの最後にまとめて行う)
+        void ProcessHits()
+        {
+            if (m_hits.Count == 0) return;
+            var hits = m_hits.ToArray();
+            m_hits.Clear();
+            foreach (var h in hits)
+            {
+                if (h.head)
+                {
+                    if (h.attacker != null)
+                    {
+                        h.attacker.CountKO();
+                        AddScore(h.attacker, Rules.headPoints, ScoreReason.KO);
+                    }
+                    else
+                    {
+                        // 相手なしでやられた(自分から場外に落ちた など)
+                        h.victim.CountSelfOut();
+                        AddScore(h.victim, Rules.selfOutPoints, ScoreReason.SelfOut);
+                    }
+                    PlayerKO?.Invoke(h.victim, h.attacker);
+                }
+                else if (h.attacker != null)
+                {
+                    // 相手が分からない減り方(自分で撃った・こぼれた等)は数えない
+                    h.attacker.CountKnock();
+                    h.victim.CountKnocked();
+                    AddScore(h.attacker, Rules.knockPoints, ScoreReason.Knock);
+                    AddScore(h.victim, Rules.knockedPoints, ScoreReason.Knocked);
+                    PlayerKnocked?.Invoke(h.victim, h.attacker);
+                }
+            }
+        }
+
+        void AddScore(MatchPlayer p, int points, ScoreReason reason)
+        {
+            if (Mode != MatchSetup.MatchMode.Time || Result != null || points == 0) return;
+            p.AddScore(points);
+            Scored?.Invoke(p, points, reason);
+        }
+
+        //========================================
+        // 当てた・やられた(共通)
+        //========================================
+
+        // ハンマー・弾・連鎖で生存者にダメージを与えた(このすぐ前に、やられた側の記録が入っている)
+        void OnDealtDamage(DarumaCharacter attackerCharacter)
+        {
+            if (m_owners.TryGetValue(attackerCharacter, out var attacker)) Attribute(attacker);
+        }
+
+        // いちばん新しい「相手がまだ分からないやられ」を、当てた人のものにする
+        void Attribute(MatchPlayer attacker)
+        {
+            for (int i = m_hits.Count - 1; i >= 0; i--)
+            {
+                var h = m_hits[i];
+                if (h.attacker != null || h.victim == attacker) continue;
+                h.attacker = attacker;
+                return;
+            }
+        }
+
+        // 脱落した順番。同じフレームでやられた人は同じ順番(相打ち)にして、順位を同じにする(最後の2人が相打ちなら引き分け)
+        int NextOutOrder()
+        {
+            if (Time.frameCount != m_lastOutFrame)
+            {
+                m_lastOutFrame = Time.frameCount;
+                m_outCount++;
+            }
+            return m_outCount;
+        }
+
+        // 首だけで叩かれた・頭に当たった・落ちた(この直後にキャラクターは消える)
+        void OnMatchCharacterEliminated(DarumaCharacter c)
+        {
+            if (!m_owners.TryGetValue(c, out var p)) return;
+            m_owners.Remove(c);
+            if (Result != null) return;
+
+            p.CountFall();
+            m_hits.Add(new Hit { victim = p, head = true });
+            Vector3 pos = c.transform.position;
+
+            switch (Mode)
+            {
+                case MatchSetup.MatchMode.Ghost:
+                    p.OutOrder = NextOutOrder();
+                    SpawnMatchGhost(p, pos);
+                    break;
+                case MatchSetup.MatchMode.Stock:
+                    p.LoseStock();
+                    if (p.Stocks > 0) p.SetRespawning(m_settings.respawnDelay);
+                    else
+                    {
+                        p.SetOut(NextOutOrder());
+                        PlayerOut?.Invoke(p);
+                    }
+                    break;
+                default:
+                    p.SetRespawning(m_settings.respawnDelay);
+                    break;
+            }
+
+            CheckLastOne();
+        }
+
+        void SpawnMatchGhost(MatchPlayer p, Vector3 pos)
+        {
+            if (GhostPrefab == null) { p.SetOut(p.OutOrder); return; }
+            if (m_stageArea != null) pos = m_stageArea.Clamp(pos, 0.5f);
+            var ghost = Instantiate(GhostPrefab, pos, Quaternion.identity);
+            ghost.Init(m_stageArea);
+            ghost.ReviveRequested += g =>
+            {
+                // 幽霊が生存者にダメージを与えた(幽霊には DealtDamage が無いので、ここで当てた人を記録する)
+                Attribute(p);
+                if (Result != null) return;
+                // その場で復活すると、直接殴った相手(近くにいる幽霊など)にすぐ殴り返されるので、出現ポイントのどれかに出す(仮)
+                Destroy(g.gameObject);
+                SpawnMatchCharacter(p, RandomSpawnPoint(), true);
+                PlayerRespawned?.Invoke(p);
+            };
+            p.SetGhost(ghost);
+        }
+
+        //========================================
+        // 試合の終わり(共通)
+        //========================================
+
+        // 生き残りが1人以下になったら終わり(ストック・ゴースト)
+        void CheckLastOne()
+        {
+            if (Mode == MatchSetup.MatchMode.Time || m_players.Count < 2) return;
+            if (CountLeft() <= 1) m_lastOnePending = true;   // 最後の一撃の「当てた人」と幽霊の復活が済んでから終わる(LateUpdate)
+        }
+
+        // まだ戦っている人数(ゴースト:生存者、ストック:脱落していない人)
+        int CountLeft()
+        {
+            int left = 0;
+            foreach (var p in m_players)
+            {
+                bool inGame = Mode == MatchSetup.MatchMode.Ghost ? p.IsAlive : p.State != MatchPlayer.PlayerState.Out;
+                if (inGame) left++;
+            }
+            return left;
+        }
+
+        void Finish(FinishReason reason)
+        {
+            if (Result != null) return;
+            ProcessHits();   // このフレームの点数を先に入れる
+            m_timeUpFinish = reason == FinishReason.TimeUp;
+
+            foreach (var p in m_players) p.StopControl();
+            Time.timeScale = 0f;   // その場で止める(セレクトへ戻るときに戻す)
+
+            var result = new MatchResult { Reason = reason };
+            result.Ranking.AddRange(m_players);
+            result.Ranking.Sort((a, b) => RankKey(b).CompareTo(RankKey(a)));
+            for (int i = 0; i < result.Ranking.Count; i++)
+            {
+                var p = result.Ranking[i];
+                p.Rank = i > 0 && RankKey(p) == RankKey(result.Ranking[i - 1]) ? result.Ranking[i - 1].Rank : i + 1;
+            }
+            // 1位が1人だけなら勝者、2人以上なら引き分け
+            if (result.Ranking.Count > 0 && (result.Ranking.Count == 1 || result.Ranking[1].Rank != 1)) result.Winner = result.Ranking[0];
+
+            Result = result;
+            m_finishTime = Time.unscaledTime;
+            Debug.Log($"[DarumaMatch] 試合終了({(reason == FinishReason.TimeUp ? "時間切れ" : "最後の1人")}):{(result.Winner != null ? result.Winner.Label + " の勝ち" : "引き分け")}");
+            Finished?.Invoke(result);
+        }
+
+        // 順位の比べ方(大きいほど上)
+        double RankKey(MatchPlayer p)
+        {
+            bool timeUp = m_timeUpFinish;
+            switch (Mode)
+            {
+                case MatchSetup.MatchMode.Time:
+                    return p.Score;
+                case MatchSetup.MatchMode.Stock:
+                    // 残っている人が上(時間切れならストックが多い順)。脱落した人は後に脱落した人ほど上
+                    if (p.State != MatchPlayer.PlayerState.Out) return 1000 + (timeUp ? p.Stocks : 0);
+                    return p.OutOrder;
+                default:
+                    // 生き残っている人が上(時間切れなら積み木が多い順)。幽霊は後にやられた人ほど上
+                    if (p.IsAlive) return 1000 + (timeUp ? p.StackCount : 0);
+                    return p.OutOrder;
+            }
+        }
+
+        // 結果を見せたら、セレクトから:セレクトへ戻る / 直接再生:同じシーンをやり直す
+        void UpdateResult()
+        {
+            if (m_leaving || !AutoReturnToSelect) return;
+            float t = Time.unscaledTime - m_finishTime;
+            if (t > m_settings.resultTime || (t > 1f && PressedStart()))
+            {
+                if (IsConfigured) BackToSelect();
+                else Restart();
+            }
+        }
+
+        // 同じシーンを読み直して、試合をやり直す(直接再生。参加していた人はボタンを押して参加し直す)
+        public void Restart()
+        {
+            if (m_leaving) return;
+            m_leaving = true;
+            BeforeRestart?.Invoke();
+            Time.timeScale = 1f;
+            var scene = gameObject.scene;
+            if (scene.buildIndex >= 0)
+            {
+                UnityEngine.SceneManagement.SceneManager.LoadScene(scene.buildIndex);
+                return;
+            }
+#if UNITY_EDITOR
+            // ビルド設定に登録していないシーンはエディタからだけ読み直せる
+            UnityEditor.SceneManagement.EditorSceneManager.LoadSceneInPlayMode(scene.path,
+                new UnityEngine.SceneManagement.LoadSceneParameters(UnityEngine.SceneManagement.LoadSceneMode.Single));
+#else
+            Debug.LogWarning("[DarumaMatch] ビルド設定にないシーンは読み直せません");
+#endif
+        }
+
+        public void BackToSelect()
+        {
+            if (m_leaving) return;
+            m_leaving = true;
+            Time.timeScale = 1f;
+            Fader.Load(SelectSceneName);
+        }
+
+        //========================================
+        // 出現ポイント(共通)
+        //========================================
+
+        // 最初は 1P から順に出現ポイント 1, 2, … に出す
+        Vector3 InitialSpawnPoint(int order)
+        {
+            if (m_spawnPoints == null || m_spawnPoints.Length == 0) return Vector3.zero;
+            return m_spawnPoints[order % m_spawnPoints.Length].position;
+        }
+
+        // 幽霊からの復活:出現ポイントからランダムに選ぶ
+        Vector3 RandomSpawnPoint()
+        {
+            if (m_spawnPoints == null || m_spawnPoints.Length == 0) return Vector3.zero;
+            return m_spawnPoints[UnityEngine.Random.Range(0, m_spawnPoints.Length)].position;
+        }
+
+        // 復活:ほかのキャラクター(生存者・幽霊)すべてから一番遠い出現ポイント
+        Vector3 FarthestSpawnPoint(MatchPlayer self)
+        {
+            if (m_spawnPoints == null || m_spawnPoints.Length == 0) return Vector3.zero;
+            Vector3 best = m_spawnPoints[0].position;
+            float bestScore = float.MinValue;
+            foreach (var point in m_spawnPoints)
+            {
+                float nearest = float.MaxValue;
+                foreach (var p in m_players)
+                {
+                    if (p == self || p.Body == null) continue;
+                    nearest = Mathf.Min(nearest, Vector3.Distance(point.position, p.Body.position));
+                }
+                if (nearest > bestScore) { bestScore = nearest; best = point.position; }
+            }
+            return best;
+        }
+
+        //========================================
+        // 入力
+        //========================================
+
+        static bool PressedStart()
+        {
+            if (Keyboard.current != null && (Keyboard.current.enterKey.wasPressedThisFrame || Keyboard.current.spaceKey.wasPressedThisFrame)) return true;
+            foreach (var g in Gamepad.all) if (g.startButton.wasPressedThisFrame || g.buttonSouth.wasPressedThisFrame) return true;
+            return false;
+        }
+
+        static bool PressedBack()
+        {
+            if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame) return true;
+            foreach (var g in Gamepad.all) if (g.selectButton.wasPressedThisFrame) return true;
+            return false;
         }
     }
 }

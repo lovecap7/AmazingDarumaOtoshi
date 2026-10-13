@@ -1,13 +1,15 @@
 using System.Collections.Generic;
+using Nakahira;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-// 試合の仮の表示（ゲーム画面の UI ができるまでの、動作確認用）。MatchDirector と MatchPlayer を読むだけで、試合には影響しない。
+// 試合の仮の表示（ゲーム画面の UI ができるまでの、動作確認用）。DarumaMatch と MatchPlayer を読むだけで、試合には影響しない。
 //  ・頭の上に「1P」「CPU1」の名札（幽霊は薄く、復活待ち・脱落は出さない）
 //  ・頭の色をキャラの色にする（キャラごとのモデルができるまでの目印）
 //  ・時間制限があれば残り時間、試合が終わったら結果
-// 本番の HUD を作ったら、MatchBridge でこれを付けるのをやめる（または HUD に置き換える）。
+// セレクトから始めた試合で、DarumaMatch が自分の GameObject に付ける（DarumaMatch の「試合の仮の表示を付ける」で切り替え）。
+// 本番の HUD を作ったら、それをオフにする（または HUD に置き換える）。
 public class MatchDebugView : MonoBehaviour
 {
     class Tag
@@ -18,7 +20,7 @@ public class MatchDebugView : MonoBehaviour
         public Object tinted;   // 頭の色を付けたキャラクター（復活で作り直されたら付け直す）
     }
 
-    MatchDirector m_director;
+    DarumaMatch m_director;
     readonly List<Tag> m_tags = new List<Tag>();
     RectTransform m_canvas;
     CanvasGroup m_finishGroup;
@@ -28,13 +30,13 @@ public class MatchDebugView : MonoBehaviour
 
     void Start()
     {
-        m_director = GetComponent<MatchDirector>();
+        m_director = GetComponent<DarumaMatch>();
         m_font = PresentationSettings.DefaultFont;
         m_letterMat = ToyKit.LetterMaterial(m_font);
         m_popMat = ToyKit.PopMaterial(m_letterMat);
         BuildUI();
 
-        // MatchDirector の Start（プレイヤーを出す）がまだなら、出てから名札を作る
+        // DarumaMatch の Start（プレイヤーを出す）がまだなら、出てから名札を作る
         if (m_director.Players.Count > 0) MakeTags();
         else m_director.Started += MakeTags;
         m_director.Finished += ShowResult;
@@ -63,9 +65,9 @@ public class MatchDebugView : MonoBehaviour
         if (m_director.IsFinished) m_finishGroup.alpha = Mathf.MoveTowards(m_finishGroup.alpha, 1f, Time.unscaledDeltaTime * 3f);
     }
 
-    void ShowResult(MatchDirector.MatchResult result)
+    void ShowResult(DarumaMatch.MatchResult result)
     {
-        string title = result.Reason == MatchDirector.FinishReason.TimeUp ? "タイムアップ！" : "しあい しゅうりょう！";
+        string title = result.Reason == DarumaMatch.FinishReason.TimeUp ? "タイムアップ！" : "しあい しゅうりょう！";
         m_finishText.text = result.Winner != null
             ? $"{title}\n<size=70%>しょうしゃ：{result.Winner.Label}　{CharaName(result.Winner)}</size>"
             : $"{title}\n<size=70%>ひきわけ</size>";

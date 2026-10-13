@@ -25,6 +25,10 @@ namespace Nakagawa.EditorTools
         const string kRandomPatternPath = "Assets/Nakagawa/SpawnPatterns/SpawnPattern_Random.asset";
         const string kEqualPatternPath = "Assets/Nakagawa/SpawnPatterns/SpawnPattern_Equal.asset";
         const string kBounceImpactPath = "Assets/Nakagawa/TumikiImpacts/TumikiImpact_Bounce.asset";
+        const string kSeeThroughWallMaterial = kMaterialDir + "/WallSeeThrough.mat";
+        const string kDurabilityImpactPath = "Assets/Nakagawa/TumikiImpacts/TumikiImpact_Durability.asset";
+        const string kCrackMaterial = kMaterialDir + "/TumikiCrack.mat";
+        const string kParticleMaterial = kMaterialDir + "/GimmickParticle.mat";
 
         const string kNakahira = "Assets/Nakahira/Player";
         const string kCharacterPrefab = kNakahira + "/Prefabs/DarumaCharacter.prefab";
@@ -45,6 +49,7 @@ namespace Nakagawa.EditorTools
                 GimmickTestFieldBuilder.BuildSpawnAssets();
             }
             EnsureFolder(kStageDir);
+            SetupTumikiPrefab();
 
             Scene original = SceneManager.GetActiveScene();
             var report = new StringBuilder();
@@ -420,7 +425,7 @@ namespace Nakagawa.EditorTools
                 go.transform.SetParent(Stage, false);
                 go.transform.localPosition = new Vector3(cx, kWallHeight * 0.5f, cz);
                 go.transform.localScale = new Vector3(w, kWallHeight, d);
-                go.GetComponent<Renderer>().sharedMaterial = Load<Material>(kWallMaterial);
+                go.GetComponent<Renderer>().sharedMaterial = SeeThroughWallMaterial();
                 go.AddComponent<ReflectWall>();
                 go.isStatic = true;
             }
@@ -698,40 +703,167 @@ namespace Nakagawa.EditorTools
             camera.ResetAspect();
         }
 
-        // プレイヤーを追うカメラと、デバッグ用の切り替え(積み木の衝突の振る舞い)を付ける。付いていれば何もしない
+        // カメラの演出(プレイヤーを追う・揺れる・壁を透過する)、壁の透過用マテリアル、デバッグ用の切り替え(積み木の衝突の振る舞い)を付ける
+        // 付いていれば何もしない
         public static void SetupCameraAndDebugTools(Scene scene)
         {
             foreach (var root in scene.GetRootGameObjects())
             {
                 var camera = root.GetComponent<Camera>();
-                if (camera != null && root.CompareTag("MainCamera") && root.GetComponent<MatchCamera>() == null)
+                if (camera == null || !root.CompareTag("MainCamera")) continue;
+                if (root.GetComponent<MatchCamera>() == null) root.AddComponent<MatchCamera>();
+                if (root.GetComponent<CameraShake>() == null) root.AddComponent<CameraShake>();
+                if (root.GetComponent<SeeThroughTargets>() == null) root.AddComponent<SeeThroughTargets>();
+                var cinematic = root.GetComponent<EliminationCinematic>();
+                if (cinematic == null) cinematic = root.AddComponent<EliminationCinematic>();
+                var cinematicSo = new SerializedObject(cinematic);
+                if (cinematicSo.FindProperty("m_effectPrefab").objectReferenceValue == null)
                 {
-                    root.AddComponent<MatchCamera>();
+                    var prefab = Load<GameObject>(EffectBuilder.kEliminationEffectPath);
+                    if (prefab == null) prefab = EffectBuilder.BuildEliminationEffect();
+                    cinematicSo.FindProperty("m_effectPrefab").objectReferenceValue = prefab;
+                    cinematicSo.ApplyModifiedPropertiesWithoutUndo();
                 }
             }
 
-            bool hasToggle = false;
+            // 壁(ReflectWall)の元のマテリアルを、裏が透けて見えるマテリアルに置き換える
+            var wallMaterial = Load<Material>(kWallMaterial);
             foreach (var root in scene.GetRootGameObjects())
             {
-                if (root.GetComponentInChildren<TumikiImpactModeToggle>(true) != null) hasToggle = true;
+                foreach (var wall in root.GetComponentsInChildren<ReflectWall>(true))
+                {
+                    var r = wall.GetComponent<Renderer>();
+                    if (r != null && r.sharedMaterial == wallMaterial) r.sharedMaterial = SeeThroughWallMaterial();
+                }
             }
-            if (hasToggle) return;
 
-            var go = new GameObject("DebugTools");
-            SceneManager.MoveGameObjectToScene(go, scene);
-            var toggle = go.AddComponent<TumikiImpactModeToggle>();
+            // デバッグ用の切り替え。モードが未設定なら既定の並びを入れる
+            var toggle = FindInScene<TumikiImpactModeToggle>(scene);
+            if (toggle == null)
+            {
+                var go = new GameObject("DebugTools");
+                SceneManager.MoveGameObjectToScene(go, scene);
+                toggle = go.AddComponent<TumikiImpactModeToggle>();
+            }
+            SetupImpactModes(toggle);
+
+            // 飛んできた積み木に乗ったときの成功エフェクト(エフェクトのプレハブが未設定なら設定する)
+            var effect = FindInScene<TumikiCatchEffect>(scene);
+            if (effect == null)
+            {
+                var go = new GameObject("Effects");
+                SceneManager.MoveGameObjectToScene(go, scene);
+                effect = go.AddComponent<TumikiCatchEffect>();
+            }
+            var effectSo = new SerializedObject(effect);
+            if (effectSo.FindProperty("m_particleMaterial").objectReferenceValue == null)
+            {
+                effectSo.FindProperty("m_particleMaterial").objectReferenceValue = Load<Material>(kParticleMaterial);
+            }
+            if (effectSo.FindProperty("m_effectPrefab").objectReferenceValue == null)
+            {
+                var prefab = Load<GameObject>(EffectBuilder.kCatchEffectPath);
+                if (prefab == null) prefab = EffectBuilder.BuildCatchEffect();
+                effectSo.FindProperty("m_effectPrefab").objectReferenceValue = prefab;
+                // 派手なエフェクトに合わせて、カメラも少し揺らす
+                effectSo.FindProperty("m_shakeCamera").boolValue = true;
+            }
+            effectSo.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        static T FindInScene<T>(Scene scene) where T : Component
+        {
+            foreach (var root in scene.GetRootGameObjects())
+            {
+                var c = root.GetComponentInChildren<T>(true);
+                if (c != null) return c;
+            }
+            return null;
+        }
+
+        // M キーで切り替えるモード: 1回ヒットで破壊 → 2回 → 3回 → 非破壊(すでに設定されていれば何もしない)
+        static void SetupImpactModes(TumikiImpactModeToggle toggle)
+        {
             var so = new SerializedObject(toggle);
-            var modes = so.FindProperty("m_modes");
-            modes.arraySize = 1;
-            modes.GetArrayElementAtIndex(0).objectReferenceValue = BounceImpactAsset();
+            var modes = so.FindProperty("m_modeList");
+            if (modes.arraySize > 0) return;
+
+            var impact = DurabilityImpactAsset();
+            var list = new (string name, int durability)[]
+            {
+                ("1回ヒットで破壊", 1),
+                ("2回ヒットで破壊", 2),
+                ("3回ヒットで破壊", 3),
+                ("非破壊", 0),
+            };
+            modes.arraySize = list.Length;
+            for (int i = 0; i < list.Length; i++)
+            {
+                var m = modes.GetArrayElementAtIndex(i);
+                m.FindPropertyRelative("Name").stringValue = list[i].name;
+                m.FindPropertyRelative("Impact").objectReferenceValue = impact;
+                m.FindPropertyRelative("Durability").intValue = list[i].durability;
+            }
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
-        // 既存のステージのシーンに、プレイヤーを追うカメラとデバッグ用の切り替えを付ける(ステージは作り直さない)
-        [MenuItem("Nakagawa/Stages/Add Camera & Debug Tools To Existing Stages")]
+        // 積み木のプレハブに耐久度(ヒビの見た目つき)を付ける。付いていれば何もしない
+        [MenuItem("Nakagawa/Tumiki/Setup Tumiki Prefab")]
+        public static void SetupTumikiPrefab()
+        {
+            var root = PrefabUtility.LoadPrefabContents(kTumikiPrefab);
+            try
+            {
+                if (root.GetComponent<TumikiEdgeSlip>() != null && root.GetComponent<TumikiDurability>() != null) return;
+                if (root.GetComponent<TumikiEdgeSlip>() == null) root.AddComponent<TumikiEdgeSlip>();
+                if (root.GetComponent<TumikiDurability>() == null)
+                {
+                    var durability = root.AddComponent<TumikiDurability>();
+                    var so = new SerializedObject(durability);
+                    so.FindProperty("m_crackMaterial").objectReferenceValue = CrackMaterial();
+                    so.ApplyModifiedPropertiesWithoutUndo();
+                }
+                PrefabUtility.SaveAsPrefabAsset(root, kTumikiPrefab);
+                Debug.Log("[StageBuilder] 積み木のプレハブに耐久度・縁から落ちる処理を付けました");
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(root);
+            }
+        }
+
+        // ヒビの色(光の影響を受けない暗い色)
+        static Material CrackMaterial()
+        {
+            var mat = Load<Material>(kCrackMaterial);
+            if (mat != null) return mat;
+            mat = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+            mat.SetColor("_BaseColor", new Color(0.08f, 0.06f, 0.05f, 1.0f));
+            EnsureFolder(kMaterialDir);
+            AssetDatabase.CreateAsset(mat, kCrackMaterial);
+            return mat;
+        }
+
+        static TumikiImpactAsset DurabilityImpactAsset()
+        {
+            var asset = Load<TumikiDurabilityImpact>(kDurabilityImpactPath);
+            if (asset != null) return asset;
+            EnsureFolder(Path.GetDirectoryName(kDurabilityImpactPath).Replace('\\', '/'));
+            asset = ScriptableObject.CreateInstance<TumikiDurabilityImpact>();
+            var so = new SerializedObject(asset);
+            so.FindProperty("m_displayName").stringValue = "耐久度つき";
+            so.FindProperty("m_onSurvive").objectReferenceValue = BounceImpactAsset();
+            so.ApplyModifiedPropertiesWithoutUndo();
+            AssetDatabase.CreateAsset(asset, kDurabilityImpactPath);
+            return asset;
+        }
+
+        // 既存のステージのシーンに、カメラの演出・壁の透過・デバッグ用の切り替えを付ける(ステージは作り直さない)
+        [MenuItem("Nakagawa/Stages/Update Existing Stages (Camera, Walls, Debug)")]
         public static void UpdateExistingStages()
         {
             if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
+            SetupTumikiPrefab();
             Scene original = SceneManager.GetActiveScene();
             int count = 0;
             foreach (var file in Directory.GetFiles(kStageDir, "Stage*.unity"))
@@ -746,7 +878,29 @@ namespace Nakagawa.EditorTools
                 count++;
             }
             if (original.IsValid()) SceneManager.SetActiveScene(original);
-            Debug.Log($"[StageBuilder] {count}ステージにカメラとデバッグ用の切り替えを付けました");
+            Debug.Log($"[StageBuilder] {count}ステージにカメラの演出・壁の透過・デバッグ用の切り替えを付けました");
+        }
+
+        // 裏が透けて見える壁のマテリアル(色などは元の壁のマテリアルから写す)
+        static Material SeeThroughWallMaterial()
+        {
+            var mat = Load<Material>(kSeeThroughWallMaterial);
+            if (mat != null) return mat;
+            mat = new Material(Shader.Find("Nakagawa/SeeThroughWall"));
+            var src = Load<Material>(kWallMaterial);
+            if (src != null)
+            {
+                foreach (var prop in new[] { "_BaseColor", "_Smoothness", "_Metallic" })
+                {
+                    if (!src.HasProperty(prop)) continue;
+                    if (prop == "_BaseColor") mat.SetColor(prop, src.GetColor(prop));
+                    else mat.SetFloat(prop, src.GetFloat(prop));
+                }
+                if (src.HasProperty("_BaseMap")) mat.SetTexture("_BaseMap", src.GetTexture("_BaseMap"));
+            }
+            EnsureFolder(kMaterialDir);
+            AssetDatabase.CreateAsset(mat, kSeeThroughWallMaterial);
+            return mat;
         }
 
         static TumikiImpactAsset BounceImpactAsset()

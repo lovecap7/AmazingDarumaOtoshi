@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 3841633084211777074}
   - component: {fileID: 8403237043251477910}
   - component: {fileID: 5114245874740468188}
+  - component: {fileID: 5921632651541030010}
   m_Layer: 0
   m_Name: Tumiki
   m_TagString: Untagged
@@ -139,7 +140,25 @@ MonoBehaviour:
   m_probeDepth: 0.15
   m_floorMask:
     serializedVersion: 2
-    m_Bits: 4294967291
+    m_Bits: 51
+--- !u!114 &5921632651541030010
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4710477447778846597}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9b32913e4dbbbc04cbf4603f3f902109, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiDurability
+  m_refillOnStacked: 1
+  m_crackMaterial: {fileID: 2100000, guid: 82ec4afed4d972c45b2b8073e3e4e95c, type: 2}
+  m_maxCracks: 6
+  m_crackLength: {x: 0.3, y: 0.45}
+  m_crackWidth: 0.04
+  m_maxDarken: 0.35
 --- !u!1 &5134043105676288420
 GameObject:
   m_ObjectHideFlags: 0
@@ -335,7 +354,7 @@ ParticleSystem:
         m_RotationOrder: 4
     startSizeY:
       serializedVersion: 3
-      minMaxState: 0
+      minMaxState: 3
       scalar: 1
       minScalar: 1
       maxCurve:
@@ -352,7 +371,7 @@ ParticleSystem:
         m_RotationOrder: 4
     startSizeZ:
       serializedVersion: 3
-      minMaxState: 0
+      minMaxState: 3
       scalar: 1
       minScalar: 1
       maxCurve:
@@ -369,7 +388,7 @@ ParticleSystem:
         m_RotationOrder: 4
     startRotationX:
       serializedVersion: 3
-      minMaxState: 0
+      minMaxState: 3
       scalar: 0
       minScalar: 0
       maxCurve:
@@ -386,7 +405,7 @@ ParticleSystem:
         m_RotationOrder: 4
     startRotationY:
       serializedVersion: 3
-      minMaxState: 0
+      minMaxState: 3
       scalar: 0
       minScalar: 0
       maxCurve:

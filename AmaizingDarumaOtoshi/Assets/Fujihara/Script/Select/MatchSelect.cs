@@ -976,6 +976,8 @@ public class MatchSelect : MonoBehaviour
         Debug.Log("試合の設定：" + MatchSetup.Describe());
 
         phase = Phase.Leaving;
+        // ステージはすべて1つのシーン（AllStages）にまとめてあり、読み込んだあとに決めたステージへ切り替える
+        Nakagawa.StageSwitcher.RequestStage(stage.id);
         string scene = !string.IsNullOrEmpty(stage.sceneName) ? stage.sceneName : gameSceneName;
         Fader.Load(scene);
     }
