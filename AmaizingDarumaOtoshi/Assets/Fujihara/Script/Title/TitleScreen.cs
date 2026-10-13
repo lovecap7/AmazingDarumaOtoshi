@@ -52,6 +52,10 @@ public partial class TitleScreen : MonoBehaviour
     [Tooltip("ボタン表示後、この秒数操作がないと最初から再生（0で無効）")]
     [SerializeField] float attractDelay = 30f;
 
+    [Header("演出")]
+    [Tooltip("「カコーン！」「ニコッ」「コトン」などの擬音（字幕）をこの画面で出す")]
+    [SerializeField] bool showOnomatopoeia = true;
+
     const float BloomBase = 0.35f;
     const float LetterboxHeight = 90f;
     const float DefaultAperture = 2.8f;
@@ -808,6 +812,8 @@ public partial class TitleScreen : MonoBehaviour
     // 擬音を画面上の位置（中央が原点、1920x1080 基準）に出す。表示のオンオフは PresentationSettings
     void PopAt(string text, Vector2 local, float size, Color color, float angle, float hold = 0.45f)
     {
+        // Inspector でオフにしているときはこの画面の擬音を出さない
+        if (!showOnomatopoeia) return;
         var go = ToyKit.Pop(this, uiRoot, font, popMat, text, local, size, color, angle, hold, pops);
         if (go != null) go.transform.SetSiblingIndex(fade.rectTransform.GetSiblingIndex());
     }

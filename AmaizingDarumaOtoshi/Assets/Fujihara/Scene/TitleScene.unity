@@ -186,6 +186,7 @@ MonoBehaviour:
   finalLook: {x: 0.6, y: 3, z: 1.5}
   finalFov: 40
   attractDelay: 30
+  showOnomatopoeia: 0
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

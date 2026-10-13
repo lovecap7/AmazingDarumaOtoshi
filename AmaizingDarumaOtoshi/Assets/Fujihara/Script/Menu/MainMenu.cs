@@ -50,6 +50,10 @@ public class MainMenu : MonoBehaviour
     [SerializeField] Vector3 boardCenter = new Vector3(2.9f, 2.35f, 1.0f);
     [SerializeField] Vector2 boardSize = new Vector2(6.4f, 3.9f);
 
+    [Header("演出")]
+    [Tooltip("「カコーン！」「コンッ」などの擬音（字幕）をこの画面で出す")]
+    [SerializeField] bool showOnomatopoeia = true;
+
     const int Battle = 0, Sound = 1, Video = 2, Credits = 3, Quit = 4;
     static readonly Vector3 BlockSize = new Vector3(2.6f, 0.72f, 1.1f);
     const float BoardDepth = 0.3f;
@@ -765,6 +769,8 @@ public class MainMenu : MonoBehaviour
 
     void Pop(string text, Vector3 world, float size, Color color, float angle)
     {
+        // Inspector でオフにしているときはこの画面の擬音を出さない
+        if (!showOnomatopoeia) return;
         var local = ToyKit.WorldToCanvas(cam, overlay, world);
         var go = ToyKit.Pop(this, overlay, font, popMat, text, local, size, color, angle, 0.45f, pops);
         if (go != null) go.transform.SetSiblingIndex(fade.transform.GetSiblingIndex());
