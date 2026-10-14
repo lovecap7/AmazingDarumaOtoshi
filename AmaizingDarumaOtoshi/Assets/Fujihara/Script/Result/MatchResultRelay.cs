@@ -73,6 +73,7 @@ public static class ResultData
         public CharacterData character; // キャラクター（無ければ null）
         public int rank;                // 1〜（同じ順位あり）
         public int blocks;              // 試合が終わったときの積み木の数
+        public List<Color> blockColors = new List<Color>();   // 試合が終わったときの積み木の色（下から）
         public int knocks;              // 崩した数
         public int kos;                 // 顔を飛ばした数
     }
@@ -90,7 +91,7 @@ public static class ResultData
         foreach (var p in result.Ranking)
         {
             if (p == null) continue;
-            Ranking.Add(new Entry
+            var entry = new Entry
             {
                 label = p.Label,
                 playerColor = p.Color,
@@ -99,7 +100,11 @@ public static class ResultData
                 blocks = p.StackCount,
                 knocks = p.Knocks,
                 kos = p.KOs,
-            });
+            };
+            var stack = p.Stack;
+            if (stack != null)
+                for (int i = 0; i < stack.Count; i++) entry.blockColors.Add(TumikiColorUtil.ToUnityColor(stack.Get(i).Color));
+            Ranking.Add(entry);
         }
     }
 
