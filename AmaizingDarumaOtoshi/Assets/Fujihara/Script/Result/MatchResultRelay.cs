@@ -48,18 +48,18 @@ public class MatchResultRelay : MonoBehaviour
         // 自動テスト（MatchSoakTest）が戻り先を止めているときは何もしない
         if (!DarumaMatch.AutoReturnToSelect) return;
 
-        ResultData.Capture(result);
+        ResultData.Capture(result, m_match.Mode);
         // DarumaMatch が自分でセレクトへ戻らないようにする（リザルト画面で元に戻す）
         DarumaMatch.AutoReturnToSelect = false;
-        StartCoroutine(GoToResult(settings));
+        StartCoroutine(GoToResult(settings, settings.ResultSceneFor(m_match.Mode)));
     }
 
-    IEnumerator GoToResult(MatchSettings settings)
+    IEnumerator GoToResult(MatchSettings settings, string sceneName)
     {
         // 試合が終わると Time.timeScale = 0 になるので、実時間で待つ
         float end = Time.unscaledTime + settings.resultSceneDelay;
         while (Time.unscaledTime < end) yield return null;
-        Fader.Load(settings.resultSceneName);
+        Fader.Load(sceneName);
     }
 }
 
@@ -76,18 +76,22 @@ public static class ResultData
         public List<Color> blockColors = new List<Color>();   // 試合が終わったときの積み木の色（下から）
         public int knocks;              // 崩した数
         public int kos;                 // 顔を飛ばした数
+        public MatchPlayer.PlayerState state;   // 試合が終わったときの状態（生存 / 幽霊 / 復活待ち / 脱落）
+        public int stocks = -1;         // 残りストック（ストックモード以外は -1）
     }
 
     public static readonly List<Entry> Ranking = new List<Entry>();   // 1位から順
     public static bool IsDraw { get; private set; }
     public static bool TimeUp { get; private set; }
+    public static MatchSetup.MatchMode Mode { get; private set; }
     public static bool HasResult => Ranking.Count > 0;
 
-    public static void Capture(DarumaMatch.MatchResult result)
+    public static void Capture(DarumaMatch.MatchResult result, MatchSetup.MatchMode mode)
     {
         Ranking.Clear();
         IsDraw = result.IsDraw;
         TimeUp = result.Reason == DarumaMatch.FinishReason.TimeUp;
+        Mode = mode;
         foreach (var p in result.Ranking)
         {
             if (p == null) continue;
@@ -100,6 +104,8 @@ public static class ResultData
                 blocks = p.StackCount,
                 knocks = p.Knocks,
                 kos = p.KOs,
+                state = p.State,
+                stocks = p.Stocks,
             };
             var stack = p.Stack;
             if (stack != null)

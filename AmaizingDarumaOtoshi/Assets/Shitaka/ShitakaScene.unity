@@ -484,7 +484,7 @@ Transform:
   m_GameObject: {fileID: 557762068}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -5.4, y: 0.24, z: -18.95}
+  m_LocalPosition: {x: -5.4, y: 0.24, z: -21.78}
   m_LocalScale: {x: 1, y: 0.1341, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -543,12 +543,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c7b9f655dbe622a4bb305eae7fcdb5b4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Blockcontroler
-  speed: 15
+  speed: 20
   deceleration: 0.1
   stopThreshold: 0.1
   behaviorType: 0
   hebiTurnSpeed: 60
-  homingTurnSpeed: 90
+  homingStartTurnSpeed: 270
+  homingGuidanceDuration: 1.5
   rehitIgnoreTime: 0.2
 --- !u!65 &557762078
 BoxCollider:
@@ -799,7 +800,7 @@ Transform:
   m_GameObject: {fileID: 792966887}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -14.340001, y: 0.6, z: -14.779601}
+  m_LocalPosition: {x: 1.53, y: 0.6, z: -21.32}
   m_LocalScale: {x: 1, y: 0.1341, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -858,12 +859,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c7b9f655dbe622a4bb305eae7fcdb5b4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Blockcontroler
-  speed: 15
+  speed: 20
   deceleration: 0.1
   stopThreshold: 0.1
   behaviorType: 0
   hebiTurnSpeed: 60
-  homingTurnSpeed: 90
+  homingStartTurnSpeed: 270
+  homingGuidanceDuration: 1.5
   rehitIgnoreTime: 0.2
 --- !u!65 &792966896
 BoxCollider:
@@ -942,12 +944,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c7b9f655dbe622a4bb305eae7fcdb5b4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Blockcontroler
-  speed: 15
+  speed: 20
   deceleration: 0.1
   stopThreshold: 0.1
   behaviorType: 0
   hebiTurnSpeed: 90
-  homingTurnSpeed: 90
+  homingStartTurnSpeed: 270
+  homingGuidanceDuration: 1.5
   rehitIgnoreTime: 0.2
 --- !u!54 &873354722
 Rigidbody:
@@ -1129,12 +1132,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c7b9f655dbe622a4bb305eae7fcdb5b4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Blockcontroler
-  speed: 15
+  speed: 20
   deceleration: 0.1
   stopThreshold: 0.1
   behaviorType: 4
   hebiTurnSpeed: 60
-  homingTurnSpeed: 90
+  homingStartTurnSpeed: 270
+  homingGuidanceDuration: 1.5
   rehitIgnoreTime: 0.2
 --- !u!54 &1098038425
 Rigidbody:
@@ -1243,7 +1247,7 @@ Transform:
   m_GameObject: {fileID: 1098038422}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -14.31, y: 0.93, z: -14.839601}
+  m_LocalPosition: {x: 1.5600004, y: 0.93, z: -21.38}
   m_LocalScale: {x: 1, y: 0.1341, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1337,7 +1341,7 @@ Transform:
   m_GameObject: {fileID: 1141642611}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -14.336001, y: 0.22000003, z: -14.809602}
+  m_LocalPosition: {x: 1.5339994, y: 0.22000003, z: -21.35}
   m_LocalScale: {x: 1, y: 0.1341, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1396,12 +1400,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c7b9f655dbe622a4bb305eae7fcdb5b4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Blockcontroler
-  speed: 15
+  speed: 20
   deceleration: 0.1
   stopThreshold: 0.1
   behaviorType: 0
   hebiTurnSpeed: 60
-  homingTurnSpeed: 90
+  homingStartTurnSpeed: 270
+  homingGuidanceDuration: 1.5
   rehitIgnoreTime: 0.2
 --- !u!65 &1141642620
 BoxCollider:
@@ -2119,12 +2124,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c7b9f655dbe622a4bb305eae7fcdb5b4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Blockcontroler
-  speed: 15
+  speed: 20
   deceleration: 0.1
   stopThreshold: 0.1
   behaviorType: 5
   hebiTurnSpeed: 60
-  homingTurnSpeed: 270
+  homingStartTurnSpeed: 360
+  homingGuidanceDuration: 2.5
   rehitIgnoreTime: 0.2
 --- !u!65 &2023414662
 BoxCollider:

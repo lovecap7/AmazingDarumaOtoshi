@@ -7,7 +7,8 @@ using UnityEngine.UI;
 
 // モードセレクト → ルールセレクト → キャラクターセレクト → ステージセレクト → ステージ抽選。
 // ・モードセレクト：ストック / タイム / ゴースト を選ぶ（←→ / A。B でメニューへ）
-// ・ルールセレクト：選んだモードの詳細設定（↑↓：項目　←→ / A：切り替え　Start：キャラクターセレクトへ　B：モードセレクトへ）
+// ・ルールセレクト：選んだモードの詳細設定（↑↓ / A：項目　←→：切り替え　Start：キャラクターセレクトへ　B：モードセレクトへ）
+//     A は次の項目へ進む。最後の「キャラクターセレクトへ」の上で押すと決定
 //     ストック：ストック数（1〜3）と時間制限（なし / 1分 / 2分 / 3分）
 //     タイム　：試合時間（1分 / 2分 / 3分）。点数（崩す +1・崩される -1・顔を飛ばす +1）は Inspector で変えられる
 //     ゴースト：時間制限（なし / 1分 / 2分 / 3分）。最後の1人になるまで戦う。やられても幽霊になって復活できる
@@ -21,6 +22,7 @@ using UnityEngine.UI;
 //   - 参加者全員が選ぶと「じゅんびOK！」。Start / Enter でステージセレクトへ
 // ・ステージセレクト：プレイヤー（CPU 以外）が自分のカーソルでステージ（またはおまかせ）に投票する
 //   全員が投票したら、マリオカートのように全員の票の中から1つを抽選する。おまかせ票は当たったときにめくれる
+//   投票した人が1人だけ・全員が同じステージに投票したときは、抽選の演出を飛ばしてそのまま決める
 // ・決まった内容は MatchSetup に入れてゲーム本編へ渡す。キャラクターセレクトに入るたびに選択はまっさらに戻る
 // キャラとステージは SelectRoster に足すだけで増やせる（並びは数に合わせて自動で調整）。
 //
@@ -267,7 +269,7 @@ public class MatchSelect : MonoBehaviour
         hint.text = phase == Phase.Mode
             ? "←→：モードをえらぶ　A / Start：決定　B：メニューへ"
             : phase == Phase.Rule
-            ? "↑↓：項目をえらぶ　←→ / A：切り替え　Start：キャラクターセレクトへ　B：モードセレクトへ"
+            ? "↑↓ / A：項目をえらぶ　←→：切り替え　Start：キャラクターセレクトへ　B：モードセレクトへ"
             : phase == Phase.Character
             ? "A：参加・えらぶ・CPUのコインをつかむ　B：取り消し・抜ける（だれもいなければルールセレクトへ）　Start：次へ"
             : phase == Phase.Stage ? "A：投票　B：取り消し（投票していなければキャラクターセレクトへ）　全員が投票したら抽選！"
@@ -346,9 +348,16 @@ public class MatchSelect : MonoBehaviour
             else if (MenuInput.Down()) ruleIndex = NextRuleRow(1);
             else if (MenuInput.Start()) { GoToCharacterSelect(); return; }
             else if (MenuInput.Cancel()) { GoToModeSelect(); return; }
-            else if (MenuInput.Left() || MenuInput.Right() || MenuInput.Submit())
+            else if (MenuInput.Submit())
             {
-                int dir = MenuInput.Left() ? -1 : 1;   // ← で戻る、→ / A で進む
+                // A：次の項目へ進む（「キャラクターセレクトへ」の上で押したら決定）
+                if (ruleRows[ruleIndex].kind == RuleKind.Next) { GoToCharacterSelect(); return; }
+                ruleIndex = NextRuleRow(1);
+            }
+            else if (MenuInput.Left() || MenuInput.Right())
+            {
+                // ←→：値を切り替える
+                int dir = MenuInput.Left() ? -1 : 1;
                 var row = ruleRows[ruleIndex];
                 switch (row.kind)
                 {
@@ -356,7 +365,6 @@ public class MatchSelect : MonoBehaviour
                     case RuleKind.StockTime: rules.stockTimeLimit = StepTime(rules.stockTimeLimit, true, dir); break;
                     case RuleKind.TimeLength: rules.timeLength = StepTime(rules.timeLength, false, dir); break;
                     case RuleKind.GhostTime: rules.ghostTimeLimit = StepTime(rules.ghostTimeLimit, true, dir); break;
-                    case RuleKind.Next: if (MenuInput.Submit()) { GoToCharacterSelect(); return; } break;
                 }
                 if (row.value != null) Bounce(row.value);
             }
@@ -822,6 +830,13 @@ public class MatchSelect : MonoBehaviour
         {
             voters.Add(p);
             votes.Add(p.randomStage ? roster.stages[Random.Range(0, roster.stages.Count)] : p.stage);
+        }
+
+        // 投票した人が1人だけ、または全員が同じステージ（おまかせ以外）に投票したときは、抽選するまでもないので演出を飛ばして決める
+        if (voters.Count == 1 || voters.TrueForAll(p => !p.randomStage && p.stage == voters[0].stage))
+        {
+            ConfirmMatch(votes[0]);
+            yield break;
         }
 
         // 札を並べる

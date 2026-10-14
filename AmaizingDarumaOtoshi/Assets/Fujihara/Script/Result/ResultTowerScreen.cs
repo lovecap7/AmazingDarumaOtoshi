@@ -12,8 +12,14 @@ using UnityEngine.Rendering.Universal;
 //     カメラは積み上がるてっぺんを追って、下から上へパンしていく。だんだん速く
 //  3. 顔が「ぴょーん」とてっぺんへ跳び乗る（ポテッ）
 //  4. その頭に王冠が「ポンッ」とかぶさる（キラキラ・紙吹雪）
-//  5. カメラが引いてタワー全体を見せ、「たかさ ○こ！」「1P のかち！」。2位以下は足元から見上げている
+//  5. カメラが引いてタワー全体を見せ、「たかさ ○こ！」「1P のかち！」。2位以下は勝者を見上げている
 // 引き分けのときは、1位の人たちのタワーが並んで同時に積み上がり、それぞれ跳び乗る（王冠なし）。
+//
+// ■ 2位以下（負けた人）の見せ方（ストック・ゴースト）
+//   最後の1人で決まったとき：ストックで負けた人は首だけ、ゴーストで負けた人は幽霊の姿で、勝者を見上げる
+//   時間切れで決まったとき　：生き残っていた人も、終了時点の積み木が同時に積み上がり、そのてっぺんから勝者を見上げる
+//                            （脱落・幽霊・積み木なしの人は、首だけ／幽霊のまま見上げる）
+//   タイムは今のところ、負けた人は首だけで見上げる（専用の演出は別に作る予定）
 // 表彰台の演出（ResultScreen / ResultScene）とは別の画面。使う方を MatchSettings の「リザルト画面のシーン名」で選ぶ。
 // 試合の結果は MatchResultRelay が ResultData に入れておく。このシーンだけを再生したときは確認用の仮の結果で動く。
 public class ResultTowerScreen : MonoBehaviour
@@ -50,6 +56,10 @@ public class ResultTowerScreen : MonoBehaviour
     [SerializeField, Range(1, 4)] int previewPlayers = 4;
     [SerializeField, Range(0, 10)] int previewBlocks = 6;
     [SerializeField] bool previewDraw = false;
+    [Tooltip("仮の結果のモード（ゴーストなら負けた人は幽霊、ストックなら首だけ）")]
+    [SerializeField] MatchSetup.MatchMode previewMode = MatchSetup.MatchMode.Ghost;
+    [Tooltip("仮の結果を時間切れにする（負けた人も積み木が積み上がる）")]
+    [SerializeField] bool previewTimeUp = false;
 
     const float BlockW = ToyKit.BlockW, BlockH = ToyKit.BlockH, BlockD = ToyKit.BlockD;
     const float HeadR = ToyKit.HeadR;
@@ -68,6 +78,7 @@ public class ResultTowerScreen : MonoBehaviour
         public int stacked;                                 // 積み上がった数
         public float wobble;                                // 積んだときの揺れ
         public bool onTop;                                  // 顔がてっぺんに乗ったか
+        public bool ghost;                                  // 幽霊の姿（ゴーストで負けた人）
         public float Top => stacked * BlockH;               // 積み木のてっぺんの高さ
         public float HeadTop => Top + HeadR * 2f;           // 顔を乗せたときの頭のてっぺん
     }
@@ -78,6 +89,11 @@ public class ResultTowerScreen : MonoBehaviour
     // ---- 結果 ----
     readonly List<ResultData.Entry> entries = new List<ResultData.Entry>();
     bool isDraw;
+    MatchSetup.MatchMode mode;
+    bool timeUp;
+
+    // 負けた人も積み木を積むか（ストック・ゴーストで時間切れになったとき。最後の1人で決まったときは勝者だけ）
+    bool LosersStack => timeUp && (mode == MatchSetup.MatchMode.Stock || mode == MatchSetup.MatchMode.Ghost);
 
     // ---- 舞台 ----
     Camera cam;
@@ -128,30 +144,39 @@ public class ResultTowerScreen : MonoBehaviour
         {
             entries.AddRange(ResultData.Ranking);
             isDraw = ResultData.IsDraw;
+            mode = ResultData.Mode;
+            timeUp = ResultData.TimeUp;
             ResultData.Clear();
             return;
         }
 
         // 確認用の仮の結果
+        mode = previewMode;
+        timeUp = previewTimeUp;
+        isDraw = previewDraw && previewPlayers >= 2;
         string[] labels = { "1P", "2P", "CPU1", "CPU2" };
         Color[] blockColors = { new Color(0.9f, 0.25f, 0.2f), new Color(0.2f, 0.45f, 0.9f), new Color(0.3f, 0.75f, 0.3f), new Color(0.95f, 0.8f, 0.2f) };
         for (int i = 0; i < previewPlayers; i++)
         {
+            bool top = i == 0 || (isDraw && i == 1);
             var e = new ResultData.Entry
             {
                 label = labels[i],
                 playerColor = Palette[(i * 2) % Palette.Length],
                 character = previewRoster != null && previewRoster.characters.Count > 0 ? previewRoster.characters[i % previewRoster.characters.Count] : null,
-                rank = previewDraw && i < 2 ? 1 : i + 1,
+                rank = isDraw && i < 2 ? 1 : i + 1,
                 knocks = 6 - i,
                 kos = 3 - i / 2,
             };
-            int n = i == 0 || (previewDraw && i == 1) ? previewBlocks - i : 0;
+            // 負けた人の状態：最後の1人で決まったなら、ゴーストは幽霊・ストックは脱落。時間切れなら最後の1人だけ幽霊（脱落）で、ほかは生存
+            bool lastLoser = i == previewPlayers - 1;
+            bool down = !top && (!timeUp || lastLoser);
+            e.state = !down ? MatchPlayer.PlayerState.Alive : mode == MatchSetup.MatchMode.Ghost ? MatchPlayer.PlayerState.Ghost : MatchPlayer.PlayerState.Out;
+            int n = top ? previewBlocks - i : down ? 0 : Mathf.Max(1, previewBlocks - 2 - i);
             for (int b = 0; b < n; b++) e.blockColors.Add(blockColors[UnityEngine.Random.Range(0, blockColors.Length)]);
             e.blocks = e.blockColors.Count;
             entries.Add(e);
         }
-        isDraw = previewDraw && previewPlayers >= 2;
     }
 
     // ================= 舞台づくり =================
@@ -186,15 +211,7 @@ public class ResultTowerScreen : MonoBehaviour
             float x = (i - (tops.Count - 1) * 0.5f) * towerSpacing;
             var t = MakeTower(tops[i], new Vector3(x, 0f, 0f));
             t.face.root.localPosition = new Vector3(WaitSide, HeadR, 0f);   // 積み終わるまで横で待つ
-            // 試合の最後に持っていた積み木（同じ色）。最初は隠しておき、1個ずつ落として床から積む
-            for (int b = 0; b < tops[i].blockColors.Count; b++)
-            {
-                var blk = ToyKit.CreateBlock("", tops[i].blockColors[b], blockMesh, new Vector2(1.05f, 0.68f), BlockD, font, letterMat, out _);
-                blk.SetParent(t.root, false);
-                blk.localPosition = new Vector3(0f, (b + 0.5f) * BlockH, 0f);
-                blk.gameObject.SetActive(false);
-                t.blocks.Add(blk);
-            }
+            AddBlocks(t, tops[i].blockColors);   // 試合の最後に持っていた積み木（同じ色）
             if (!isDraw)
             {
                 t.crown = MakeCrown(t.root);
@@ -204,18 +221,74 @@ public class ResultTowerScreen : MonoBehaviour
         }
 
         // 2位以下は足元に並んで見上げる
+        //  ・幽霊だった人（ゴーストで負けた）は、幽霊の姿で浮いて見上げる
+        //  ・時間切れなら、生き残っていた人も自分の積み木を積み、そのてっぺんから見上げる
+        //  ・それ以外（脱落・復活待ち・積み木なし）は、首だけで床から見上げる
         int k = 0;
+        bool stacking = LosersStack;
         foreach (var e in entries)
         {
             if (tops.Contains(e)) continue;
-            float side = (k % 2 == 0 ? -1f : 1f) * (3.3f + (k / 2) * 1.5f);   // 1位が横で待つ場所と重ならないように
+            // 横に並べる（積む人は、横で待つ場所も要るので間隔を広く）
+            float side = (k % 2 == 0 ? -1f : 1f) * (stacking ? 3.8f + (k / 2) * 2.8f : 3.3f + (k / 2) * 1.5f);
             float spread = (towers.Count - 1) * towerSpacing * 0.5f;
             var t = MakeTower(e, new Vector3(side + Mathf.Sign(side) * spread, 0f, 1.2f + (k / 2) * 0.6f));
             t.root.localScale = Vector3.one * 0.85f;
             t.tag.gameObject.SetActive(false);
+
+            if (e.state == MatchPlayer.PlayerState.Ghost) MakeGhostLook(t);
+            else if (stacking && e.blockColors.Count > 0)
+            {
+                t.face.root.localPosition = new Vector3(Mathf.Sign(side) * -WaitSide, HeadR, 0f);   // 外側で待つ
+                AddBlocks(t, e.blockColors);
+            }
             others.Add(t);
             k++;
         }
+    }
+
+    // 積み木を並べておく（最初は隠しておき、1個ずつ落として床から積む）
+    void AddBlocks(Tower t, List<Color> colors)
+    {
+        for (int b = 0; b < colors.Count; b++)
+        {
+            var blk = ToyKit.CreateBlock("", colors[b], blockMesh, new Vector2(1.05f, 0.68f), BlockD, font, letterMat, out _);
+            blk.SetParent(t.root, false);
+            blk.localPosition = new Vector3(0f, (b + 0.5f) * BlockH, 0f);
+            blk.gameObject.SetActive(false);
+            t.blocks.Add(blk);
+        }
+    }
+
+    // 幽霊の姿：顔を白く半透明にして、しっぽを付けて浮かせる
+    void MakeGhostLook(Tower t)
+    {
+        Color tint = t.entry.character != null && t.entry.character.color != Color.white ? t.entry.character.color : Color.white;
+        var mat = GhostMaterial(new Color(Mathf.Lerp(0.92f, tint.r, 0.25f), Mathf.Lerp(0.95f, tint.g, 0.25f), Mathf.Lerp(1f, tint.b, 0.25f), 0.55f));
+        var body = t.face.root.Find("Body");
+        if (body != null) body.GetComponent<Renderer>().sharedMaterial = mat;
+        t.face.body = mat;
+        var tail = ToyKit.Primitive(PrimitiveType.Sphere, "Tail", t.face.root);
+        tail.localScale = new Vector3(0.5f, 0.42f, 0.5f);
+        tail.localPosition = new Vector3(0.06f, -HeadR * 0.8f, 0.08f);
+        tail.GetComponent<Renderer>().sharedMaterial = mat;
+        t.face.root.localPosition = new Vector3(0f, HeadR + 0.5f, 0f);
+        t.ghost = true;
+    }
+
+    // 半透明のマテリアル（URP Lit を透明にする）
+    static Material GhostMaterial(Color c)
+    {
+        var m = ToyKit.Lit(c, 0.6f);
+        m.SetFloat("_Surface", 1f);
+        m.SetFloat("_Blend", 0f);
+        m.SetOverrideTag("RenderType", "Transparent");
+        m.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+        m.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+        m.SetFloat("_ZWrite", 0f);
+        m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+        m.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+        return m;
     }
 
     Tower MakeTower(ResultData.Entry e, Vector3 at)
@@ -337,6 +410,11 @@ public class ResultTowerScreen : MonoBehaviour
     {
         float centerX = 0f;
         float spread = (towers.Count - 1) * towerSpacing;
+        // 積む人：1位（引き分けなら1位の人たち）と、時間切れなら積み木を持っていた2位以下
+        var builders = new List<Tower>(towers);
+        builders.AddRange(others.FindAll(o => o.blocks.Count > 0));
+        // 2位以下も積むときは、みんなのタワーが入るように少し引いて見る
+        float back = builders.Count > towers.Count ? 4f : 0f;
 
         // ---- 1. 足元から見上げる（顔は横で待っている） ----
         SetCam(new Vector3(centerX - 1.2f, 0.35f, -4.6f - spread * 0.6f), new Vector3(centerX - 0.5f, 1.1f, 0f), 45f, true);
@@ -349,12 +427,12 @@ public class ResultTowerScreen : MonoBehaviour
 
         // ---- 2. 積み木が1個ずつ床から積み上がる（カメラは下から上へ） ----
         int max = 0;
-        foreach (var t in towers) max = Mathf.Max(max, t.blocks.Count);
+        foreach (var t in builders) max = Mathf.Max(max, t.blocks.Count);
         for (int b = 0; b < max; b++)
         {
             float top = (b + 1) * BlockH;
-            SetCam(new Vector3(centerX - 0.7f, top - 0.9f, -4.6f - top * 0.12f - spread * 0.6f), new Vector3(centerX, top + 0.1f, 0f), 45f, false);
-            foreach (var t in towers)
+            SetCam(new Vector3(centerX - 0.7f, top - 0.9f + back * 0.25f, -4.6f - top * 0.12f - spread * 0.6f - back), new Vector3(centerX, top + 0.1f, 0f), 45f, false);
+            foreach (var t in builders)
                 if (b < t.blocks.Count) StartCoroutine(DropBlock(t, b));
             float interval = Mathf.Lerp(firstInterval, lastInterval, max <= 1 ? 1f : b / (float)(max - 1));
             yield return Wait(interval);
@@ -364,8 +442,10 @@ public class ResultTowerScreen : MonoBehaviour
         // ---- 3. 顔がてっぺんへ跳び乗る ----
         float maxTop = 0f;
         foreach (var t in towers) maxTop = Mathf.Max(maxTop, t.HeadTop);
-        SetCam(new Vector3(centerX - 1.3f, maxTop + 0.2f, -4.8f - spread * 0.6f), new Vector3(centerX, maxTop - 0.3f, 0f), 44f, false);
+        SetCam(new Vector3(centerX - 1.3f, maxTop + 0.2f + back * 0.25f, -4.8f - spread * 0.6f - back), new Vector3(centerX, maxTop - 0.3f, 0f), 44f, false);
         yield return Wait(0.3f);
+        // 1位と一緒に、積んだ2位以下も自分のタワーに跳び乗る（最後に終わる1位を待つ）
+        for (int i = towers.Count; i < builders.Count; i++) StartCoroutine(HopOnTop(builders[i]));
         for (int i = 0; i < towers.Count; i++)
         {
             if (i < towers.Count - 1) StartCoroutine(HopOnTop(towers[i]));
@@ -442,8 +522,13 @@ public class ResultTowerScreen : MonoBehaviour
     {
         float height = 0f;
         foreach (var t in towers) height = Mathf.Max(height, t.HeadTop + (t.crown != null ? 0.7f : 0f));   // 王冠は飾りの先まで
+        foreach (var o in others) if (o.onTop) height = Mathf.Max(height, o.HeadTop * 0.85f);
         float spread = (towers.Count - 1) * towerSpacing;
         float dist = Mathf.Max(9f, height * 1.5f + 3.5f) + spread * 0.7f;
+        // 2位以下のタワーも横に入るように（横に一番離れた人まで）
+        float width = 0f;
+        foreach (var o in others) if (o.blocks.Count > 0) width = Mathf.Max(width, Mathf.Abs(o.root.position.x) + 1.2f);
+        dist = Mathf.Max(dist, width * 1.75f);
         // 下に文字を出すので、タワーは画面の少し上寄りに
         float lookY = height * 0.5f - 0.6f;
         SetCam(new Vector3(0f, lookY + 0.7f, -dist), new Vector3(0f, lookY, 0f), 42f, false);
@@ -654,8 +739,11 @@ public class ResultTowerScreen : MonoBehaviour
         {
             var w = towers[0];
             Vector3 top = w.onTop ? w.face.root.position : w.root.position + Vector3.up * (w.Top + 0.5f);
-            foreach (var o in others)
+            for (int i = 0; i < others.Count; i++)
             {
+                var o = others[i];
+                // 幽霊はふわふわ浮く
+                if (o.ghost) o.face.root.localPosition = new Vector3(0f, HeadR + 0.5f + Mathf.Sin(time * 2f + i * 1.3f) * 0.12f, 0f);
                 Vector3 dir = o.face.root.position - top;
                 var look = Quaternion.LookRotation(dir.normalized);
                 o.face.root.rotation = Quaternion.Slerp(o.face.root.rotation, look, 1f - Mathf.Exp(-5f * raw));

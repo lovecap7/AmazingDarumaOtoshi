@@ -31,6 +31,21 @@ public class MatchSettings : ScriptableObject
     public string resultSceneName = "ResultScene";
     [Tooltip("試合が終わってから、リザルト画面へ移るまでの時間（秒）。「しあい しゅうりょう！」を見せる間")]
     public float resultSceneDelay = 2f;
+    [Tooltip("ストックのリザルト画面（空欄なら上の「リザルト画面のシーン名」）")]
+    public string stockResultSceneName = "ResultTowerScene";
+    [Tooltip("ゴーストのリザルト画面（空欄なら上の「リザルト画面のシーン名」）")]
+    public string ghostResultSceneName = "ResultTowerScene";
+    [Tooltip("タイムのリザルト画面（空欄なら上の「リザルト画面のシーン名」）")]
+    public string timeResultSceneName = "";
+
+    // モードに合わせたリザルト画面のシーン名
+    public string ResultSceneFor(MatchSetup.MatchMode mode)
+    {
+        string scene = mode == MatchSetup.MatchMode.Stock ? stockResultSceneName
+                     : mode == MatchSetup.MatchMode.Ghost ? ghostResultSceneName
+                     : timeResultSceneName;
+        return string.IsNullOrEmpty(scene) ? resultSceneName : scene;
+    }
 
     static MatchSettings s_instance;
     public static MatchSettings Instance
