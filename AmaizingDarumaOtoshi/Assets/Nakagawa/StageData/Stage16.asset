@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9bc7d20817a22f54b80f1965aafc188c, type: 3}
+  m_Name: Stage16
+  m_EditorClassIdentifier: Assembly-CSharp::StageData
+  id: Stage16
+  displayName: "\u6E6F\u8239\u306E\u3075\u305F"
+  description: "\u6E6F\u8239\u306B\u6E21\u3057\u305F\u4E09\u679A\u306E\u98A8\u5442\u3075\u305F\u306E\u4E0A\u3002\u9577\u3044\u8FBA\u306F\u6E6F\u8239\u306E\u7E01(\u58C1)\u3001\u77ED\u3044\u8FBA\u306E\u5148\u306F\u6E6F\u8239\u3078\u843D\u3061\u308B\u5D16\u3002\u30A2\u30D2\u30EB\u306E\u3088\u3046\u306A\u30D0\u30F3\u30D1\u30FC\u304C\u6D6E\u304B\u3076\u3002"
+  color: {r: 0.85, g: 0.7, b: 0.95, a: 1}
+  preview: {fileID: 21300000, guid: 7d5a952375224074d8eed73e7764e496, type: 3}
+  sceneName: AllStages

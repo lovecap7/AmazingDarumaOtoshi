@@ -14,6 +14,9 @@ namespace Nakahira
         [Tooltip("これ未満の速さになったら止まって落ちている積み木に戻る")]
         [Min(0.0f)] public float StopSpeed = 0.5f;
 
+        [Tooltip("飛んでいる積み木が床から落ちている間の重力の倍率(1で通常)。大きいほど素早く落ちる")]
+        [Min(1.0f)] public float FallGravityScale = 2.0f;
+
         [Header("衝突の手ごたえ(ヒットストップ)。速い積み木ほど長く強く止まる")]
         [Tooltip("この速さ以下で当たったときに最小の値になる")]
         [Min(0.0f)] public float ImpactMinSpeed = 5.0f;

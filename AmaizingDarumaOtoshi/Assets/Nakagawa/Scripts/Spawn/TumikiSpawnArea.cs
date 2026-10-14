@@ -36,6 +36,13 @@ namespace Nakagawa
         [SerializeField] float m_checkHeight = 1.0f;
         // 積み木の真下(中心と外周4点)に床があるところにだけ置く(穴の上に生成して落ちないように)
         [SerializeField] bool m_requireFloor = true;
+        // 積み木の底面全体が床の高さの床に乗る(完全に接地する)ところにだけ置く
+        // (エリアがステージの外へはみ出していたり、床の縁・継ぎ目の隙間にかかっていたりしても、床の上だけに生成される)
+        [SerializeField] bool m_requireFullSupport = true;
+        // 底面の外周を調べる点の数
+        [SerializeField, Min(4)] int m_supportSamples = 12;
+        // 床の上面の高さとみなす誤差(m)。これより高い・低い物(ギミックの上面・段差)は床とみなさない
+        [SerializeField, Min(0.001f)] float m_supportTolerance = 0.03f;
 
         [Header("見た目")]
         // 床の目印(形に合わせて片方だけ表示し、大きさを合わせる。当たり判定なし)
@@ -118,6 +125,7 @@ namespace Nakagawa
                 if (!TryRandomPoint(r, out pos)) return false;
                 if (OverlapsReserved(pos, reserved, minDistance)) continue;
                 if (m_requireFloor && !HasFloorBelow(pos, r)) continue;
+                if (m_requireFullSupport && !IsFullySupported(pos, r)) continue;
                 if (OverlapsObstacle(pos, r + m_spacing)) continue;
                 return true;
             }
@@ -168,6 +176,38 @@ namespace Nakagawa
                 if (!Physics.Raycast(origin, Vector3.down, 0.5f, m_obstacleMask, QueryTriggerInteraction.Ignore)) return false;
             }
             return true;
+        }
+
+        static readonly RaycastHit[] s_hits = new RaycastHit[8];
+
+        // 積み木の底面(中心と外周)のすべての点の真下に、床の高さの動かない床があるか
+        public bool IsFullySupported(Vector3 pos, float radius)
+        {
+            if (!HasSupportAt(pos)) return false;
+            int samples = Mathf.Max(4, m_supportSamples);
+            // 外周ぎりぎりではなく、ほんの少し内側を調べる(床の縁にぴったり乗るのは許す)
+            float r = radius * 0.98f;
+            for (int i = 0; i < samples; i++)
+            {
+                float a = i * Mathf.PI * 2.0f / samples;
+                if (!HasSupportAt(pos + new Vector3(Mathf.Cos(a), 0.0f, Mathf.Sin(a)) * r)) return false;
+            }
+            return true;
+        }
+
+        private bool HasSupportAt(Vector3 p)
+        {
+            float top = FloorY + kFloorClearance + 0.2f;
+            Vector3 origin = new Vector3(p.x, top, p.z);
+            int n = Physics.RaycastNonAlloc(origin, Vector3.down, s_hits, 0.5f, m_obstacleMask, QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < n; i++)
+            {
+                var hit = s_hits[i];
+                // 動く物(積み木・プレイヤー・ギミック)は床とみなさない
+                if (hit.collider.attachedRigidbody != null) continue;
+                if (Mathf.Abs(hit.point.y - FloorY) <= m_supportTolerance) return true;
+            }
+            return false;
         }
 
         // 積み木の円柱を囲む箱の範囲に、当たり判定(生成済みの積み木・ギミック・壁・プレイヤー等)があるか

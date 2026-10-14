@@ -14,8 +14,8 @@ namespace Nakagawa
     {
         // 横向きとみなす接触の法線の上下成分
         const float kSideNormalY = 0.7f;
-        // 接触点が別の床の「中」にあるとみなす余裕(横は内側へ、上は床の上面より少し上まで)
-        const float kInsideInset = 0.02f;
+        // 接触点が別の床の「中」にあるとみなす余裕(横は外側へ少し広げ、辺どうしで接しているだけの床も継ぎ目とみなす。上は床の上面より少し上まで)
+        const float kInsideInset = -0.03f;
         const float kTopTolerance = 0.05f;
         // 継ぎ目とみなす、触れている床の上面から接触点までの深さの上限(積み木1段の高さ)
         const float kMaxSeamDepth = TumikiBlock.kHeight;
@@ -126,7 +126,7 @@ namespace Nakagawa
             }
         }
 
-        // 接触点が、触れている床以外の床の中に埋まっているか(外から見えない側面か)
+        // 接触点が、触れている床以外の床の中に埋まっているか・その床の面に接しているか(外から見えない側面か)
         static bool IsInsideOtherFloor(Vector3 point, int exclude)
         {
             for (int i = 0; i < s_floors.Count; i++)

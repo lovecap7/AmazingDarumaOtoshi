@@ -31,6 +31,8 @@ namespace Nakagawa
         [SerializeField] float m_surfaceOffset = 0.02f;
         // 表面の線(回っているのが分かるように。長さを直径に合わせる)
         [SerializeField] Transform[] m_lines;
+        // 線ごとにずらす高さ(m)
+        const float kLineStep = 0.004f;
 
         Rigidbody m_rb;
         Quaternion m_baseRotation;
@@ -95,13 +97,15 @@ namespace Nakagawa
                 m_disc.localPosition = new Vector3(0.0f, m_surfaceOffset - m_thickness * 0.5f, 0.0f);
             }
             if (m_lines == null) return;
-            foreach (var line in m_lines)
+            for (int i = 0; i < m_lines.Length; i++)
             {
+                var line = m_lines[i];
                 if (line == null) continue;
                 Vector3 s = line.localScale;
                 line.localScale = new Vector3(diameter * 0.92f, s.y, s.z);
                 Vector3 p = line.localPosition;
-                line.localPosition = new Vector3(p.x, m_surfaceOffset + s.y * 0.5f, p.z);
+                // 交差する線どうしの面が同じ高さだとちらつくので、線ごとに少しずつ高さをずらす
+                line.localPosition = new Vector3(p.x, m_surfaceOffset + s.y * 0.5f + i * kLineStep, p.z);
             }
         }
 

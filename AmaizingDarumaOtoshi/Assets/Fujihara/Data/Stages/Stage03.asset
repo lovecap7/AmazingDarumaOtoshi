@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9bc7d20817a22f54b80f1965aafc188c, type: 3}
   m_Name: Stage03
   m_EditorClassIdentifier: Assembly-CSharp::StageData
-  id: Stage03
+  id: DebugStage03
   displayName: "\u5948\u843D\u306E\u821E\u53F0"
   description: "\u58C1\u306E\u306A\u3044\u5C0F\u3055\u306A\u6B63\u65B9\u5F62\u306E\u821E\u53F0\u3002\u7E01\u304B\u3089\u843D\u3061\u308C\u3070\u5373\u8131\u843D\u3002"
   color: {r: 0.7, g: 0.9, b: 0.65, a: 1}

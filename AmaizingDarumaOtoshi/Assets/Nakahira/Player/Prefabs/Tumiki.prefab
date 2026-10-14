@@ -135,6 +135,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f4e41303c5ea1dd418f036c1c274ba83, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiEdgeSlip
+  m_reflectAtCliff: 0
   m_slipAcceleration: 25
   m_rimSamples: 8
   m_probeDepth: 0.15
@@ -154,6 +155,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiDurability
   m_refillOnStacked: 1
+  m_damageMaterial: {fileID: 2100000, guid: 609a3ce824795284999f2a0678d1b8e9, type: 2}
+  m_damageGrowSpeed: 2.5
   m_crackMaterial: {fileID: 2100000, guid: 82ec4afed4d972c45b2b8073e3e4e95c, type: 2}
   m_maxCracks: 6
   m_crackLength: {x: 0.3, y: 0.45}

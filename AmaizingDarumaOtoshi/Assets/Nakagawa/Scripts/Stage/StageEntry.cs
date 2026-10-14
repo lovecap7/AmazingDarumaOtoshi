@@ -15,12 +15,21 @@ namespace Nakagawa
         [SerializeField] StageArea m_stageArea;
         // このステージを映すカメラの位置・向き
         [SerializeField] Transform m_cameraPoint;
+        // このステージの背景(StageBackdrop のプレハブ)。なしでもよい
+        // 変えたら「Nakagawa > Backdrops > Apply Backdrops To Open Scene」で、ステージの子に置かれた背景を作り直す
+        [SerializeField] StageBackdrop m_backdrop;
 
         public StageInfo Info => m_info;
         public Transform[] SpawnPoints => m_spawnPoints;
         public StageArea StageArea => m_stageArea;
         public Transform CameraPoint => m_cameraPoint;
+        public StageBackdrop Backdrop => m_backdrop;
         public string DisplayName => m_info != null ? $"{m_info.Id} {m_info.Title}" : name;
+
+        public void SetBackdrop(StageBackdrop backdropPrefab)
+        {
+            m_backdrop = backdropPrefab;
+        }
 
         public void Set(StageInfo info, Transform[] spawnPoints, StageArea stageArea, Transform cameraPoint)
         {

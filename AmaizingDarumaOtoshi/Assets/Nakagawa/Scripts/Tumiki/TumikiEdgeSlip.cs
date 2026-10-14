@@ -10,6 +10,8 @@ namespace Nakagawa
     [RequireComponent(typeof(TumikiBlock))]
     public class TumikiEdgeSlip : MonoBehaviour
     {
+        // 飛んでいる積み木を崖(壁のない縁)で反射させるか(通常は床から落ちるのでオフ)
+        [SerializeField] bool m_reflectAtCliff = false;
         // 縁の外へ押し出す加速度(床との摩擦に勝てる強さ)
         [SerializeField] float m_slipAcceleration = 25.0f;
         // 底の外周を調べる点の数
@@ -29,9 +31,9 @@ namespace Nakagawa
             m_collider = GetComponent<Collider>();
 
             // 床の縁まわりの振る舞いをまとめて付ける(積み木のプレハブを編集せずに済むように、ここから追加する)
-            // ・飛んでいる積み木は崖(壁のない縁)で反射する
             // ・床どうしが重なる継ぎ目(めり込んだ床の側面)には引っかからない
-            if (!TryGetComponent<TumikiCliffReflect>(out _)) gameObject.AddComponent<TumikiCliffReflect>();
+            // ・崖(壁のない縁)での反射は、床から落ちるべき積み木まで跳ね返してしまうため既定では付けない
+            if (m_reflectAtCliff && !TryGetComponent<TumikiCliffReflect>(out _)) gameObject.AddComponent<TumikiCliffReflect>();
             FloorSeamFilter.Register(m_collider);
         }
 

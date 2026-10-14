@@ -107,6 +107,8 @@ namespace Nakahira
         public bool IsConfigured { get; private set; }
         public bool IsFinished => Result != null;
         public StageArea StageArea => m_stageArea;
+        // 出現・復活ポイント(デバッグ表示などで読む)
+        public IReadOnlyList<Transform> SpawnPoints => m_spawnPoints ?? Array.Empty<Transform>();
         public MatchSetup.MatchRules Rules => m_rules ?? MatchSetup.Rules;
         public MatchSetup.MatchMode Mode => Rules.mode;
         public IReadOnlyList<MatchPlayer> Players => m_players;

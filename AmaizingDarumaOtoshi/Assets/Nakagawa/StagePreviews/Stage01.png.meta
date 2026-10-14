@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 14f199f772e02554ea1b83a6b62e72cf
+guid: 84928b72d813ae94ab79be3e766fd1fa
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -2045999987958129151
-    second: Stage01_0
+      213: 214014463705813545
+    second: Stage21_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -98,24 +98,11 @@ TextureImporter:
     ignorePlatformSupport: 0
     androidETC2FallbackOverride: 0
     forceMaximumCompressionQuality_BC6H_BC7: 0
-  - serializedVersion: 4
-    buildTarget: WebGL
-    maxTextureSize: 2048
-    resizeAlgorithm: 0
-    textureFormat: -1
-    textureCompression: 1
-    compressionQuality: 50
-    crunchedCompression: 0
-    allowsAlphaSplitting: 0
-    overridden: 0
-    ignorePlatformSupport: 0
-    androidETC2FallbackOverride: 0
-    forceMaximumCompressionQuality_BC6H_BC7: 0
   spriteSheet:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: Stage01_0
+      name: Stage21_0
       rect:
         serializedVersion: 2
         x: 0
@@ -130,8 +117,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 10e5d43e9d52b93e0800000000000000
-      internalID: -2045999987958129151
+      spriteID: 9221bf5550558f200800000000000000
+      internalID: 214014463705813545
       vertices: []
       indices: 
       edges: []

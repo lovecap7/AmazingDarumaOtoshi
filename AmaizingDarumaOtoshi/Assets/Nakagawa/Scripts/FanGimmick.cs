@@ -10,9 +10,10 @@ namespace Nakagawa
     // (飛んでいる積み木は弾道が曲がる。落ちている積み木は床との摩擦より強いときだけ動く)
     // このTransformの位置が足元、向きは風の方向に自動で合わせる
     // ギミックの要求は受ける側より先に処理する(同じステップで反映させる)
+    // 飛んでいる積み木が本体に当たると、壁と同じように跳ね返る(ITumikiReflector)
     [DefaultExecutionOrder(-10)]
     [RequireComponent(typeof(Rigidbody))]
-    public class FanGimmick : MonoBehaviour
+    public class FanGimmick : MonoBehaviour, ITumikiReflector
     {
         [Header("移動")]
         // 往復する二点(扇風機の子にしないこと。開始時の位置を使う)

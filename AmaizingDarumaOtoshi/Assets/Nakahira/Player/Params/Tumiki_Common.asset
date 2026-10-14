@@ -15,6 +15,7 @@ MonoBehaviour:
   Deceleration: 5
   HarmlessSpeed: 10
   StopSpeed: 0.5
+  FallGravityScale: 5
   ImpactMinSpeed: 5
   ImpactMaxSpeed: 30
   ImpactMinDuration: 0.04

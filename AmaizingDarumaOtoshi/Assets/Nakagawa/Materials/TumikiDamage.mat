@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: TumikiDamage
+  m_Shader: {fileID: 4800000, guid: fc32ae2213cfb374ca385f2b1cd0c7a9, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs: []
+    m_Ints: []
+    m_Floats:
+    - _Chip: 0.8
+    - _ChipBand: 0.07
+    - _ChipBrightness: 0.68
+    - _CrackDarkness: 0.9
+    - _CrackRim: 0.1
+    - _CrackScale: 4
+    - _CrackSpread: 1.3
+    - _CrackWidth: 0.016
+    - _Damage: 0
+    - _FineScale: 14
+    - _FineStart: 0.45
+    - _FineWidth: 0.006
+    - _Grime: 0.35
+    - _GrimeScale: 7
+    - _Seed: 0
+    m_Colors: []
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1

@@ -68,6 +68,12 @@ namespace Nakahira
         public const float kRadius = 0.5f;
         // 触れたまま弾かれたとき、相手に向かって進んでいるとみなす向きの一致度(cos約70°)
         const float kApproachDot = 0.35f;
+        // 法線の上下成分がこれ未満の面を横向きの側面とみなす
+        const float kSideSurfaceNormalY = 0.5f;
+        // 側面の接触点が上面からこれ以内なら、上面の縁(継ぎ目)に触れただけとみなす
+        const float kSideSurfaceTopMargin = 0.1f;
+        // 落下中とみなす下向きの速さ
+        const float kFallingSpeed = 0.5f;
 
         [SerializeField] TumikiColor m_color = TumikiColor.Red;
         // これより下に落ちたら奈落に落ちたとみなして消滅
@@ -208,6 +214,11 @@ namespace Nakahira
             // 水平に直進する(Y方向は重力に任せる)
             Vector3 v = Direction * (Speed * timeScale);
             v.y = m_rb.linearVelocity.y;
+            // 床から落ちている間は重力を強めて、空中に長く滞空しないようにする
+            if (v.y < -kFallingSpeed && m_params.FallGravityScale > 1.0f)
+            {
+                v.y += Physics.gravity.y * (m_params.FallGravityScale - 1.0f) * dt;
+            }
             m_rb.linearVelocity = v;
         }
 
@@ -612,11 +623,11 @@ namespace Nakahira
             return Vector3.Dot(Direction, to.normalized) > kApproachDot;
         }
 
-        // 壁(ReflectWall)なら、壁に向かって進んでいるときだけ反射する。壁ならtrue
+        // 壁(ReflectWall)・床の側面なら、そちらに向かって進んでいるときだけ反射する。反射の対象ならtrue
         // (反射後は壁から離れる向きになるので、接触が続いても何度も反射しない)
         private bool TryReflect(Collision collision)
         {
-            if (collision.collider.GetComponentInParent<ReflectWall>() == null) return false;
+            if (!IsReflectSurface(collision)) return false;
 
             Vector3 normal = collision.GetContact(0).normal;
             normal.y = 0.0f;
@@ -625,6 +636,22 @@ namespace Nakahira
                 Direction = Vector3.Reflect(Direction, normal.normalized).normalized;
             }
             return true;
+        }
+
+        // 反射する面か: 壁と同じように反射させる物(ITumikiReflector。壁・扇風機など)、または動かない当たり判定(床など)の横向きの側面
+        // 床から落ちた積み木が床の側面に当たったとき、壁と同じように跳ね返して空中で張り付かないようにする
+        // (それ以外のRigidbodyを持つギミックは、それぞれの処理に任せる)
+        private static bool IsReflectSurface(Collision collision)
+        {
+            Collider col = collision.collider;
+            if (col.GetComponentInParent<ITumikiReflector>() != null) return true;
+            if (col.attachedRigidbody != null) return false;
+            if (collision.contactCount == 0) return false;
+            ContactPoint contact = collision.GetContact(0);
+            if (Mathf.Abs(contact.normal.y) >= kSideSurfaceNormalY) return false;
+            // 上面の高さで触れただけ(床の上を滑っていて、接している床どうしの継ぎ目に引っかかった)なら床として扱う
+            if (contact.point.y > col.bounds.max.y - kSideSurfaceTopMargin) return false;
+            return col.GetComponentInParent<TumikiBlock>() == null && col.GetComponentInParent<DarumaCharacter>() == null;
         }
 
         // 崩れる: すぐには消えず、当たり判定を消して残りの速度でゆっくり進みながら震え、

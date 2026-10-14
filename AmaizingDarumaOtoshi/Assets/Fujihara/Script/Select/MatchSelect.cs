@@ -40,6 +40,8 @@ public class MatchSelect : MonoBehaviour
 
     [Header("データ")]
     [SerializeField] SelectRoster roster;
+    [Tooltip("ステージセレクトで横に並べるステージの数（最大）。ステージが多いときは増やすと1つずつが小さくなり、少ない行に収まる")]
+    [SerializeField, Range(1, 20)] int stageColumns = 7;
 
     [Header("ルール")]
     [SerializeField, Range(1, 8)] int maxPlayers = 4;
@@ -1285,7 +1287,7 @@ public class MatchSelect : MonoBehaviour
         Header(stageRoot, "ステージセレクト", ToyKit.Palette[4]);
 
         int sc = roster.stages.Count + 1;   // 最後におまかせ
-        var sgrid = GridLayout(sc, 7, new Vector2(1760f, 470f), new Vector2(380f, 240f), 18f, 345f);
+        var sgrid = GridLayout(sc, stageColumns, new Vector2(1760f, 470f), new Vector2(380f, 240f), 18f, 345f);
         for (int i = 0; i < sc; i++)
         {
             bool random = i == roster.stages.Count;

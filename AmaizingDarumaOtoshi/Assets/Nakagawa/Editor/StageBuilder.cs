@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -12,7 +12,7 @@ using Object = UnityEngine.Object;
 
 namespace Nakagawa.EditorTools
 {
-    // 対戦ステージ(Stage01〜20)を Assets/Nakagawa/Stages に生成する
+    // 対戦ステージ(本編 Stage01〜 / デバッグ DebugStage01〜)を、ステージをまとめたシーン(Assets/Nakagawa/Stages/AllStages.unity)の中に生成する
     // 各ステージはこのファイルの定義(床・壁・ギミック・積み木の生成エリア・出現位置・説明)から作るので、数値を直して作り直せる
     // 床はすべて同じ高さ(段差なし)。床の穴・壁のない縁は奈落(落ちると脱落)
     // 開いているシーンには触れない(別のシーンを追加で開いて組み立て、保存して閉じる)
@@ -20,6 +20,7 @@ namespace Nakagawa.EditorTools
     {
         const string kStageDir = "Assets/Nakagawa/Stages";
         const string kDocPath = kStageDir + "/StageList.md";
+        const string kCombinedPath = kStageDir + "/AllStages.unity";
         const string kPrefabDir = "Assets/Nakagawa/Prefabs";
         const string kMaterialDir = "Assets/Nakagawa/Materials";
         const string kRandomPatternPath = "Assets/Nakagawa/SpawnPatterns/SpawnPattern_Random.asset";
@@ -28,6 +29,7 @@ namespace Nakagawa.EditorTools
         const string kSeeThroughWallMaterial = kMaterialDir + "/WallSeeThrough.mat";
         const string kDurabilityImpactPath = "Assets/Nakagawa/TumikiImpacts/TumikiImpact_Durability.asset";
         const string kCrackMaterial = kMaterialDir + "/TumikiCrack.mat";
+        const string kDamageMaterial = kMaterialDir + "/TumikiDamage.mat";
         const string kParticleMaterial = kMaterialDir + "/GimmickParticle.mat";
 
         const string kNakahira = "Assets/Nakahira/Player";
@@ -39,11 +41,31 @@ namespace Nakagawa.EditorTools
         const string kWallMaterial = kNakahira + "/Materials/Wall.mat";
 
         const float kWallHeight = 1.5f;
+        // 1ステージの積み木の生成エリアの最低数と、エリアのうち積み木を置ける場所の割合の下限(検証用)
+        const int kMinSpawnAreas = 6;
+        const float kMinSpawnCapacity = 0.2f;
         const float kBumperBaseRadius = 0.8f;   // Bumper.prefab の円盤の半径(スケール1のとき)
 
-        [MenuItem("Nakagawa/Stages/Build All Stages")]
+        // ステージは1つずつのシーンを作らず、すべてまとめたシーン(AllStages)の中に組み立てる
+        // (同じ id のステージは入れ替え、他のステージ・共有の物はそのまま残す)
+
+        [MenuItem("Nakagawa/Stages/Build All Stages Into AllStages")]
         public static void BuildAll()
         {
+            BuildIntoCombined(def => true);
+        }
+
+        // 本編のステージ(Stage01〜。背景のあるステージ)だけを作り直す。デバッグステージはそのまま
+        [MenuItem("Nakagawa/Stages/Build Main Stages Into AllStages")]
+        public static void BuildMainStages()
+        {
+            BuildIntoCombined(def => !def.Id.StartsWith(kDebugPrefix));
+        }
+
+        // 条件に合うステージを一時的なシーンに組み立て、まとめたシーンへ移す(一時的なシーンは保存しない)
+        static void BuildIntoCombined(Predicate<StageDef> filter)
+        {
+            if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
             if (Load<GameObject>($"{kPrefabDir}/TumikiSpawnArea.prefab") == null || Load<TumikiSpawnPattern>(kRandomPatternPath) == null)
             {
                 GimmickTestFieldBuilder.BuildSpawnAssets();
@@ -51,23 +73,36 @@ namespace Nakagawa.EditorTools
             EnsureFolder(kStageDir);
             SetupTumikiPrefab();
 
-            Scene original = SceneManager.GetActiveScene();
-            var report = new StringBuilder();
             var defs = Definitions();
-            foreach (var def in defs)
+            var targets = defs.FindAll(filter);
+            var report = new StringBuilder();
+            StageCombiner.AddOrUpdateStages(targets.ConvertAll(d => d.Id), id =>
             {
-                report.AppendLine(BuildStage(def));
-            }
-            if (original.IsValid()) SceneManager.SetActiveScene(original);
+                var def = targets.Find(d => d.Id == id);
+                Scene scene = BuildStageScene(def, out string line);
+                report.AppendLine(line);
+                return scene;
+            });
 
             WriteDocument(defs);
             AssetDatabase.Refresh();
-            Debug.Log("[StageBuilder] 20ステージを作成しました\n" + report);
+            Debug.Log($"[StageBuilder] {targets.Count}ステージを {kCombinedPath} に作りました\n" + report);
         }
 
         //========================================
         // ステージの定義
         //========================================
+
+        // ステージの id の接頭辞(デバッグステージ / 本編)
+        public const string kDebugPrefix = "DebugStage";
+        public const string kStagePrefix = "Stage";
+
+        // 背景の id(BackdropBuilder の定義)
+        const string kChanomaBackdrop = "Chanoma";
+        const string kKitchenBackdrop = "Kitchen";
+        const string kDeskBackdrop = "Desk";
+        const string kEngawaBackdrop = "Engawa";
+        const string kBathBackdrop = "Bath";
 
         class StageDef
         {
@@ -75,15 +110,32 @@ namespace Nakagawa.EditorTools
             public int MaxBlocks = 24;
             public Action<Ctx> Build;
             public string Layout; // 生成後に埋める
+            // 背景の id(BackdropBuilder の定義)。なければ背景なし
+            public string Backdrop;
         }
 
         static List<StageDef> Definitions()
         {
             var list = new List<StageDef>();
-            void Add(string title, int maxBlocks, string concept, string flow, Action<Ctx> build)
+            // id は「接頭辞 + シリーズ内の通し番号」(DebugStage01, Stage01 ...)。BeginSeries で接頭辞と番号を切り替える
+            string prefix = "Stage";
+            int number = 0;
+            void BeginSeries(string seriesPrefix)
             {
-                list.Add(new StageDef { Id = $"Stage{list.Count + 1:00}", Title = title, MaxBlocks = maxBlocks, Concept = concept, Flow = flow, Build = build });
+                prefix = seriesPrefix;
+                number = 0;
             }
+            StageDef Add(string title, int maxBlocks, string concept, string flow, Action<Ctx> build)
+            {
+                var def = new StageDef { Id = $"{prefix}{++number:00}", Title = title, MaxBlocks = maxBlocks, Concept = concept, Flow = flow, Build = build };
+                list.Add(def);
+                return def;
+            }
+
+            //----------------------------------------
+            // デバッグステージ(DebugStage01〜20)。ギミックの組み合わせを試すための、背景のないステージ
+            //----------------------------------------
+            BeginSeries(kDebugPrefix);
 
             Add("基本の闘技場", 24,
                 "ギミックなしの正方形の闘技場。全ステージの基準となる、操作と駆け引きの基本だけで戦う舞台。",
@@ -92,6 +144,13 @@ namespace Nakagawa.EditorTools
                 {
                     c.Arena(0, 0, 24, 24, true, true, true, true);
                     c.AreaCircle(0, 0, 4);
+                    // 壁際(壁にかぶせて置く。床の上の部分にだけ湧く)
+                    c.AreaRect(0, 10.5f, 8, 4);
+                    c.AreaRect(0, -10.5f, 8, 4);
+                    c.AreaRect(10.5f, 0, 4, 8);
+                    c.AreaRect(-10.5f, 0, 4, 8);
+                    c.AreaCircle(5, -5, 1.5f);
+                    c.AreaCircle(-5, 5, 1.5f);
                     c.Spawns(new Vector2(-8, -8), new Vector2(8, -8), new Vector2(-8, 8), new Vector2(8, 8));
                 });
 
@@ -101,10 +160,14 @@ namespace Nakagawa.EditorTools
                 c =>
                 {
                     c.Arena(0, 0, 26, 26, true, true, true, true);
-                    c.AreaRect(-9, -9, 5, 5);
-                    c.AreaRect(9, -9, 5, 5);
-                    c.AreaRect(-9, 9, 5, 5);
-                    c.AreaRect(9, 9, 5, 5);
+                    // 四隅の補給所は壁の角にかぶせる
+                    c.AreaRect(-11, -11, 5, 5);
+                    c.AreaRect(11, -11, 5, 5);
+                    c.AreaRect(-11, 11, 5, 5);
+                    c.AreaRect(11, 11, 5, 5);
+                    c.AreaCircle(0, 0, 3);
+                    c.AreaCircle(5.5f, -5.5f, 1.5f);
+                    c.AreaCircle(-5.5f, 5.5f, 1.5f);
                     c.Spawns(new Vector2(0, -10), new Vector2(0, 10), new Vector2(-10, 0), new Vector2(10, 0));
                 });
 
@@ -114,7 +177,14 @@ namespace Nakagawa.EditorTools
                 c =>
                 {
                     c.Arena(0, 0, 22, 22, false, false, false, false);
-                    c.AreaCircle(0, 0, 5);
+                    c.AreaCircle(0, 0, 4);
+                    // 縁(崖の外へはみ出して置く。床の上の部分にだけ湧く)
+                    c.AreaRect(0, 10.5f, 8, 3);
+                    c.AreaRect(0, -10.5f, 8, 3);
+                    c.AreaRect(10.5f, 0, 3, 8);
+                    c.AreaRect(-10.5f, 0, 3, 8);
+                    c.AreaCircle(4.5f, -4.5f, 1.2f);
+                    c.AreaCircle(-4.5f, 4.5f, 1.2f);
                     c.Spawns(new Vector2(-7, -7), new Vector2(7, -7), new Vector2(-7, 7), new Vector2(7, 7));
                 });
 
@@ -128,8 +198,14 @@ namespace Nakagawa.EditorTools
                     {
                         c.Bumper(p.x, p.y, 1.5f);
                     }
-                    c.AreaRect(0, -11.5f, 12, 4);
-                    c.AreaRect(0, 11.5f, 12, 4);
+                    c.AreaRect(0, -13.5f, 12, 4);
+                    c.AreaRect(0, 13.5f, 12, 4);
+                    c.AreaRect(-12.2f, 0, 3, 6);
+                    c.AreaRect(12.2f, 0, 3, 6);
+                    // バンパーにかぶせて置く(バンパーと重ならない所にだけ湧く)
+                    c.AreaCircle(0, 0, 2.5f);
+                    c.AreaCircle(0, 6.2f, 2);
+                    c.AreaCircle(0, -6.2f, 2);
                     c.Spawns(new Vector2(-10, -7), new Vector2(10, -7), new Vector2(-10, 7), new Vector2(10, 7));
                 });
 
@@ -141,6 +217,12 @@ namespace Nakagawa.EditorTools
                     c.Arena(0, 0, 26, 26, true, true, true, true);
                     c.Turntable(0, 0, 5, true, 40);
                     c.AreaCircle(0, 0, 4);
+                    c.AreaCircle(6.5f, 0, 1.5f);
+                    c.AreaCircle(-6.5f, 0, 1.5f);
+                    c.AreaRect(0, 12, 8, 3);
+                    c.AreaRect(0, -12, 8, 3);
+                    c.AreaRect(12, 0, 3, 8);
+                    c.AreaRect(-12, 0, 3, 8);
                     c.Spawns(new Vector2(-9, -9), new Vector2(9, -9), new Vector2(-9, 9), new Vector2(9, 9));
                 });
 
@@ -153,6 +235,11 @@ namespace Nakagawa.EditorTools
                     c.Fan(new Vector2(-17, -5), new Vector2(-17, 5), Vector3.right, 32, 4, 12, 1.5f);
                     c.AreaRect(-6, 0, 4, 10);
                     c.AreaRect(8, 0, 4, 10);
+                    // 扇風機の通り道にかぶせて置く
+                    c.AreaRect(-16.5f, 0, 3, 6);
+                    c.AreaRect(17.5f, 0, 3, 8);
+                    c.AreaRect(1, 7.5f, 6, 3);
+                    c.AreaRect(1, -7.5f, 6, 3);
                     c.Spawns(new Vector2(-13, -5), new Vector2(-13, 5), new Vector2(14, -5), new Vector2(14, 5));
                 });
 
@@ -167,6 +254,10 @@ namespace Nakagawa.EditorTools
                     c.AreaCircle(-8, 0, 2.5f);
                     c.AreaCircle(8, 0, 2.5f);
                     c.AreaRect(0, 0, 3, 8);
+                    c.AreaRect(0, 10.5f, 6, 3);
+                    c.AreaRect(0, -10.5f, 6, 3);
+                    c.AreaRect(15.5f, 0, 3, 6);
+                    c.AreaRect(-15.5f, 0, 3, 6);
                     c.Spawns(new Vector2(-13, -8), new Vector2(13, -8), new Vector2(-13, 8), new Vector2(13, 8));
                 });
 
@@ -186,6 +277,10 @@ namespace Nakagawa.EditorTools
                     c.AreaRect(-14.5f, 0, 4, 6);
                     c.AreaRect(0, 14.5f, 6, 4);
                     c.AreaRect(0, -14.5f, 6, 4);
+                    // 交差点のバンパーにかぶせる / 通路の角から奈落へはみ出す
+                    c.AreaCircle(0, 0, 3.5f);
+                    c.AreaRect(5.5f, 5.5f, 5, 5);
+                    c.AreaRect(-5.5f, -5.5f, 5, 5);
                     c.Spawns(new Vector2(8, 0), new Vector2(-8, 0), new Vector2(0, 8), new Vector2(0, -8));
                 });
 
@@ -202,10 +297,16 @@ namespace Nakagawa.EditorTools
                     c.Floor(0, -8, 7, 3);
                     c.Floor(8, 0, 3, 7);
                     c.Floor(-8, 0, 3, 7);
-                    c.AreaRect(0, 8, 5, 2.4f);
-                    c.AreaRect(0, -8, 5, 2.4f);
-                    c.AreaRect(8, 0, 2.4f, 5);
-                    c.AreaRect(-8, 0, 2.4f, 5);
+                    // 橋(両側の奈落へはみ出す)
+                    c.AreaRect(0, 8, 5, 4);
+                    c.AreaRect(0, -8, 5, 4);
+                    c.AreaRect(8, 0, 4, 5);
+                    c.AreaRect(-8, 0, 4, 5);
+                    // 島の内側の角(奈落へはみ出す)
+                    c.AreaRect(4.5f, 4.5f, 3, 3);
+                    c.AreaRect(-4.5f, 4.5f, 3, 3);
+                    c.AreaRect(4.5f, -4.5f, 3, 3);
+                    c.AreaRect(-4.5f, -4.5f, 3, 3);
                     c.Spawns(new Vector2(-8, -8), new Vector2(8, -8), new Vector2(-8, 8), new Vector2(8, 8));
                 });
 
@@ -221,6 +322,13 @@ namespace Nakagawa.EditorTools
                         c.Bumper(Mathf.Cos(a) * 6.5f, Mathf.Sin(a) * 6.5f, 1.3f);
                     }
                     c.AreaCircle(0, 0, 3.5f);
+                    // 輪のバンパーにかぶせる
+                    c.AreaCircle(0, 8.3f, 2);
+                    c.AreaCircle(0, -8.3f, 2);
+                    c.AreaCircle(8.3f, 0, 2);
+                    c.AreaCircle(-8.3f, 0, 2);
+                    c.AreaRect(0, 13, 8, 3);
+                    c.AreaRect(0, -13, 8, 3);
                     c.Spawns(new Vector2(-10, -10), new Vector2(10, -10), new Vector2(-10, 10), new Vector2(10, 10));
                 });
 
@@ -235,6 +343,13 @@ namespace Nakagawa.EditorTools
                     c.Bumper(0, -7, 1.3f);
                     c.Bumper(7, -6, 1.3f);
                     c.AreaRect(0, 5.5f, 18, 3);
+                    c.AreaCircle(0, -1, 2.5f);
+                    // 崖の外へはみ出す / 崖際のバンパーにかぶせる
+                    c.AreaRect(0, -9.5f, 8, 3);
+                    c.AreaRect(12, 6, 3, 6);
+                    c.AreaRect(-12, 6, 3, 6);
+                    c.AreaCircle(-7, -3.8f, 1.8f);
+                    c.AreaCircle(7, -3.8f, 1.8f);
                     c.Spawns(new Vector2(-10, 2), new Vector2(10, 2), new Vector2(-10, -3), new Vector2(10, -3));
                 });
 
@@ -249,6 +364,10 @@ namespace Nakagawa.EditorTools
                     c.AreaCircle(-6, 0, 2);
                     c.AreaCircle(0, 6, 2);
                     c.AreaCircle(0, -6, 2);
+                    c.AreaRect(0, 12, 8, 3);
+                    c.AreaRect(0, -12, 8, 3);
+                    c.AreaRect(12, 0, 3, 8);
+                    c.AreaRect(-12, 0, 3, 8);
                     c.Spawns(new Vector2(-10.5f, -10.5f), new Vector2(10.5f, -10.5f), new Vector2(-10.5f, 10.5f), new Vector2(10.5f, 10.5f));
                 });
 
@@ -263,6 +382,13 @@ namespace Nakagawa.EditorTools
                     c.Fan(new Vector2(12, 12), new Vector2(12, 12), Vector3.left, 24, 4, 10, 0);
                     c.Fan(new Vector2(-12, 12), new Vector2(-12, 12), Vector3.back, 24, 4, 10, 0);
                     c.AreaCircle(0, 0, 4);
+                    // 風の環の中(壁にかぶせる) / 隅の扇風機にかぶせる
+                    c.AreaRect(0, 13, 6, 3);
+                    c.AreaRect(0, -13, 6, 3);
+                    c.AreaRect(13, 0, 3, 6);
+                    c.AreaRect(-13, 0, 3, 6);
+                    c.AreaCircle(12, 12, 2);
+                    c.AreaCircle(-12, -12, 2);
                     c.Spawns(new Vector2(-6, -6), new Vector2(6, -6), new Vector2(-6, 6), new Vector2(6, 6));
                 });
 
@@ -276,8 +402,13 @@ namespace Nakagawa.EditorTools
                     {
                         foreach (int z in new[] { -6, 0, 6 }) c.Bumper(x, z, 1.2f);
                     }
-                    c.AreaRect(12.5f, 0, 4, 14);
-                    c.AreaRect(-12.5f, 0, 4, 14);
+                    c.AreaRect(13.5f, 0, 4, 14);
+                    c.AreaRect(-13.5f, 0, 4, 14);
+                    c.AreaCircle(2, 0, 1.8f);
+                    c.AreaRect(0, 11.5f, 6, 3);
+                    c.AreaRect(0, -11.5f, 6, 3);
+                    c.AreaCircle(4, 3, 1.5f);
+                    c.AreaCircle(-4, -3, 1.5f);
                     c.Spawns(new Vector2(-6, -10), new Vector2(6, -10), new Vector2(-6, 10), new Vector2(6, 10));
                 });
 
@@ -295,6 +426,12 @@ namespace Nakagawa.EditorTools
                     c.Fan(new Vector2(0, -0.6f), new Vector2(0, -0.6f), Vector3.back, 7, 8, 18, 0);
                     c.AreaRect(-10, 0, 6, 10);
                     c.AreaRect(10, 0, 6, 10);
+                    // 橋(両側の奈落へはみ出す) / 中央の柱の扇風機にかぶせる / 壁にかぶせる
+                    c.AreaRect(0, 5, 6, 4);
+                    c.AreaRect(0, -5, 6, 4);
+                    c.AreaRect(-4.5f, 0, 3, 4);
+                    c.AreaRect(-10, 8, 6, 2.5f);
+                    c.AreaRect(10, -8, 6, 2.5f);
                     c.Spawns(new Vector2(-14.5f, -6), new Vector2(-14.5f, 6), new Vector2(14.5f, -6), new Vector2(14.5f, 6));
                 });
 
@@ -310,6 +447,13 @@ namespace Nakagawa.EditorTools
                     c.Bumper(-8, 8, 1.3f);
                     c.Bumper(8, 8, 1.3f);
                     c.AreaCircle(0, 0, 3);
+                    // 縁(奈落へはみ出す) / 隅のバンパーにかぶせる
+                    c.AreaRect(0, 9.5f, 6, 2);
+                    c.AreaRect(0, -9.5f, 6, 2);
+                    c.AreaRect(9.5f, 0, 2, 6);
+                    c.AreaRect(-9.5f, 0, 2, 6);
+                    c.AreaCircle(8.6f, 5.6f, 1.5f);
+                    c.AreaCircle(-8.6f, -5.6f, 1.5f);
                     c.Spawns(new Vector2(-6, -6), new Vector2(6, -6), new Vector2(-6, 6), new Vector2(6, 6));
                 });
 
@@ -322,6 +466,13 @@ namespace Nakagawa.EditorTools
                     c.Fan(new Vector2(-17, 0), new Vector2(-17, 0), Vector3.right, 16, 14, 10, 0);
                     c.Fan(new Vector2(17, 0), new Vector2(17, 0), Vector3.left, 16, 14, 10, 0);
                     c.AreaCircle(0, 0, 3);
+                    // 壁にかぶせる / 両端の扇風機にかぶせる
+                    c.AreaRect(-8, 6.5f, 5, 3);
+                    c.AreaRect(8, 6.5f, 5, 3);
+                    c.AreaRect(-8, -6.5f, 5, 3);
+                    c.AreaRect(8, -6.5f, 5, 3);
+                    c.AreaCircle(-15.5f, 0, 1.8f);
+                    c.AreaCircle(15.5f, 0, 1.8f);
                     c.Spawns(new Vector2(-14, -4), new Vector2(-14, 4), new Vector2(14, -4), new Vector2(14, 4));
                 });
 
@@ -337,6 +488,10 @@ namespace Nakagawa.EditorTools
                     c.AreaCircle(-9, 0, 2.5f);
                     c.AreaCircle(0, 0, 2);
                     c.AreaCircle(9, 0, 2.5f);
+                    c.AreaRect(0, 11, 8, 3);
+                    c.AreaRect(0, -11, 8, 3);
+                    c.AreaRect(15.5f, 0, 3, 6);
+                    c.AreaRect(-15.5f, 0, 3, 6);
                     c.Spawns(new Vector2(-12, -9), new Vector2(12, -9), new Vector2(-12, 9), new Vector2(12, 9));
                 });
 
@@ -357,10 +512,15 @@ namespace Nakagawa.EditorTools
                     c.Bumper(8.5f, -8.5f, 1.3f);
                     c.Bumper(-8.5f, 8.5f, 1.3f);
                     c.Bumper(8.5f, 8.5f, 1.3f);
-                    c.AreaRect(0, 10.5f, 8, 4);
-                    c.AreaRect(0, -10.5f, 8, 4);
-                    c.AreaRect(10.5f, 0, 4, 8);
-                    c.AreaRect(-10.5f, 0, 4, 8);
+                    // 内側の縁(大穴へはみ出す) / 穴の四隅のバンパーにかぶせる
+                    c.AreaRect(0, 7.5f, 8, 4);
+                    c.AreaRect(0, -7.5f, 8, 4);
+                    c.AreaRect(7.5f, 0, 4, 8);
+                    c.AreaRect(-7.5f, 0, 4, 8);
+                    c.AreaCircle(10, 10, 2);
+                    c.AreaCircle(-10, 10, 2);
+                    c.AreaCircle(10, -10, 2);
+                    c.AreaCircle(-10, -10, 2);
                     c.Spawns(new Vector2(-12, -12), new Vector2(12, -12), new Vector2(-12, 12), new Vector2(12, 12));
                 });
 
@@ -379,8 +539,381 @@ namespace Nakagawa.EditorTools
                     c.AreaCircle(0, -11, 2);
                     c.AreaCircle(11, 0, 2);
                     c.AreaCircle(-11, 0, 2);
+                    // 中央の回転台 / 隅の扇風機にかぶせる
+                    c.AreaCircle(0, 0, 2.5f);
+                    c.AreaCircle(11.5f, -11.5f, 2.5f);
+                    c.AreaCircle(-11.5f, 11.5f, 2.5f);
                     c.Spawns(new Vector2(-8, -8), new Vector2(8, -8), new Vector2(-8, 8), new Vector2(8, 8));
                 });
+
+            //----------------------------------------
+            // 本編のステージ(Stage01〜)。家にある物とその周りをテーマにした背景の上で戦う
+            //----------------------------------------
+            BeginSeries(kStagePrefix);
+
+            // お茶の間の机の上(Stage01〜05)。ちゃぶ台の上に積んだ本の上で戦う。背景: Chanoma
+
+            Add("お盆の上", 24,
+                "ちゃぶ台に置かれたお盆の上。縁が壁になった闘技場で、湯呑みのように並んだ4つのバンパーが中央の補給所を囲む。",
+                "四方の縁(壁)で弾が跳ね返るので、どこにいても跳弾が飛んでくる。中央の補給所へはバンパーの間を抜けて入ることになり、はじかれた弾や体が思わぬ方向へ飛ぶ。お茶の間シリーズの入門として、基本の撃ち合いとバンパーの使い方を覚える舞台。",
+                c =>
+                {
+                    c.Arena(0, 0, 24, 20, true, true, true, true);
+                    c.Bumper(-6, -4, 1.4f);
+                    c.Bumper(6, -4, 1.4f);
+                    c.Bumper(-6, 4, 1.4f);
+                    c.Bumper(6, 4, 1.4f);
+                    c.AreaCircle(0, 0, 3.5f);
+                    // 湯呑みのようなバンパーにかぶせる / お盆の縁(壁)の角にかぶせる
+                    c.AreaCircle(-8, -5.5f, 1.8f);
+                    c.AreaCircle(8, -5.5f, 1.8f);
+                    c.AreaCircle(-8, 5.5f, 1.8f);
+                    c.AreaCircle(8, 5.5f, 1.8f);
+                    c.AreaRect(10.5f, 9, 4, 3);
+                    c.AreaRect(-10.5f, -9, 4, 3);
+                    c.Spawns(new Vector2(-9.5f, 0), new Vector2(9.5f, 0), new Vector2(0, -7.5f), new Vector2(0, 7.5f));
+                }).Backdrop = kChanomaBackdrop;
+
+            Add("卓上扇風機", 22,
+                "東西だけ壁のある本の上。中央の扇風機二台が首を振るように東西へ往復し、南北の崖へ向けて風を送る。",
+                "風の通り道が左右に動き続けるので、南北の崖際に立つと風に押されて落ちる危険がある。補給所は風の来ない東西の壁際。扇風機の往復を読んで風の切れ目を渡り、反対側の補給所へ攻め込むタイミングが勝負を分ける。",
+                c =>
+                {
+                    c.Arena(0, 0, 24, 24, false, false, true, true);
+                    c.Fan(new Vector2(-6, 0.7f), new Vector2(6, 0.7f), Vector3.forward, 12, 4, 12, 2);
+                    c.Fan(new Vector2(-6, -0.7f), new Vector2(6, -0.7f), Vector3.back, 12, 4, 12, 2);
+                    c.AreaRect(-9.5f, 0, 3, 10);
+                    c.AreaRect(9.5f, 0, 3, 10);
+                    // 崖の外へはみ出す / 中央の扇風機にかぶせる
+                    c.AreaRect(0, 11, 8, 3);
+                    c.AreaRect(0, -11, 8, 3);
+                    c.AreaRect(0, 0, 4, 8);
+                    c.AreaCircle(4, -5, 1.5f);
+                    c.AreaCircle(-4, 5, 1.5f);
+                    c.Spawns(new Vector2(-9, -8), new Vector2(9, -8), new Vector2(-9, 8), new Vector2(9, 8));
+                }).Backdrop = kChanomaBackdrop;
+
+            Add("みかんの回転盆", 22,
+                "中央の本の上に、みかんを載せるような回転盆。四方の小さな本の島と、細い栞の橋でつながっている。",
+                "積み木は中央の回転盆の上に湧き、回りながら流れていく。各自の島から橋を渡って取りに行くが、橋の両側は崖なので、渡っている最中に撃たれると逃げ場がない。回転盆の上では弾が曲がるので、島から盆の上の相手を狙うには曲がりを読む必要がある。",
+                c =>
+                {
+                    c.Floor(0, 0, 14, 14);
+                    c.Turntable(0, 0, 5.5f, true, 45);
+                    c.Arena(0, 13, 10, 6, true, false, false, false);
+                    c.Arena(0, -13, 10, 6, false, true, false, false);
+                    c.Arena(13, 0, 6, 10, false, false, true, false);
+                    c.Arena(-13, 0, 6, 10, false, false, false, true);
+                    c.Floor(0, 8.5f, 3, 3);
+                    c.Floor(0, -8.5f, 3, 3);
+                    c.Floor(8.5f, 0, 3, 3);
+                    c.Floor(-8.5f, 0, 3, 3);
+                    c.AreaCircle(0, 0, 3);
+                    // 四方の島の角(崖へはみ出す) / 中央の本の角(崖へはみ出す)
+                    c.AreaRect(-4, 12.5f, 3, 4);
+                    c.AreaRect(4, -12.5f, 3, 4);
+                    c.AreaRect(12.5f, 4, 4, 3);
+                    c.AreaRect(-12.5f, -4, 4, 3);
+                    c.AreaCircle(6.5f, 6.5f, 1.5f);
+                    c.AreaCircle(-6.5f, -6.5f, 1.5f);
+                    c.Spawns(new Vector2(0, 13), new Vector2(0, -13), new Vector2(13, 0), new Vector2(-13, 0));
+                }).Backdrop = kChanomaBackdrop;
+
+            Add("栞の橋", 26,
+                "開いた二冊の本を一本の栞がつなぐ。本の外側は壁、栞の両側は崖。栞の入口をバンパーが固める。",
+                "補給所はそれぞれの本の両端にあるので、序盤は自分の本の上で積み木を集める撃ち合い。相手の本へ攻め込むには細い栞を渡るしかなく、入口のバンパーにはじかれると崖へ落ちる危険がある。栞の上での撃ち合いと、入口での押し合いが山場。",
+                c =>
+                {
+                    c.Arena(-10, 0, 8, 24, true, true, false, true);
+                    c.Arena(10, 0, 8, 24, true, true, true, false);
+                    c.Floor(0, 0, 12, 4);
+                    c.Bumper(-8.5f, 4, 1.2f);
+                    c.Bumper(-8.5f, -4, 1.2f);
+                    c.Bumper(8.5f, 4, 1.2f);
+                    c.Bumper(8.5f, -4, 1.2f);
+                    c.AreaRect(-10, 8.5f, 6, 4);
+                    c.AreaRect(-10, -8.5f, 6, 4);
+                    c.AreaRect(10, 8.5f, 6, 4);
+                    c.AreaRect(10, -8.5f, 6, 4);
+                    // 栞(両側の崖へはみ出す) / 入口のバンパーにかぶせる
+                    c.AreaRect(0, 0, 10, 5);
+                    c.AreaCircle(8.5f, 6, 1.6f);
+                    c.AreaCircle(-8.5f, -6, 1.6f);
+                    c.Spawns(new Vector2(-11, -2.5f), new Vector2(-11, 2.5f), new Vector2(11, -2.5f), new Vector2(11, 2.5f));
+                }).Backdrop = kChanomaBackdrop;
+
+            Add("ちゃぶ台返し", 26,
+                "南側だけ壁のない大きな本の上。北の隅の扇風機二台が、ちゃぶ台をひっくり返すような突風を南の崖へ斜めに吹きつける。",
+                "風は北の隅から南の崖へ向かって吹くので、南へ行くほど落下の危険が高い。補給所は風上の北の壁際と、崖に近い南の中央。安全な北で地道に集めるか、崖際の補給所で一気に稼ぐかの選択になる。中央のバンパーにはじかれて風に乗ると、そのまま崖まで運ばれる。",
+                c =>
+                {
+                    c.Arena(0, 0, 30, 24, true, false, true, true);
+                    c.Fan(new Vector2(-13, 10), new Vector2(-13, 10), new Vector3(1, 0, -1), 20, 5, 12, 0);
+                    c.Fan(new Vector2(13, 10), new Vector2(13, 10), new Vector3(-1, 0, -1), 20, 5, 12, 0);
+                    c.Bumper(-6, 2, 1.3f);
+                    c.Bumper(6, 2, 1.3f);
+                    c.Bumper(0, -4, 1.3f);
+                    c.AreaRect(0, 9, 10, 3);
+                    c.AreaCircle(0, -8.5f, 2.5f);
+                    // 南の崖の外へはみ出す / 隅の扇風機・バンパーにかぶせる
+                    c.AreaRect(0, -11.5f, 10, 2);
+                    c.AreaCircle(11.5f, 9, 2);
+                    c.AreaCircle(-11.5f, 9, 2);
+                    c.AreaCircle(6, 4, 1.6f);
+                    c.AreaCircle(0, -6.2f, 1.6f);
+                    c.Spawns(new Vector2(-10, -2), new Vector2(10, -2), new Vector2(-10, 6), new Vector2(10, 6));
+                }).Backdrop = kChanomaBackdrop;
+
+            // 台所の調理台(Stage06〜08)。調理台の上に重ねたまな板の上で戦う。背景: Kitchen
+            Add("まな板の上", 24,
+                "調理台に置いた細長いまな板の上。長い辺には縁(壁)があり、短い辺の先は調理台へ真っ逆さま。野菜のように並んだ4つのバンパーが中央を囲む。",
+                "東西の端は崖なので、端に近い補給所は積み木が湧いても取りに行くのが怖い。中央の補給所はバンパーの間にあり、はじかれた弾が縁で跳ね返って戻ってくる。端へ押し出すか、中央で跳弾を浴びるかの駆け引き。",
+                c =>
+                {
+                    c.Arena(0, 0, 26, 18, true, true, false, false);
+                    c.Bumper(-6, 0, 1.3f);
+                    c.Bumper(6, 0, 1.3f);
+                    c.Bumper(0, 4.5f, 1.3f);
+                    c.Bumper(0, -4.5f, 1.3f);
+                    c.AreaCircle(0, 0, 2.5f);
+                    // 崖の外へはみ出す / 縁(壁)にかぶせる / バンパーにかぶせる
+                    c.AreaRect(12, 0, 3, 6);
+                    c.AreaRect(-12, 0, 3, 6);
+                    c.AreaRect(0, 8, 6, 3);
+                    c.AreaRect(0, -8, 6, 3);
+                    c.AreaCircle(-6, 2.2f, 1.6f);
+                    c.Spawns(new Vector2(-10, 5), new Vector2(10, 5), new Vector2(-10, -5), new Vector2(10, -5));
+                }).Backdrop = kKitchenBackdrop;
+
+            Add("電子レンジの回転皿", 20,
+                "四方を壁に囲まれた電子レンジの中。床の大半を大きな回転皿が占め、ゆっくり逆回りに回り続ける。",
+                "回転皿の上を通る弾は大きく曲がり、壁で跳ね返ってさらに読めない軌道になる。出現位置は皿の外の四隅で、皿に乗ると流されて位置がずれる。皿の上の補給所に湧いた積み木は回りながら外へ運ばれるので、皿の縁で待ち構えるのも手。",
+                c =>
+                {
+                    c.Arena(0, 0, 22, 22, true, true, true, true);
+                    c.Turntable(0, 0, 7, false, 50);
+                    c.AreaCircle(0, 0, 2.5f);
+                    c.AreaCircle(4, 4, 1.5f);
+                    c.AreaRect(0, 10, 6, 3);
+                    c.AreaRect(0, -10, 6, 3);
+                    c.AreaRect(10, 0, 3, 6);
+                    c.AreaRect(-10, 0, 3, 6);
+                    c.Spawns(new Vector2(-8.5f, -8.5f), new Vector2(8.5f, -8.5f), new Vector2(-8.5f, 8.5f), new Vector2(8.5f, 8.5f));
+                }).Backdrop = kKitchenBackdrop;
+
+            Add("流し台", 24,
+                "中央に流しの穴が空いた調理台。西の壁際を換気扇の風が上下に往復し、東の崖へ向かって吹き続ける。",
+                "穴のまわりを回る口の字の通路で、東へ行くほど風下で崖が近い。風上(西)から撃つ弾は風に乗って伸び、風下からの弾は押し戻される。穴の縁の補給所は落ちる危険と隣り合わせ。風の往復の切れ目を読んで攻め込む。",
+                c =>
+                {
+                    c.Floor(-0.5f, 7.5f, 29, 7);
+                    c.Floor(-0.5f, -7.5f, 29, 7);
+                    c.Floor(-10, 0, 10, 8);
+                    c.Floor(9.5f, 0, 9, 8);
+                    c.Wall(-0.5f, 10.5f, 29, 1);
+                    c.Wall(-0.5f, -10.5f, 29, 1);
+                    c.Wall(-14.5f, 0, 1, 20);
+                    c.Fan(new Vector2(-12, -6), new Vector2(-12, 6), Vector3.right, 26, 4, 10, 2);
+                    c.Bumper(0, 7.5f, 1.2f);
+                    c.Bumper(0, -7.5f, 1.2f);
+                    c.AreaRect(9.5f, 0, 4, 6);
+                    // 東の崖・中央の穴へはみ出す / 換気扇の通り道の近く / バンパーにかぶせる
+                    c.AreaRect(13.5f, 7.5f, 3, 6);
+                    c.AreaRect(13.5f, -7.5f, 3, 6);
+                    c.AreaRect(0, 0, 14, 10);
+                    c.AreaCircle(-9, 0, 2);
+                    c.AreaCircle(2.5f, 7.5f, 1.8f);
+                    c.Spawns(new Vector2(-8, 7.5f), new Vector2(8, 7.5f), new Vector2(-8, -7.5f), new Vector2(8, -7.5f));
+                }).Backdrop = kKitchenBackdrop;
+
+            // 子ども部屋の勉強机(Stage09〜11)。机に積んだ教科書・ノートの上で戦う。背景: Desk
+            Add("消しゴムの林", 26,
+                "四方を壁で囲んだノートの上に、消しゴムのようなバンパーが互い違いに立ち並ぶ。",
+                "どの方向に撃っても消しゴムにはじかれ、壁で跳ね返る跳弾の多いステージ。出現位置は四隅で、補給所は中央と壁際。林の隙間を縫って撃つか、壁に跳ね返して裏から当てるかの撃ち合い。",
+                c =>
+                {
+                    c.Arena(0, 0, 30, 20, true, true, true, true);
+                    c.Bumper(-8, -4, 1.3f);
+                    c.Bumper(0, -4, 1.3f);
+                    c.Bumper(8, -4, 1.3f);
+                    c.Bumper(-4, 4, 1.3f);
+                    c.Bumper(4, 4, 1.3f);
+                    c.AreaCircle(0, 0, 2.5f);
+                    c.AreaRect(0, 9.5f, 8, 3);
+                    c.AreaRect(0, -9.5f, 8, 3);
+                    c.AreaRect(14, 0, 3, 6);
+                    c.AreaRect(-14, 0, 3, 6);
+                    c.AreaCircle(-8, -1.8f, 1.6f);
+                    c.Spawns(new Vector2(-12, -7), new Vector2(12, -7), new Vector2(-12, 7), new Vector2(12, 7));
+                }).Backdrop = kDeskBackdrop;
+
+            Add("定規の橋", 22,
+                "東西の教科書を三本の定規がつなぐ。真ん中の定規の途中には小さな回転台の付いた消しゴムの島。",
+                "自分の教科書の上で積み木を集め、細い定規を渡って攻め込む。定規の両側は崖なので、撃たれて避けると落ちる。中央の島の回転台に乗ると流されて定規から外れやすい。三本のどの定規から攻めるかの読み合い。",
+                c =>
+                {
+                    c.Arena(-11, 0, 10, 16, true, true, false, true);
+                    c.Arena(11, 0, 10, 16, true, true, true, false);
+                    c.Floor(0, 5, 12, 2.5f);
+                    c.Floor(0, -5, 12, 2.5f);
+                    c.Floor(0, 0, 12, 2.5f);
+                    c.Floor(0, 0, 6, 6);
+                    c.Turntable(0, 0, 2.8f, true, 60);
+                    c.AreaCircle(0, 0, 2);
+                    c.AreaRect(11, 0, 4, 4);
+                    c.AreaRect(-11, 0, 4, 4);
+                    // 定規(崖へはみ出す) / 壁にかぶせる
+                    c.AreaRect(0, 5, 8, 3.5f);
+                    c.AreaRect(0, -5, 8, 3.5f);
+                    c.AreaRect(-11, 8, 6, 2.5f);
+                    c.Spawns(new Vector2(-11, -5), new Vector2(11, -5), new Vector2(-11, 5), new Vector2(11, 5));
+                }).Backdrop = kDeskBackdrop;
+
+            Add("鉛筆の仕切り", 24,
+                "鉛筆の仕切り(壁)で区切られた筆箱の中。南西の隅の小型扇風機が、南の通路へ東向きの風を送る。",
+                "仕切りに沿って弾が跳ね返るので、壁越しの跳弾を狙える。南の通路は風に乗った弾が速く飛ぶ危険地帯。中央のバンパーのまわりと、仕切りの陰の補給所を行き来しながら、壁を使って相手の死角から撃つ。",
+                c =>
+                {
+                    c.Arena(0, 0, 28, 22, true, true, true, true);
+                    c.Wall(-5, 4, 1, 10);
+                    c.Wall(5, -4, 1, 10);
+                    c.Fan(new Vector2(-12.5f, -8), new Vector2(-12.5f, -8), Vector3.right, 24, 4, 10, 0);
+                    c.Bumper(0, 0, 1.3f);
+                    c.AreaRect(0, 10, 8, 3);
+                    c.AreaRect(0, -10, 8, 3);
+                    c.AreaRect(13, -6, 3, 6);
+                    c.AreaRect(-13, 4, 3, 6);
+                    c.AreaCircle(-10.5f, -8, 1.8f);
+                    c.AreaCircle(0, 2.2f, 1.6f);
+                    c.Spawns(new Vector2(-10, 8), new Vector2(10, 8), new Vector2(-10, -3), new Vector2(10, 3));
+                }).Backdrop = kDeskBackdrop;
+
+            // 夏の縁側(Stage12〜14)。縁側の板の間と庭で戦う。背景: Engawa
+            Add("縁側の板の間", 24,
+                "障子の前の細長い板の間。南と東西は庭へ落ちる崖。西の端の扇風機が首を振るように南北へ往復し、東へ風を送る。",
+                "風は西から東へ吹き抜けるので、東の端ほど落ちやすい。南の縁も崖なので、風に流されながら撃ち合うと足元が危うい。補給所は障子の前・庭側の縁・東の端に分かれ、風上の西を取った人が有利になる。",
+                c =>
+                {
+                    c.Arena(0, 0, 36, 12, true, false, false, false);
+                    c.Fan(new Vector2(-16, -3), new Vector2(-16, 3), Vector3.right, 30, 4, 10, 1.5f);
+                    c.Bumper(6, 2, 1.2f);
+                    c.Bumper(-2, -2, 1.2f);
+                    c.AreaCircle(2, -0.5f, 1.5f);
+                    c.AreaRect(17, 0, 3, 8);
+                    c.AreaRect(0, -5.5f, 10, 3);
+                    c.AreaRect(0, 5.5f, 8, 3);
+                    c.AreaCircle(-13.5f, 0, 1.8f);
+                    c.AreaCircle(6, 4.2f, 1.6f);
+                    c.Spawns(new Vector2(-10, 3), new Vector2(10, 3), new Vector2(-10, -3), new Vector2(10, -3));
+                }).Backdrop = kEngawaBackdrop;
+
+            Add("庭の飛び石", 20,
+                "庭に並んだ飛び石が、中央の大きな石でX字に交わる。中央の石には回転台。まわりはすべて崖。",
+                "各自が四隅の石から始まり、斜めに並ぶ飛び石を渡って中央へ向かう。石と石の継ぎ目は狭く、横から撃たれると落ちやすい。中央の回転台の補給所を取るか、途中の石の補給所で稼ぐか。",
+                c =>
+                {
+                    c.Floor(-12, -8, 8, 8);
+                    c.Floor(-6, -4, 6, 6);
+                    c.Floor(0, 0, 8, 8);
+                    c.Floor(6, 4, 6, 6);
+                    c.Floor(12, 8, 8, 8);
+                    c.Floor(-12, 8, 8, 8);
+                    c.Floor(-6, 4, 6, 6);
+                    c.Floor(6, -4, 6, 6);
+                    c.Floor(12, -8, 8, 8);
+                    c.Turntable(0, 0, 3.5f, false, 40);
+                    c.AreaCircle(0, 0, 2.5f);
+                    // 途中の石・四隅の石の外側(崖へはみ出す)
+                    c.AreaRect(6, 4, 7, 7);
+                    c.AreaRect(-6, -4, 7, 7);
+                    c.AreaRect(-6, 4, 7, 7);
+                    c.AreaRect(6, -4, 7, 7);
+                    c.AreaRect(14.8f, -10.8f, 4, 4);
+                    c.AreaRect(-14.8f, 10.8f, 4, 4);
+                    c.Spawns(new Vector2(-12, -8), new Vector2(12, -8), new Vector2(-12, 8), new Vector2(12, 8));
+                }).Backdrop = kEngawaBackdrop;
+
+            Add("蚊取り線香の渦", 24,
+                "蚊取り線香のような渦巻きの仕切り(壁)が中心へ向かって巻いている。四方の通路から中心の補給所へ向かう。",
+                "渦巻きの通路は細く、仕切りで弾が何度も跳ね返る。中心へ行くには通路を回り込む必要があり、外周の補給所で集めてから中心を目指すのが基本。曲がり角の先での鉢合わせと、壁越しの跳弾が見どころ。",
+                c =>
+                {
+                    c.Arena(0, 0, 26, 26, true, true, true, true);
+                    c.Wall(-3, 9, 20, 1);
+                    c.Wall(7.5f, 1, 1, 15);
+                    c.Wall(-0.5f, -6, 15, 1);
+                    c.Wall(-8.5f, -0.75f, 1, 9.5f);
+                    c.Wall(-3, 3.5f, 10, 1);
+                    c.Bumper(10.5f, 10.5f, 1.2f);
+                    c.Bumper(-10.5f, -10.5f, 1.2f);
+                    c.AreaCircle(2, -1, 2.5f);
+                    c.AreaRect(0, 11.5f, 8, 4);
+                    c.AreaRect(10.5f, -5, 4, 6);
+                    c.AreaRect(-5, -10, 6, 4);
+                    c.AreaRect(-11, 6, 4, 4);
+                    c.AreaCircle(-3, 6.2f, 1.8f);
+                    c.Spawns(new Vector2(-10, 11.2f), new Vector2(10.5f, 0), new Vector2(0, -10), new Vector2(-11, -2));
+                }).Backdrop = kEngawaBackdrop;
+
+            // お風呂場(Stage15〜17)。タイルの床に置いた風呂ふた・洗面器の上で戦う。背景: Bath
+            Add("洗い場の渦", 24,
+                "南側だけ壁のない洗い場。南寄りの排水口の渦(高速の回転台)が、近づいた物を巻き込んで流す。",
+                "排水口の渦は南の崖のすぐそばにあり、乗ると流されて崖へ運ばれやすい。渦の上の補給所は危険だが積み木が多く湧く。北の壁際は安全な撃ち合いの場。バンパーにはじかれて渦に入ると、そのまま崖へ一直線。",
+                c =>
+                {
+                    c.Arena(0, 0, 28, 22, true, false, true, true);
+                    c.Turntable(0, -6, 4, false, 70);
+                    c.Bumper(-8, 4, 1.3f);
+                    c.Bumper(8, 4, 1.3f);
+                    c.AreaCircle(0, -6, 2);
+                    c.AreaRect(0, -10.5f, 8, 3);
+                    c.AreaRect(0, 10.5f, 8, 3);
+                    c.AreaRect(13.5f, 0, 3, 6);
+                    c.AreaRect(-13.5f, 0, 3, 6);
+                    c.AreaCircle(-6, 5.8f, 1.6f);
+                    c.Spawns(new Vector2(-10, -5), new Vector2(10, -5), new Vector2(-10, 7), new Vector2(10, 7));
+                }).Backdrop = kBathBackdrop;
+
+            Add("湯船のふた", 24,
+                "湯船に渡した三枚の風呂ふたの上。長い辺は湯船の縁(壁)、短い辺の先は湯船へ落ちる崖。アヒルのようなバンパーが浮かぶ。",
+                "東西の端は崖なので、端の補給所は落下と隣り合わせ。中央のバンパーのまわりで撃ち合うと、はじかれた弾が縁で跳ね返って戻ってくる。三枚のふたの継ぎ目をまたいで追いかけっこが起きる。",
+                c =>
+                {
+                    c.Floor(-8, 0, 8, 20);
+                    c.Floor(0, 0, 8, 20);
+                    c.Floor(8, 0, 8, 20);
+                    c.Wall(0, 9.5f, 24, 1);
+                    c.Wall(0, -9.5f, 24, 1);
+                    c.Bumper(-8, 3, 1.3f);
+                    c.Bumper(0, -3, 1.3f);
+                    c.Bumper(8, 3, 1.3f);
+                    c.AreaRect(11.5f, 0, 3, 8);
+                    c.AreaRect(-11.5f, 0, 3, 8);
+                    c.AreaCircle(0, -0.8f, 1.6f);
+                    c.AreaRect(0, 8, 8, 3);
+                    c.AreaRect(0, -8, 8, 3);
+                    c.AreaCircle(-10, 4.5f, 1.6f);
+                    c.Spawns(new Vector2(-9, -5), new Vector2(9, -5), new Vector2(-6, 6), new Vector2(6, 6));
+                }).Backdrop = kBathBackdrop;
+
+            Add("換気扇のつむじ風", 22,
+                "壁のない風呂いすの上。北西と南東の隅の扇風機が縁に沿って逆向きに風を送り、外周につむじ風ができる。",
+                "外周の風は時計回りに体と弾を運び、縁から押し出そうとする。中央はバンパー二つが並ぶ無風地帯。外周の補給所は風に乗って崖へ流されやすく、中央の補給所はバンパーにはじかれやすい。",
+                c =>
+                {
+                    c.Arena(0, 0, 24, 24, false, false, false, false);
+                    c.Fan(new Vector2(-10, 10), new Vector2(-10, 10), Vector3.right, 20, 4, 12, 0);
+                    c.Fan(new Vector2(10, -10), new Vector2(10, -10), Vector3.left, 20, 4, 12, 0);
+                    c.Bumper(0, 3, 1.2f);
+                    c.Bumper(0, -3, 1.2f);
+                    c.AreaCircle(0, 1, 1.6f);
+                    c.AreaRect(0, 11.5f, 8, 2.5f);
+                    c.AreaRect(0, -11.5f, 8, 2.5f);
+                    c.AreaRect(11.5f, 0, 2.5f, 8);
+                    c.AreaRect(-11.5f, 0, 2.5f, 8);
+                    c.AreaCircle(-8, 10, 1.8f);
+                    c.Spawns(new Vector2(-6, 6), new Vector2(6, 6), new Vector2(-6, -6), new Vector2(6, -6));
+                }).Backdrop = kBathBackdrop;
 
             return list;
         }
@@ -404,6 +937,8 @@ namespace Nakagawa.EditorTools
             public readonly List<Vector3> Tables = new List<Vector3>();   // x, z, 半径
             public readonly SortedSet<string> GimmickTypes = new SortedSet<string>();
             public int Bumpers, Fans, Turntables;
+            // 床・壁の見た目(背景に合わせる場合。null なら既定)
+            public Material FloorMaterial, WallMaterial;
             int m_fanIndex;
 
             public void Floor(float cx, float cz, float w, float d)
@@ -413,7 +948,7 @@ namespace Nakagawa.EditorTools
                 go.transform.SetParent(Stage, false);
                 go.transform.localPosition = new Vector3(cx, -0.5f, cz);
                 go.transform.localScale = new Vector3(w, 1.0f, d);
-                go.GetComponent<Renderer>().sharedMaterial = Load<Material>(kStageMaterial);
+                go.GetComponent<Renderer>().sharedMaterial = FloorMaterial != null ? FloorMaterial : Load<Material>(kStageMaterial);
                 go.isStatic = true;
                 Floors.Add(new Rect(cx - w * 0.5f, cz - d * 0.5f, w, d));
             }
@@ -425,7 +960,7 @@ namespace Nakagawa.EditorTools
                 go.transform.SetParent(Stage, false);
                 go.transform.localPosition = new Vector3(cx, kWallHeight * 0.5f, cz);
                 go.transform.localScale = new Vector3(w, kWallHeight, d);
-                go.GetComponent<Renderer>().sharedMaterial = SeeThroughWallMaterial();
+                go.GetComponent<Renderer>().sharedMaterial = WallMaterial != null ? WallMaterial : SeeThroughWallMaterial();
                 go.AddComponent<ReflectWall>();
                 go.isStatic = true;
             }
@@ -524,12 +1059,7 @@ namespace Nakagawa.EditorTools
                 var go = Place("TumikiSpawnArea", new Vector3(x, 0, z), Areas);
                 go.name = $"SpawnArea_{AreaList.Count + 1}_{shape}";
                 var area = go.GetComponent<TumikiSpawnArea>();
-                var so = new SerializedObject(area);
-                so.FindProperty("m_shape").enumValueIndex = (int)shape;
-                so.FindProperty("m_size").vector2Value = size;
-                so.FindProperty("m_radius").floatValue = radius;
-                so.ApplyModifiedPropertiesWithoutUndo();
-                area.ApplyShape();
+                ConfigureArea(area, shape, size, radius);
                 AreaList.Add(area);
             }
 
@@ -564,18 +1094,176 @@ namespace Nakagawa.EditorTools
             }
         }
 
-        static string BuildStage(StageDef def)
+        static void ConfigureArea(TumikiSpawnArea area, TumikiSpawnArea.Shape shape, Vector2 size, float radius)
         {
-            string path = $"{kStageDir}/{def.Id}.unity";
+            var so = new SerializedObject(area);
+            so.FindProperty("m_shape").enumValueIndex = (int)shape;
+            so.FindProperty("m_size").vector2Value = size;
+            so.FindProperty("m_radius").floatValue = radius;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            area.ApplyShape();
+        }
+
+        //========================================
+        // 生成エリアだけを写す
+        //========================================
+
+        // 定義から作った生成エリア1つ分
+        struct AreaSpec
+        {
+            public string Name;
+            public Vector3 Position;
+            public Quaternion Rotation;
+            public TumikiSpawnArea.Shape Shape;
+            public Vector2 Size;
+            public float Radius;
+        }
+
+        // 定義の積み木の生成エリアを、まとめたシーン(AllStages)と、フォルダにあるステージのシーンへ写す
+        // ステージ(床・ギミック・背景など)は作り直さないので、まとめたシーンで手を加えた所はそのまま残る
+        [MenuItem("Nakagawa/Stages/Sync Spawn Areas From Definitions (AllStages + Stage Scenes)")]
+        public static void SyncSpawnAreas()
+        {
+            if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
+            if (Load<GameObject>($"{kPrefabDir}/TumikiSpawnArea.prefab") == null) GimmickTestFieldBuilder.BuildSpawnAssets();
+
+            // 定義からステージを一時的なシーンに組み立てて、生成エリアと検証の結果を取り出す(保存しない)
+            Scene original = SceneManager.GetActiveScene();
+            var defs = Definitions();
+            var specs = new Dictionary<string, List<AreaSpec>>();
+            var report = new StringBuilder();
+            foreach (var def in defs)
+            {
+                specs[def.Id] = BuildAreaSpecs(def, out string validation);
+                report.AppendLine($"{def.Id} {def.Title}: 生成エリア{specs[def.Id].Count}か所 / {validation}");
+            }
+            if (original.IsValid()) SceneManager.SetActiveScene(original);
+
+            // まとめたシーン
+            int combinedCount = 0;
+            if (File.Exists(kCombinedPath))
+            {
+                Scene combined = SceneManager.GetSceneByPath(kCombinedPath);
+                bool wasLoaded = combined.IsValid() && combined.isLoaded;
+                if (!wasLoaded) combined = EditorSceneManager.OpenScene(kCombinedPath, OpenSceneMode.Additive);
+                foreach (var root in combined.GetRootGameObjects())
+                {
+                    var entry = root.GetComponent<StageEntry>();
+                    var def = defs.Find(d => d.Id == root.name);
+                    if (entry == null || def == null) continue;
+                    ApplyAreaSpecs(root.transform, specs[def.Id]);
+                    if (entry.Info != null) SetLayout(entry.Info, def);
+                    combinedCount++;
+                }
+                EditorSceneManager.SaveScene(combined);
+                if (!wasLoaded) EditorSceneManager.CloseScene(combined, true);
+            }
+
+            // ステージのシーン(あるものだけ)
+            int sceneCount = 0;
+            foreach (var def in defs)
+            {
+                string path = $"{kStageDir}/{def.Id}.unity";
+                if (!File.Exists(path)) continue;
+                Scene scene = SceneManager.GetSceneByPath(path);
+                bool wasLoaded = scene.IsValid() && scene.isLoaded;
+                if (!wasLoaded) scene = EditorSceneManager.OpenScene(path, OpenSceneMode.Additive);
+                foreach (var root in scene.GetRootGameObjects())
+                {
+                    if (root.GetComponent<TumikiSpawner>() != null) ApplyAreaSpecs(root.transform, specs[def.Id]);
+                    if (root.TryGetComponent<StageInfo>(out var info)) SetLayout(info, def);
+                }
+                EditorSceneManager.SaveScene(scene);
+                if (!wasLoaded) EditorSceneManager.CloseScene(scene, true);
+                sceneCount++;
+            }
+
+            WriteDocument(defs);
+            AssetDatabase.Refresh();
+            Debug.Log($"[StageBuilder] 生成エリアを写しました(AllStages {combinedCount}ステージ / ステージのシーン {sceneCount}個)\n" + report);
+        }
+
+        static void SetLayout(StageInfo info, StageDef def)
+        {
+            info.Set(def.Id, def.Title, def.Concept, def.Flow, def.Layout);
+            EditorUtility.SetDirty(info);
+        }
+
+        // 定義どおりにステージを一時的なシーンに組み立て、生成エリアを取り出す
+        static List<AreaSpec> BuildAreaSpecs(StageDef def, out string validation)
+        {
+            Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Additive);
+            SceneManager.SetActiveScene(scene);
+            var list = new List<AreaSpec>();
+            try
+            {
+                var c = new Ctx { Scene = scene };
+                c.Stage = new GameObject("Stage").transform;
+                c.Gimmicks = new GameObject("Gimmicks").transform;
+                c.Areas = new GameObject("TumikiSpawner").transform;
+                def.Build(c);
+                def.Layout = Layout(c, c.Bounds(), def.MaxBlocks);
+                validation = Validate(c);
+                foreach (var area in c.AreaList)
+                {
+                    var so = new SerializedObject(area);
+                    list.Add(new AreaSpec
+                    {
+                        Name = area.name,
+                        Position = area.transform.position,
+                        Rotation = area.transform.rotation,
+                        Shape = (TumikiSpawnArea.Shape)so.FindProperty("m_shape").enumValueIndex,
+                        Size = so.FindProperty("m_size").vector2Value,
+                        Radius = so.FindProperty("m_radius").floatValue,
+                    });
+                }
+            }
+            finally
+            {
+                EditorSceneManager.CloseScene(scene, true);
+            }
+            return list;
+        }
+
+        // stageRoot の下の生成エリアを、specs に入れ替える(TumikiSpawner の子に置く)
+        static void ApplyAreaSpecs(Transform stageRoot, List<AreaSpec> specs)
+        {
+            var spawner = stageRoot.GetComponentInChildren<TumikiSpawner>(true);
+            Transform parent = spawner != null ? spawner.transform : stageRoot;
+            foreach (var old in stageRoot.GetComponentsInChildren<TumikiSpawnArea>(true)) Object.DestroyImmediate(old.gameObject);
+
+            var prefab = Load<GameObject>($"{kPrefabDir}/TumikiSpawnArea.prefab");
+            foreach (var spec in specs)
+            {
+                var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab, stageRoot.gameObject.scene);
+                go.transform.SetParent(parent, false);
+                go.transform.SetPositionAndRotation(spec.Position, spec.Rotation);
+                go.name = spec.Name;
+                ConfigureArea(go.GetComponent<TumikiSpawnArea>(), spec.Shape, spec.Size, spec.Radius);
+            }
+        }
+
+        // ステージ1つ分を、新しい一時的なシーン(保存しない)に組み立てる。シーンを閉じるのは呼んだ側
+        // (StageCombiner がまとめたシーンへ移してから閉じる)
+        static Scene BuildStageScene(StageDef def, out string report)
+        {
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Additive);
             SceneManager.SetActiveScene(scene);
 
             var c = new Ctx { Scene = scene };
+            StageBackdrop backdrop = BackdropBuilder.LoadOrBuild(def.Backdrop);
+            if (backdrop != null)
+            {
+                c.FloorMaterial = backdrop.FloorMaterial;
+                c.WallMaterial = backdrop.WallMaterial;
+            }
             c.Stage = new GameObject("Stage").transform;
             c.Gimmicks = new GameObject("Gimmicks").transform;
             var spawnerGo = new GameObject("TumikiSpawner");
             c.Areas = spawnerGo.transform;
             def.Build(c);
+            // 重なった床・壁の同じ平面の面はちらつくので、重ならないように分ける・縮める
+            StageGeometryFixer.Fix(c.Stage);
 
             Rect bounds = c.Bounds();
             Vector3 center = new Vector3(bounds.center.x, 0, bounds.center.y);
@@ -594,6 +1282,9 @@ namespace Nakagawa.EditorTools
             var saSo = new SerializedObject(stageArea);
             saSo.FindProperty("m_size").vector2Value = bounds.size;
             saSo.ApplyModifiedPropertiesWithoutUndo();
+
+            // 背景(当たり判定のない飾り)。まとめたシーンでは、このステージの子に移される
+            if (backdrop != null) BackdropBuilder.Place(scene, null, backdrop, center, bounds.size, c.Stage);
 
             var spawnRoot = new GameObject("SpawnPoints").transform;
             var spawns = new Transform[c.SpawnPoints.Count];
@@ -614,10 +1305,8 @@ namespace Nakagawa.EditorTools
             def.Layout = layout;
             new GameObject("StageInfo").AddComponent<StageInfo>().Set(def.Id, def.Title, def.Concept, def.Flow, layout);
 
-            string validation = Validate(c);
-            EditorSceneManager.SaveScene(scene, path);
-            EditorSceneManager.CloseScene(scene, true);
-            return $"{def.Id} {def.Title}: {validation}";
+            report = $"{def.Id} {def.Title}: {Validate(c)}";
+            return scene;
         }
 
         static DarumaMatch BuildMatch(Transform[] spawns, StageArea stageArea)
@@ -746,6 +1435,12 @@ namespace Nakagawa.EditorTools
                 toggle = go.AddComponent<TumikiImpactModeToggle>();
             }
             SetupImpactModes(toggle);
+            // 出現位置のデバッグ表示
+            if (toggle.GetComponent<SpawnPointDebugView>() == null) toggle.gameObject.AddComponent<SpawnPointDebugView>();
+
+            // 画面下の表示(ストック・点数・撃墜数)は試合と同じ GameObject に付ける
+            var match = FindInScene<DarumaMatch>(scene);
+            if (match != null && match.GetComponent<MatchHud>() == null) match.gameObject.AddComponent<MatchHud>();
 
             // 飛んできた積み木に乗ったときの成功エフェクト(エフェクトのプレハブが未設定なら設定する)
             var effect = FindInScene<TumikiCatchEffect>(scene);
@@ -814,22 +1509,49 @@ namespace Nakagawa.EditorTools
             var root = PrefabUtility.LoadPrefabContents(kTumikiPrefab);
             try
             {
-                if (root.GetComponent<TumikiEdgeSlip>() != null && root.GetComponent<TumikiDurability>() != null) return;
-                if (root.GetComponent<TumikiEdgeSlip>() == null) root.AddComponent<TumikiEdgeSlip>();
-                if (root.GetComponent<TumikiDurability>() == null)
+                bool changed = false;
+                if (root.GetComponent<TumikiEdgeSlip>() == null)
                 {
-                    var durability = root.AddComponent<TumikiDurability>();
+                    root.AddComponent<TumikiEdgeSlip>();
+                    changed = true;
+                }
+                var durability = root.GetComponent<TumikiDurability>();
+                if (durability == null)
+                {
+                    durability = root.AddComponent<TumikiDurability>();
                     var so = new SerializedObject(durability);
                     so.FindProperty("m_crackMaterial").objectReferenceValue = CrackMaterial();
                     so.ApplyModifiedPropertiesWithoutUndo();
+                    changed = true;
                 }
+                // 損傷の見た目(シェーダー)
+                var dso = new SerializedObject(durability);
+                var damage = dso.FindProperty("m_damageMaterial");
+                if (damage.objectReferenceValue == null)
+                {
+                    damage.objectReferenceValue = DamageMaterial();
+                    dso.ApplyModifiedPropertiesWithoutUndo();
+                    changed = true;
+                }
+                if (!changed) return;
                 PrefabUtility.SaveAsPrefabAsset(root, kTumikiPrefab);
-                Debug.Log("[StageBuilder] 積み木のプレハブに耐久度・縁から落ちる処理を付けました");
+                Debug.Log("[StageBuilder] 積み木のプレハブに耐久度(損傷の見た目)・縁から落ちる処理を付けました");
             }
             finally
             {
                 PrefabUtility.UnloadPrefabContents(root);
             }
+        }
+
+        // 積み木の損傷の見た目(ヒビ・汚れ・欠けを重ねて描くシェーダー)
+        static Material DamageMaterial()
+        {
+            var mat = Load<Material>(kDamageMaterial);
+            if (mat != null) return mat;
+            mat = new Material(Shader.Find("Nakagawa/TumikiDamage"));
+            EnsureFolder(kMaterialDir);
+            AssetDatabase.CreateAsset(mat, kDamageMaterial);
+            return mat;
         }
 
         // ヒビの色(光の影響を受けない暗い色)
@@ -924,7 +1646,7 @@ namespace Nakagawa.EditorTools
         {
             var problems = new List<string>();
             if (c.SpawnPoints.Count != 4) problems.Add($"出現位置が{c.SpawnPoints.Count}か所");
-            if (c.AreaList.Count == 0) problems.Add("生成エリアがない");
+            if (c.AreaList.Count < kMinSpawnAreas) problems.Add($"生成エリアが{c.AreaList.Count}か所({kMinSpawnAreas}か所以上にする)");
             if (c.GimmickTypes.Count > 2) problems.Add("ギミックが3種類以上");
 
             // 出現位置: 床の上で、ギミック・生成エリアと重ならない
@@ -973,7 +1695,8 @@ namespace Nakagawa.EditorTools
                 }
                 float ratio = total > 0 ? (float)ok / total : 0.0f;
                 capacity.Add($"{ratio:P0}");
-                if (ratio < 0.5f) problems.Add($"生成エリア{area.name}で置ける場所が{ratio:P0}しかない");
+                // エリアは床の外・ギミックにかぶせて置いてよい(床の上で空いている所にだけ湧く)。ほとんど置けないものだけ知らせる
+                if (ratio < kMinSpawnCapacity) problems.Add($"生成エリア{area.name}で置ける場所が{ratio:P0}しかない");
             }
 
             string result = problems.Count == 0 ? "OK" : "要確認: " + string.Join(" / ", problems);
@@ -1004,27 +1727,41 @@ namespace Nakagawa.EditorTools
                    $"盤面の積み木の上限: {maxBlocks}個";
         }
 
+        // 今回作ったステージ(Layout のあるもの)は書き直し、作らなかったステージは前の一覧の内容を残す
         static void WriteDocument(List<StageDef> defs)
         {
+            ReadExistingDocument(out var oldRows, out var oldSections);
+
             var sb = new StringBuilder();
             sb.AppendLine("# ステージ一覧");
             sb.AppendLine();
             sb.AppendLine("`Nakagawa > Stages > Build All Stages` で生成したステージの一覧です。定義は `Assets/Nakagawa/Editor/StageBuilder.cs` にあります。");
             sb.AppendLine("各シーンの `StageInfo` オブジェクトにも同じ内容が入っています。");
             sb.AppendLine();
-            sb.AppendLine("| No. | 名前 | ギミック | 生成エリア |");
-            sb.AppendLine("|---|---|---|---|");
+            sb.AppendLine("| No. | 名前 | ギミック | 生成エリア | 背景 |");
+            sb.AppendLine("|---|---|---|---|---|");
             foreach (var d in defs)
             {
+                if (d.Layout == null)
+                {
+                    if (oldRows.TryGetValue(d.Id, out var row)) sb.AppendLine(row);
+                    continue;
+                }
                 string[] lines = d.Layout.Split('\n');
-                sb.AppendLine($"| {d.Id} | {d.Title} | {lines[1].Replace("ギミック: ", "")} | {lines[2].Replace("生成エリア: ", "")} |");
+                sb.AppendLine($"| {d.Id} | {d.Title} | {lines[1].Replace("ギミック: ", "")} | {lines[2].Replace("生成エリア: ", "")} | {(string.IsNullOrEmpty(d.Backdrop) ? "なし" : d.Backdrop)} |");
             }
             sb.AppendLine();
             foreach (var d in defs)
             {
+                if (d.Layout == null)
+                {
+                    if (oldSections.TryGetValue(d.Id, out var section)) sb.Append(section);
+                    continue;
+                }
                 sb.AppendLine($"## {d.Id} {d.Title}");
                 sb.AppendLine();
                 foreach (var line in d.Layout.Split('\n')) sb.AppendLine($"- {line}");
+                if (!string.IsNullOrEmpty(d.Backdrop)) sb.AppendLine($"- 背景: {d.Backdrop}");
                 sb.AppendLine();
                 sb.AppendLine($"**コンセプト**: {d.Concept}");
                 sb.AppendLine();
@@ -1032,6 +1769,37 @@ namespace Nakagawa.EditorTools
                 sb.AppendLine();
             }
             File.WriteAllText(kDocPath, sb.ToString(), new UTF8Encoding(false));
+        }
+
+        // 前の一覧から、ステージごとの表の行と説明(## から次の ## の前まで)を読む
+        static void ReadExistingDocument(out Dictionary<string, string> rows, out Dictionary<string, string> sections)
+        {
+            rows = new Dictionary<string, string>();
+            sections = new Dictionary<string, string>();
+            if (!File.Exists(kDocPath)) return;
+
+            string currentId = null;
+            var current = new StringBuilder();
+            foreach (var raw in File.ReadAllLines(kDocPath))
+            {
+                string line = raw.TrimEnd();
+                if (line.StartsWith("| Stage"))
+                {
+                    string[] cells = line.Split('|');
+                    string id = cells[1].Trim();
+                    // 背景の列がない古い行には足す
+                    rows[id] = cells.Length >= 7 ? line : line + " なし |";
+                    continue;
+                }
+                if (line.StartsWith("## "))
+                {
+                    if (currentId != null) sections[currentId] = current.ToString();
+                    currentId = line.Substring(3).Split(' ')[0];
+                    current.Clear();
+                }
+                if (currentId != null) current.AppendLine(line);
+            }
+            if (currentId != null) sections[currentId] = current.ToString();
         }
 
         //========================================

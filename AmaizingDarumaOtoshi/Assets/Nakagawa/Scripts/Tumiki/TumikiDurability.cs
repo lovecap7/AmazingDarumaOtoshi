@@ -9,7 +9,9 @@ namespace Nakagawa
     // 攻撃判定のある積み木が他の積み木に当たるたびに減り(TumikiDurabilityImpact)、0になると崩れる
     // プレイヤーに積まれる(上に乗って拾われる)と最大値まで回復する
     // 見た目は「最大値に対する残りの割合」で変わる(1回で壊れる設定なら、壊れる直前まで無傷に見える)
-    //  ・削れた割合に応じて色が暗くなり、上面にヒビが増える
+    //  ・損傷のマテリアル(シェーダー「Nakagawa/TumikiDamage」)があれば、積み木に重ねて描く
+    //    (衝撃点から広がるヒビ・細かいヒビ・汚れ・縁の欠け。損傷が増えると少しずつ広がる)
+    //  ・なければ、削れた割合に応じて色が暗くなり、上面に板のヒビが増える
     [RequireComponent(typeof(TumikiBlock))]
     public class TumikiDurability : MonoBehaviour
     {
@@ -23,7 +25,13 @@ namespace Nakagawa
         [Tooltip("プレイヤーに積まれたら最大値まで回復する")]
         [SerializeField] bool m_refillOnStacked = true;
 
-        [Header("見た目")]
+        [Header("見た目(シェーダー)")]
+        [Tooltip("損傷の見た目のマテリアル(シェーダー Nakagawa/TumikiDamage)。設定すると下の板のヒビ・暗さの代わりに使う")]
+        [SerializeField] Material m_damageMaterial;
+        [Tooltip("損傷の見た目が新しい値まで広がる速さ(1秒あたりの割合)")]
+        [SerializeField, Min(0.01f)] float m_damageGrowSpeed = 2.5f;
+
+        [Header("見た目(板のヒビ。損傷のマテリアルがないとき)")]
         [Tooltip("ヒビの色(未設定ならヒビを出さない)")]
         [SerializeField] Material m_crackMaterial;
         [Tooltip("耐久値が0になる直前に出るヒビの数")]
@@ -36,6 +44,8 @@ namespace Nakagawa
         [SerializeField, Range(0.0f, 1.0f)] float m_maxDarken = 0.35f;
 
         static readonly int kBaseColorId = Shader.PropertyToID("_BaseColor");
+        static readonly int kDamageId = Shader.PropertyToID("_Damage");
+        static readonly int kSeedId = Shader.PropertyToID("_Seed");
         static Mesh s_cubeMesh;
 
         TumikiBlock m_block;
@@ -45,6 +55,13 @@ namespace Nakagawa
         readonly List<GameObject> m_cracks = new List<GameObject>();
         System.Random m_crackRandom;
         float m_appliedDarken = -1.0f;
+        // 損傷のマテリアルで表示中の損傷の割合(DamageRatio へ少しずつ近づける)と、積み木ごとの模様
+        float m_shownDamage;
+        float m_appliedDamage = -1.0f;
+        float m_seed;
+        bool m_overlayAttached;
+
+        bool UsesShader => m_damageMaterial != null;
 
         // 最大値(0以下なら壊れない)
         public int Max { get; private set; }
@@ -63,6 +80,7 @@ namespace Nakagawa
             m_block = GetComponent<TumikiBlock>();
             m_renderer = GetComponentInChildren<MeshRenderer>();
             m_mpb = new MaterialPropertyBlock();
+            m_seed = UnityEngine.Random.Range(0.0f, 1000.0f);
             m_block.StateChanged += OnStateChanged;
             SetMax(DefaultMax, true);
         }
@@ -111,6 +129,11 @@ namespace Nakagawa
         private void LateUpdate()
         {
             if (m_renderer == null) return;
+            if (UsesShader)
+            {
+                UpdateDamageOverlay();
+                return;
+            }
             float darken = m_maxDarken * DamageRatio;
             if (darken <= 0.0f && m_appliedDarken <= 0.0f) return;
 
@@ -122,10 +145,40 @@ namespace Nakagawa
             m_appliedDarken = darken;
         }
 
+        // 損傷のマテリアルを重ねて描く。損傷が増えたときは少しずつ広がり、回復したらすぐ消す
+        private void UpdateDamageOverlay()
+        {
+            float target = DamageRatio;
+            m_shownDamage = target < m_shownDamage ? target : Mathf.MoveTowards(m_shownDamage, target, m_damageGrowSpeed * Time.deltaTime);
+
+            SetOverlayAttached(m_shownDamage > 0.0001f);
+            if (!m_overlayAttached || Mathf.Approximately(m_shownDamage, m_appliedDamage)) return;
+
+            m_renderer.GetPropertyBlock(m_mpb);
+            m_mpb.SetFloat(kDamageId, m_shownDamage);
+            m_mpb.SetFloat(kSeedId, m_seed);
+            m_renderer.SetPropertyBlock(m_mpb);
+            m_appliedDamage = m_shownDamage;
+        }
+
+        // 積み木のメッシュにもう1つマテリアルを足すと、同じ形をもう一度描く(損傷のマテリアルを重ねる)
+        private void SetOverlayAttached(bool attached)
+        {
+            if (m_overlayAttached == attached) return;
+            m_overlayAttached = attached;
+            m_appliedDamage = -1.0f;
+
+            var materials = new List<Material>();
+            m_renderer.GetSharedMaterials(materials);
+            materials.Remove(m_damageMaterial);
+            if (attached) materials.Add(m_damageMaterial);
+            m_renderer.sharedMaterials = materials.ToArray();
+        }
+
         // 削れた割合に応じた本数だけヒビを表示する(ヒビの位置は積み木ごとに固定)
         private void UpdateCracks()
         {
-            if (m_crackMaterial == null || m_renderer == null) return;
+            if (UsesShader || m_crackMaterial == null || m_renderer == null) return;
             int count = DamageRatio <= 0.0f ? 0 : Mathf.CeilToInt(DamageRatio * m_maxCracks);
             if (count > 0) EnsureCracks(count);
             for (int i = 0; i < m_cracks.Count; i++) m_cracks[i].SetActive(i < count);

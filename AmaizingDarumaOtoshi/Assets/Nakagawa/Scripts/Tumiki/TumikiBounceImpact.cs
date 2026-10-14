@@ -17,7 +17,9 @@ namespace Nakagawa
 
         [Header("当てた積み木")]
         [Tooltip("正面から当てたときに跳ね返る速さ(当たる直前の、相手に向かう速さに対する割合)。斜めなら横へそれる")]
-        [SerializeField, Range(0.0f, 1.0f)] float m_selfRebound = 0.3f;
+        [SerializeField, Range(0.0f, 1.0f)] float m_selfRebound = 0.6f;
+        [Tooltip("跳ね返った後に最低限残す速さ(当たる直前の自分の速さに対する割合)。正面から当てても、この割合の速さは引き継いで跳ね返る")]
+        [SerializeField, Range(0.0f, 1.0f)] float m_selfSpeedKeep = 0.75f;
 
         [Tooltip("当たったときにヒットストップを入れる")]
         [SerializeField] bool m_hitStop = true;
@@ -34,6 +36,10 @@ namespace Nakagawa
 
             Vector3 v2After = v2 + n * transfer;
             Vector3 v1After = v1 - n * (approach * (1.0f + m_selfRebound));
+            // 当てた勢いをある程度引き継ぐ: 跳ね返る向きはそのままに、元の速さの一定割合までは速さを残す
+            float keep = v1.magnitude * m_selfSpeedKeep;
+            float after = v1After.magnitude;
+            if (after > 0.0001f && after < keep) v1After *= keep / after;
 
             if (m_hitStop)
             {
