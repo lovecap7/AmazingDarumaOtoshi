@@ -162,6 +162,8 @@ MonoBehaviour:
   previewPlayers: 4
   previewBlocks: 6
   previewDraw: 0
+  previewMode: 2
+  previewTimeUp: 0
 --- !u!4 &102567124
 Transform:
   m_ObjectHideFlags: 0
