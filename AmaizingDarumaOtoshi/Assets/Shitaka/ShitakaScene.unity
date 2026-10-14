@@ -484,7 +484,7 @@ Transform:
   m_GameObject: {fileID: 557762068}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.56, y: 0.24, z: -15.14}
+  m_LocalPosition: {x: -5.4, y: 0.24, z: -18.95}
   m_LocalScale: {x: 1, y: 0.1341, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -548,6 +548,7 @@ MonoBehaviour:
   stopThreshold: 0.1
   behaviorType: 0
   hebiTurnSpeed: 60
+  homingTurnSpeed: 90
   rehitIgnoreTime: 0.2
 --- !u!65 &557762078
 BoxCollider:
@@ -798,7 +799,7 @@ Transform:
   m_GameObject: {fileID: 792966887}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -14.340001, y: 0.63, z: -14.779601}
+  m_LocalPosition: {x: -14.340001, y: 0.6, z: -14.779601}
   m_LocalScale: {x: 1, y: 0.1341, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -862,6 +863,7 @@ MonoBehaviour:
   stopThreshold: 0.1
   behaviorType: 0
   hebiTurnSpeed: 60
+  homingTurnSpeed: 90
   rehitIgnoreTime: 0.2
 --- !u!65 &792966896
 BoxCollider:
@@ -897,9 +899,9 @@ GameObject:
   - component: {fileID: 873354724}
   - component: {fileID: 873354723}
   - component: {fileID: 873354722}
+  - component: {fileID: 873354727}
   - component: {fileID: 873354721}
   - component: {fileID: 873354720}
-  - component: {fileID: 873354727}
   m_Layer: 0
   m_Name: SpecialBlock
   m_TagString: Block
@@ -943,8 +945,9 @@ MonoBehaviour:
   speed: 15
   deceleration: 0.1
   stopThreshold: 0.1
-  behaviorType: 3
+  behaviorType: 0
   hebiTurnSpeed: 90
+  homingTurnSpeed: 90
   rehitIgnoreTime: 0.2
 --- !u!54 &873354722
 Rigidbody:
@@ -1131,6 +1134,7 @@ MonoBehaviour:
   stopThreshold: 0.1
   behaviorType: 4
   hebiTurnSpeed: 60
+  homingTurnSpeed: 90
   rehitIgnoreTime: 0.2
 --- !u!54 &1098038425
 Rigidbody:
@@ -1239,7 +1243,7 @@ Transform:
   m_GameObject: {fileID: 1098038422}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -14.31, y: 0.96, z: -14.839601}
+  m_LocalPosition: {x: -14.31, y: 0.93, z: -14.839601}
   m_LocalScale: {x: 1, y: 0.1341, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1333,7 +1337,7 @@ Transform:
   m_GameObject: {fileID: 1141642611}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -14.336001, y: 0.25, z: -14.809602}
+  m_LocalPosition: {x: -14.336001, y: 0.22000003, z: -14.809602}
   m_LocalScale: {x: 1, y: 0.1341, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1397,6 +1401,7 @@ MonoBehaviour:
   stopThreshold: 0.1
   behaviorType: 0
   hebiTurnSpeed: 60
+  homingTurnSpeed: 90
   rehitIgnoreTime: 0.2
 --- !u!65 &1141642620
 BoxCollider:
@@ -1981,6 +1986,7 @@ GameObject:
   - component: {fileID: 2023414660}
   - component: {fileID: 2023414661}
   - component: {fileID: 2023414662}
+  - component: {fileID: 2023414663}
   m_Layer: 0
   m_Name: GreenBlock
   m_TagString: Block
@@ -2054,7 +2060,7 @@ Transform:
   m_GameObject: {fileID: 2023414653}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 13, y: 0.18, z: -10.84}
+  m_LocalPosition: {x: 9.67, y: 0.18, z: -10.21}
   m_LocalScale: {x: 1, y: 0.1341, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2116,8 +2122,9 @@ MonoBehaviour:
   speed: 15
   deceleration: 0.1
   stopThreshold: 0.1
-  behaviorType: 0
+  behaviorType: 5
   hebiTurnSpeed: 60
+  homingTurnSpeed: 270
   rehitIgnoreTime: 0.2
 --- !u!65 &2023414662
 BoxCollider:
@@ -2140,6 +2147,18 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1.0000001, y: 2, z: 1.0000002}
   m_Center: {x: 0.000000059604645, y: 0, z: -0.00000008940697}
+--- !u!114 &2023414663
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2023414653}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f2c73a86cb38db247a625a76e41dac73, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DebugBlockLauncher
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

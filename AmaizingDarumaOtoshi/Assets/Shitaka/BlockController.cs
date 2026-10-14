@@ -13,10 +13,11 @@ public class BlockController : MonoBehaviour
     public float CurrentSpeed => currentSpeed;
 
     // テスト用：インスペクターで挙動を選べるようにする
-    public enum BehaviorType { Normal, Iwa,HebiLeft, HebiRight, UnBreak }
+    public enum BehaviorType { Normal, Iwa,HebiLeft, HebiRight, UnBreak,Homing }
     [SerializeField] BehaviorType behaviorType = BehaviorType.Normal;
     // テスト用：へびだるの曲がる強さ(度/秒)。大きいほど急カーブになる
     [SerializeField] float hebiTurnSpeed = 60.0f;
+    [SerializeField] float homingTurnSpeed = 90.0f; // テスト用：ホーミングの旋回速度(度/秒)
 
     public bool isFlying {  get; private set; } // 現在飛行中かどうか trueの場合は攻撃判定が発生する
 
@@ -69,6 +70,7 @@ public class BlockController : MonoBehaviour
             case BehaviorType.HebiLeft: return new HebiBehavior(HebiBehavior.CurveSide.Left, hebiTurnSpeed);
             case BehaviorType.HebiRight: return new HebiBehavior(HebiBehavior.CurveSide.Right, hebiTurnSpeed);
             case BehaviorType.UnBreak: return new UnBreakBehavior();
+            case BehaviorType.Homing: return new HomingBehavior(this, new OtherBlockTargetSelector(), homingTurnSpeed);
             case BehaviorType.Normal:
             default: return new NormalBehavior();
         }
