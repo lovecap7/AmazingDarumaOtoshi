@@ -17469,13 +17469,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1093670292}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.40821794, y: -0.23456973, z: 0.10938166, w: 0.8754261}
+  m_LocalRotation: {x: 0.6427876, y: 0, z: 0, w: 0.7660445}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 80, y: 0, z: 0}
 --- !u!1001 &1095244987
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -19772,6 +19772,9 @@ MonoBehaviour:
   m_characterPrefab: {fileID: 6242312641939630888, guid: 98dfe1d631da6fc429ba3618bb53aa46, type: 3}
   m_ghostPrefab: {fileID: 8875810368968693823, guid: f0f050629671f114096c296b81b42a53, type: 3}
   m_reviveInvincibleTime: 1.5
+  m_directMode: 2
+  m_directStocks: 3
+  m_directTimeLimit: 0
   m_maxPlayers: 4
   m_dummyCount: 0
   m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
@@ -21374,10 +21377,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.SeeThroughTargets
   m_enabled: 1
   m_includePlayers: 1
-  m_playerRadius: 1.3
+  m_playerRadius: 1.5
   m_playerCenterHeight: 1
   m_includeBlocks: 1
-  m_blockRadius: 0.7
+  m_blockRadius: 1.2
   m_feather: 0.3
   m_depthMargin: 0.6
   m_match: {fileID: 0}
@@ -35283,6 +35286,7 @@ GameObject:
   - component: {fileID: 1298081250}
   - component: {fileID: 1298081249}
   - component: {fileID: 1298081251}
+  - component: {fileID: 2122201620}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -35298,6 +35302,50 @@ AudioListener:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2122201618}
   m_Enabled: 1
+--- !u!114 &2122201620
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2122201618}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a79441f348de89743a2939f4d699eac1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.UniversalAdditionalCameraData
+  m_RenderShadows: 1
+  m_RequiresDepthTextureOption: 2
+  m_RequiresOpaqueTextureOption: 2
+  m_CameraType: 0
+  m_Cameras: []
+  m_RendererIndex: -1
+  m_VolumeLayerMask:
+    serializedVersion: 2
+    m_Bits: 1
+  m_VolumeTrigger: {fileID: 0}
+  m_VolumeFrameworkUpdateModeOption: 2
+  m_RenderPostProcessing: 0
+  m_Antialiasing: 0
+  m_AntialiasingQuality: 2
+  m_StopNaN: 0
+  m_Dithering: 0
+  m_ClearDepth: 1
+  m_AllowXRRendering: 1
+  m_AllowHDROutput: 1
+  m_UseScreenCoordOverride: 0
+  m_ScreenSizeOverride: {x: 0, y: 0, z: 0, w: 0}
+  m_ScreenCoordScaleBias: {x: 0, y: 0, z: 0, w: 0}
+  m_RequiresDepthTexture: 0
+  m_RequiresColorTexture: 0
+  m_TaaSettings:
+    m_Quality: 3
+    m_FrameInfluence: 0.1
+    m_JitterScale: 1
+    m_MipBias: 0
+    m_VarianceClampScale: 0.9
+    m_ContrastAdaptiveSharpening: 0
+  m_Version: 2
 --- !u!1 &2123532012
 GameObject:
   m_ObjectHideFlags: 0
@@ -35825,7 +35873,7 @@ MonoBehaviour:
   - {fileID: 1698109328}
   - {fileID: 2070183492}
   - {fileID: 1405479747}
-  m_startIndex: 0
+  m_startIndex: 7
   m_debugInConfiguredMatch: 0
   m_match: {fileID: 1218044441}
   m_spawnPoints:

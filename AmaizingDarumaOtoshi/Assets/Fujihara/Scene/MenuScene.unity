@@ -164,11 +164,12 @@ MonoBehaviour:
   - 
   - "\u3053\u306E\u30B2\u30FC\u30E0\u3092\n\u3064\u304F\u3063\u305F\u4EBA\u305F\u3061"
   - "\u30B2\u30FC\u30E0\u3092\u304A\u308F\u308A\u307E\u3059"
-  creditsText: "<size=150%>\u30A2\u30E1\u30A4\u30B8\u30F3\u30B0 \u3060\u308B\u307E\u843D\u3068\u3057</size>\n\n\n<size=110%>\u30D7\u30ED\u30B0\u30E9\u30E0</size>\nFujihara\nInoue\nShitaka\nNakahira\n\n\n<size=110%>\u30D5\u30A9\u30F3\u30C8</size>\nYuji Syuku (SIL Open Font License)\n\n\n\n<size=120%>Thank you for playing!</size>"
+  creditsText: "<size=150%>\u30A2\u30E1\u30A4\u30B8\u30F3\u30B0 \u3060\u308B\u307E\u843D\u3068\u3057</size>\n\n\n<size=110%>\u30D7\u30ED\u30B0\u30E9\u30E0\uFF08\u4E94\u5341\u97F3\u9806\uFF09</size>\n\u4E95\u4E0A\n\u5FD7\u9DF9\n\u4E2D\u5DDD\n\u4E2D\u5E73\n\u85E4\u539F\n\n\n<size=110%>\u30D5\u30A9\u30F3\u30C8</size>\nYuji Syuku (SIL Open Font License)\n\n\n\n<size=120%>Thank you for Playing!</size>"
   stackX: -2.9
   hammerScale: 0.75
   boardCenter: {x: 2.9, y: 2.35, z: 1}
   boardSize: {x: 6.4, y: 3.9}
+  showOnomatopoeia: 1
 --- !u!4 &2041404170
 Transform:
   m_ObjectHideFlags: 0

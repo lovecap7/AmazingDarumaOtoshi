@@ -27,10 +27,18 @@ namespace Nakagawa
         {
             m_block = GetComponent<TumikiBlock>();
             m_collider = GetComponent<Collider>();
+
+            // 床の縁まわりの振る舞いをまとめて付ける(積み木のプレハブを編集せずに済むように、ここから追加する)
+            // ・飛んでいる積み木は崖(壁のない縁)で反射する
+            // ・床どうしが重なる継ぎ目(めり込んだ床の側面)には引っかからない
+            if (!TryGetComponent<TumikiCliffReflect>(out _)) gameObject.AddComponent<TumikiCliffReflect>();
+            FloorSeamFilter.Register(m_collider);
         }
 
         private void FixedUpdate()
         {
+            FloorSeamFilter.UpdateFloors();
+
             if (!m_block.CanBeAffected || m_block.CurrentState == TumikiBlock.State.Stacked) return;
             if (m_block.Rigidbody == null || m_block.Rigidbody.isKinematic) return;
             if (!TryGetSlipDirection(out Vector3 dir)) return;
