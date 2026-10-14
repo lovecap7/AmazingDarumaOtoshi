@@ -17,8 +17,8 @@ public class BlockController : MonoBehaviour
     [SerializeField] BehaviorType behaviorType = BehaviorType.Normal;
     // テスト用：へびだるの曲がる強さ(度/秒)。大きいほど急カーブになる
     [SerializeField] float hebiTurnSpeed = 60.0f;
-    [SerializeField] float homingTurnSpeed = 90.0f; // テスト用：ホーミングの旋回速度(度/秒)
-
+    [SerializeField] float homingStartTurnSpeed = 270f;  // テスト用：ホーミング発射直後の旋回速度(度/秒)
+    [SerializeField] float homingGuidanceDuration = 1.5f; // テスト用：誘導が切れるまでの時間(秒)
     public bool isFlying {  get; private set; } // 現在飛行中かどうか trueの場合は攻撃判定が発生する
 
     // 開始時点で飛行中だったかを記録する
@@ -70,7 +70,7 @@ public class BlockController : MonoBehaviour
             case BehaviorType.HebiLeft: return new HebiBehavior(HebiBehavior.CurveSide.Left, hebiTurnSpeed);
             case BehaviorType.HebiRight: return new HebiBehavior(HebiBehavior.CurveSide.Right, hebiTurnSpeed);
             case BehaviorType.UnBreak: return new UnBreakBehavior();
-            case BehaviorType.Homing: return new HomingBehavior(this, new OtherBlockTargetSelector(), homingTurnSpeed);
+            case BehaviorType.Homing: return new HomingBehavior(this, new OtherBlockTargetSelector(), homingStartTurnSpeed, homingGuidanceDuration);
             case BehaviorType.Normal:
             default: return new NormalBehavior();
         }
