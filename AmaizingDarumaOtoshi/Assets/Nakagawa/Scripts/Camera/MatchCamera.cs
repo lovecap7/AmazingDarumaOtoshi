@@ -13,6 +13,11 @@ namespace Nakagawa
         // 未設定ならシーンから探す
         [SerializeField] DarumaMatch m_match;
 
+        [Header("位置の補正")]
+        [Tooltip("全ステージ共通で、基準の位置(ステージのカメラ位置)をワールド座標でずらす量。" +
+                 "画面下のプレイヤーの状態表示とステージが重なる場合などに使う(向きは変えない。再生中に変えても即座に反映される)")]
+        [SerializeField] Vector3 m_worldOffset = Vector3.zero;
+
         [Header("移動")]
         // 基準の注視点から中点までのずれのうち、カメラが追う割合
         [SerializeField, Range(0.0f, 1.0f)] float m_followRatio = 0.25f;
@@ -36,11 +41,10 @@ namespace Nakagawa
         [SerializeField, Min(0.0f)] float m_bodyHeight = 2.0f;
 
         Camera m_camera;
+        // ステージのカメラ位置(ずらす前)
         Vector3 m_basePosition;
         Quaternion m_baseRotation;
         float m_baseFov;
-        // 基準の位置から見ている床の上の点
-        Vector3 m_baseFocus;
 
         Vector3 m_offset;
         Vector3 m_offsetVelocity;
@@ -66,11 +70,10 @@ namespace Nakagawa
             if (m_camera == null) m_camera = GetComponent<Camera>();
             m_basePosition = position;
             m_baseRotation = rotation;
-            m_baseFocus = FocusOnFloor(position, rotation);
             m_offset = Vector3.zero;
             m_offsetVelocity = Vector3.zero;
             m_fovVelocity = 0.0f;
-            transform.SetPositionAndRotation(position, rotation);
+            transform.SetPositionAndRotation(OffsetBasePosition, rotation);
             if (m_baseFov > 0.0f)
             {
                 m_fov = m_baseFov;
@@ -82,6 +85,10 @@ namespace Nakagawa
         {
             CollectBodies();
 
+            // ずらした基準の位置と、そこから見ている床の上の点
+            Vector3 basePosition = OffsetBasePosition;
+            Vector3 baseFocus = FocusOnFloor(basePosition, m_baseRotation);
+
             Vector3 targetOffset = Vector3.zero;
             float targetFov = m_baseFov;
             if (m_bodies.Count > 0)
@@ -90,7 +97,7 @@ namespace Nakagawa
                 foreach (var p in m_bodies) mid += p;
                 mid /= m_bodies.Count;
 
-                Vector3 toMid = mid - m_baseFocus;
+                Vector3 toMid = mid - baseFocus;
                 toMid.y = 0.0f;
                 targetOffset = Vector3.ClampMagnitude(toMid * m_followRatio, m_maxOffset);
 
@@ -103,7 +110,7 @@ namespace Nakagawa
                 }
                 float t = Mathf.InverseLerp(m_nearDistance, m_farDistance, farthest);
                 targetFov = Mathf.Lerp(Mathf.Min(m_minFov, m_baseFov), m_baseFov, t);
-                if (m_keepPlayersInView) targetFov = Mathf.Clamp(Mathf.Max(targetFov, RequiredFov(m_basePosition + targetOffset)), 1.0f, m_baseFov);
+                if (m_keepPlayersInView) targetFov = Mathf.Clamp(Mathf.Max(targetFov, RequiredFov(basePosition + targetOffset)), 1.0f, m_baseFov);
             }
 
             // スロー演出中も実時間でなめらかに追う
@@ -112,7 +119,7 @@ namespace Nakagawa
             m_fov = Mathf.SmoothDamp(m_fov, targetFov, ref m_fovVelocity, m_fovSmoothTime, Mathf.Infinity, dt);
 
             // 演出による寄りを重ねる(向きは変えない)
-            Vector3 position = m_basePosition + m_offset;
+            Vector3 position = basePosition + m_offset;
             float fov = m_fov;
             if (m_overrideWeight > 0.0f)
             {
@@ -138,6 +145,16 @@ namespace Nakagawa
         }
 
         public Quaternion BaseRotation => m_baseRotation;
+
+        // 基準の位置をずらす量(ワールド座標)。演出やデバッグから変えてもよい
+        public Vector3 WorldOffset
+        {
+            get => m_worldOffset;
+            set => m_worldOffset = value;
+        }
+
+        // ずらした後の基準の位置
+        Vector3 OffsetBasePosition => m_basePosition + m_worldOffset;
 
         // 参加中のプレイヤーが操作している体(生存キャラクター・幽霊)の位置
         private void CollectBodies()
