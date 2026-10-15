@@ -13,12 +13,17 @@ public class BlockController : MonoBehaviour
     public float CurrentSpeed => currentSpeed;
 
     // テスト用：インスペクターで挙動を選べるようにする
-    public enum BehaviorType { Normal, Iwa,HebiLeft, HebiRight, UnBreak,Homing }
+    public enum BehaviorType { Normal, Iwa,HebiLeft, HebiRight, UnBreak,Homing,Ziguzagu,Grow,Bomb }
     [SerializeField] BehaviorType behaviorType = BehaviorType.Normal;
     // テスト用：へびだるの曲がる強さ(度/秒)。大きいほど急カーブになる
     [SerializeField] float hebiTurnSpeed = 60.0f;
     [SerializeField] float homingStartTurnSpeed = 270f;  // テスト用：ホーミング発射直後の旋回速度(度/秒)
     [SerializeField] float homingGuidanceDuration = 1.5f; // テスト用：誘導が切れるまでの時間(秒)
+    [SerializeField] float ziguzagAngle = 40.0f;      // テスト用：ジグザグの傾き(度)
+    [SerializeField] float ziguzagInterval = 0.4f;  // テスト用：向きを切り替える間隔(秒)
+    [SerializeField] float growRate = 1.2f;        // テスト用：壁ヒットごとの拡大倍率
+    [SerializeField] float growMaxMultiplier = 3.0f; // テスト用：初期サイズに対する最大倍率
+    [SerializeField] float explosionRadius = 2.0f; // テスト用：爆発の範囲(半径)
     public bool isFlying {  get; private set; } // 現在飛行中かどうか trueの場合は攻撃判定が発生する
 
     // 開始時点で飛行中だったかを記録する
@@ -52,6 +57,9 @@ public class BlockController : MonoBehaviour
         rb = GetComponent<Rigidbody>();
         info = rb.GetComponent<BlockInfo>();
 
+        // 高速で動いても壁や他の積み木に深くめり込まないよう、連続衝突判定にする
+        rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+
         // インスペクターで選んだ種類に応じてbehaviorを生成する
         behavior = CreateBehavior(behaviorType);
     }
@@ -71,6 +79,9 @@ public class BlockController : MonoBehaviour
             case BehaviorType.HebiRight: return new HebiBehavior(HebiBehavior.CurveSide.Right, hebiTurnSpeed);
             case BehaviorType.UnBreak: return new UnBreakBehavior();
             case BehaviorType.Homing: return new HomingBehavior(this, new OtherBlockTargetSelector(), homingStartTurnSpeed, homingGuidanceDuration);
+            case BehaviorType.Ziguzagu: return new ZiguzagBehavior(ziguzagAngle, ziguzagInterval);
+            case BehaviorType.Grow: return new GrowBehavior(this, growRate, growMaxMultiplier);
+            case BehaviorType.Bomb: return new BombBehavior(explosionRadius);
             case BehaviorType.Normal:
             default: return new NormalBehavior();
         }
@@ -158,8 +169,27 @@ public class BlockController : MonoBehaviour
         {
             // direction = Vector3.Reflect(direction, collision.contacts[0].normal); // behaviorに委譲したため不要
 
+            // 接触法線を水平方向だけにする
+            // (壁の縁や傾きでYが混ざると、反射後の水平速度が落ちて止まったように見えるため)
+            Vector3 wallNormal = collision.GetContact(0).normal;
+            wallNormal.y = 0f;
+            // if (wallNormal.sqrMagnitude < 0.0001f) return; // 反射できずに止まる原因になったため、保険の処理に変更
+            if (wallNormal.sqrMagnitude < 0.0001f)
+            {
+                // めり込み等で法線が上下を向いたときは、壁の軸のうち進行方向と最も向かい合う向きを法線の代わりにする
+                wallNormal = FallbackWallNormal(collision.transform, direction);
+            }
+            wallNormal.Normalize();
+
+            // すでに壁から離れる向きに動いているなら反射しない
+            // (同じ壁との接触イベントが続けて来たとき、2回反射して壁の方へ戻ってしまうのを防ぐ)
+            if (Vector3.Dot(direction, wallNormal) >= 0f) return;
+
+            // direction = Vector3.Reflect(direction, collision.contacts[0].normal); // behaviorに委譲したため不要
+
             hasHit = true; // 壁ヒットでも二重判定を防ぐため統一して立てる
-            if (behavior.OnWallHit(direction, collision.contacts[0].normal, out var newDirection))
+            // if (behavior.OnWallHit(direction, collision.contacts[0].normal, out var newDirection)) // 加工した法線を使うため変更
+            if (behavior.OnWallHit(direction, wallNormal, out var newDirection))
             {
                 direction = newDirection; // 反射するキャラ(Normal等)
                 hasHit = false; // 反射の場合は引き続き攻撃判定を持たせるため戻す
@@ -217,5 +247,25 @@ public class BlockController : MonoBehaviour
     public void Break()
     {
         Destroy(gameObject);
+    }
+
+    // 壁の水平な軸(前後左右)のうち、進行方向に最も向かい合う向きを返す
+    static Vector3 FallbackWallNormal(Transform wall, Vector3 dir)
+    {
+        Vector3[] axes = { wall.right, -wall.right, wall.forward, -wall.forward };
+        Vector3 best = Vector3.zero;
+        float bestDot = float.MaxValue;
+
+        foreach (var a in axes)
+        {
+            Vector3 flat = new Vector3(a.x, 0f, a.z).normalized;
+            float d = Vector3.Dot(dir, flat);
+            if (d < bestDot)
+            {
+                bestDot = d;
+                best = flat;
+            }
+        }
+        return best;
     }
 }
