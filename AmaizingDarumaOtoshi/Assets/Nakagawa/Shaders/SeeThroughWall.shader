@@ -1,4 +1,6 @@
 // 壁の裏に隠れた積み木・プレイヤーが見えるように、カメラから見て対象の手前にある部分を円形に透過する壁(URP)
+// 手前かどうかは、カメラから壁の点への視線上で、対象の体(足元〜頭の縦の軸)より手前にあるかで決める(低い壁でも透過できる)
+// 床など透過しない物に隠れている対象は、SeeThroughTargets が渡さない(床が残るのに壁だけ透けることがない)
 // 対象の位置は SeeThroughTargets(カメラに付けるコンポーネント)がグローバル変数で渡す
 // 透過はディザ(画素ごとに描く・描かないを切り替える)で行うので、不透明のまま描ける。円の縁はぼかす
 // 影は透過せずに落とす
@@ -29,11 +31,28 @@ Shader "Nakagawa/SeeThroughWall"
         // SeeThroughTargets から渡される値
         // xy: 対象のカメラ空間での位置 / z: カメラからの奥行き(m) / w: 円の半径(m)
         float4 _SeeThroughPoints[64];
+        // 対象の体の縦の軸 xyz: 足元(ワールド座標) / w: 高さ(m)
+        float4 _SeeThroughAxes[64];
         int _SeeThroughCount;
         // x: 縁をぼかす幅(半径に対する割合) / y: 対象よりこれだけ手前の壁から透過する(m)
         float4 _SeeThroughParams;
-        // 透過する範囲を決めるカメラのワールド→カメラ空間の行列
+        // 透過する範囲を決めるカメラのワールド→カメラ空間の行列と、カメラのワールド座標
         float4x4 _SeeThroughView;
+        float4 _SeeThroughCameraPos;
+
+        // カメラから壁のこの点への視線(向き dir)が、対象の体の縦の軸に最も近づく所までの距離
+        // (低い壁でも、視線の先の体の下の方より手前にあれば透過できるように、体の中心ではなく軸と比べる)
+        float DistanceToBodyAlongRay(float3 cameraPos, float3 dir, float4 axis)
+        {
+            float3 w0 = cameraPos - axis.xyz;
+            // 軸は真上向き(0, 1, 0)。視線と軸の最も近い点の、軸上の高さを求めて体の範囲に収める
+            float b = dir.y;
+            float denom = 1.0 - b * b;
+            float s = denom > 0.0001 ? (w0.y - b * dot(dir, w0)) / denom : 0.0;
+            s = clamp(s, 0.0, axis.w);
+            float3 q = axis.xyz + float3(0.0, s, 0.0);
+            return dot(q - cameraPos, dir);
+        }
 
         // 透過する度合い(0: 描く 〜 1: 描かない)
         half SeeThroughAmount(float3 positionWS)
@@ -42,18 +61,25 @@ Shader "Nakagawa/SeeThroughWall"
             float depth = -v.z;
             if (depth <= 0.001) return 0.0;
 
+            float3 cameraPos = _SeeThroughCameraPos.xyz;
+            float3 toWall = positionWS - cameraPos;
+            float wallDistance = length(toWall);
+            float3 dir = toWall / max(wallDistance, 0.0001);
+
             float feather = max(_SeeThroughParams.x, 0.0001);
             half amount = 0.0;
             [loop]
             for (int i = 0; i < _SeeThroughCount; i++)
             {
                 float4 t = _SeeThroughPoints[i];
-                // 対象より奥(または対象を囲む近さ)の壁は透過しない
-                if (depth > t.z - _SeeThroughParams.y) continue;
-                // 壁のこの点を、視線に沿って対象の奥行きまで延ばした位置で、対象からの距離を測る
+                // 壁のこの点を、視線に沿って対象の奥行きまで延ばした位置で、対象からの距離を測る(円の内側か)
                 float2 p = v.xy * (t.z / depth);
                 float d = length(p - t.xy) / max(t.w, 0.0001);
-                amount = max(amount, saturate((1.0 - d) / feather));
+                half a = saturate((1.0 - d) / feather);
+                if (a <= amount) continue;
+                // 視線上で体より奥(または体を囲む近さ)の壁は透過しない
+                if (wallDistance > DistanceToBodyAlongRay(cameraPos, dir, _SeeThroughAxes[i]) - _SeeThroughParams.y) continue;
+                amount = a;
             }
             return amount;
         }

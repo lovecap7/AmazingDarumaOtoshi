@@ -453,11 +453,14 @@ namespace Nakagawa.EditorTools
 
         // まとめたシーンの壁(ReflectWall)の高さを変える。底は床の高さのまま、上に伸ばす
         // (各ステージのシーンの壁はそのまま)
+        // 伸ばした後、床から StageWallSplitter.kVisibleHeight までの見える壁と、その上の見えない壁(InvWall)に分ける
         static void ApplyWallHeight(List<StageEntry> stages)
         {
             int count = 0;
             foreach (var stage in stages)
             {
+                // 既に分けてある壁は、見えない壁を取り除いてから伸ばし直す
+                StageWallSplitter.RemoveInvisible(stage.transform);
                 foreach (var wall in stage.GetComponentsInChildren<ReflectWall>(true))
                 {
                     Transform t = wall.transform;
@@ -470,8 +473,9 @@ namespace Nakagawa.EditorTools
                     t.localPosition = pos;
                     count++;
                 }
+                StageWallSplitter.Split(stage.transform);
             }
-            Debug.Log($"[StageCombiner] 壁 {count} 枚の高さ(Yスケール)を {kWallHeight} にしました");
+            Debug.Log($"[StageCombiner] 壁 {count} 枚の高さ(Yスケール)を {kWallHeight} にし、高さ {StageWallSplitter.kVisibleHeight} から上を見えない壁にしました");
         }
 
         // 各ステージを、そのステージのカメラ位置から撮って PNG で保存し、スプライトとして読み込めるようにする
