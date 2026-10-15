@@ -7,6 +7,14 @@ namespace Nakahira
     [CreateAssetMenu(fileName = "HammerParams", menuName = "Nakahira/Hammer Params")]
     public class HammerParams : ScriptableObject
     {
+        // 飛んできた(攻撃判定のある)積み木を打ち返す向きの決め方
+        public enum ReturnAim
+        {
+            Facing,        // 持ち主が向いている向き(ハンマーの当たった位置に依存しない)
+            HammerAngle,   // ハンマーが当たった角度(先端で捉えると左へ、根元で捉えると右へずれる)
+        }
+
+
         [Header("振る速さ")]
         [Tooltip("薙ぎ払いにかかる時間(秒)")]
         [Min(0.01f)] public float SweepDuration = 0.25f;
@@ -18,6 +26,10 @@ namespace Nakahira
         [Min(0.1f)] public float HitReachScale = 1.5f;
 
         [Header("打ち返し")]
+        [Tooltip("飛んできた積み木を打ち返す向き。Facing: 向いている向き / HammerAngle: ハンマーが当たった角度")]
+        public ReturnAim ReturnAimMode = ReturnAim.Facing;
+        [Tooltip("Facing のとき、向いている向きからずらす角度(度。右が+)")]
+        [Range(-60.0f, 60.0f)] public float ReturnAimOffset = 0.0f;
         [Tooltip("打ち返した積み木が自分に当たらない時間(秒)")]
         [Min(0.0f)] public float ReturnImmunityTime = 0.5f;
         [Tooltip("打ち返すたびにヒットストップの時間に掛ける倍率")]

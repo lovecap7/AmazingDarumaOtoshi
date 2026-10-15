@@ -175,6 +175,13 @@ namespace Nakagawa.EditorTools
                     Description = "タイル張りのお風呂場。ステージは重ねた風呂ふたの上にあり、まわりには湯船・洗面器・風呂いす・アヒル・石けん・シャンプー・スポンジが置いてある。",
                     Build = BuildBath,
                 },
+                new BackdropDef
+                {
+                    Id = "Monja",
+                    Title = "もんじゃ焼き屋の鉄板",
+                    Description = "下町のもんじゃ焼き屋のテーブル。ステージは大きな鉄板に重ねた鉄の板の上にあり、まわりには土手を作ったもんじゃ・小さなヘラ・具の入ったボウル・ソース・青のり・ラムネ・取り皿が置いてあり、奥の壁には品書きの札と提灯が下がっている。",
+                    Build = BuildMonja,
+                },
             };
         }
 
@@ -620,6 +627,166 @@ namespace Nakagawa.EditorTools
                 var g = c.Anchored("Sponge", new Vector2(0.9f, -1), 5);
                 c.Box(g, "Sponge", new Vector3(0, T + 0.9f, 0), new Vector3(5, 1.8f, 3.4f), -20, c.Mat("Sponge", new Color(1.0f, 0.88f, 0.3f), 0.1f));
                 c.Box(g, "Scrub", new Vector3(0, T + 2.0f, 0), new Vector3(5, 0.4f, 3.4f), -20, c.Mat("Scrub", new Color(0.2f, 0.55f, 0.3f), 0.1f));
+            }
+        }
+
+        //----------------------------------------
+        // もんじゃ焼き屋の鉄板
+        //----------------------------------------
+        static void BuildMonja(Ctx c)
+        {
+            float T = kTableTop;
+            var iron = c.Mat("Iron", new Color(0.2f, 0.2f, 0.22f), 0.65f, 0.6f);
+            var ironDark = c.Mat("IronDark", new Color(0.12f, 0.12f, 0.13f), 0.55f, 0.6f);
+            var steel = c.Mat("Steel", new Color(0.7f, 0.72f, 0.75f), 0.85f, 0.8f);
+            SetSupports(c, StageBackdrop.SupportStyle.SlabStack, 1.0f, 2.0f, null, iron, ironDark);
+            // ステージの床は油の引かれた鉄板(まわりの大きな鉄板と見分けられるよう少し明るく)、縁(壁)は鉄板の縁の金枠
+            c.FloorMaterial = c.Mat("StageFloor", new Color(0.36f, 0.34f, 0.33f), 0.7f, 0.5f);
+            c.WallMaterial = c.SeeThroughMat("StageWall", new Color(0.62f, 0.64f, 0.68f), 0.8f);
+
+            // テーブル(木の天板に大きな鉄板が埋め込んである)と店の床
+            var table = c.Group("Table");
+            c.Box(table, "Top", new Vector3(0, T - 2, 10), new Vector3(240, 4, 180), 0, c.Mat("TableWood", new Color(0.5f, 0.32f, 0.18f), 0.45f));
+            c.Box(table, "Teppan", new Vector3(0, T + 0.15f, 0), new Vector3(130, 0.3f, 96), 0, iron);
+            // 鉄板の縁の金枠(上面どうしが同じ高さにならないよう、少し高くする)
+            c.Box(table, "RimN", new Vector3(0, T + 0.4f, 48.5f), new Vector3(132, 0.8f, 1), 0, steel);
+            c.Box(table, "RimS", new Vector3(0, T + 0.4f, -48.5f), new Vector3(132, 0.8f, 1), 0, steel);
+            c.Box(table, "RimW", new Vector3(-65.5f, T + 0.4f, 0), new Vector3(1, 0.8f, 96), 0, steel);
+            c.Box(table, "RimE", new Vector3(65.5f, T + 0.4f, 0), new Vector3(1, 0.8f, 96), 0, steel);
+            // 焦げ跡(鉄板の上の黒いしみ)
+            var scorch = c.Mat("Scorch", new Color(0.08f, 0.07f, 0.06f), 0.3f);
+            var scorches = new[] { new Vector3(-40, 0, -30), new Vector3(35, 0, 32), new Vector3(48, 0, -20), new Vector3(-52, 0, 25) };
+            for (int i = 0; i < scorches.Length; i++)
+            {
+                c.Prim(PrimitiveType.Cylinder, table, $"Scorch_{i}", scorches[i] + new Vector3(0, T + 0.31f, 0), new Vector3(9 + i * 2, 0.01f, 6 + i), Quaternion.Euler(0, i * 37, 0), scorch);
+            }
+            c.Box(table, "Front", new Vector3(0, T - 20, -80.5f), new Vector3(240, 32, 1), 0, c.Mat("TableFront", new Color(0.38f, 0.24f, 0.13f), 0.4f));
+            FarFloor(c, "ShopFloor", c.Mat("ShopFloor", new Color(0.3f, 0.27f, 0.24f), 0.25f));
+
+            // 奥の壁と品書きの札・提灯(ステージより奥・上にあるので、遊ぶ邪魔にならない)
+            {
+                var g = c.Group("BackWall");
+                c.Box(g, "Wall", new Vector3(0, T + 20, 100), new Vector3(260, 100, 2), 0, c.Mat("ShopWall", new Color(0.82f, 0.74f, 0.58f), 0.2f));
+                c.Box(g, "Beam", new Vector3(0, T + 44, 98.5f), new Vector3(260, 3, 1.5f), 0, c.Mat("Beam", new Color(0.3f, 0.18f, 0.1f), 0.4f));
+                var tag = c.Mat("MenuTag", new Color(0.95f, 0.9f, 0.76f), 0.15f);
+                var tagEdge = c.Mat("MenuTagEdge", new Color(0.55f, 0.35f, 0.18f), 0.3f);
+                var ink = c.Mat("Ink", new Color(0.12f, 0.1f, 0.1f), 0.1f);
+                var red = c.Mat("InkRed", new Color(0.75f, 0.12f, 0.1f), 0.2f);
+                for (int i = 0; i < 12; i++)
+                {
+                    float x = -66 + i * 12;
+                    var t = c.Box(g, $"MenuTag_{i}", new Vector3(x, T + 32, 98.4f), new Vector3(7, 18, 0.4f), 0, tag);
+                    c.Prim(PrimitiveType.Cube, t.transform, "Edge", new Vector3(0, 0, 0.6f), new Vector3(1.12f, 1.06f, 0.5f), Quaternion.identity, tagEdge, true);
+                    // 品名の文字の代わりの縦の線(値段のところは赤)
+                    c.Prim(PrimitiveType.Cube, t.transform, "Name", new Vector3(0, 0.12f, -0.6f), new Vector3(0.22f, 0.6f, 0.5f), Quaternion.identity, ink, true);
+                    c.Prim(PrimitiveType.Cube, t.transform, "Price", new Vector3(0, -0.36f, -0.6f), new Vector3(0.3f, 0.14f, 0.5f), Quaternion.identity, i % 3 == 0 ? red : ink, true);
+                }
+                var lantern = c.Mat("Lantern", new Color(0.88f, 0.18f, 0.12f), 0.45f);
+                var lanternCap = c.Mat("LanternCap", new Color(0.12f, 0.1f, 0.1f), 0.4f);
+                foreach (float x in new[] { -95f, 95f })
+                {
+                    c.Sphere(g, $"Lantern_{x}", new Vector3(x, T + 28, 92), new Vector3(12, 16, 12), lantern);
+                    c.Cylinder(g, $"LanternTop_{x}", new Vector3(x, T + 36.5f, 92), 3.5f, 1.5f, lanternCap);
+                    c.Cylinder(g, $"LanternBottom_{x}", new Vector3(x, T + 19.5f, 92), 3.5f, 1.5f, lanternCap);
+                }
+            }
+
+            // もんじゃ(西)。キャベツの土手の中に生地を流し込んだところ
+            {
+                var g = c.Anchored("Monja", new Vector2(-1, 0.1f), 14);
+                var batter = c.Mat("Batter", new Color(0.62f, 0.45f, 0.24f), 0.75f);
+                var cabbage = c.Mat("Cabbage", new Color(0.82f, 0.88f, 0.6f), 0.4f);
+                var cabbageGreen = c.Mat("CabbageGreen", new Color(0.55f, 0.74f, 0.35f), 0.4f);
+                c.Cylinder(g, "Batter", new Vector3(0, T + 0.45f, 0), 7.5f, 0.3f, batter);
+                for (int i = 0; i < 14; i++)
+                {
+                    float a = i * Mathf.PI * 2.0f / 14;
+                    Vector3 p = new Vector3(Mathf.Cos(a) * 8.5f, T + 1.0f, Mathf.Sin(a) * 8.5f);
+                    c.Sphere(g, $"Dote_{i}", p, new Vector3(4.2f, 1.8f, 3.2f), i % 3 == 0 ? cabbageGreen : cabbage);
+                }
+                // 具(切りイカ・桜えび・天かす)
+                var shrimp = c.Mat("Sakuraebi", new Color(0.95f, 0.45f, 0.35f), 0.5f);
+                var tenkasu = c.Mat("Tenkasu", new Color(0.93f, 0.8f, 0.5f), 0.3f);
+                for (int i = 0; i < 8; i++)
+                {
+                    float a = i * 2.4f;
+                    float r = 1.5f + (i % 3) * 1.8f;
+                    c.Sphere(g, $"Gu_{i}", new Vector3(Mathf.Cos(a) * r, T + 0.65f, Mathf.Sin(a) * r), new Vector3(1.2f, 0.5f, 0.9f), i % 2 == 0 ? shrimp : tenkasu);
+                }
+                // 小さなヘラ(はがし)が2本刺さっている
+                for (int i = 0; i < 2; i++)
+                {
+                    float x = 3 + i * 2.5f;
+                    c.Box(g, $"HeraBlade_{i}", new Vector3(x, T + 0.7f, -2), new Vector3(1.6f, 0.15f, 2.2f), 20 + i * 15, steel);
+                    c.Prim(PrimitiveType.Cylinder, g, $"HeraHandle_{i}", new Vector3(x + 0.6f, T + 2.6f, -4.2f), new Vector3(0.5f, 2.2f, 0.5f), Quaternion.Euler(-55, 20 + i * 15, 0), c.Mat("HeraHandle", new Color(0.35f, 0.2f, 0.1f), 0.5f));
+                }
+            }
+
+            // 具の入ったボウルと大きなヘラ(北東)
+            {
+                var g = c.Anchored("Bowl", new Vector2(0.75f, 1), 12);
+                c.Cylinder(g, "Bowl", new Vector3(0, T + 3, 0), 6, 6, steel);
+                c.Cylinder(g, "Rim", new Vector3(0, T + 6.1f, 0), 6.3f, 0.3f, steel);
+                c.Cylinder(g, "Batter", new Vector3(0, T + 5.5f, 0), 5.6f, 0.4f, c.Mat("BowlBatter", new Color(0.78f, 0.62f, 0.38f), 0.6f));
+                var cabbage = c.Mat("Cabbage", new Color(0.82f, 0.88f, 0.6f), 0.4f);
+                for (int i = 0; i < 6; i++)
+                {
+                    float a = i * 1.05f;
+                    c.Sphere(g, $"Cabbage_{i}", new Vector3(Mathf.Cos(a) * 3, T + 6.2f, Mathf.Sin(a) * 3), new Vector3(3, 1.4f, 2.4f), cabbage);
+                }
+                c.Sphere(g, "Yolk", new Vector3(0.5f, T + 6.4f, -0.5f), new Vector3(2.2f, 1.1f, 2.2f), c.Mat("Yolk", new Color(1.0f, 0.68f, 0.1f), 0.8f));
+                // 大きなヘラ(コテ)
+                c.Box(g, "KoteBlade", new Vector3(-10, T + 0.5f, -3), new Vector3(5, 0.2f, 4), 30, steel);
+                c.Prim(PrimitiveType.Cylinder, g, "KoteHandle", new Vector3(-13.8f, T + 0.9f, -5.2f), new Vector3(0.9f, 3.2f, 0.9f), Quaternion.Euler(0, 30, 90), c.Mat("KoteHandle", new Color(0.3f, 0.18f, 0.09f), 0.5f));
+            }
+
+            // ソース・青のり・かつお節(北)
+            {
+                var g = c.Anchored("Condiments", new Vector2(-0.2f, 1), 16);
+                c.Cylinder(g, "Sauce", new Vector3(-5, T + 5, 0), 2.2f, 10, c.Mat("Sauce", new Color(0.25f, 0.12f, 0.06f), 0.75f));
+                c.Cylinder(g, "SauceLabel", new Vector3(-5, T + 4.5f, 0), 2.25f, 4, c.Mat("SauceLabel", new Color(0.95f, 0.85f, 0.2f), 0.4f));
+                c.Cylinder(g, "SauceCap", new Vector3(-5, T + 10.6f, 0), 1.0f, 1.2f, c.Mat("SauceCap", new Color(0.85f, 0.15f, 0.1f), 0.5f));
+                c.Cylinder(g, "Aonori", new Vector3(0, T + 3, 0), 1.8f, 6, c.Mat("Aonori", new Color(0.2f, 0.42f, 0.18f), 0.4f));
+                c.Cylinder(g, "AonoriCap", new Vector3(0, T + 6.3f, 0), 1.85f, 0.6f, c.Mat("ShakerCap", new Color(0.95f, 0.95f, 0.92f), 0.6f));
+                c.Box(g, "Katsuobushi", new Vector3(5.5f, T + 3, 0), new Vector3(5, 6, 3.4f), -8, c.Mat("KatsuoBag", new Color(0.95f, 0.75f, 0.45f), 0.3f));
+            }
+
+            // ラムネとウーロン茶(東)
+            {
+                var g = c.Anchored("Drinks", new Vector2(1, 0.2f), 9);
+                var glass = c.Mat("RamuneGlass", new Color(0.45f, 0.75f, 0.85f), 0.95f);
+                c.Cylinder(g, "Ramune", new Vector3(0, T + 5, 0), 2.2f, 10, glass);
+                c.Cylinder(g, "RamuneNeck", new Vector3(0, T + 11.2f, 0), 1.2f, 2.4f, glass);
+                c.Sphere(g, "Marble", new Vector3(0, T + 10.2f, 0), new Vector3(1.4f, 1.4f, 1.4f), c.Mat("Marble", new Color(0.85f, 0.95f, 1.0f), 0.95f));
+                c.Cylinder(g, "RamuneCap", new Vector3(0, T + 12.6f, 0), 1.3f, 0.5f, c.Mat("RamuneCap", new Color(0.2f, 0.35f, 0.8f), 0.6f));
+                c.Cylinder(g, "Glass", new Vector3(6, T + 3.5f, 3), 2.6f, 7, c.Mat("Glass", new Color(0.85f, 0.9f, 0.92f), 0.95f));
+                c.Cylinder(g, "Oolong", new Vector3(6, T + 3, 3), 2.3f, 5.6f, c.Mat("Oolong", new Color(0.55f, 0.3f, 0.1f), 0.8f));
+            }
+
+            // 取り皿(南東。平たいので手前でも邪魔にならない)
+            {
+                var g = c.Anchored("Plates", new Vector2(0.8f, -1), 5);
+                var plate = c.Mat("Plate", new Color(0.96f, 0.95f, 0.92f), 0.85f);
+                var plateRim = c.Mat("PlateRim", new Color(0.2f, 0.3f, 0.6f), 0.8f);
+                for (int i = 0; i < 2; i++)
+                {
+                    Vector3 p = new Vector3(i * 9, T + 0.3f, i * 1.5f);
+                    c.Cylinder(g, $"PlateRim_{i}", p, 3.8f, 0.5f, plateRim);
+                    c.Cylinder(g, $"Plate_{i}", p + new Vector3(0, 0.05f, 0), 3.4f, 0.52f, plate);
+                }
+            }
+
+            // 小さなヘラの束と伝票(南西)
+            {
+                var g = c.Anchored("Heras", new Vector2(-0.8f, -1), 5);
+                var handle = c.Mat("HeraHandle", new Color(0.35f, 0.2f, 0.1f), 0.5f);
+                for (int i = 0; i < 4; i++)
+                {
+                    float z = i * 1.4f;
+                    c.Box(g, $"Blade_{i}", new Vector3(0, T + 0.25f, z), new Vector3(1.8f, 0.12f, 1.2f), 5 * i, steel);
+                    c.Prim(PrimitiveType.Cylinder, g, $"Handle_{i}", new Vector3(2.8f, T + 0.35f, z), new Vector3(0.45f, 2, 0.45f), Quaternion.Euler(0, 5 * i, 90), handle);
+                }
+                c.Box(g, "Denpyo", new Vector3(-8, T + 0.1f, 1), new Vector3(4.5f, 0.2f, 9), 12, c.Mat("Denpyo", new Color(0.95f, 0.93f, 0.85f), 0.1f));
             }
         }
 

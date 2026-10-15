@@ -31,7 +31,8 @@ namespace Nakahira
     // ハンマー。このコンポーネントが付いたTransformを回転の支点として振る
     // 子に「前方(+Z)へ伸びる」ハンマーの見た目を置く
     //  ・薙ぎ払い     : 前方を右から左へ水平に振る。ハンマーが対象の位置を通過した瞬間に当たり、その角度へ飛ばす
-    //                   飛んできた積み木は、先端で捉える(早振り)と左へ、根元で捉える(振り遅れ)と右へずれる
+    //                   飛んできた積み木は、既定では向いている向きへ打ち返す(HammerParams.ReturnAimMode で
+    //                   「先端で捉える(早振り)と左へ、根元で捉える(振り遅れ)と右へずれる」従来の打ち方に切り替えられる)
     //  ・股抜きショット: 後ろから振り下ろし、自分の最下段を向いている方向へ打ち出す(生存キャラクターのみ)
     // 持ち主(IDarumaAttacker)は親から自動で取得する
     // 振る速さ・弾速は HammerParams(キャラクターごとのScriptableObject)から毎回読む
@@ -56,7 +57,7 @@ namespace Nakahira
         [SerializeField] float m_hitHeightRange = 0.6f;
         // 打ち返す方向の最大角度(正面からの左右)
         [SerializeField] float m_maxReturnAngle = 60.0f;
-        // 飛んできた積み木を打ち返すとき、ハンマーの先端(早振り)で左へ、根元(振り遅れ)で右へずらす最大角度
+        // 飛んできた積み木を打ち返すとき、ハンマーの先端(早振り)で左へ、根元(振り遅れ)で右へずらす最大角度(ReturnAimMode が HammerAngle のとき)
         [SerializeField] float m_returnSpreadAngle = 40.0f;
 
         [Header("股抜きショット")]
@@ -243,11 +244,7 @@ namespace Nakahira
             // 攻撃判定のある積み木だけ「打ち返し」。攻撃判定のない動いている積み木は落ちている積み木と同じ扱い
             if (block.IsHarmful)
             {
-                // 飛んできた積み木: ハンマーの先端で捉える(早振り)ほど左へ引っ張り、根元(振り遅れ)ほど右へ流す
-                float near = DarumaCharacter.kBodyRadius + TumikiBlock.kRadius;
-                float far = HitReach + TumikiBlock.kRadius;
-                float t = Mathf.InverseLerp(near, far, dist);
-                angle += Mathf.Lerp(m_returnSpreadAngle, -m_returnSpreadAngle, t);
+                angle = ReturnAngle(bearing, dist);
                 // 打ち返すほど速くなる
                 returnCount = block.ReturnCount + 1;
                 speed = Mathf.Min(m_params.SweepLaunchSpeed * Mathf.Pow(m_params.ReturnSpeedRate, returnCount), m_params.MaxProjectileSpeed);
@@ -258,6 +255,25 @@ namespace Nakahira
             if (returnCount > 0) block.ExtendIgnore(m_params.ReturnImmunityTime);
             BeginHitStop(block, null, returnCount);
             Hit?.Invoke(new HammerHitInfo(this, m_owner, block, block.transform.position, false, returnCount));
+        }
+
+        // 飛んできた積み木を打ち返す角度(持ち主の正面から。右が+)。決め方は HammerParams.ReturnAimMode
+        private float ReturnAngle(float bearing, float dist)
+        {
+            switch (m_params.ReturnAimMode)
+            {
+                case HammerParams.ReturnAim.HammerAngle:
+                {
+                    // ハンマーの先端で捉える(早振り)ほど左へ引っ張り、根元(振り遅れ)ほど右へ流す
+                    float near = DarumaCharacter.kBodyRadius + TumikiBlock.kRadius;
+                    float far = HitReach + TumikiBlock.kRadius;
+                    float t = Mathf.InverseLerp(near, far, dist);
+                    return bearing + Mathf.Lerp(m_returnSpreadAngle, -m_returnSpreadAngle, t);
+                }
+                default:
+                    // ハンマーのどこで捉えても、向いている向きへ
+                    return m_params.ReturnAimOffset;
+            }
         }
 
         private void HitCharacter(DarumaCharacter other, float bearing)
