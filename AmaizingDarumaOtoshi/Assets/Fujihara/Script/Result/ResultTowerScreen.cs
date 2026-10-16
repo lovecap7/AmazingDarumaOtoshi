@@ -19,7 +19,9 @@ using UnityEngine.Rendering.Universal;
 //   最後の1人で決まったとき：ストックで負けた人は首だけ、ゴーストで負けた人は幽霊の姿で、勝者を見上げる
 //   時間切れで決まったとき　：生き残っていた人も、終了時点の積み木が同時に積み上がり、そのてっぺんから勝者を見上げる
 //                            （脱落・幽霊・積み木なしの人は、首だけ／幽霊のまま見上げる）
-//   タイムは今のところ、負けた人は首だけで見上げる（専用の演出は別に作る予定）
+// ■ タイム
+//   全員、最終ポイントの数だけ積み木が積み上がり（0点以下は積まない・首だけ）、てっぺんから1位を見上げる。1位だけ王冠
+//   積み木の色はその人の色。点数がとても多いときは MaxScoreBlocks 個まで積み、右の数字は本当の点数を出す
 // 表彰台の演出（ResultScreen / ResultScene）とは別の画面。使う方を MatchSettings の「リザルト画面のシーン名」で選ぶ。
 // 試合の結果は MatchResultRelay が ResultData に入れておく。このシーンだけを再生したときは確認用の仮の結果で動く。
 public class ResultTowerScreen : MonoBehaviour
@@ -92,8 +94,12 @@ public class ResultTowerScreen : MonoBehaviour
     MatchSetup.MatchMode mode;
     bool timeUp;
 
-    // 負けた人も積み木を積むか（ストック・ゴーストで時間切れになったとき。最後の1人で決まったときは勝者だけ）
-    bool LosersStack => timeUp && (mode == MatchSetup.MatchMode.Stock || mode == MatchSetup.MatchMode.Ghost);
+    // 負けた人も積み木を積むか（タイムは全員。ストック・ゴーストは時間切れのときだけ。最後の1人で決まったときは勝者だけ）
+    bool LosersStack => mode == MatchSetup.MatchMode.Time
+                     || timeUp && (mode == MatchSetup.MatchMode.Stock || mode == MatchSetup.MatchMode.Ghost);
+
+    const int MaxScoreBlocks = 25;   // タイムで積む積み木の上限（点数がとても多いとき、画面に収めるため）
+    string CountUnit => mode == MatchSetup.MatchMode.Time ? "てん" : "こ";
 
     // ---- 舞台 ----
     Camera cam;
@@ -147,6 +153,7 @@ public class ResultTowerScreen : MonoBehaviour
             mode = ResultData.Mode;
             timeUp = ResultData.TimeUp;
             ResultData.Clear();
+            if (mode == MatchSetup.MatchMode.Time) ScoresToBlocks();
             return;
         }
 
@@ -175,7 +182,22 @@ public class ResultTowerScreen : MonoBehaviour
             int n = top ? previewBlocks - i : down ? 0 : Mathf.Max(1, previewBlocks - 2 - i);
             for (int b = 0; b < n; b++) e.blockColors.Add(blockColors[UnityEngine.Random.Range(0, blockColors.Length)]);
             e.blocks = e.blockColors.Count;
+            e.score = top ? previewBlocks + 2 : previewBlocks - 1 - i * 2;   // タイム用（最後の人はマイナスになることも）
             entries.Add(e);
+        }
+        if (mode == MatchSetup.MatchMode.Time) ScoresToBlocks();
+    }
+
+    // タイム：最終ポイントを積み木の数にする（0点以下は積まない）。色はその人の色と、少し明るい色を交互に
+    void ScoresToBlocks()
+    {
+        foreach (var e in entries)
+        {
+            e.blockColors.Clear();
+            int n = Mathf.Clamp(e.score, 0, MaxScoreBlocks);
+            Color light = Color.Lerp(e.playerColor, Color.white, 0.35f);
+            for (int b = 0; b < n; b++) e.blockColors.Add(b % 2 == 0 ? e.playerColor : light);
+            e.blocks = n;
         }
     }
 
@@ -376,9 +398,9 @@ public class ResultTowerScreen : MonoBehaviour
         ToyKit.Anchor(countRoot, new Vector2(1f, 0.5f), new Vector2(-260f, 0f), new Vector2(400f, 300f));
         countGroup = countRoot.gameObject.AddComponent<CanvasGroup>();
         countGroup.alpha = 0f;
-        var label = ToyKit.UIText("Label", countRoot, font, "たかさ", 52f, ToyKit.Ink);
+        var label = ToyKit.UIText("Label", countRoot, font, mode == MatchSetup.MatchMode.Time ? "ポイント" : "たかさ", 52f, ToyKit.Ink);
         ToyKit.Anchor(label.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 90f), new Vector2(400f, 70f));
-        countText = ToyKit.UIText("Number", countRoot, font, "0こ", 140f, Palette[2]);
+        countText = ToyKit.UIText("Number", countRoot, font, "0" + CountUnit, 140f, Palette[2]);
         countText.fontSharedMaterial = popMat;
         ToyKit.Anchor(countText.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, -20f), new Vector2(400f, 180f));
 
@@ -577,7 +599,9 @@ public class ResultTowerScreen : MonoBehaviour
         if (index % 2 == 0) Pop("トン", at + new Vector3(1.1f, 0.3f, 0f), 46f, Palette[(index + 2) % Palette.Length], UnityEngine.Random.Range(-12f, 12f));
         if (t == towers[0])
         {
-            countText.text = t.stacked + "こ";
+            // タイムは最後の1個で本当の点数を出す（上限より多く取っていたとき）
+            int shown = mode == MatchSetup.MatchMode.Time && t.stacked == t.blocks.Count ? t.entry.score : t.stacked;
+            countText.text = shown + CountUnit;
             countPunch = 1f;
         }
 
@@ -674,7 +698,7 @@ public class ResultTowerScreen : MonoBehaviour
         nextSource = (nextSource + 1) % audioSources.Length;
         source.clip = clip;
         source.pitch = pitch;
-        source.volume = volume * MatchSounds.Instance.seVolume * GameSettings.SeVolume;
+        source.volume = volume * MatchSounds.Instance.SeVolume * GameSettings.SeVolume;
         source.Play();
     }
 

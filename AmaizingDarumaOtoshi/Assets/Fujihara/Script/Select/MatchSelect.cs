@@ -381,7 +381,7 @@ public class MatchSelect : MonoBehaviour
                     break;
                 case RuleKind.StockTime:
                     SetRule(row, rules.stockTimeLimit > 0f ? TimeText(rules.stockTimeLimit) : "なし",
-                        rules.stockTimeLimit > 0f ? "時間切れになったら、残りストックが一番多い人の勝ち" : "最後の1人になるまで続ける");
+                        rules.stockTimeLimit > 0f ? "時間切れになったら、残りストックが一番多い人の勝ち（同じなら積み木が多い人）" : "最後の1人になるまで続ける");
                     break;
                 case RuleKind.TimeLength:
                     SetRule(row, TimeText(rules.timeLength), "決めた時間いっぱい戦う。やられても何度でも復活できる");

@@ -21,3 +21,6 @@ MonoBehaviour:
   useResultScene: 1
   resultSceneName: ResultTowerScene
   resultSceneDelay: 2
+  stockResultSceneName: ResultTowerScene
+  ghostResultSceneName: ResultTowerScene
+  timeResultSceneName: ResultTowerScene

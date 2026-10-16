@@ -98,7 +98,7 @@ public class MatchAudio : MonoBehaviour
     void Prewarm()
     {
         var s = m_sounds;
-        foreach (var clip in new[] { s.Bgm, s.Swing, s.ShotSwing, s.HitBlock, s.HitReturn, s.HitCharacter, s.BlockHitCharacter,
+        foreach (var clip in new[] { s.Bgm, s.Swing, s.HitBlock, s.Knock,
                                      s.BlockHitBlock, s.Pickup, s.Jump, s.KO, s.Fall, s.Ghost, s.Respawn, s.PlayerOut, s.ScoreUp,
                                      s.ScoreDown, s.StartWhistle, s.Tick, s.TickLast, s.FinishWhistle, s.TimeUpWhistle, s.Victory, s.Draw })
         {
@@ -163,7 +163,7 @@ public class MatchAudio : MonoBehaviour
         DontDestroyOnLoad(go);
         var source = go.AddComponent<AudioSource>();
         source.clip = clip;
-        source.volume = volume * m_sounds.seVolume * GameSettings.SeVolume;
+        source.volume = volume * m_sounds.SeVolume * GameSettings.SeVolume;
         source.Play();
         Destroy(go, clip.length + 0.1f);
     }
@@ -183,7 +183,7 @@ public class MatchAudio : MonoBehaviour
                 m_lastTick = sec;
                 Play(sec <= 3 ? m_sounds.TickLast : m_sounds.Tick, 0.6f);
             }
-            m_bgm.pitch = left <= 10f ? m_sounds.hurryPitch : 1f;
+            m_bgm.pitch = left <= 10f ? m_sounds.HurryPitch : 1f;
         }
     }
 
@@ -208,8 +208,9 @@ public class MatchAudio : MonoBehaviour
                 bool busy = w.hammer.IsBusy;
                 if (busy && !w.busy)
                 {
+                    // 振った音（股抜きショットは少し低く重く、幽霊は小さく低く）
                     bool ghost = w.player.State == MatchPlayer.PlayerState.Ghost;
-                    if (w.hammer.IsShooting) Play(m_sounds.ShotSwing, 0.8f, 1f, body);
+                    if (w.hammer.IsShooting) Play(m_sounds.Swing, 0.8f, 0.85f, body);
                     else Play(m_sounds.Swing, ghost ? 0.45f : 0.7f, ghost ? 0.8f : 1f, body);
                 }
                 w.busy = busy;
@@ -230,16 +231,16 @@ public class MatchAudio : MonoBehaviour
     {
         if (h.Target is DarumaCharacter)
         {
-            // 無敵中で効かなかったときは軽い音
-            if (h.Damaged) Play(m_sounds.HitCharacter, 1f, 1f, h.Point);
+            // ハンマーで相手の積み木を直接はじき出した → 積み木を飛ばした音。無敵中で効かなかったときは軽い音
+            if (h.Damaged) Play(m_sounds.Knock, 1f, 1f, h.Point);
             else Play(m_sounds.BlockHitBlock, 0.4f, 0.8f, h.Point);
         }
-        else if (h.ReturnCount > 0)
+        else
         {
-            // 打ち返すほど高く
-            Play(m_sounds.HitReturn, 0.9f, Mathf.Min(1f + 0.08f * (h.ReturnCount - 1), 1.5f), h.Point);
+            // 振ったハンマーが積み木に当たった（打ち返しは、打ち返すほど高く）
+            float pitch = h.ReturnCount > 0 ? Mathf.Min(1.05f + 0.08f * (h.ReturnCount - 1), 1.5f) : 1f;
+            Play(m_sounds.HitBlock, 0.9f, pitch, h.Point);
         }
-        else Play(m_sounds.HitBlock, 0.9f, 1f, h.Point);
     }
 
     void OnBlockHit(TumikiHitInfo h)
@@ -247,7 +248,8 @@ public class MatchAudio : MonoBehaviour
         float power = Mathf.Clamp01(h.Speed / 15f);
         if (h.Target is DarumaCharacter)
         {
-            if (h.IsHarmful) Play(m_sounds.BlockHitCharacter, Mathf.Lerp(0.5f, 1f, power), 1f, h.Point);
+            // 飛ばした積み木が相手に当たった → 積み木を飛ばした音
+            if (h.IsHarmful) Play(m_sounds.Knock, Mathf.Lerp(0.6f, 1f, power), 1f, h.Point);
         }
         else if (h.Speed > 1.5f) Play(m_sounds.BlockHitBlock, Mathf.Lerp(0.2f, 0.8f, power), Random.Range(0.9f, 1.15f), h.Point);
     }
@@ -295,7 +297,7 @@ public class MatchAudio : MonoBehaviour
             m_pool.Add(source);
         }
         source.clip = clip;
-        source.volume = volume * m_sounds.seVolume * GameSettings.SeVolume;
+        source.volume = volume * m_sounds.SeVolume * GameSettings.SeVolume;
         source.pitch = pitch * Random.Range(0.97f, 1.03f);   // 同じ音が続いても単調にならないように
         source.panStereo = at.HasValue ? Pan(at.Value) : 0f;
         source.Play();
@@ -312,6 +314,6 @@ public class MatchAudio : MonoBehaviour
 
     void ApplyBgmVolume()
     {
-        if (m_bgm != null) m_bgm.volume = m_sounds.bgmVolume * GameSettings.BgmVolume * m_bgmFade;
+        if (m_bgm != null) m_bgm.volume = m_sounds.BgmVolume * GameSettings.BgmVolume * m_bgmFade;
     }
 }

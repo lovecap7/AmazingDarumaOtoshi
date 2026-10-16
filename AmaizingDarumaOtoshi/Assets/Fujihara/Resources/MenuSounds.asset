@@ -1,0 +1,18 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8a5aa3ea4c7df434e85e488c03f4590c, type: 3}
+  m_Name: MenuSounds
+  m_EditorClassIdentifier: Assembly-CSharp::MenuSounds
+  cursor: {fileID: 8300000, guid: cb11370985264c7408c80b75fac11306, type: 3}
+  decide: {fileID: 8300000, guid: b6d0769405a1e46469803ee036a0542f, type: 3}
+  cancel: {fileID: 8300000, guid: ba07f28fcf1dbed4cb7767d93647f7e2, type: 3}
+  candidates: []

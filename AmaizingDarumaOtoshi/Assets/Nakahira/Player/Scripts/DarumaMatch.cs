@@ -15,7 +15,7 @@ namespace Nakahira
     //
     // ■ モード
     //   ストック：やられるとストックが1つ減り、少ししてから首だけで復活。0 になったら脱落。最後の1人が勝ち
-    //             時間制限ありなら、時間切れでストックが一番多い人の勝ち
+    //             時間制限ありなら、時間切れでストックが一番多い人の勝ち(同じストックなら積み木が多い人)
     //   タイム　：やられても少ししてから復活。崩す +1・崩される -1・顔を飛ばす +1・相手なしで落ちる -1(MatchSetup.Rules)。
     //             時間切れで点が一番多い人の勝ち
     //   ゴースト：やられると幽霊になり、生き残っている相手を叩くと復活(出現ポイントのどれかにランダムで)。生き残りが1人になったら終わり
@@ -640,8 +640,8 @@ namespace Nakahira
                 case MatchSetup.MatchMode.Time:
                     return p.Score;
                 case MatchSetup.MatchMode.Stock:
-                    // 残っている人が上(時間切れならストックが多い順)。脱落した人は後に脱落した人ほど上
-                    if (p.State != MatchPlayer.PlayerState.Out) return 1000 + (timeUp ? p.Stocks : 0);
+                    // 残っている人が上(時間切れならストックが多い順。同じストックなら積み木が多い順)。脱落した人は後に脱落した人ほど上
+                    if (p.State != MatchPlayer.PlayerState.Out) return 1000 + (timeUp ? p.Stocks * 100 + p.StackCount : 0);
                     return p.OutOrder;
                 default:
                     // 生き残っている人が上(時間切れなら積み木が多い順)。幽霊は後にやられた人ほど上

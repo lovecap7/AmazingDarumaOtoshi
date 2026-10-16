@@ -12,30 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f751af4a15b44f04ba5ac086d513b0e7, type: 3}
   m_Name: MatchSounds
   m_EditorClassIdentifier: Assembly-CSharp::MatchSounds
-  bgmVolume: 0.45
-  seVolume: 0.9
-  bgm: {fileID: 0}
-  hurryPitch: 1.06
-  swing: {fileID: 0}
-  shotSwing: {fileID: 0}
-  hitBlock: {fileID: 0}
-  hitReturn: {fileID: 0}
-  hitCharacter: {fileID: 0}
-  blockHitCharacter: {fileID: 0}
-  blockHitBlock: {fileID: 0}
-  pickup: {fileID: 0}
-  jump: {fileID: 0}
-  ko: {fileID: 0}
-  fall: {fileID: 0}
-  ghost: {fileID: 0}
-  respawn: {fileID: 0}
-  playerOut: {fileID: 0}
-  scoreUp: {fileID: 0}
-  scoreDown: {fileID: 0}
-  startWhistle: {fileID: 0}
-  tick: {fileID: 0}
-  tickLast: {fileID: 0}
-  finishWhistle: {fileID: 0}
-  timeUpWhistle: {fileID: 0}
-  victory: {fileID: 0}
-  draw: {fileID: 0}
+  swing: {fileID: 8300000, guid: fe71af07b4b586c41ab5ba2091fbafb2, type: 3}
+  hitBlock: {fileID: 8300000, guid: 76548ba859b11a8469b62ef0991a0e84, type: 3}
+  knock: {fileID: 8300000, guid: 134f23bee96e81a4691d5da8fde41ceb, type: 3}
+  ko: {fileID: 8300000, guid: 23b67cafc04fffa4e942af16e6a9e643, type: 3}
+  candidates: []

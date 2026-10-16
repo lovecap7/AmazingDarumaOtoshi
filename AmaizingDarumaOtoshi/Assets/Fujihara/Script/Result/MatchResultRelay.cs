@@ -78,6 +78,7 @@ public static class ResultData
         public int kos;                 // 顔を飛ばした数
         public MatchPlayer.PlayerState state;   // 試合が終わったときの状態（生存 / 幽霊 / 復活待ち / 脱落）
         public int stocks = -1;         // 残りストック（ストックモード以外は -1）
+        public int score;               // 点数（タイムモード）
     }
 
     public static readonly List<Entry> Ranking = new List<Entry>();   // 1位から順
@@ -106,6 +107,7 @@ public static class ResultData
                 kos = p.KOs,
                 state = p.State,
                 stocks = p.Stocks,
+                score = p.Score,
             };
             var stack = p.Stack;
             if (stack != null)

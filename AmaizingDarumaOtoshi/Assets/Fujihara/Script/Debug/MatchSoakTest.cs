@@ -299,7 +299,9 @@ public class MatchSoakTest : MonoBehaviour
         if (r.Reason == DarumaMatch.FinishReason.TimeUp && r.Winner != null)
         {
             if (d.Mode == MatchSetup.MatchMode.Time && d.Players.Any(p => p != r.Winner && p.Score >= r.Winner.Score)) Problem("タイム：一番点が多い人が勝っていない");
-            if (d.Mode == MatchSetup.MatchMode.Stock && d.Players.Any(p => p != r.Winner && p.State != MatchPlayer.PlayerState.Out && p.Stocks >= r.Winner.Stocks)) Problem("ストック：一番ストックが多い人が勝っていない");
+            if (d.Mode == MatchSetup.MatchMode.Stock && d.Players.Any(p => p != r.Winner && p.State != MatchPlayer.PlayerState.Out
+                    && (p.Stocks > r.Winner.Stocks || p.Stocks == r.Winner.Stocks && p.StackCount >= r.Winner.StackCount)))
+                Problem("ストック：ストック（同じなら積み木）が一番多い人が勝っていない");
             if (d.Mode == MatchSetup.MatchMode.Ghost && d.Players.Any(p => p != r.Winner && p.IsAlive && p.StackCount >= r.Winner.StackCount)) Problem("ゴースト：一番積み木が多い人が勝っていない");
         }
 

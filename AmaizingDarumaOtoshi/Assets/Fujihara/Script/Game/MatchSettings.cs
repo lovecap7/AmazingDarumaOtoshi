@@ -36,7 +36,7 @@ public class MatchSettings : ScriptableObject
     [Tooltip("ゴーストのリザルト画面（空欄なら上の「リザルト画面のシーン名」）")]
     public string ghostResultSceneName = "ResultTowerScene";
     [Tooltip("タイムのリザルト画面（空欄なら上の「リザルト画面のシーン名」）")]
-    public string timeResultSceneName = "";
+    public string timeResultSceneName = "ResultTowerScene";
 
     // モードに合わせたリザルト画面のシーン名
     public string ResultSceneFor(MatchSetup.MatchMode mode)
