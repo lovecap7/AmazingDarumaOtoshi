@@ -87,10 +87,11 @@ public class BlockController : MonoBehaviour
         }
     }
 
-    // behaviorを外部(生成担当側)から差し替えるための窓口
-    public void SetBehavior(IBlockBehavior newBehavior)
+    // 生成担当が、積み木を生成した直後に種類を指定するための窓口
+    public void SetBehaviorType(BehaviorType type)
     {
-        behavior = newBehavior;
+        behaviorType = type;
+        behavior = CreateBehavior(type);
     }
 
     // 積み木を飛ばす処理

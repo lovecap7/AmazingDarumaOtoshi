@@ -2,7 +2,7 @@ using UnityEngine;
 
 // 色の定義と判定
 public enum BlockColor {Red,Blue,Green,Yellow,All }
-public static class BlockColorUtil
+public static class BlockDefinition
 {
     // 2つの色が一致しているか判定
     public static bool IsMatch(BlockColor color1, BlockColor color2)
