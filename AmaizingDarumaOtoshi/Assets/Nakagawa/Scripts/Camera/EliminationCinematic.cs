@@ -6,6 +6,7 @@ namespace Nakagawa
     // プレイヤーが脱落した瞬間に、一瞬スローにしてカメラを脱落した場所へ寄せ、その場所にエフェクトを出す演出(MatchCamera と同じカメラに付ける)
     // 流れ(実時間): 寄る → スローのまま止める → 通常の速さに戻しながら引く
     // 時間の速さ(Time.timeScale)は演出の前の値に戻す。演出中に他(試合の進行など)が時間の速さを変えたら、その値を優先して手を引く
+    // 落下で脱落したときは、場外判定に触れた位置に同じエフェクトを文字なしで出す(カメラの演出は既定ではしない)
     [RequireComponent(typeof(MatchCamera))]
     [DefaultExecutionOrder(-50)]
     public class EliminationCinematic : MonoBehaviour
@@ -46,6 +47,14 @@ namespace Nakagawa
         [Tooltip("エフェクトを消すまでの時間(ゲーム内の時間・秒。スロー中はゆっくり進む)")]
         [SerializeField, Min(0.1f)] float m_effectLifetime = 3.0f;
 
+        [Header("場外(落下)のエフェクト")]
+        [Tooltip("落下で脱落したとき、場外判定に触れた位置にエフェクトを出す(カメラの演出は「演出する脱落」の設定に従う)")]
+        [SerializeField] bool m_effectOnFall = true;
+        [Tooltip("落下のときに出すエフェクト。未設定なら上の「エフェクト」と同じものを使う")]
+        [SerializeField] GameObject m_fallEffectPrefab;
+        [Tooltip("落下のときは文字(K.O.! など)を出さない")]
+        [SerializeField] bool m_hideTextOnFall = true;
+
         MatchCamera m_camera;
         bool m_playing;
         float m_time;
@@ -77,10 +86,31 @@ namespace Nakagawa
 
         private void OnEliminated(DarumaCharacter character)
         {
-            if (!m_enabled || !ShouldPlay(character.EliminationCause)) return;
+            if (!m_enabled) return;
+            if (character.EliminationCause == EliminationCause.Fall) SpawnFallEffect(character);
+            if (!ShouldPlay(character.EliminationCause)) return;
+            if (character.EliminationCause == EliminationCause.Fall)
+            {
+                // 落下のエフェクトは SpawnFallEffect で出したので、カメラの演出だけ
+                Play(character.EliminationPosition + Vector3.up * m_focusHeight);
+                return;
+            }
             Vector3 position = character.transform.position;
             if (m_effectPrefab != null) Destroy(Instantiate(m_effectPrefab, position, Quaternion.identity), m_effectLifetime);
             Play(position + Vector3.up * m_focusHeight);
+        }
+
+        // 落下で脱落した: 場外判定に触れた位置(DarumaCharacter.EliminationPosition)にエフェクトを出す
+        private void SpawnFallEffect(DarumaCharacter character)
+        {
+            var prefab = m_fallEffectPrefab != null ? m_fallEffectPrefab : m_effectPrefab;
+            if (!m_effectOnFall || prefab == null) return;
+            var effect = Instantiate(prefab, character.EliminationPosition, Quaternion.identity);
+            if (m_hideTextOnFall)
+            {
+                foreach (var popup in effect.GetComponentsInChildren<EffectPopup>(true)) popup.HideText();
+            }
+            Destroy(effect, m_effectLifetime);
         }
 
         private bool ShouldPlay(EliminationCause cause)

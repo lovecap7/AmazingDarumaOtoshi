@@ -12,7 +12,8 @@ namespace Nakagawa
     // 生成する数は各エリアの最小排出量を配ったうえで、少ないエリアから順に(同数ならランダムに)最大排出量まで割り振る
     // 生成予定数が全エリアの最小の合計より少ない / 最大の合計より多い場合は、生成予定数を合計に合わせて色を作り直す
     // 全エリアは同じタイミングで命令を受け取り、それぞれ命令どおりに生成する(プレイヤーがいるエリアはスキップ)
-    // 盤面にある積み木(積まれていないもの)が上限以上なら、その回はどのエリアも生成しない
+    // 生成は床の予告(TumikiSpawnWarning)を出してから行う(予告の時間はエリアごとの設定)
+    // 盤面にある積み木(積まれていないもの。予告中のものも含む)が上限以上なら、その回はどのエリアも生成しない
     public class TumikiSpawner : MonoBehaviour
     {
         [SerializeField] TumikiBlock m_tumikiPrefab;
@@ -34,7 +35,7 @@ namespace Nakagawa
         TumikiSpawnArea[] m_areas = Array.Empty<TumikiSpawnArea>();
         readonly List<Vector3> m_reserved = new List<Vector3>();
 
-        // 生成命令を出した(使ったパターン、命令した数、実際に生成した数)。演出・UI等の拡張用
+        // 生成命令を出した(使ったパターン、命令した数、実際に生成(予告)した数)。演出・UI等の拡張用
         public event Action<TumikiSpawnPattern, int, int> Spawned;
         // 盤面の積み木が多すぎて生成しなかった
         public event Action<int> SpawnSkipped;
@@ -55,7 +56,8 @@ namespace Nakagawa
         private void Update()
         {
             if (m_needsScan) ScanAreas();
-            if (!HasPatterns || m_match != null && m_match.IsFinished) return;
+            // 試合が終わった・開始のカウントダウン中は生成しない(最初の生成までの時間もカウントダウンが終わってから数える)
+            if (!HasPatterns || m_match != null && (m_match.IsFinished || m_match.IsCountingDown)) return;
 
             m_timer -= Time.deltaTime;
             if (m_timer > 0.0f) return;
@@ -169,10 +171,10 @@ namespace Nakagawa
             return sum;
         }
 
-        // 盤面にある積み木(プレイヤーに積まれているものは除く)
+        // 盤面にある積み木(プレイヤーに積まれているものは除く。予告中でまだ生成していないものは含む)
         public static int CountBlocksOnBoard()
         {
-            int n = 0;
+            int n = TumikiSpawnWarning.Active.Count;
             foreach (var block in FindObjectsByType<TumikiBlock>())
             {
                 if (block.CurrentState != TumikiBlock.State.Stacked) n++;

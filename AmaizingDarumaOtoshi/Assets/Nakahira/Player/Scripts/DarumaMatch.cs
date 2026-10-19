@@ -30,9 +30,12 @@ namespace Nakahira
     //     IsFinished / Result：結果(勝者・理由・順位)
     //   イベント
     //     Started                  ：試合が始まった(全員が出たあと。直接再生では、最初からいる人(ダミー)が出たあと)
+    //     CountdownFinished        ：開始のカウントダウンが終わって動けるようになった(カウントダウンが無ければ来ない)
+    //                                カウントダウン中は IsCountingDown / CountdownLeft で読む。操作・時間・積み木の生成は止まる
     //     PlayerJoined(人)         ：途中から参加した(直接再生)
     //     PlayerKnocked(被害, 相手)：積み木を崩された(相手が分かったときだけ)
     //     PlayerKO(被害, 相手)     ：顔を飛ばされた / 落ちた(相手は分からなければ null)
+    //     PlayerRespawnAppearing(人, 位置, 秒)：復活の出現演出が始まった(この秒数のあとに位置へ出て PlayerRespawned が来る)
     //     PlayerRespawned(人)      ：復活した(ストック・タイムの復活、幽霊からの復活)
     //     PlayerOut(人)            ：脱落した(ストックが無くなった)
     //     Scored(人, 点, 理由)      ：点が動いた(タイム)
@@ -81,6 +84,14 @@ namespace Nakahira
         [Header("表示")]
         // 試合の仮の表示(名札・残り時間・結果)を付ける
         [SerializeField] bool m_addDebugView = true;
+        // 復活するとき、出る位置で光る演出(PlayerRespawnAppearing)を見せてからキャラクターを出すまでの時間(0 ならすぐ出す)
+        [SerializeField, Min(0.0f)] float m_respawnAppearTime = 0.8f;
+
+        [Header("開始のカウントダウン")]
+        // カウントダウンの秒数(3 なら 3, 2, 1。0 ならすぐ始める)。シーンのフェードが明けてから数え始める
+        [SerializeField, Min(0.0f)] float m_startCountdown = 3.0f;
+        // 直接再生でもカウントダウンする(オフならセレクトから始めた試合だけ)
+        [SerializeField] bool m_countdownInDirectPlay = false;
 
         public static DarumaMatch Current { get; private set; }
 
@@ -117,12 +128,21 @@ namespace Nakahira
         public float TimeLeft => HasTimeLimit ? Mathf.Max(0f, m_timeLimit - Elapsed) : -1f;
         public float Elapsed { get; private set; }
         public MatchResult Result { get; private set; }
+        // 復活の出現演出の時間
+        public float RespawnAppearTime => m_respawnAppearTime;
+        // 開始のカウントダウン中か(フェードが明けるのを待っている間も含む)。この間は操作・時間・積み木の生成が止まる
+        public bool IsCountingDown => m_countdownLeft > 0f;
+        // カウントダウンの残り(秒)と、全体の秒数
+        public float CountdownLeft => Mathf.Max(0f, m_countdownLeft);
+        public float CountdownLength => m_countdownLength;
 
         // ---- お知らせ ----
         public event Action Started;
+        public event Action CountdownFinished;
         public event Action<MatchPlayer> PlayerJoined;
         public event Action<MatchPlayer, MatchPlayer> PlayerKnocked;
         public event Action<MatchPlayer, MatchPlayer> PlayerKO;
+        public event Action<MatchPlayer, Vector3, float> PlayerRespawnAppearing;
         public event Action<MatchPlayer> PlayerRespawned;
         public event Action<MatchPlayer> PlayerOut;
         public event Action<MatchPlayer, int, ScoreReason> Scored;
@@ -135,6 +155,14 @@ namespace Nakahira
             public bool head;
         }
 
+        // 復活の出現演出中(時間が来たら pos に出す)
+        class Appearing
+        {
+            public MatchPlayer player;
+            public Vector3 pos;
+            public float timeLeft;
+        }
+
         MatchSettings m_settings;
         MatchSetup.MatchRules m_rules;
         PlayerInputManager m_inputManager;
@@ -142,10 +170,12 @@ namespace Nakahira
         readonly List<MatchPlayer> m_players = new List<MatchPlayer>();
         readonly Dictionary<DarumaCharacter, MatchPlayer> m_owners = new Dictionary<DarumaCharacter, MatchPlayer>();
         readonly List<Hit> m_hits = new List<Hit>();
+        readonly List<Appearing> m_appearing = new List<Appearing>();
         int m_outCount, m_lastOutFrame = -1;
         bool m_lastOnePending, m_timeUpFinish;
         float m_finishTime = -1f;
         bool m_leaving;
+        float m_countdownLeft, m_countdownLength;
 
         private void Awake()
         {
@@ -234,6 +264,8 @@ namespace Nakahira
                 if (p.Ghost != null) Destroy(p.Ghost.gameObject);
             }
             m_hits.Clear();
+            // 出現演出中の人も SpawnAllAtStart で出し直す
+            m_appearing.Clear();
         }
 
         // 全員(脱落した人を除く)を出現ポイントに出し直す
@@ -271,6 +303,7 @@ namespace Nakahira
                 StackDebugBlocks(p.Character);
             }
             Time.timeScale = PlaySpeed;
+            if (m_countdownInDirectPlay) BeginCountdown();
             Started?.Invoke();
         }
 
@@ -344,7 +377,35 @@ namespace Nakahira
             }
             Debug.Log("[DarumaMatch] " + MatchSetup.Describe());
             Time.timeScale = PlaySpeed;
+            BeginCountdown();
             Started?.Invoke();
+        }
+
+        //========================================
+        // 開始のカウントダウン(共通)
+        //========================================
+
+        // カウントダウンを始める(出ている全員の操作を止める。あとから出たキャラクターも SpawnMatchCharacter で止める)
+        void BeginCountdown()
+        {
+            if (m_startCountdown <= 0f) return;
+            m_countdownLength = m_startCountdown;
+            m_countdownLeft = m_startCountdown;
+            foreach (var p in m_players) if (p.Character != null) p.Character.SetCommandSource(null);
+        }
+
+        // フェードが明けてから数える。終わったら全員を動けるようにする。カウントダウン中なら true
+        bool UpdateCountdown()
+        {
+            if (m_countdownLeft <= 0f) return false;
+            if (Fader.IsBusy) return true;
+            m_countdownLeft -= Time.deltaTime;
+            if (m_countdownLeft > 0f) return true;
+
+            m_countdownLeft = 0f;
+            foreach (var p in m_players) if (p.Character != null) p.Character.SetCommandSource(p.CommandSource);
+            CountdownFinished?.Invoke();
+            return false;
         }
 
         MatchPlayer CreatePlayer(MatchSetup.Entry e)
@@ -400,6 +461,8 @@ namespace Nakahira
                 last = n;
             };
             p.SetCharacter(c);
+            // カウントダウン中に出し直した(ステージの切り替えなど)キャラクターも、終わるまで動かさない
+            if (IsCountingDown) c.SetCommandSource(null);
         }
 
         DarumaCharacter CharacterPrefab(MatchPlayer p)
@@ -424,21 +487,61 @@ namespace Nakahira
         void UpdateMatch()
         {
             if (Result != null) { UpdateResult(); return; }
+            // カウントダウン中は時間を進めない
+            if (UpdateCountdown()) return;
 
             Elapsed += Time.deltaTime;
 
             // 復活待ち
             foreach (var p in m_players)
             {
-                if (p.State != MatchPlayer.PlayerState.Respawning) continue;
+                if (p.State != MatchPlayer.PlayerState.Respawning || IsAppearing(p)) continue;
                 p.RespawnTimeLeft -= Time.deltaTime;
                 if (p.RespawnTimeLeft > 0f) continue;
-                SpawnMatchCharacter(p, FarthestSpawnPoint(p), true);
-                PlayerRespawned?.Invoke(p);
+                Respawn(p, FarthestSpawnPoint(p));
             }
+            UpdateAppearing();
 
             if (HasTimeLimit && Elapsed >= m_timeLimit) Finish(FinishReason.TimeUp);
             else if (IsConfigured && AutoReturnToSelect && PressedBack()) BackToSelect();   // テスト用:途中でもセレクトへ戻れる
+        }
+
+        // 復活させる。出現演出の時間があれば、その間は出る位置で光る演出を見せてから出す
+        void Respawn(MatchPlayer p, Vector3 pos)
+        {
+            if (m_respawnAppearTime <= 0f)
+            {
+                RespawnNow(p, pos);
+                return;
+            }
+            m_appearing.Add(new Appearing { player = p, pos = pos, timeLeft = m_respawnAppearTime });
+            PlayerRespawnAppearing?.Invoke(p, pos, m_respawnAppearTime);
+        }
+
+        void RespawnNow(MatchPlayer p, Vector3 pos)
+        {
+            SpawnMatchCharacter(p, pos, true);
+            PlayerRespawned?.Invoke(p);
+        }
+
+        // 出現演出が終わった人を出す
+        void UpdateAppearing()
+        {
+            for (int i = 0; i < m_appearing.Count;)
+            {
+                var a = m_appearing[i];
+                a.timeLeft -= Time.deltaTime;
+                if (a.timeLeft > 0f) { i++; continue; }
+                m_appearing.RemoveAt(i);
+                if (a.player != null && a.player.State != MatchPlayer.PlayerState.Out) RespawnNow(a.player, a.pos);
+            }
+        }
+
+        // 復活の出現演出中か(まだキャラクターは出ていない)
+        public bool IsAppearing(MatchPlayer p)
+        {
+            foreach (var a in m_appearing) if (a.player == p) return true;
+            return false;
         }
 
         void LateUpdateMatch()
@@ -576,8 +679,7 @@ namespace Nakahira
                 if (Result != null) return;
                 // その場で復活すると、直接殴った相手(近くにいる幽霊など)にすぐ殴り返されるので、出現ポイントのどれかに出す(仮)
                 Destroy(g.gameObject);
-                SpawnMatchCharacter(p, RandomSpawnPoint(), true);
-                PlayerRespawned?.Invoke(p);
+                Respawn(p, RandomSpawnPoint());
             };
             p.SetGhost(ghost);
         }
@@ -599,7 +701,8 @@ namespace Nakahira
             int left = 0;
             foreach (var p in m_players)
             {
-                bool inGame = Mode == MatchSetup.MatchMode.Ghost ? p.IsAlive : p.State != MatchPlayer.PlayerState.Out;
+                // 幽霊から復活する途中(出現演出中)の人は生存者として数える
+                bool inGame = Mode == MatchSetup.MatchMode.Ghost ? p.IsAlive || IsAppearing(p) : p.State != MatchPlayer.PlayerState.Out;
                 if (inGame) left++;
             }
             return left;
@@ -645,7 +748,7 @@ namespace Nakahira
                     return p.OutOrder;
                 default:
                     // 生き残っている人が上(時間切れなら積み木が多い順)。幽霊は後にやられた人ほど上
-                    if (p.IsAlive) return 1000 + (timeUp ? p.StackCount : 0);
+                    if (p.IsAlive || IsAppearing(p)) return 1000 + (timeUp ? p.StackCount : 0);
                     return p.OutOrder;
             }
         }
@@ -710,7 +813,7 @@ namespace Nakahira
             return m_spawnPoints[UnityEngine.Random.Range(0, m_spawnPoints.Length)].position;
         }
 
-        // 復活:ほかのキャラクター(生存者・幽霊)すべてから一番遠い出現ポイント
+        // 復活:ほかのキャラクター(生存者・幽霊・出現演出中の位置)すべてから一番遠い出現ポイント
         Vector3 FarthestSpawnPoint(MatchPlayer self)
         {
             if (m_spawnPoints == null || m_spawnPoints.Length == 0) return Vector3.zero;
@@ -723,6 +826,10 @@ namespace Nakahira
                 {
                     if (p == self || p.Body == null) continue;
                     nearest = Mathf.Min(nearest, Vector3.Distance(point.position, p.Body.position));
+                }
+                foreach (var a in m_appearing)
+                {
+                    if (a.player != self) nearest = Mathf.Min(nearest, Vector3.Distance(point.position, a.pos));
                 }
                 if (nearest > bestScore) { bestScore = nearest; best = point.position; }
             }

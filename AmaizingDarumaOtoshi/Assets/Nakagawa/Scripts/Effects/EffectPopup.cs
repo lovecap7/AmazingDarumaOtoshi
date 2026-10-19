@@ -32,6 +32,14 @@ namespace Nakagawa
 
         float m_time;
         Vector3 m_textBasePosition;
+
+        // 文字を出さない(同じエフェクトを文字なしで使うとき。生成した直後に呼ぶ)
+        public void HideText()
+        {
+            if (m_text != null) m_text.gameObject.SetActive(false);
+            m_text = null;
+            m_textMeshes = null;
+        }
         Vector3 m_textBaseScale;
         Color[] m_textColors;
 

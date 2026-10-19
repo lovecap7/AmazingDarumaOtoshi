@@ -13,6 +13,8 @@ namespace Nakagawa
     //  ・タイム  : 点数
     //  ・ゴースト: 撃墜数(相手の顔を飛ばした数)
     // どのモードでも、撃墜数と積んでいる積み木の数を小さく出す。復活待ち・幽霊・脱落も表示する
+    // 開始のカウントダウン(StartCountdownView)を自動で付ける
+    // プレイヤーや積み木がパネルの近くに映っているときは、パネルを半透明にして見えるようにする
     // 途中参加(直接再生)した人のパネルもその場で増える
     [RequireComponent(typeof(DarumaMatch))]
     public class MatchHud : MonoBehaviour
@@ -23,6 +25,25 @@ namespace Nakagawa
         // 画面下からパネルの中心までの高さ
         [SerializeField] float m_bottom = 120.0f;
         [SerializeField] int m_sortingOrder = 15;
+
+        [Header("近くに物があるときの半透明")]
+        [SerializeField] bool m_fadeWhenOccluding = true;
+        // プレイヤーや積み木がパネルに重なっている(近い)ときの濃さ
+        [SerializeField, Range(0.0f, 1.0f)] float m_occludedAlpha = 0.3f;
+        // パネルの外側のこの距離(1920x1080 基準のピクセル)までを「近い」とみなす
+        [SerializeField, Min(0.0f)] float m_occludeMargin = 40.0f;
+        // 頭の高さ(この高さまでを画面に映る体とみなして調べる)
+        [SerializeField, Min(0.0f)] float m_bodyCheckHeight = 1.6f;
+        // 半透明になる・戻る速さ(1秒あたり)
+        [SerializeField, Min(0.1f)] float m_fadeSpeed = 6.0f;
+
+        [Header("積み木の数")]
+        // 積み木の数をパネルに出す
+        [SerializeField] bool m_showStackInPanel = true;
+
+        [Header("開始のカウントダウン")]
+        // 開始のカウントダウンの表示(StartCountdownView)を自動で付ける(数える秒数は DarumaMatch で決める)
+        [SerializeField] bool m_addStartCountdown = true;
 
         [Header("ストックのアイコン")]
         [SerializeField] float m_stockIconSize = 30.0f;
@@ -39,6 +60,8 @@ namespace Nakagawa
             public readonly List<Image> StockIcons = new List<Image>();
             public int LastMain = int.MinValue;
             public float Punch;
+            // 近くに物があるときの濃さ(1 = 通常)
+            public float Occlusion = 1.0f;
         }
 
         DarumaMatch m_match;
@@ -46,6 +69,10 @@ namespace Nakagawa
         TMP_FontAsset m_font;
         Material m_letterMat, m_popMat;
         readonly List<Panel> m_panels = new List<Panel>();
+        // パネルの近さを調べる物の画面上の位置(足元と頭)
+        readonly List<Vector2> m_screenPoints = new List<Vector2>();
+        readonly List<Transform> m_bodies = new List<Transform>();
+        readonly Vector3[] m_corners = new Vector3[4];
 
         private void Start()
         {
@@ -55,6 +82,7 @@ namespace Nakagawa
             m_popMat = ToyKit.PopMaterial(m_letterMat);
             m_canvas = ToyKit.CreateOverlayCanvas("MatchHud", m_sortingOrder);
             m_canvas.SetParent(transform, false);
+            if (m_addStartCountdown && GetComponent<StartCountdownView>() == null) gameObject.AddComponent<StartCountdownView>();
         }
 
         private void OnDestroy()
@@ -67,7 +95,59 @@ namespace Nakagawa
             if (m_match == null || m_canvas == null) return;
             SyncPanels();
             float dt = Time.unscaledDeltaTime;
-            foreach (var p in m_panels) UpdatePanel(p, dt);
+            if (m_fadeWhenOccluding) CollectScreenPoints();
+            foreach (var p in m_panels)
+            {
+                UpdatePanel(p, dt);
+                float target = m_fadeWhenOccluding && IsOccluded(p) ? m_occludedAlpha : 1.0f;
+                p.Occlusion = Mathf.MoveTowards(p.Occlusion, target, dt * m_fadeSpeed);
+                p.Group.alpha *= p.Occlusion;
+            }
+        }
+
+        // プレイヤー(生存・幽霊)と、盤面の積み木(積まれているものはプレイヤーの体で調べる)の画面上の位置
+        private void CollectScreenPoints()
+        {
+            m_screenPoints.Clear();
+            var cam = Camera.main;
+            if (cam == null) return;
+            m_match.GetBodies(m_bodies);
+            foreach (var body in m_bodies)
+            {
+                if (body == null) continue;
+                float height = m_bodyCheckHeight;
+                var character = body.GetComponent<DarumaCharacter>();
+                if (character != null) height = Mathf.Max(height, character.Stack.Height);
+                AddScreenPoint(cam, body.position);
+                AddScreenPoint(cam, body.position + Vector3.up * (height * 0.5f));
+                AddScreenPoint(cam, body.position + Vector3.up * height);
+            }
+            foreach (var block in FindObjectsByType<TumikiBlock>())
+            {
+                if (block.CurrentState != TumikiBlock.State.Stacked) AddScreenPoint(cam, block.transform.position);
+            }
+        }
+
+        private void AddScreenPoint(Camera cam, Vector3 world)
+        {
+            Vector3 sp = cam.WorldToScreenPoint(world);
+            if (sp.z > 0.0f) m_screenPoints.Add(sp);
+        }
+
+        // パネル(と周りの余白)の中に、プレイヤーや積み木が映っているか
+        private bool IsOccluded(Panel p)
+        {
+            if (m_screenPoints.Count == 0) return false;
+            // オーバーレイのキャンバスなので、角のワールド座標がそのまま画面のピクセル座標
+            p.Root.GetWorldCorners(m_corners);
+            float margin = m_occludeMargin * m_canvas.lossyScale.x;
+            float xMin = m_corners[0].x - margin, yMin = m_corners[0].y - margin;
+            float xMax = m_corners[2].x + margin, yMax = m_corners[2].y + margin;
+            foreach (var sp in m_screenPoints)
+            {
+                if (sp.x >= xMin && sp.x <= xMax && sp.y >= yMin && sp.y <= yMax) return true;
+            }
+            return false;
         }
 
         // 参加者が増えたら(途中参加)パネルを足し、全員分を横に並べ直す
@@ -136,7 +216,7 @@ namespace Nakagawa
 
             // 小さい数(撃墜・積み木)。ゴーストは撃墜数が大きい数なので出さない
             string kos = mode == MatchSetup.MatchMode.Stock || mode == MatchSetup.MatchMode.Time ? $"げきつい {player.KOs}　" : "";
-            p.Sub.text = $"{kos}つみき {player.StackCount}";
+            p.Sub.text = m_showStackInPanel ? $"{kos}つみき {player.StackCount}" : kos.TrimEnd('　');
 
             // 状態
             switch (player.State)

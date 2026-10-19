@@ -12,11 +12,13 @@ public class BlockController : MonoBehaviour
     // 現在の水平速度を外部(Behavior)から参照するための公開プロパティ
     public float CurrentSpeed => currentSpeed;
 
+    // 現在のbehaviorを外部から参照するための公開プロパティ(MagnetBehaviorが相手の挙動を判定するのに使う)
+    public IBlockBehavior Behavior => behavior;
+
     // テスト用：インスペクターで挙動を選べるようにする
-    public enum BehaviorType { Normal, Iwa,HebiLeft, HebiRight, UnBreak,Homing,Ziguzagu,Grow,Bomb }
+    public enum BehaviorType { Normal, Iwa,HebiLeft, HebiRight, UnBreak,Homing,Ziguzagu,Grow,Bomb, Magnet }
     [SerializeField] BehaviorType behaviorType = BehaviorType.Normal;
-    // テスト用：へびだるの曲がる強さ(度/秒)。大きいほど急カーブになる
-    [SerializeField] float hebiTurnSpeed = 60.0f;
+    [SerializeField] float hebiTurnSpeed = 60.0f; // テスト用：へびだるの曲がる強さ(度/秒)。大きいほど急カーブになる
     [SerializeField] float homingStartTurnSpeed = 270f;  // テスト用：ホーミング発射直後の旋回速度(度/秒)
     [SerializeField] float homingGuidanceDuration = 1.5f; // テスト用：誘導が切れるまでの時間(秒)
     [SerializeField] float ziguzagAngle = 40.0f;      // テスト用：ジグザグの傾き(度)
@@ -24,6 +26,10 @@ public class BlockController : MonoBehaviour
     [SerializeField] float growRate = 1.2f;        // テスト用：壁ヒットごとの拡大倍率
     [SerializeField] float growMaxMultiplier = 3.0f; // テスト用：初期サイズに対する最大倍率
     [SerializeField] float explosionRadius = 2.0f; // テスト用：爆発の範囲(半径)
+    [SerializeField] float magnetRange = 10.0f;     // テスト用：磁力が届く距離
+    [SerializeField] float magnetStrength = 10.0f;  // テスト用：磁力の強さ
+    [SerializeField] float magnetRepelStrength = 8.0f;  // テスト用：反発する力の強さ(最も近いとき)
+    [SerializeField] float magnetMinDistance = 0.5f;    // テスト用：反発が最大になる距離
     public bool isFlying {  get; private set; } // 現在飛行中かどうか trueの場合は攻撃判定が発生する
 
     // 開始時点で飛行中だったかを記録する
@@ -82,6 +88,7 @@ public class BlockController : MonoBehaviour
             case BehaviorType.Ziguzagu: return new ZiguzagBehavior(ziguzagAngle, ziguzagInterval);
             case BehaviorType.Grow: return new GrowBehavior(this, growRate, growMaxMultiplier);
             case BehaviorType.Bomb: return new BombBehavior(explosionRadius);
+            case BehaviorType.Magnet: return new MagnetBehavior(this, magnetRange, magnetStrength, magnetRepelStrength, magnetMinDistance);
             case BehaviorType.Normal:
             default: return new NormalBehavior();
         }

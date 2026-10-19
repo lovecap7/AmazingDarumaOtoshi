@@ -132,10 +132,26 @@ namespace Nakahira
         public static event Action<DarumaCharacter> AnyEliminated;
         // いずれかのキャラクターが積み木に上から乗って拾った(成功エフェクトなどの演出用)
         public static event Action<TumikiPickupInfo> AnyPickedUp;
+
+        // ドメインの再読み込みをしない設定では、前の再生で登録されたまま残った受け取り手が呼ばれ続けるので、再生のたびに空にする
+        // (受け取る側はシーンの読み込み時(OnEnable など)に登録し直す)
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetStatics()
+        {
+            AnyEliminated = null;
+            AnyPickedUp = null;
+        }
         // 脱落の原因(脱落していなければOther)
         public EliminationCause EliminationCause { get; private set; }
         // 攻撃(積み木・ハンマー)で脱落したか
         public bool IsEliminatedByAttack => EliminationCause == EliminationCause.Projectile || EliminationCause == EliminationCause.Hammer;
+        // 脱落したときに吹き飛んだ向き(演出用。単位ベクトル)
+        //  落下・原因不明: 真上 / ハンマー: 叩いた相手からやられた側への向き / 積み木: 当たった積み木の進む向き
+        public Vector3 EliminationDirection { get; private set; } = Vector3.up;
+        // 脱落した位置(撃墜演出を出す位置)。落下は場外判定(m_killY の高さ)に触れた位置
+        public Vector3 EliminationPosition { get; private set; }
+        // 場外判定の高さ(これより下に落ちたら脱落)
+        public float KillY => m_killY;
         // 他の生存者にダメージを与えた
         public event Action<DarumaCharacter> DealtDamage;
 
@@ -193,7 +209,10 @@ namespace Nakahira
             // 奈落に落ちた
             if (m_rb.position.y < m_killY)
             {
-                Eliminate(EliminationCause.Fall);
+                // 場外判定に触れた位置(1ステップで判定の高さを通り過ぎた分は、判定の高さに戻す)
+                Vector3 outPos = m_rb.position;
+                outPos.y = m_killY;
+                Eliminate(EliminationCause.Fall, Vector3.up, outPos);
                 return;
             }
 
@@ -389,8 +408,15 @@ namespace Nakahira
 
             if (m_stack.Count == 0)
             {
-                // 首だけ
-                Eliminate(EliminationCause.Hammer);
+                // 首だけ。叩いた相手からこちらへの向きに吹き飛ぶ(相手が分からなければ叩かれた向き)
+                Vector3 away = dir;
+                if (attacker != null && attacker.Body != null)
+                {
+                    Vector3 d = transform.position - attacker.Body.transform.position;
+                    d.y = 0.0f;
+                    if (d.sqrMagnitude > 0.0001f) away = d.normalized;
+                }
+                Eliminate(EliminationCause.Hammer, away, transform.position);
                 return true;
             }
 
@@ -415,8 +441,8 @@ namespace Nakahira
             int index = m_stack.IndexFromHeight(hitPoint.y - m_rb.position.y);
             if (index >= m_stack.Count)
             {
-                // 頭に当たった
-                Eliminate(EliminationCause.Projectile);
+                // 頭に当たった。当たった積み木の進む向きに吹き飛ぶ
+                Eliminate(EliminationCause.Projectile, projectile.Direction, transform.position);
                 return true;
             }
 
@@ -435,11 +461,16 @@ namespace Nakahira
         // 脱落。とりあえずキャラクターを消すだけ(演出は今後)
         public void Eliminate() => Eliminate(EliminationCause.Other);
 
-        public void Eliminate(EliminationCause cause)
+        public void Eliminate(EliminationCause cause) => Eliminate(cause, Vector3.up, transform.position);
+
+        // direction: 吹き飛んだ向き(撃墜演出の向き) / position: 撃墜演出を出す位置
+        public void Eliminate(EliminationCause cause, Vector3 direction, Vector3 position)
         {
             if (m_isEliminated) return;
             m_isEliminated = true;
             EliminationCause = cause;
+            EliminationDirection = direction.sqrMagnitude > 0.0001f ? direction.normalized : Vector3.up;
+            EliminationPosition = position;
             Eliminated?.Invoke(this);
             AnyEliminated?.Invoke(this);
             Destroy(gameObject);

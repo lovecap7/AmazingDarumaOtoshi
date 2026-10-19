@@ -156,9 +156,13 @@ namespace Nakahira
         // 飛んでいる積み木が他の積み木・キャラクターに当たった(カメラの揺れ・効果音など演出用。積み木側の処理の直前に呼ぶ)
         public static event Action<TumikiHitInfo> Hit;
 
-        // ドメインの再読み込みをしない設定でも、再生のたびに既定に戻す
+        // ドメインの再読み込みをしない設定でも、再生のたびに既定に戻す(前の再生で残った Hit の受け取り手も外す)
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        static void ResetStatics() => DefaultImpactBehavior = TumikiBreakImpact.Instance;
+        static void ResetStatics()
+        {
+            DefaultImpactBehavior = TumikiBreakImpact.Instance;
+            Hit = null;
+        }
 
         private void Awake()
         {
@@ -734,6 +738,15 @@ namespace Nakahira
         public void ExtendIgnore(float time)
         {
             m_ignoreTimer = Mathf.Max(m_ignoreTimer, time);
+        }
+
+        // 指定した相手と time 秒以上当たらないようにする(壁際で出してキャラクターと重なった積み木など)
+        // 当たらない時間は他の相手と共通。Launch / 積まれる / 崩れると元に戻る
+        public void IgnoreFor(Collider col, float time)
+        {
+            if (col == null || m_isConsumed) return;
+            if (!m_ignored.Contains(col)) IgnoreTemporarily(col);
+            ExtendIgnore(time);
         }
 
         private void UpdateIgnore(float dt)
