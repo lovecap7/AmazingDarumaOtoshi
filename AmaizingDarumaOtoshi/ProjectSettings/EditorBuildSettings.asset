@@ -5,15 +5,27 @@ EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Scenes:
-  - enabled: 0
-    path: Assets/Scenes/SampleScene.unity
-    guid: 99c9720ab356a0642a771bea13969a05
   - enabled: 1
     path: Assets/Fujihara/Scene/TitleScene.unity
     guid: a382cde5beb26954fac6dc2d675b03bf
   - enabled: 1
     path: Assets/Fujihara/Scene/MenuScene.unity
     guid: 9ab4f013aa928074caabc2f80ba37fcf
+  - enabled: 1
+    path: Assets/Fujihara/Scene/ResultScene.unity
+    guid: 159367a8d4ccb924fa2d99c6cba1e14c
+  - enabled: 1
+    path: Assets/Fujihara/Scene/ResultTowerScene.unity
+    guid: d97756bf23dbdb34c85532a9ac768d9b
+  - enabled: 1
+    path: Assets/Fujihara/Scene/SelectScene.unity
+    guid: 74df6591c4091f94cbfe804de1416819
+  - enabled: 1
+    path: Assets/Fujihara/Scene/MatchCheckScene.unity
+    guid: 803cb684c76a9df47a12d14ebb77bc7a
+  - enabled: 1
+    path: Assets/Nakagawa/Stages/AllStages.unity
+    guid: 03bf6466dd777a44ab80882ef9ed0dd3
   m_configObjects:
     com.unity.dt.app-ui: {fileID: 11400000, guid: 1b1c20d82303e4b5781c3ef50ac1449f, type: 2}
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
