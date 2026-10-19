@@ -43,7 +43,12 @@ namespace Nakagawa
 
         // ドメインの再読み込みをしない設定でも、再生のたびに空にする
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        static void ResetStatics() => s_active.Clear();
+        static void ResetStatics()
+        {
+            s_active.Clear();
+            AnySpawned = null;
+            AnyCanceled = null;
+        }
 
         public static TumikiSpawnWarning Create(TumikiSpawnArea area, TumikiBlock prefab, TumikiColor color, Vector3 pos, Quaternion rot, float duration)
         {

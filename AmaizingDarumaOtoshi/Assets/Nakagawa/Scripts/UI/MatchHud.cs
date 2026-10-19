@@ -12,9 +12,8 @@ namespace Nakagawa
     //  ・ストック: 残りストック(アイコン)
     //  ・タイム  : 点数
     //  ・ゴースト: 撃墜数(相手の顔を飛ばした数)
-    // どのモードでも撃墜数を小さく出す。復活待ち・幽霊・脱落も表示する
-    // 積んでいる積み木の数はプレイヤーの頭上に出す(StackCountOverhead。このコンポーネントが自動で付ける)
-    // 開始のカウントダウン(StartCountdownView)も自動で付ける
+    // どのモードでも、撃墜数と積んでいる積み木の数を小さく出す。復活待ち・幽霊・脱落も表示する
+    // 開始のカウントダウン(StartCountdownView)を自動で付ける
     // プレイヤーや積み木がパネルの近くに映っているときは、パネルを半透明にして見えるようにする
     // 途中参加(直接再生)した人のパネルもその場で増える
     [RequireComponent(typeof(DarumaMatch))]
@@ -39,10 +38,8 @@ namespace Nakagawa
         [SerializeField, Min(0.1f)] float m_fadeSpeed = 6.0f;
 
         [Header("積み木の数")]
-        // 積み木の数をパネルにも出す(オフなら頭上だけ)
-        [SerializeField] bool m_showStackInPanel = false;
-        // 頭上の積み木の数(StackCountOverhead)を自動で付ける
-        [SerializeField] bool m_addOverheadStackCount = true;
+        // 積み木の数をパネルに出す
+        [SerializeField] bool m_showStackInPanel = true;
 
         [Header("開始のカウントダウン")]
         // 開始のカウントダウンの表示(StartCountdownView)を自動で付ける(数える秒数は DarumaMatch で決める)
@@ -85,7 +82,6 @@ namespace Nakagawa
             m_popMat = ToyKit.PopMaterial(m_letterMat);
             m_canvas = ToyKit.CreateOverlayCanvas("MatchHud", m_sortingOrder);
             m_canvas.SetParent(transform, false);
-            if (m_addOverheadStackCount && GetComponent<StackCountOverhead>() == null) gameObject.AddComponent<StackCountOverhead>();
             if (m_addStartCountdown && GetComponent<StartCountdownView>() == null) gameObject.AddComponent<StartCountdownView>();
         }
 
@@ -218,7 +214,7 @@ namespace Nakagawa
             p.Main.rectTransform.localScale = Vector3.one * s;
             p.StockRoot.localScale = Vector3.one * s;
 
-            // 小さい数(撃墜・積み木)。ゴーストは撃墜数が大きい数なので出さない。積み木は頭上に出すので、設定したときだけ
+            // 小さい数(撃墜・積み木)。ゴーストは撃墜数が大きい数なので出さない
             string kos = mode == MatchSetup.MatchMode.Stock || mode == MatchSetup.MatchMode.Time ? $"げきつい {player.KOs}　" : "";
             p.Sub.text = m_showStackInPanel ? $"{kos}つみき {player.StackCount}" : kos.TrimEnd('　');
 

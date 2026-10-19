@@ -132,18 +132,26 @@ namespace Nakahira
         public static event Action<DarumaCharacter> AnyEliminated;
         // いずれかのキャラクターが積み木に上から乗って拾った(成功エフェクトなどの演出用)
         public static event Action<TumikiPickupInfo> AnyPickedUp;
+
+        // ドメインの再読み込みをしない設定では、前の再生で登録されたまま残った受け取り手が呼ばれ続けるので、再生のたびに空にする
+        // (受け取る側はシーンの読み込み時(OnEnable など)に登録し直す)
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetStatics()
+        {
+            AnyEliminated = null;
+            AnyPickedUp = null;
+        }
         // 脱落の原因(脱落していなければOther)
         public EliminationCause EliminationCause { get; private set; }
         // 攻撃(積み木・ハンマー)で脱落したか
         public bool IsEliminatedByAttack => EliminationCause == EliminationCause.Projectile || EliminationCause == EliminationCause.Hammer;
-        // 脱落したときに吹き飛んだ向き(撃墜演出の向き。水平・単位ベクトル。落下・原因不明は真上)
-        //  落下: 真上 / ハンマー: 叩いた相手からやられた側への向き / 積み木: 当たった積み木の進む向き
+        // 脱落したときに吹き飛んだ向き(演出用。単位ベクトル)
+        //  落下・原因不明: 真上 / ハンマー: 叩いた相手からやられた側への向き / 積み木: 当たった積み木の進む向き
         public Vector3 EliminationDirection { get; private set; } = Vector3.up;
-        // 脱落した位置(撃墜演出を出す位置)。落下は床の高さから落ちた所(奈落の底ではなく、床の縁を越えたあたり)
+        // 脱落した位置(撃墜演出を出す位置)。落下は場外判定(m_killY の高さ)に触れた位置
         public Vector3 EliminationPosition { get; private set; }
-        // 最後に床の高さにいた位置(落下したときの EliminationPosition)
-        Vector3 m_lastFloorLevelPosition;
-        float m_lastGroundedY;
+        // 場外判定の高さ(これより下に落ちたら脱落)
+        public float KillY => m_killY;
         // 他の生存者にダメージを与えた
         public event Action<DarumaCharacter> DealtDamage;
 
@@ -157,8 +165,6 @@ namespace Nakahira
             m_commandSource = GetComponent<IDarumaCommandSource>();
             m_stack.Changed += UpdateBodyCollider;
             UpdateBodyCollider();
-            m_lastFloorLevelPosition = transform.position;
-            m_lastGroundedY = transform.position.y;
         }
 
         private void Update()
@@ -203,14 +209,14 @@ namespace Nakahira
             // 奈落に落ちた
             if (m_rb.position.y < m_killY)
             {
-                Eliminate(EliminationCause.Fall, Vector3.up, m_lastFloorLevelPosition);
+                // 場外判定に触れた位置(1ステップで判定の高さを通り過ぎた分は、判定の高さに戻す)
+                Vector3 outPos = m_rb.position;
+                outPos.y = m_killY;
+                Eliminate(EliminationCause.Fall, Vector3.up, outPos);
                 return;
             }
 
             m_isGrounded = CheckGrounded();
-            // 落下の撃墜演出の位置用: 床の高さ(最後に立っていた高さから少し下まで)にいる間の位置を覚えておく
-            if (m_isGrounded) m_lastGroundedY = m_rb.position.y;
-            if (m_rb.position.y >= m_lastGroundedY - 0.5f) m_lastFloorLevelPosition = m_rb.position;
 
             // 本来の速度で計算し、最後に時間の倍率を掛けてRigidbodyに渡す(ヒットストップ中はスローになる)
             float timeScale = LocalTimeScale;
