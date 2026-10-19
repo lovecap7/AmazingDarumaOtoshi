@@ -8056,13 +8056,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 83487900}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.46174863, y: -0, z: -0, w: 0.8870109}
-  m_LocalPosition: {x: -0.5, y: 24.57456, z: -17.207294}
+  m_LocalRotation: {x: 0.3420201, y: 0, z: 0, w: 0.9396927}
+  m_LocalPosition: {x: -0.5, y: 16.1, z: -17.207294}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 909832465}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 40, y: 0, z: 0}
 --- !u!1 &84117905
 GameObject:
   m_ObjectHideFlags: 0
@@ -83249,7 +83249,7 @@ MonoBehaviour:
   - Name: "\u975E\u7834\u58CA"
     Impact: {fileID: 11400000, guid: 7b7fb6a71946c8d458b6cea72dd4a7e0, type: 2}
     Durability: 0
-  m_startIndex: 0
+  m_startIndex: 1
   m_showLabel: 1
   m_log: 1
 --- !u!4 &970866684
@@ -83282,6 +83282,7 @@ MonoBehaviour:
   m_visible: 1
   m_toggleKey: 30
   m_showInConfiguredMatch: 0
+  m_showSpawnAreas: 1
   m_radius: 0.9
   m_pillarHeight: 1.6
   m_dashCount: 16
@@ -106767,6 +106768,9 @@ MonoBehaviour:
   m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
   m_dummyStartBlocks: 5
   m_addDebugView: 1
+  m_respawnAppearTime: 0.8
+  m_startCountdown: 3
+  m_countdownInDirectPlay: 0
 --- !u!4 &1218044442
 Transform:
   m_ObjectHideFlags: 0
@@ -106863,6 +106867,14 @@ MonoBehaviour:
   m_spacing: 24
   m_bottom: 120
   m_sortingOrder: 15
+  m_fadeWhenOccluding: 1
+  m_occludedAlpha: 0.3
+  m_occludeMargin: 40
+  m_bodyCheckHeight: 1.6
+  m_fadeSpeed: 6
+  m_showStackInPanel: 0
+  m_addOverheadStackCount: 1
+  m_addStartCountdown: 1
   m_stockIconSize: 30
   m_maxStockIcons: 5
 --- !u!1 &1219132576
@@ -113662,13 +113674,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2122201618}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.46174863, y: -0, z: -0, w: 0.8870109}
+  m_LocalRotation: {x: 0.46174863, y: 0, z: 0, w: 0.8870109}
   m_LocalPosition: {x: 0, y: 24.57456, z: -17.207294}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 55, y: 0, z: 0}
 --- !u!114 &1298081248
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -113683,6 +113695,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.MatchCamera
   m_match: {fileID: 0}
   m_worldOffset: {x: 0, y: 0, z: -1}
+  m_localOffset: {x: 0, y: 0, z: 0}
+  m_angleOffset: {x: 0, y: 0, z: 0}
+  m_orbitAroundFocus: 1
+  m_fovOffset: 0
   m_followRatio: 0.8
   m_maxOffset: 13
   m_moveSmoothTime: 0.4

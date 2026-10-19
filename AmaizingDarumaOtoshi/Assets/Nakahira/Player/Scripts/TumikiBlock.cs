@@ -736,6 +736,15 @@ namespace Nakahira
             m_ignoreTimer = Mathf.Max(m_ignoreTimer, time);
         }
 
+        // 指定した相手と time 秒以上当たらないようにする(壁際で出してキャラクターと重なった積み木など)
+        // 当たらない時間は他の相手と共通。Launch / 積まれる / 崩れると元に戻る
+        public void IgnoreFor(Collider col, float time)
+        {
+            if (col == null || m_isConsumed) return;
+            if (!m_ignored.Contains(col)) IgnoreTemporarily(col);
+            ExtendIgnore(time);
+        }
+
         private void UpdateIgnore(float dt)
         {
             if (m_ignored.Count == 0) return;

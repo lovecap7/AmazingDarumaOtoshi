@@ -9,6 +9,8 @@ namespace Nakagawa
     //  ・エリアからはみ出さない
     //  ・生成済みの積み木、同じ命令で生成する他の積み木、当たり判定を持つステージギミック等と重ならない
     // プレイヤーが範囲内にいる場合は、このエリアの生成をスキップする
+    // 生成は直接行わず、決めた位置に床の予告(TumikiSpawnWarning)を出し、予告の時間が過ぎてから生成する
+    // 床の目印(範囲の表示)はデバッグ表示。MarkersVisible がオンのときだけ見える(SpawnPointDebugView が切り替える。エディタでは常に見える)
     // このTransformの位置が床の高さの中心。矩形は向きに合わせて回る
     public class TumikiSpawnArea : MonoBehaviour
     {
@@ -44,7 +46,13 @@ namespace Nakagawa
         // 床の上面の高さとみなす誤差(m)。これより高い・低い物(ギミックの上面・段差)は床とみなさない
         [SerializeField, Min(0.001f)] float m_supportTolerance = 0.03f;
 
-        [Header("見た目")]
+        [Header("予告")]
+        // 予告を出してから生成するまでの時間(0 なら予告なしですぐ生成する)
+        [SerializeField, Min(0.0f)] float m_warningTime = 1.0f;
+        // 生成する直前に、予告の位置にプレイヤー・積み木などが乗っていたら生成しない
+        [SerializeField] bool m_recheckOnSpawn = true;
+
+        [Header("見た目(デバッグ表示)")]
         // 床の目印(形に合わせて片方だけ表示し、大きさを合わせる。当たり判定なし)
         [SerializeField] Transform m_rectMarker;
         [SerializeField] Transform m_circleMarker;
@@ -52,12 +60,36 @@ namespace Nakagawa
         // 床から浮かせて調べる高さ(床そのものに当たらないように)
         const float kFloorClearance = 0.05f;
 
+        // 再生中に床の目印を見せるか(全エリア共通のデバッグ表示)
+        public static bool MarkersVisible
+        {
+            get => s_markersVisible;
+            set
+            {
+                if (s_markersVisible == value) return;
+                s_markersVisible = value;
+                foreach (var area in FindObjectsByType<TumikiSpawnArea>()) area.ApplyShape();
+            }
+        }
+        static bool s_markersVisible;
+
+        // ドメインの再読み込みをしない設定でも、再生のたびに非表示に戻す
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetStatics() => s_markersVisible = false;
+
         public Shape AreaShape => m_shape;
         public float FloorY => transform.position.y;
         public int MinAmount => m_minAmount;
         public int MaxAmount => Mathf.Max(m_minAmount, m_maxAmount);
+        public float WarningTime => m_warningTime;
 
         private void Awake()
+        {
+            ApplyShape();
+        }
+
+        // ステージの切り替えなどで無効の間に表示が切り替わっていても合わせる
+        private void OnEnable()
         {
             ApplyShape();
         }
@@ -71,7 +103,7 @@ namespace Nakagawa
             ApplyShape();
         }
 
-        // 生成命令。colors の色の積み木を生成し、生成した数を返す
+        // 生成命令。colors の色の積み木の位置を決めて予告を出し(予告の時間が0ならすぐ生成し)、その数を返す
         // reserved: 同じ命令で他のエリアが生成した位置(重ならないよう共有する。生成した位置を追加する)
         public int Spawn(IReadOnlyList<TumikiColor> colors, TumikiBlock prefab, List<Vector3> reserved)
         {
@@ -84,12 +116,28 @@ namespace Nakagawa
                 if (!TryFindPosition(reserved, out Vector3 pos)) continue;
                 reserved.Add(pos);
 
-                TumikiBlock block = Instantiate(prefab, pos, Quaternion.Euler(0.0f, Random.Range(0.0f, 360.0f), 0.0f));
-                block.SetColor(color);
-                block.gameObject.AddComponent<TumikiSpawnPop>();
+                Quaternion rot = Quaternion.Euler(0.0f, Random.Range(0.0f, 360.0f), 0.0f);
+                if (m_warningTime > 0.0f) TumikiSpawnWarning.Create(this, prefab, color, pos, rot, m_warningTime);
+                else SpawnBlock(prefab, color, pos, rot);
                 spawned++;
             }
             return spawned;
+        }
+
+        // 積み木を1個生成する(ポンと出てくる演出つき)。予告(TumikiSpawnWarning)が終わったときにも呼ばれる
+        public TumikiBlock SpawnBlock(TumikiBlock prefab, TumikiColor color, Vector3 pos, Quaternion rot)
+        {
+            if (prefab == null) return null;
+            TumikiBlock block = Instantiate(prefab, pos, rot);
+            block.SetColor(color);
+            block.gameObject.AddComponent<TumikiSpawnPop>();
+            return block;
+        }
+
+        // 予告していた位置に、今も生成してよいか(プレイヤー・積み木・ギミックなどが乗っていないか)
+        public bool CanSpawnAt(Vector3 pos)
+        {
+            return !m_recheckOnSpawn || !OverlapsObstacle(pos, TumikiBlock.kRadius);
         }
 
         // プレイヤー(生存キャラクター)の体が少しでも範囲にかかっているか
@@ -124,6 +172,7 @@ namespace Nakagawa
             {
                 if (!TryRandomPoint(r, out pos)) return false;
                 if (OverlapsReserved(pos, reserved, minDistance)) continue;
+                if (OverlapsWarning(pos, minDistance)) continue;
                 if (m_requireFloor && !HasFloorBelow(pos, r)) continue;
                 if (m_requireFullSupport && !IsFullySupported(pos, r)) continue;
                 if (OverlapsObstacle(pos, r + m_spacing)) continue;
@@ -160,6 +209,18 @@ namespace Nakagawa
             foreach (var p in reserved)
             {
                 Vector3 d = p - pos;
+                d.y = 0.0f;
+                if (d.sqrMagnitude < minDistance * minDistance) return true;
+            }
+            return false;
+        }
+
+        // 予告中(まだ生成していない)の積み木と重なるか
+        private static bool OverlapsWarning(Vector3 pos, float minDistance)
+        {
+            foreach (var w in TumikiSpawnWarning.Active)
+            {
+                Vector3 d = w.Position - pos;
                 d.y = 0.0f;
                 if (d.sqrMagnitude < minDistance * minDistance) return true;
             }
@@ -222,18 +283,20 @@ namespace Nakagawa
         }
 
         // 形に合わせて床の目印を切り替え、大きさを合わせる(エディタから設定を変えたときにも呼ぶ)
+        // 再生中は MarkersVisible(デバッグ表示)がオフなら両方とも隠す
         public void ApplyShape()
         {
+            bool show = !Application.isPlaying || s_markersVisible;
             // OnValidateからも呼ぶので、SetActiveではなく描画の有効・無効で切り替える
             if (m_rectMarker != null)
             {
-                SetVisible(m_rectMarker, m_shape == Shape.Rectangle);
+                SetVisible(m_rectMarker, show && m_shape == Shape.Rectangle);
                 Vector3 s = m_rectMarker.localScale;
                 m_rectMarker.localScale = new Vector3(m_size.x, s.y, m_size.y);
             }
             if (m_circleMarker != null)
             {
-                SetVisible(m_circleMarker, m_shape == Shape.Circle);
+                SetVisible(m_circleMarker, show && m_shape == Shape.Circle);
                 Vector3 s = m_circleMarker.localScale;
                 m_circleMarker.localScale = new Vector3(m_radius * 2.0f, s.y, m_radius * 2.0f);
             }

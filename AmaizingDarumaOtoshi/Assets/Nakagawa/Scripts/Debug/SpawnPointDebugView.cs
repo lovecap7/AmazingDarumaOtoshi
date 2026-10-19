@@ -9,6 +9,8 @@ namespace Nakagawa
     //  ・再生中: 床の上に点線の輪と柱、画面に番号(S1, S2, ...)を出す。キーで表示を切り替える
     //    出現ポイントが動いても(ステージの切り替えなど)ついていく。当たり判定は持たない
     //  ・エディタ: Gizmos で同じ位置に輪と番号を出す(再生していなくても見える)
+    //  ・積み木の生成エリアの床の目印(TumikiSpawnArea.MarkersVisible)も、同じ切り替えで表示する
+    //    (このデバッグ表示がオフ・無い場合は、生成エリアの目印は見えない)
     // 試合のシーンのデバッグ用の物(DebugTools など)に付ける
     public class SpawnPointDebugView : MonoBehaviour
     {
@@ -16,6 +18,8 @@ namespace Nakagawa
         [SerializeField] Key m_toggleKey = Key.P;
         [Tooltip("セレクト画面から始めた試合でも表示する(オフなら直接再生のときだけ)")]
         [SerializeField] bool m_showInConfiguredMatch = false;
+        [Tooltip("積み木の生成エリアの床の目印も表示する")]
+        [SerializeField] bool m_showSpawnAreas = true;
 
         [Header("見た目")]
         [SerializeField, Min(0.1f)] float m_radius = 0.9f;
@@ -63,6 +67,7 @@ namespace Nakagawa
         private void LateUpdate()
         {
             bool enabled = Enabled;
+            TumikiSpawnArea.MarkersVisible = enabled && m_showSpawnAreas;
             var points = enabled ? Match.SpawnPoints : null;
             int count = points != null ? points.Count : 0;
             while (m_markers.Count < count) m_markers.Add(CreateMarker(m_markers.Count));
@@ -72,6 +77,11 @@ namespace Nakagawa
                 if (m_markers[i].gameObject.activeSelf != show) m_markers[i].gameObject.SetActive(show);
                 if (show) m_markers[i].SetPositionAndRotation(points[i].position + Vector3.up * kFloorOffset, Quaternion.identity);
             }
+        }
+
+        private void OnDisable()
+        {
+            TumikiSpawnArea.MarkersVisible = false;
         }
 
         private void OnDestroy()
@@ -161,7 +171,7 @@ namespace Nakagawa
                 GUI.Label(rect, text, m_labelStyle);
             }
 
-            GUI.Label(new Rect(10, Screen.height - 30, 400, 24), $"出現位置の表示 [{m_toggleKey}]");
+            GUI.Label(new Rect(10, Screen.height - 30, 400, 24), m_showSpawnAreas ? $"出現位置・生成エリアの表示 [{m_toggleKey}]" : $"出現位置の表示 [{m_toggleKey}]");
         }
 
         private void OnDrawGizmos()

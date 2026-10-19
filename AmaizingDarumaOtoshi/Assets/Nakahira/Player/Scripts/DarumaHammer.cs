@@ -326,10 +326,13 @@ namespace Nakahira
 
             Transform root = m_root;
             TumikiBlock block = m_character.Stack.RemoveAt(0);
-            block.transform.position = root.position
-                + root.forward * (DarumaCharacter.kBodyRadius + TumikiBlock.kRadius + 0.05f)
-                + Vector3.up * (TumikiBlock.kHeight * 0.5f);
+            Vector3 center = root.position + Vector3.up * (TumikiBlock.kHeight * 0.5f);
+            Vector3 pos = center + root.forward * (DarumaCharacter.kBodyRadius + TumikiBlock.kRadius + 0.05f);
+            // 壁に密着して撃つと壁にめり込むので、キャラクターの近くまで引き戻し、しばらくキャラクターと当たらないようにする
+            bool embedded = Nakagawa.TumikiPlacement.ResolveEmbed(center, ref pos);
+            block.transform.position = pos;
             block.Launch(root.forward, m_params.ShotSpeed, m_owner);
+            if (embedded) Nakagawa.TumikiPlacement.IgnoreCharactersAfterEmbed(block);
             BeginHitStop(block, null);
         }
     }

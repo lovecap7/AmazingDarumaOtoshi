@@ -119,13 +119,14 @@ namespace Nakagawa
             if (dir.sqrMagnitude < 0.0001f) dir = Vector3.forward;
             dir.Normalize();
 
-            // 弾が出る位置(股抜きショットの打ち出し位置と同じ)
-            Vector3 pos = new Vector3(body.position.x, floorY + m_castHeight, body.position.z)
-                + dir * (DarumaCharacter.kBodyRadius + TumikiBlock.kRadius + 0.05f);
+            // 体の中心から調べ始める(弾が出る位置から調べると、壁に密着しているときに弾の出る位置が壁の中・向こうになり、
+            // 壁を素通りした線になる。実際の弾も壁際では体の近くに引き戻されて出る: TumikiPlacement.ResolveEmbed)
+            // 弾が出る位置(体の中心からの距離)の分だけ長さを足して、壁が無いときの線の長さは変えない
+            float launchOffset = DarumaCharacter.kBodyRadius + TumikiBlock.kRadius + 0.05f;
+            Vector3 pos = new Vector3(body.position.x, floorY + m_castHeight, body.position.z);
             AddPoint(body.position, floorY);
-            AddPoint(pos, floorY);
 
-            float remaining = m_length;
+            float remaining = m_length + launchOffset;
             for (int bounce = 0; remaining > 0.0f; bounce++)
             {
                 if (!Cast(body, pos, dir, remaining, out RaycastHit hit, out bool reflects))

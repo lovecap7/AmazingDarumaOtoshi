@@ -17,6 +17,9 @@ public class Fader : MonoBehaviour
     CanvasGroup group;
     bool busy;
 
+    // フェード中（シーン遷移の途中・遷移後に明るくなるまで）か。開始演出などを明るくなってから始めるのに使う
+    public static bool IsBusy => instance != null && instance.busy;
+
     // 最初のシーンが読み込まれる前に、自動でフェード用オブジェクトを作る
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     static void Create()
