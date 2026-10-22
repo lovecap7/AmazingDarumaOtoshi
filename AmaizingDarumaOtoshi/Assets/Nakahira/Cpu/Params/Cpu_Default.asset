@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 183ba240b15e3474fb7fa0958817b77e, type: 3}
+  m_Name: Cpu_Default
+  m_EditorClassIdentifier: Assembly-CSharp::Nakahira.CpuParams
+  ThinkInterval: 0.2
+  CollectUntil: 10
+  SearchRadius: 25
+  SwitchMargin: 1.5
+  GiveUpTime: 4
+  GiveUpCooldown: 3
+  OpponentAvoidRadius: 3
+  OpponentPenalty: 6
+  WallPenalty: 8
+  JumpDistanceError: 0.1
+  AimError: 0.1
+  EdgeLookAhead: 0.6
+  GroundProbeDepth: 2
+  PathSampleStep: 0.5

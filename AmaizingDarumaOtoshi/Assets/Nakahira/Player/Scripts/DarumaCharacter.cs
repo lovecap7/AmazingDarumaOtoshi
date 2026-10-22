@@ -139,6 +139,7 @@ namespace Nakahira
         public bool CanStartShot => m_isGrounded && !m_jumpRequested;
         public bool IsInvincible => m_invincibleTimer > 0.0f;
         public float MoveSpeed => Mathf.Max(m_minMoveSpeed, m_baseMoveSpeed - m_stack.Count * m_speedLossPerBlock);
+        public JumpParams JumpParams => m_jumpParams;
         // ヒットストップ中は1未満(移動・落下・ハンマーがスローになる)
         public float LocalTimeScale => Mathf.Max(0.01f, m_hitStop.TimeScale);
 
@@ -305,7 +306,7 @@ namespace Nakahira
             // ハンマーを振っている間は向きを固定(打ち返しの方向がブレないように)
             // ただし股抜きショットは弾が出るまで向きを変えて狙える
             bool canTurn = !m_hammer.IsBusy || m_hammer.IsAimingShot;
-            if (moveDir.sqrMagnitude > 0.0001f && !m_hammer.IsBusy)
+            if (moveDir.sqrMagnitude > 0.0001f && canTurn)
             {
                 Quaternion target = Quaternion.LookRotation(moveDir, Vector3.up);
                 m_rb.MoveRotation(Quaternion.Slerp(m_rb.rotation, target, m_turnSpeed * dt));

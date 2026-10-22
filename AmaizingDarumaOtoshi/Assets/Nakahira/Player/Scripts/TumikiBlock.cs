@@ -158,12 +158,27 @@ namespace Nakahira
         // 飛んでいる積み木が他の積み木・キャラクターに当たった(カメラの揺れ・効果音など演出用。積み木側の処理の直前に呼ぶ)
         public static event Action<TumikiHitInfo> Hit;
 
+        // シーン上で有効な積み木すべて(CPU が拾う積み木を探すのに使う)
+        public static IReadOnlyList<TumikiBlock> All => s_all;
+        static readonly List<TumikiBlock> s_all = new List<TumikiBlock>();
+
         // ドメインの再読み込みをしない設定でも、再生のたびに既定に戻す(前の再生で残った Hit の受け取り手も外す)
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         static void ResetStatics()
         {
             DefaultImpactBehavior = TumikiBreakImpact.Instance;
             Hit = null;
+            s_all.Clear();
+        }
+
+        private void OnEnable()
+        {
+            s_all.Add(this);
+        }
+
+        private void OnDisable()
+        {
+            s_all.Remove(this);
         }
 
         private void Awake()
@@ -509,6 +524,19 @@ namespace Nakahira
                 v.y = 0.0f;
                 return v;
             }
+        }
+
+        // seconds 秒後の位置の予想(CPU が動いている積み木を狙うのに使う)
+        // 飛んでいる積み木は減速して止まるところまで進める。壁での反射・ギミック・ヒットストップは考えない
+        public Vector3 PredictPosition(float seconds)
+        {
+            Vector3 pos = transform.position;
+            if (CurrentState != State.Flying || m_isBreaking || seconds <= 0.0f) return pos;
+
+            float decel = m_params.Deceleration;
+            float t = seconds;
+            if (decel > 0.0f) t = Mathf.Min(t, Mathf.Max(0.0f, Speed - m_params.StopSpeed) / decel);
+            return pos + Direction * (Speed * t - 0.5f * decel * t * t);
         }
 
         // 攻撃判定のない積み木同士が弾き合う(同じ重さの弾性衝突。どちらも壊れない)
