@@ -12,7 +12,7 @@ namespace Nakagawa
     // 生成は直接行わず、決めた位置に床の予告(TumikiSpawnWarning)を出し、予告の時間が過ぎてから生成する
     // 床の目印(範囲の表示)はデバッグ表示。MarkersVisible がオンのときだけ見える(SpawnPointDebugView が切り替える。エディタでは常に見える)
     // このTransformの位置が床の高さの中心。矩形は向きに合わせて回る
-    public class TumikiSpawnArea : MonoBehaviour
+    public class TumikiSpawnArea : TumikiSpawnSource
     {
         public enum Shape { Rectangle, Circle }
 
@@ -79,8 +79,8 @@ namespace Nakagawa
 
         public Shape AreaShape => m_shape;
         public float FloorY => transform.position.y;
-        public int MinAmount => m_minAmount;
-        public int MaxAmount => Mathf.Max(m_minAmount, m_maxAmount);
+        public override int MinAmount => m_minAmount;
+        public override int MaxAmount => Mathf.Max(m_minAmount, m_maxAmount);
         public float WarningTime => m_warningTime;
 
         private void Awake()
@@ -105,7 +105,7 @@ namespace Nakagawa
 
         // 生成命令。colors の色の積み木の位置を決めて予告を出し(予告の時間が0ならすぐ生成し)、その数を返す
         // reserved: 同じ命令で他のエリアが生成した位置(重ならないよう共有する。生成した位置を追加する)
-        public int Spawn(IReadOnlyList<TumikiColor> colors, TumikiBlock prefab, List<Vector3> reserved)
+        public override int Spawn(IReadOnlyList<TumikiColor> colors, TumikiBlock prefab, List<Vector3> reserved)
         {
             if (colors.Count == 0 || prefab == null) return 0;
             if (HasPlayerInside()) return 0;

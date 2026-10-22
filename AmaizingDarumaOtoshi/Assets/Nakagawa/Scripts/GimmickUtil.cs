@@ -35,6 +35,13 @@ namespace Nakagawa
             }
         }
 
+        // 当たり判定のある足場(移動床・せり上がり塀)に乗っていれば、物理の摩擦・押し上げだけで一緒に動くもの(落ちている積み木)
+        // 足場が AddCarryVelocity でも運ぶと二重に動いて足場から滑り落ちるので、運ぶ対象から外す
+        public static bool MovesWithSolidPlatform(IGimmickAffectable target)
+        {
+            return target is TumikiBlock block && block.CurrentState == TumikiBlock.State.Loose;
+        }
+
         // 破棄済みのMonoBehaviourもnull扱いにする
         public static bool IsAlive(IGimmickAffectable target)
         {

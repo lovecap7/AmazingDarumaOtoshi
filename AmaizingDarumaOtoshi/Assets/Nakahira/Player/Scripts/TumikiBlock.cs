@@ -112,7 +112,9 @@ namespace Nakahira
         Vector3 m_force;              // 次のステップで加える力(加速度)
         float m_carryYaw;             // 次のステップで足場ごと回る角度(度)
         float m_gravityScale = 1.0f;  // 次のステップの重力の倍率
-
+        float m_speedScale = 1.0f;    // 次のステップの水平の速さの倍率
+        bool m_isSuspended;           // 一時的に止めている(ワープの移動中など)
+        Vector3 m_suspendedVelocity;  // 止めたときの物理の速度(解除すると戻す)
 
         // 一時的に衝突を無視している相手
         readonly List<Collider> m_ignored = new List<Collider>();
@@ -188,6 +190,8 @@ namespace Nakahira
                 UpdateBreaking();
                 return;
             }
+            // 止めている間は減速もしない(解除すると続きから飛ぶ)
+            if (m_isSuspended) return;
 
             // 奈落に落ちた
             if (transform.position.y < m_killY)
@@ -233,10 +237,12 @@ namespace Nakahira
             Vector3 force = m_force;
             float yaw = m_carryYaw;
             float gravityScale = m_gravityScale;
+            float speedScale = m_speedScale;
             m_carryVelocity = Vector3.zero;
             m_force = Vector3.zero;
             m_carryYaw = 0.0f;
             m_gravityScale = 1.0f;
+            m_speedScale = 1.0f;
 
             if (!CanBeAffected || m_rb.isKinematic)
             {
@@ -290,6 +296,26 @@ namespace Nakahira
             {
                 m_rb.AddForce(Physics.gravity * (gravityScale - 1.0f), ForceMode.Acceleration);
             }
+
+            if (speedScale != 1.0f) ApplySpeedScale(speedScale);
+        }
+
+        // 水平の速さを倍率で変える。落ちている積み木が速くなって動き出したら、弾と同じ仕組みで飛ばす(攻撃判定と最後の持ち主を引き継ぐ)
+        private void ApplySpeedScale(float scale)
+        {
+            if (CurrentState == State.Flying)
+            {
+                SetHorizontalVelocity(Direction * (Speed * scale));
+                return;
+            }
+            Vector3 v = m_rb.linearVelocity;
+            Vector3 h = new Vector3(v.x, 0.0f, v.z) * scale;
+            if (scale > 1.0f && h.magnitude >= m_params.StopSpeed)
+            {
+                Push(h, h.magnitude, Owner, ReturnCount);
+                return;
+            }
+            m_rb.linearVelocity = new Vector3(h.x, v.y, h.z);
         }
 
         private void Update()
@@ -392,7 +418,7 @@ namespace Nakahira
 
         public Rigidbody Rigidbody => m_rb;
         // 積まれている間はキャラクターがまとめて影響を受ける
-        public bool CanBeAffected => CurrentState != State.Stacked && !m_isConsumed && !m_isBreaking;
+        public bool CanBeAffected => CurrentState != State.Stacked && !m_isConsumed && !m_isBreaking && !m_isSuspended;
 
         public void AddCarryVelocity(Vector3 velocity)
         {
@@ -426,6 +452,51 @@ namespace Nakahira
         public void RequestGravityScale(float scale)
         {
             m_gravityScale = Mathf.Min(m_gravityScale, scale);
+        }
+
+        public void RequestSpeedScale(float scale)
+        {
+            m_speedScale *= Mathf.Max(0.0f, scale);
+        }
+
+        // 状態(飛んでいる・攻撃判定・持ち主)はそのまま
+        public void Teleport(Vector3 position, float yawDegrees)
+        {
+            if (CurrentState == State.Stacked || m_isConsumed || m_isBreaking) return;
+            m_rb.position = position;
+            transform.position = position;
+            if (yawDegrees == 0.0f) return;
+
+            Quaternion turn = Quaternion.Euler(0.0f, yawDegrees, 0.0f);
+            m_rb.rotation = turn * m_rb.rotation;
+            transform.rotation = m_rb.rotation;
+            if (CurrentState == State.Flying) Direction = turn * Direction;
+            if (m_isSuspended) m_suspendedVelocity = turn * m_suspendedVelocity;
+            else if (!m_rb.isKinematic) m_rb.linearVelocity = turn * m_rb.linearVelocity;
+        }
+
+        // 止めている間は動かない物として扱い(当たり判定なし)、解除すると止めたときの続きから動く
+        public void SetSuspended(bool suspended)
+        {
+            if (m_isSuspended == suspended || m_isConsumed || CurrentState == State.Stacked) return;
+            m_isSuspended = suspended;
+            if (suspended)
+            {
+                m_suspendedVelocity = m_rb.isKinematic ? Vector3.zero : m_rb.linearVelocity;
+                if (!m_rb.isKinematic) m_rb.linearVelocity = Vector3.zero;
+                m_collider.enabled = false;
+                m_rb.isKinematic = true;
+                return;
+            }
+            m_rb.isKinematic = false;
+            m_collider.enabled = true;
+            Vector3 v = m_suspendedVelocity;
+            if (CurrentState == State.Flying)
+            {
+                Vector3 h = Direction * (Speed * m_hitStop.TimeScale);
+                v = new Vector3(h.x, v.y, h.z);
+            }
+            m_rb.linearVelocity = v;
         }
 
         // 水平方向の今の速度(落ちている積み木は物理の速度)

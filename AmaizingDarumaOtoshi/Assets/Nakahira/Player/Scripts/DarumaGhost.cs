@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Nakahira
@@ -25,12 +26,33 @@ namespace Nakahira
         bool m_reviveRequested;
         readonly RaycastHit[] m_wallHits = new RaycastHit[8];
 
+        static readonly List<DarumaGhost> s_active = new List<DarumaGhost>();
+
+        // 出ている幽霊(当たり判定を持たないので、ギミックはここから探す)
+        public static IReadOnlyList<DarumaGhost> Active => s_active;
+
+        // ドメインの再読み込みをしない設定でも、再生のたびに空にする
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetStatics() => s_active.Clear();
+
         public Collider Body => null;
         public float LocalTimeScale => Mathf.Max(0.01f, m_hitStop.TimeScale);
 
         private void Awake()
         {
             m_hitStop = GetComponent<HitStop>();
+        }
+
+        private void OnEnable() => s_active.Add(this);
+        private void OnDisable() => s_active.Remove(this);
+
+        // 瞬間移動する(ワープなど)。浮いている高さはそのままで、ステージ範囲内に収める
+        public void Teleport(Vector3 position, float yawDegrees)
+        {
+            position.y = transform.position.y;
+            if (m_stageArea != null) position = m_stageArea.Clamp(position, m_radius);
+            transform.position = position;
+            transform.rotation = Quaternion.Euler(0.0f, yawDegrees, 0.0f) * transform.rotation;
         }
 
         public void StartHitStop(float duration, float timeScale, float shake)
@@ -52,8 +74,18 @@ namespace Nakahira
             m_moveDirection = Vector3.zero;
         }
 
+        // 一時的に止めている(ワープの移動中など)。止めている間は操作も移動もしない
+        public bool IsSuspended { get; private set; }
+
+        public void SetSuspended(bool suspended)
+        {
+            IsSuspended = suspended;
+            if (suspended) m_moveDirection = Vector3.zero;
+        }
+
         private void Update()
         {
+            if (IsSuspended) return;
             if (m_commandSource != null)
             {
                 DarumaCommand command = m_commandSource.ReadCommand();

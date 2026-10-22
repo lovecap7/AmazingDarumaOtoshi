@@ -41,9 +41,16 @@ namespace Nakagawa.EditorTools
             var walls = new List<ReflectWall>(root.GetComponentsInChildren<ReflectWall>(true));
             foreach (var wall in walls)
             {
+                if (IsMovingWall(wall)) continue;
                 if (SplitWall(wall.transform)) count++;
             }
             return count;
+        }
+
+        // 動くギミックの壁(せり上がり塀など。Rigidbody の子)か。ギミックが大きさを決めるので、伸ばしたり分けたりしない
+        public static bool IsMovingWall(ReflectWall wall)
+        {
+            return wall.GetComponentInParent<Rigidbody>(true) != null;
         }
 
         // root の下の見えない壁を取り除く(壁を作り直す前に使う)

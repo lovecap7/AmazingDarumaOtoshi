@@ -12,7 +12,7 @@ using Object = UnityEngine.Object;
 
 namespace Nakagawa.EditorTools
 {
-    // 対戦ステージ(本編 Stage01〜 / デバッグ DebugStage01〜)を、ステージをまとめたシーン(Assets/Nakagawa/Stages/AllStages.unity)の中に生成する
+    // 対戦ステージ(本編 Stage01〜 / デバッグ DebugStage01〜 / 追加ギミックの確認 GimmickDebugStage01〜)を、ステージをまとめたシーン(Assets/Nakagawa/Stages/AllStages.unity)の中に生成する
     // 各ステージはこのファイルの定義(床・壁・ギミック・積み木の生成エリア・出現位置・説明)から作るので、数値を直して作り直せる
     // 床はすべて同じ高さ(段差なし)。床の穴・壁のない縁は奈落(落ちると脱落)
     // 開いているシーンには触れない(別のシーンを追加で開いて組み立て、保存して閉じる)
@@ -59,8 +59,18 @@ namespace Nakagawa.EditorTools
         [MenuItem("Nakagawa/Stages/Build Main Stages Into AllStages")]
         public static void BuildMainStages()
         {
-            BuildIntoCombined(def => !def.Id.StartsWith(kDebugPrefix));
+            BuildIntoCombined(def => !IsDebugStage(def.Id));
         }
+
+        // 追加ギミックを試すステージ(GimmickDebugStage01〜)だけを作り直す。他のステージはそのまま
+        [MenuItem("Nakagawa/Stages/Build Gimmick Debug Stages Into AllStages")]
+        public static void BuildGimmickDebugStages()
+        {
+            BuildIntoCombined(def => def.Id.StartsWith(kGimmickDebugPrefix));
+        }
+
+        // デバッグ用のステージか(DebugStage01〜 / GimmickDebugStage01〜)。並び順・作り直しの対象の判定に使う
+        public static bool IsDebugStage(string id) => id.Contains(kDebugPrefix);
 
         // 条件に合うステージを一時的なシーンに組み立て、まとめたシーンへ移す(一時的なシーンは保存しない)
         static void BuildIntoCombined(Predicate<StageDef> filter)
@@ -70,6 +80,7 @@ namespace Nakagawa.EditorTools
             {
                 GimmickTestFieldBuilder.BuildSpawnAssets();
             }
+            if (!AdditionalGimmickBuilder.PrefabsExist()) AdditionalGimmickBuilder.BuildAll();
             EnsureFolder(kStageDir);
             SetupTumikiPrefab();
 
@@ -96,6 +107,8 @@ namespace Nakagawa.EditorTools
         // ステージの id の接頭辞(デバッグステージ / 本編)
         public const string kDebugPrefix = "DebugStage";
         public const string kStagePrefix = "Stage";
+        // 追加ギミックを試すステージ(名前に kDebugPrefix を含むので、デバッグステージとして扱われる)
+        public const string kGimmickDebugPrefix = "Gimmick" + kDebugPrefix;
 
         // 背景の id(BackdropBuilder の定義)
         const string kChanomaBackdrop = "Chanoma";
@@ -915,6 +928,68 @@ namespace Nakagawa.EditorTools
                     c.Spawns(new Vector2(-6, 6), new Vector2(6, 6), new Vector2(-6, -6), new Vector2(6, -6));
                 }).Backdrop = kBathBackdrop;
 
+            //----------------------------------------
+            // 追加ギミックの確認用ステージ(GimmickDebugStage01〜)。背景なし・種類の数の制限なし
+            //----------------------------------------
+            BeginSeries(kGimmickDebugPrefix);
+
+            Add("追加ギミック見本市", 30,
+                "追加ギミック6種(せり上がり塀・加速床/減速床・移動床・ワープゲート・シューターレーン・回転砲台)を1つの闘技場にまとめた確認用ステージ。",
+                "北西の塀が波のように立ち上がって壁と高台を作り、北東の加速床・減速床で弾と体の速さが変わる。南西の穴は移動床でしか渡れず、ワープゲートは色(グループ)ごとに行き先が決まっている。東のシューターレーンは乗った積み木を一直線に撃ち出し、中央南の回転砲台は生成命令のたびに積み木を扇状にばらまく。",
+                c =>
+                {
+                    c.MaxGimmickTypes = int.MaxValue;
+
+                    // 遊べる範囲 36×32m。南西に穴(移動床で渡る)を空けた床と、四方の壁
+                    c.Floor(0, 3, 38, 28);
+                    c.Floor(0, -15.5f, 38, 3);
+                    c.Floor(-17, -12.5f, 4, 3);
+                    c.Floor(8, -12.5f, 22, 3);
+                    c.Wall(0, 16.5f, 38, 1);
+                    c.Wall(0, -16.5f, 38, 1);
+                    c.Wall(18.5f, 0, 1, 34);
+                    c.Wall(-18.5f, 0, 1, 34);
+
+                    // 案1: せり上がり塀(北西)。開始を0.3秒ずつずらして、西から東へ波のように立ち上がる
+                    for (int i = 0; i < 5; i++) c.RisingWall(-15 + i * 2, 12, new Vector2(2, 1.5f), 1.5f, i * 0.3f);
+
+                    // 案2: 加速床・減速床(北東)
+                    c.SpeedFloor(4, 12, new Vector2(3, 3), true);
+                    c.SpeedFloor(10, 12, new Vector2(3, 3), false);
+
+                    // 案3: 移動床(南西の穴を往復)
+                    c.MovingFloor(new Vector2(2.9f, 2.9f), MovingFloorGimmick.LoopMode.PingPong, 2.5f, 1.5f,
+                        new Vector2(-13.5f, -12.5f), new Vector2(-4.5f, -12.5f));
+
+                    // 案4: ワープゲート
+                    //  グループ0(どちらも・ランダム): 西・北・南東の3か所
+                    c.WarpGate(-15, 4, 90, 0, WarpGateGimmick.TargetType.Both, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.Keep);
+                    c.WarpGate(0, 9, 180, 0, WarpGateGimmick.TargetType.Both, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.Keep);
+                    c.WarpGate(16, -12.5f, 270, 0, WarpGateGimmick.TargetType.Both, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.Keep);
+                    //  グループ1(プレイヤーのみ・順番)
+                    c.WarpGate(-9, -7, 0, 1, WarpGateGimmick.TargetType.Players, WarpGateGimmick.Selection.Sequential, WarpGateGimmick.Orientation.Keep);
+                    c.WarpGate(8, 4, 0, 1, WarpGateGimmick.TargetType.Players, WarpGateGimmick.Selection.Sequential, WarpGateGimmick.Orientation.Keep);
+                    //  グループ2(積み木のみ・ゲートの向きを基準に回す)
+                    c.WarpGate(-15, -4, 90, 2, WarpGateGimmick.TargetType.Blocks, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.RelativeToGate);
+                    c.WarpGate(16, 10, 270, 2, WarpGateGimmick.TargetType.Blocks, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.RelativeToGate);
+
+                    // 案5: シューターレーン(東: 西向き / 南東: 北向き)
+                    c.ShooterLane(15.5f, 3, 270, new Vector2(2.5f, 3));
+                    c.ShooterLane(12, -7, 0, new Vector2(2.5f, 3));
+
+                    // 案6: 回転砲台(中央南。生成エリアの一種)
+                    c.Cannon(2, -6, 0, TumikiCannon.RotationMode.Spin, 1, 4);
+
+                    // 積み木の生成エリア
+                    c.AreaCircle(0, 2, 2.5f);
+                    c.AreaRect(-11, 8, 6, 3);
+                    c.AreaRect(7, 8.5f, 6, 2.5f);
+                    c.AreaCircle(-11, -2, 2);
+                    c.AreaRect(8, -12.5f, 6, 3);
+                    c.AreaCircle(12, -1, 1.8f);
+                    c.Spawns(new Vector2(-6, 0), new Vector2(6, -1), new Vector2(-2, 6), new Vector2(-3, -6));
+                });
+
             return list;
         }
 
@@ -936,7 +1011,10 @@ namespace Nakagawa.EditorTools
             public readonly List<Vector3> Blockers = new List<Vector3>(); // x, z, 半径
             public readonly List<Vector3> Tables = new List<Vector3>();   // x, z, 半径
             public readonly SortedSet<string> GimmickTypes = new SortedSet<string>();
-            public int Bumpers, Fans, Turntables;
+            // ギミックの種類ごとの数(名前 → 数)
+            public readonly Dictionary<string, int> GimmickCounts = new Dictionary<string, int>();
+            // 1ステージに置いてよいギミックの種類の数(ギミックを試すステージでは増やす)
+            public int MaxGimmickTypes = 2;
             // 床・壁の見た目(背景に合わせる場合。null なら既定)
             public Material FloorMaterial, WallMaterial;
             int m_fanIndex;
@@ -985,8 +1063,15 @@ namespace Nakagawa.EditorTools
                 var go = Place("Bumper", new Vector3(x, 0, z));
                 go.transform.localScale = new Vector3(scale, 1.0f, scale);
                 Blockers.Add(new Vector3(x, z, kBumperBaseRadius * scale * 1.12f)); // 外周のリングまで
-                GimmickTypes.Add("バンパー");
-                Bumpers++;
+                Count("バンパー");
+            }
+
+            // ギミックを1つ数える(説明の「ギミック」の欄と、種類の数の検証に使う)
+            public void Count(string gimmickName)
+            {
+                GimmickTypes.Add(gimmickName);
+                GimmickCounts.TryGetValue(gimmickName, out int n);
+                GimmickCounts[gimmickName] = n + 1;
             }
 
             // speed: 往復の速さ(0なら止まったまま)
@@ -1022,8 +1107,7 @@ namespace Nakagawa.EditorTools
                     Vector2 p = Vector2.Lerp(a, b, (float)i / steps);
                     Blockers.Add(new Vector3(p.x, p.y, 0.8f));
                 }
-                GimmickTypes.Add("扇風機");
-                Fans++;
+                Count("扇風機");
             }
 
             public void Turntable(float x, float z, float radius, bool clockwise, float speed)
@@ -1038,8 +1122,113 @@ namespace Nakagawa.EditorTools
                 so.ApplyModifiedPropertiesWithoutUndo();
                 table.ApplyShape();
                 Tables.Add(new Vector3(x, z, radius));
-                GimmickTypes.Add("回転台");
-                Turntables++;
+                Count("回転台");
+            }
+
+            //---- 追加ギミック(プレハブは AdditionalGimmickBuilder が作る) ----
+
+            int m_movingFloorIndex;
+
+            // せり上がり塀。phaseOffset: 開始のずれ(秒)。並べて少しずつずらすと波のように立ち上がる
+            public void RisingWall(float x, float z, Vector2 size, float height, float phaseOffset)
+            {
+                var go = Place(AdditionalGimmickBuilder.kRisingWall, new Vector3(x, 0, z));
+                var wall = go.GetComponent<RisingWallGimmick>();
+                var so = new SerializedObject(wall);
+                so.FindProperty("m_size").vector2Value = size;
+                so.FindProperty("m_wallHeight").floatValue = height;
+                so.FindProperty("m_phaseOffset").floatValue = phaseOffset;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                wall.ApplyShape();
+                Count("せり上がり塀");
+            }
+
+            public void SpeedFloor(float x, float z, Vector2 size, bool accelerate)
+            {
+                var go = Place(accelerate ? AdditionalGimmickBuilder.kAccelerateFloor : AdditionalGimmickBuilder.kDecelerateFloor, new Vector3(x, 0, z));
+                var floor = go.GetComponent<SpeedFloorGimmick>();
+                var so = new SerializedObject(floor);
+                so.FindProperty("m_size").vector2Value = size;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                floor.ApplyShape();
+                Count(accelerate ? "加速床" : "減速床");
+            }
+
+            // 移動床。points の順に移動する(最初の地点から始める)。床の上面は床と同じ高さ
+            public void MovingFloor(Vector2 size, MovingFloorGimmick.LoopMode mode, float speed, float wait, params Vector2[] points)
+            {
+                var group = new GameObject($"MovingFloor_Group_{m_movingFloorIndex++}").transform;
+                group.SetParent(Gimmicks, false);
+                var go = Place(AdditionalGimmickBuilder.kMovingFloor, new Vector3(points[0].x, 0, points[0].y), group);
+                var floor = go.GetComponent<MovingFloorGimmick>();
+                var so = new SerializedObject(floor);
+                var list = so.FindProperty("m_waypoints");
+                list.arraySize = points.Length;
+                for (int i = 0; i < points.Length; i++)
+                {
+                    var t = new GameObject($"Point{i}").transform;
+                    t.SetParent(group, false);
+                    t.position = new Vector3(points[i].x, 0, points[i].y);
+                    var element = list.GetArrayElementAtIndex(i);
+                    element.FindPropertyRelative("Point").objectReferenceValue = t;
+                    element.FindPropertyRelative("WaitTime").floatValue = -1.0f;
+                }
+                so.FindProperty("m_size").vector2Value = size;
+                so.FindProperty("m_loopMode").enumValueIndex = (int)mode;
+                so.FindProperty("m_speed").floatValue = speed;
+                so.FindProperty("m_waitTime").floatValue = wait;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                floor.ApplyShape();
+                Count("移動床");
+            }
+
+            // ワープゲート。yaw: ゲートの向き(ゲートの向きを基準に回す方式で使う)
+            public void WarpGate(float x, float z, float yaw, int group, WarpGateGimmick.TargetType target,
+                WarpGateGimmick.Selection selection, WarpGateGimmick.Orientation orientation, float radius = 1.0f)
+            {
+                var go = Place(AdditionalGimmickBuilder.kWarpGate, new Vector3(x, 0, z));
+                go.transform.rotation = Quaternion.Euler(0, yaw, 0);
+                go.name = $"WarpGate_G{group}_{target}";
+                var gate = go.GetComponent<WarpGateGimmick>();
+                var so = new SerializedObject(gate);
+                so.FindProperty("m_radius").floatValue = radius;
+                so.FindProperty("m_group").intValue = group;
+                so.FindProperty("m_target").enumValueIndex = (int)target;
+                so.FindProperty("m_selection").enumValueIndex = (int)selection;
+                so.FindProperty("m_orientation").enumValueIndex = (int)orientation;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                gate.ApplyShape();
+                Count("ワープゲート");
+            }
+
+            // シューターレーン。yaw: 飛ばす向き(0 = 北(+Z))。size: 幅×長さ
+            public void ShooterLane(float x, float z, float yaw, Vector2 size)
+            {
+                var go = Place(AdditionalGimmickBuilder.kShooterLane, new Vector3(x, 0, z));
+                go.transform.rotation = Quaternion.Euler(0, yaw, 0);
+                var lane = go.GetComponent<ShooterLaneGimmick>();
+                var so = new SerializedObject(lane);
+                so.FindProperty("m_size").vector2Value = size;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                lane.ApplyShape();
+                Count("シューターレーン");
+            }
+
+            // 回転砲台(生成エリアの一種。TumikiSpawner の命令で積み木を撃つ)。yaw: 首振り・固定の基準の向き
+            public void Cannon(float x, float z, float yaw, TumikiCannon.RotationMode mode, int minAmount, int maxAmount)
+            {
+                var go = Place(AdditionalGimmickBuilder.kCannon, new Vector3(x, 0, z));
+                go.transform.rotation = Quaternion.Euler(0, yaw, 0);
+                var cannon = go.GetComponent<TumikiCannon>();
+                var so = new SerializedObject(cannon);
+                so.FindProperty("m_rotationMode").enumValueIndex = (int)mode;
+                so.FindProperty("m_minAmount").intValue = minAmount;
+                so.FindProperty("m_maxAmount").intValue = maxAmount;
+                float radius = so.FindProperty("m_radius").floatValue;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                cannon.ApplyShape();
+                Blockers.Add(new Vector3(x, z, radius + 0.1f));
+                Count("回転砲台");
             }
 
             public void AreaRect(float x, float z, float w, float d)
@@ -1647,7 +1836,7 @@ namespace Nakagawa.EditorTools
             var problems = new List<string>();
             if (c.SpawnPoints.Count != 4) problems.Add($"出現位置が{c.SpawnPoints.Count}か所");
             if (c.AreaList.Count < kMinSpawnAreas) problems.Add($"生成エリアが{c.AreaList.Count}か所({kMinSpawnAreas}か所以上にする)");
-            if (c.GimmickTypes.Count > 2) problems.Add("ギミックが3種類以上");
+            if (c.GimmickTypes.Count > c.MaxGimmickTypes) problems.Add($"ギミックが{c.GimmickTypes.Count}種類({c.MaxGimmickTypes}種類まで)");
 
             // 出現位置: 床の上で、ギミック・生成エリアと重ならない
             foreach (var p in c.SpawnPoints)
@@ -1715,12 +1904,22 @@ namespace Nakagawa.EditorTools
             return true;
         }
 
+        // 説明の「ギミック」の欄に並べる順
+        static readonly string[] kGimmickOrder =
+        {
+            "扇風機", "バンパー", "回転台", "せり上がり塀", "加速床", "減速床", "移動床", "ワープゲート", "シューターレーン", "回転砲台",
+        };
+
         static string Layout(Ctx c, Rect bounds, int maxBlocks)
         {
+            // 決まった順に並べ、順番の決まっていない種類は後ろに足す
             var gimmicks = new List<string>();
-            if (c.Fans > 0) gimmicks.Add($"扇風機×{c.Fans}");
-            if (c.Bumpers > 0) gimmicks.Add($"バンパー×{c.Bumpers}");
-            if (c.Turntables > 0) gimmicks.Add($"回転台×{c.Turntables}");
+            var order = new List<string>(kGimmickOrder);
+            foreach (var name in c.GimmickCounts.Keys) if (!order.Contains(name)) order.Add(name);
+            foreach (var name in order)
+            {
+                if (c.GimmickCounts.TryGetValue(name, out int n) && n > 0) gimmicks.Add($"{name}×{n}");
+            }
             return $"広さ: {bounds.width}×{bounds.height}m\n" +
                    $"ギミック: {(gimmicks.Count == 0 ? "なし" : string.Join("、", gimmicks))}\n" +
                    $"生成エリア: {c.AreaList.Count}か所({string.Join("、", c.AreaDesc)})\n" +
@@ -1783,7 +1982,8 @@ namespace Nakagawa.EditorTools
             foreach (var raw in File.ReadAllLines(kDocPath))
             {
                 string line = raw.TrimEnd();
-                if (line.StartsWith("| Stage"))
+                // ステージの行(見出しの行・区切りの行は除く)
+                if (line.StartsWith("| ") && !line.StartsWith("| No.") && !line.StartsWith("|---"))
                 {
                     string[] cells = line.Split('|');
                     string id = cells[1].Trim();
