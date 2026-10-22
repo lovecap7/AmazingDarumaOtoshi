@@ -80,6 +80,9 @@ namespace Nakahira
         // ダミーに最初から積んでおく積み木
         [SerializeField] TumikiBlock m_tumikiPrefab;
         [SerializeField] int m_dummyStartBlocks = 5;
+        // 開始時に置く CPU(DarumaCpu)の数と、その考え方・腕前
+        [SerializeField] int m_cpuCount = 0;
+        [SerializeField] CpuParams m_cpuParams;
 
         [Header("表示")]
         // 試合の仮の表示(名札・残り時間・結果)を付ける
@@ -301,6 +304,23 @@ namespace Nakahira
                 m_players.Add(p);
                 SpawnMatchCharacter(p, InitialSpawnPoint(m_players.Count - 1), false);
                 StackDebugBlocks(p.Character);
+            }
+            for (int i = 0; i < m_cpuCount && m_players.Count < m_maxPlayers; i++)
+            {
+                var entry = new MatchSetup.Entry
+                {
+                    playerIndex = m_players.Count,
+                    isCpu = true,
+                    deviceName = "CPU",
+                    cpuNumber = m_dummyCount + m_cpuCount > 1 ? m_dummyCount + i + 1 : 0,
+                };
+                var go = new GameObject();
+                var cpu = go.AddComponent<DarumaCpu>();
+                cpu.Params = m_cpuParams;
+                var p = go.AddComponent<MatchPlayer>();
+                p.Setup(entry, ColorFor(entry), cpu, Mode == MatchSetup.MatchMode.Stock ? Mathf.Max(1, Rules.stocks) : -1);
+                m_players.Add(p);
+                SpawnMatchCharacter(p, InitialSpawnPoint(m_players.Count - 1), false);
             }
             Time.timeScale = PlaySpeed;
             if (m_countdownInDirectPlay) BeginCountdown();
