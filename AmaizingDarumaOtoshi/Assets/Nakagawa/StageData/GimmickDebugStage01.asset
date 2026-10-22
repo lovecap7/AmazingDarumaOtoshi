@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9bc7d20817a22f54b80f1965aafc188c, type: 3}
+  m_Name: GimmickDebugStage01
+  m_EditorClassIdentifier: Assembly-CSharp::StageData
+  id: GimmickDebugStage01
+  displayName: "\u8FFD\u52A0\u30AE\u30DF\u30C3\u30AF\u30C6\u30B9\u30C8"
+  description: "\u8FFD\u52A0\u30AE\u30DF\u30C3\u30AF6\u7A2E(\u305B\u308A\u4E0A\u304C\u308A\u5840\u30FB\u52A0\u901F\u5E8A/\u6E1B\u901F\u5E8A\u30FB\u79FB\u52D5\u5E8A\u30FB\u30EF\u30FC\u30D7\u30B2\u30FC\u30C8\u30FB\u30B7\u30E5\u30FC\u30BF\u30FC\u30EC\u30FC\u30F3\u30FB\u56DE\u8EE2\u7832\u53F0)\u30921\u3064\u306E\u95D8\u6280\u5834\u306B\u307E\u3068\u3081\u305F\u78BA\u8A8D\u7528\u30B9\u30C6\u30FC\u30B8\u3002"
+  color: {r: 0.95, g: 0.75, b: 0.6, a: 1}
+  preview: {fileID: 21300000, guid: 1fb2743a78374db448f60b6fe77b73a8, type: 3}
+  sceneName: AllStages

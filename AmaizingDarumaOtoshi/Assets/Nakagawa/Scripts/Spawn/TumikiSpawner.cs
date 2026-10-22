@@ -8,7 +8,7 @@ namespace Nakagawa
 {
     // 積み木の生成の司令塔
     // 一定間隔(パターンごとの最小〜最大のランダム)で、生成パターンを順番に(2つなら交互に)使って生成命令を出す
-    // 生成するエリアは、有効になった後の最初のフレームに盤面(シーン内の有効なTumikiSpawnArea)を読み取って決める
+    // 生成するエリアは、有効になった後の最初のフレームに盤面(シーン内の有効なTumikiSpawnSource。生成エリア・回転砲台など)を読み取って決める
     // 生成する数は各エリアの最小排出量を配ったうえで、少ないエリアから順に(同数ならランダムに)最大排出量まで割り振る
     // 生成予定数が全エリアの最小の合計より少ない / 最大の合計より多い場合は、生成予定数を合計に合わせて色を作り直す
     // 全エリアは同じタイミングで命令を受け取り、それぞれ命令どおりに生成する(プレイヤーがいるエリアはスキップ)
@@ -32,7 +32,7 @@ namespace Nakagawa
         int m_patternIndex;
         float m_timer;
         bool m_needsScan;
-        TumikiSpawnArea[] m_areas = Array.Empty<TumikiSpawnArea>();
+        TumikiSpawnSource[] m_areas = Array.Empty<TumikiSpawnSource>();
         readonly List<Vector3> m_reserved = new List<Vector3>();
 
         // 生成命令を出した(使ったパターン、命令した数、実際に生成(予告)した数)。演出・UI等の拡張用
@@ -41,7 +41,7 @@ namespace Nakagawa
         public event Action<int> SpawnSkipped;
 
         public TumikiSpawnPattern NextPattern => HasPatterns ? m_patterns[m_patternIndex % m_patterns.Length] : null;
-        public IReadOnlyList<TumikiSpawnArea> Areas => m_areas;
+        public IReadOnlyList<TumikiSpawnSource> Areas => m_areas;
         bool HasPatterns => m_patterns != null && m_patterns.Length > 0;
 
         // 有効になるたび(ゲーム開始・ステージ切り替え)に最初からやり直す
@@ -68,7 +68,7 @@ namespace Nakagawa
         public void ScanAreas()
         {
             m_needsScan = false;
-            m_areas = FindObjectsByType<TumikiSpawnArea>();
+            m_areas = FindObjectsByType<TumikiSpawnSource>();
             // 割り振りの順番が毎回同じになるよう名前順にする
             Array.Sort(m_areas, (a, b) => string.CompareOrdinal(a.name, b.name));
             if (m_log)
@@ -124,7 +124,7 @@ namespace Nakagawa
 
         // 各エリアに最小排出量を配り、残りは最大排出量に達していないエリアのうち一番少ないところへ1個ずつ(同数ならランダム)
         // count は全エリアの最小の合計〜最大の合計の範囲であること
-        private static int[] Distribute(int count, TumikiSpawnArea[] areas)
+        private static int[] Distribute(int count, TumikiSpawnSource[] areas)
         {
             var amounts = new int[areas.Length];
             int rest = count;
@@ -171,10 +171,11 @@ namespace Nakagawa
             return sum;
         }
 
-        // 盤面にある積み木(プレイヤーに積まれているものは除く。予告中でまだ生成していないものは含む)
+        // 盤面にある積み木(プレイヤーに積まれているものは除く。予告中・発射待ちでまだ生成していないものは含む)
         public static int CountBlocksOnBoard()
         {
             int n = TumikiSpawnWarning.Active.Count;
+            foreach (var source in FindObjectsByType<TumikiSpawnSource>()) n += source.PendingCount;
             foreach (var block in FindObjectsByType<TumikiBlock>())
             {
                 if (block.CurrentState != TumikiBlock.State.Stacked) n++;

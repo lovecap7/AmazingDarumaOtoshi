@@ -52,10 +52,6 @@ public partial class TitleScreen : MonoBehaviour
     [Tooltip("ボタン表示後、この秒数操作がないと最初から再生（0で無効）")]
     [SerializeField] float attractDelay = 30f;
 
-    [Header("演出")]
-    [Tooltip("「カコーン！」「ニコッ」「コトン」などの擬音（字幕）をこの画面で出す")]
-    [SerializeField] bool showOnomatopoeia = true;
-
     const float BloomBase = 0.35f;
     const float LetterboxHeight = 90f;
     const float DefaultAperture = 2.8f;
@@ -125,7 +121,6 @@ public partial class TitleScreen : MonoBehaviour
     float speedTarget, speedReroll;
     float shockStart = -100f, ringStart = -100f;
     Coroutine slowRoutine;
-    readonly List<GameObject> pops = new List<GameObject>();
 
     float lastInputTime;
     int skipFrame = -1;
@@ -179,7 +174,6 @@ public partial class TitleScreen : MonoBehaviour
             Knock(0, 1f);
             SlowMo(0.08f, 0.45f);
             Track(blocks[0].t, 0.65f);
-            Pop("カコーン！", StackContact() + new Vector3(-0.2f, 1.0f, -0.3f), 96f, Palette[1], -8f);
         });
         yield return Real(1.2f);
         Track(null, 0f);
@@ -215,7 +209,6 @@ public partial class TitleScreen : MonoBehaviour
             Knock(n - 1, 1.4f);
             SlowMo(0.04f, 1.3f);
             speedTarget = 1f;
-            PopAt("ドンッ！！", new Vector2(-520f, 270f), 150f, Palette[0], -8f, 1.3f);   // 寄りのカメラなので画面上の位置で出す
         });
         float timeout = Time.unscaledTime + 6f;
         while (!headLanded && Time.unscaledTime < timeout) yield return null;
@@ -285,7 +278,6 @@ public partial class TitleScreen : MonoBehaviour
 
         SetHappy(true);
         Emit(sparkle, new Vector3(0f, HeadR + 0.3f, 0f), Quaternion.Euler(-90f, 0f, 0f), 25);
-        Pop("ニコッ", new Vector3(0.95f, HeadR + 0.8f, 0f), 64f, Palette[5], 10f);
         headHopStart = sim;
         headHopHeight = 0.22f;
     }
@@ -325,8 +317,6 @@ public partial class TitleScreen : MonoBehaviour
         slowRoutine = null;
         Time.timeScale = 1f;
         speedTarget = 0f;
-        foreach (var p in pops) Destroy(p);
-        pops.Clear();
         swinging = false;
         recoverStart = -100f;
         Track(null, 0f);
@@ -420,7 +410,6 @@ public partial class TitleScreen : MonoBehaviour
             Emit(sparkle, contact, Quaternion.Euler(0f, 90f, 0f), 20);
             shake = 0.7f;
             chromaPulse = 0.5f;
-            Pop("カコーン！", contact + new Vector3(-0.3f, 1.0f, -0.3f), 96f, Palette[1], -8f);
         });
         yield return Real(0.55f);
 
@@ -553,7 +542,6 @@ public partial class TitleScreen : MonoBehaviour
                 ringStart = Time.unscaledTime;
                 groundRing.position = new Vector3(0f, 0.02f, 0f);
                 shake = Mathf.Max(shake, 0.5f);
-                Pop("ポテッ", new Vector3(1.0f, HeadR + 0.7f, 0f), 72f, Palette[2], 12f);
             }
         }
         else y = HeadR;
@@ -592,7 +580,6 @@ public partial class TitleScreen : MonoBehaviour
                 buttonLanded[i] = true;
                 Emit(puff, slot - Vector3.up * bh * 0.5f, Quaternion.Euler(-90f, 0f, 0f), 8);
                 shake = Mathf.Max(shake, 0.2f);
-                Pop("コトン", slot + new Vector3(1.6f, 0.2f, 0f), 46f, Palette[(i + 2) % Palette.Length], UnityEngine.Random.Range(-12f, 12f));
             }
             if (t >= 1f) s = SquashVec(Squash((t - 1f) * 0.45f / 0.35f, 0.18f));
 
@@ -799,23 +786,6 @@ public partial class TitleScreen : MonoBehaviour
     {
         skipGroup.alpha = Mathf.MoveTowards(skipGroup.alpha, phase == Phase.Cinematic && fade.color.a < 0.5f ? 1f : 0f, dt * 3f);
         hintGroup.alpha = Mathf.MoveTowards(hintGroup.alpha, phase == Phase.Ready ? 1f : 0f, dt * 3f);
-    }
-
-    // 擬音をワールド座標の位置に出す（ポンと膨らんで、少し浮いて消える）
-    void Pop(string text, Vector3 world, float size, Color color, float angle, float hold = 0.45f)
-    {
-        Vector2 sp = cam.WorldToScreenPoint(world);
-        RectTransformUtility.ScreenPointToLocalPointInRectangle(uiRoot, sp, null, out var local);
-        PopAt(text, local, size, color, angle, hold);
-    }
-
-    // 擬音を画面上の位置（中央が原点、1920x1080 基準）に出す。表示のオンオフは PresentationSettings
-    void PopAt(string text, Vector2 local, float size, Color color, float angle, float hold = 0.45f)
-    {
-        // Inspector でオフにしているときはこの画面の擬音を出さない
-        if (!showOnomatopoeia) return;
-        var go = ToyKit.Pop(this, uiRoot, font, popMat, text, local, size, color, angle, hold, pops);
-        if (go != null) go.transform.SetSiblingIndex(fade.rectTransform.GetSiblingIndex());
     }
 
     IEnumerator FadeTo(float target, float time)

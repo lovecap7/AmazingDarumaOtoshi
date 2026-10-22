@@ -302,7 +302,7 @@ public static class ToyKit
         return m;
     }
 
-    // 擬音用（太め）
+    // 見出し用（太め）
     public static Material PopMaterial(Material letter)
     {
         var m = new Material(letter);
@@ -522,47 +522,11 @@ public static class ToyKit
         r.offsetMin = r.offsetMax = Vector2.zero;
     }
 
-    // 擬音（ポンと膨らんで、少し浮いて消える）。local は canvas 上の位置（中央が原点、1920x1080 基準）
-    // PresentationSettings で擬音をオフにしているときは何も出さず null を返す
-    public static GameObject Pop(MonoBehaviour host, RectTransform canvas, TMP_FontAsset font, Material popMat,
-                                 string text, Vector2 local, float size, Color color, float angle, float hold, List<GameObject> live)
-    {
-        if (!PresentationSettings.ShowOnomatopoeia) return null;
-        var t = UIText("Pop", canvas, font, text, size, color);
-        t.fontSharedMaterial = popMat;
-        Anchor(t.rectTransform, new Vector2(0.5f, 0.5f), local, new Vector2(700f, 220f));
-        t.rectTransform.localRotation = Quaternion.Euler(0f, 0f, angle);
-        live?.Add(t.gameObject);
-        host.StartCoroutine(PopRoutine(t, hold, live));
-        return t.gameObject;
-    }
-
     public static Vector2 WorldToCanvas(Camera cam, RectTransform canvas, Vector3 world)
     {
         Vector2 sp = cam.WorldToScreenPoint(world);
         RectTransformUtility.ScreenPointToLocalPointInRectangle(canvas, sp, null, out var local);
         return local;
-    }
-
-    static IEnumerator PopRoutine(TextMeshProUGUI t, float hold, List<GameObject> live)
-    {
-        var r = t.rectTransform;
-        var basePos = r.anchoredPosition;
-        float total = 0.18f + hold + 0.3f;
-        for (float time = 0f; time < total && t != null; time += Time.unscaledDeltaTime)
-        {
-            float s = time < 0.08f ? Mathf.Lerp(0f, 1.3f, time / 0.08f) : time < 0.18f ? Mathf.Lerp(1.3f, 1f, (time - 0.08f) / 0.1f) : 1f;
-            r.localScale = Vector3.one * s;
-            r.anchoredPosition = basePos + Vector2.up * 30f * (time / total);
-            float fadeT = (time - 0.18f - hold) / 0.3f;
-            t.alpha = fadeT > 0f ? 1f - fadeT : 1f;
-            yield return null;
-        }
-        if (t != null)
-        {
-            live?.Remove(t.gameObject);
-            Object.Destroy(t.gameObject);
-        }
     }
 
     // ---------------- 動きの補助 ----------------

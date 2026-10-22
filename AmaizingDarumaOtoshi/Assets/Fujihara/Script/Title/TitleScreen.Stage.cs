@@ -43,14 +43,13 @@ public partial class TitleScreen
     Image fade;
     CanvasGroup skipGroup, hintGroup, speedGroup;
     SpeedLines speedLines;
-    Material letterMat, popMat;
+    Material letterMat;
 
     void BuildStage()
     {
         var blockMesh = ToyKit.RoundedBox(new Vector3(BlockW, BlockH, BlockD), 0.14f, 10);
         var buttonMesh = ToyKit.RoundedBox(ButtonSize, 0.16f, 10);
         letterMat = ToyKit.LetterMaterial(font);
-        popMat = ToyKit.PopMaterial(letterMat);
 
         cam = ToyKit.CreateCamera();
         ToyKit.CreateLights();
