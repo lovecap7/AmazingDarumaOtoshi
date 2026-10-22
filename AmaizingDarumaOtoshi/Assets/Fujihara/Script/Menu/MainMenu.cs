@@ -50,10 +50,6 @@ public class MainMenu : MonoBehaviour
     [SerializeField] Vector3 boardCenter = new Vector3(2.9f, 2.35f, 1.0f);
     [SerializeField] Vector2 boardSize = new Vector2(6.4f, 3.9f);
 
-    [Header("演出")]
-    [Tooltip("「カコーン！」「コンッ」などの擬音（字幕）をこの画面で出す")]
-    [SerializeField] bool showOnomatopoeia = true;
-
     const int Battle = 0, Sound = 1, Video = 2, Credits = 3, Quit = 4;
     static readonly Vector3 BlockSize = new Vector3(2.6f, 0.72f, 1.1f);
     const float BoardDepth = 0.3f;
@@ -77,7 +73,7 @@ public class MainMenu : MonoBehaviour
     Transform[] blocks;
     Material[] blockMats;
     Color[] blockColors;
-    Material letterMat, popMat;
+    Material letterMat;
 
     // ---- 積み木の状態 ----
     int cursor;
@@ -115,7 +111,6 @@ public class MainMenu : MonoBehaviour
     TextMeshProUGUI descText, boardTitle;
     Image boardDim;
     Selectable soundFirst, videoFirst;
-    readonly List<GameObject> pops = new List<GameObject>();
 
     float BH => BlockSize.y;
 
@@ -135,7 +130,6 @@ public class MainMenu : MonoBehaviour
         var blockMesh = ToyKit.RoundedBox(new Vector3(ToyKit.BlockW, ToyKit.BlockH, ToyKit.BlockD), 0.14f, 10);
         var menuMesh = ToyKit.RoundedBox(BlockSize, 0.16f, 10);
         letterMat = ToyKit.LetterMaterial(font);
-        popMat = ToyKit.PopMaterial(letterMat);
 
         cam = ToyKit.CreateCamera();
         ToyKit.CreateLights();
@@ -462,14 +456,12 @@ public class MainMenu : MonoBehaviour
                 outIdx = index;
                 impactTime = sim;
                 phase = Phase.Flying;
-                Pop("カコーン！", contact + new Vector3(-0.3f, 1.1f, -0.3f), 90f, ToyKit.Palette[1], -8f);
                 break;
 
             case Quit:
                 outIdx = index;
                 impactTime = sim;
                 phase = Phase.Leaving;
-                Pop("カコーン！", contact + new Vector3(-0.3f, 1.1f, -0.3f), 90f, ToyKit.Palette[1], -8f);
                 yield return new WaitForSecondsRealtime(0.5f);
                 for (float t = 0f; t < 0.5f; t += Time.unscaledDeltaTime)
                 {
@@ -486,7 +478,6 @@ public class MainMenu : MonoBehaviour
             case Credits:
                 wobbleIdx = index;
                 wobbleTime = sim;
-                Pop("コンッ", contact + new Vector3(-0.3f, 1.0f, -0.3f), 70f, ToyKit.Palette[3], -8f);
                 yield return new WaitForSecondsRealtime(0.35f);
                 credits.Play();
                 phase = Phase.Credits;
@@ -497,7 +488,6 @@ public class MainMenu : MonoBehaviour
                 outIdx = index;
                 impactTime = sim;
                 phase = Phase.Leaving;
-                Pop("カコーン！", contact + new Vector3(-0.3f, 1.1f, -0.3f), 90f, ToyKit.Palette[1], -8f);
                 yield return new WaitForSecondsRealtime(0.45f);
                 Fader.Load(battleSceneName);
                 break;
@@ -765,15 +755,6 @@ public class MainMenu : MonoBehaviour
         titleGroup.alpha = 1f - dim;
         hintText.text = phase == Phase.Panel ? "上下：えらぶ　左右：かえる　B：もどる"
                       : phase == Phase.Credits ? "" : "上下：えらぶ　A：けってい";
-    }
-
-    void Pop(string text, Vector3 world, float size, Color color, float angle)
-    {
-        // Inspector でオフにしているときはこの画面の擬音を出さない
-        if (!showOnomatopoeia) return;
-        var local = ToyKit.WorldToCanvas(cam, overlay, world);
-        var go = ToyKit.Pop(this, overlay, font, popMat, text, local, size, color, angle, 0.45f, pops);
-        if (go != null) go.transform.SetSiblingIndex(fade.transform.GetSiblingIndex());
     }
 
     // ================= 位置 =================
