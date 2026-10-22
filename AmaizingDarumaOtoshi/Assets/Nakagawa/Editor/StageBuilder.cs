@@ -69,6 +69,20 @@ namespace Nakagawa.EditorTools
             BuildIntoCombined(def => def.Id.StartsWith(kGimmickDebugPrefix));
         }
 
+        // 追加ギミックと元からあるギミックを組み合わせたデバッグステージ(DebugStage21〜30)だけを作り直す。他のステージはそのまま
+        [MenuItem("Nakagawa/Stages/Build Debug Stages 21-30 Into AllStages")]
+        public static void BuildDebugStages21To30()
+        {
+            BuildIntoCombined(def => InNumberRange(def.Id, kDebugPrefix, 21, 30));
+        }
+
+        // id が「接頭辞 + 通し番号」で、番号が from〜to か
+        static bool InNumberRange(string id, string prefix, int from, int to)
+        {
+            if (!id.StartsWith(prefix) || !int.TryParse(id.Substring(prefix.Length), out int n)) return false;
+            return n >= from && n <= to;
+        }
+
         // デバッグ用のステージか(DebugStage01〜 / GimmickDebugStage01〜)。並び順・作り直しの対象の判定に使う
         public static bool IsDebugStage(string id) => id.Contains(kDebugPrefix);
 
@@ -557,6 +571,267 @@ namespace Nakagawa.EditorTools
                     c.AreaCircle(11.5f, -11.5f, 2.5f);
                     c.AreaCircle(-11.5f, 11.5f, 2.5f);
                     c.Spawns(new Vector2(-8, -8), new Vector2(8, -8), new Vector2(-8, 8), new Vector2(8, 8));
+                });
+
+            //----------------------------------------
+            // デバッグステージ(DebugStage21〜30)。追加ギミック(せり上がり塀・加速床/減速床・移動床・ワープゲート・
+            // シューターレーン・回転砲台)と、元からあるギミックを組み合わせたステージ
+            //----------------------------------------
+
+            Add("波打つ防波堤", 26,
+                "南北の陣地を、東西に一列に並んだせり上がり塀が仕切る。塀は西から東へ波のように順番に立ち上がる。四隅寄りにバンパー。",
+                "塀が下がっている所だけが通り道になり、その切れ目は西から東へ流れていく。塀が立っている間は弾が跳ね返るので、切れ目を狙って撃ち込むか、塀の上に乗って高台から撃つかの駆け引きになる。切れ目を追って走ると、バンパーにはじかれて塀の前に押し戻されることもある。",
+                c =>
+                {
+                    c.Arena(0, 0, 28, 24, true, true, true, true);
+                    for (int i = 0; i < 13; i++) c.RisingWall(-12 + i * 2, 0, new Vector2(2, 1.2f), 1.5f, i * 0.25f);
+                    c.Bumper(-8, 6, 1.2f);
+                    c.Bumper(8, 6, 1.2f);
+                    c.Bumper(-8, -6, 1.2f);
+                    c.Bumper(8, -6, 1.2f);
+                    c.AreaCircle(0, 6, 2.5f);
+                    c.AreaCircle(0, -6, 2.5f);
+                    // 四隅(壁にかぶせる)
+                    c.AreaRect(-12, 10.5f, 4, 3);
+                    c.AreaRect(12, 10.5f, 4, 3);
+                    c.AreaRect(-12, -10.5f, 4, 3);
+                    c.AreaRect(12, -10.5f, 4, 3);
+                    c.Spawns(new Vector2(-11, 4), new Vector2(11, -4), new Vector2(-4, -9), new Vector2(4, 9));
+                });
+
+            Add("加速サーキット", 26,
+                "中央の回転台を囲む周回路。各辺の中央に加速床、四隅に減速床が置かれている。",
+                "加速床で一気に速くなった体と弾は、隅の減速床でがくんと落ちる。速さの変わり目で相手との距離が急に縮まったり開いたりするので、周回の流れを読んで待ち伏せるのが強い。中央の回転台に飛び込んだ弾は曲がりながら飛び出し、思わぬ方向から飛んでくる。",
+                c =>
+                {
+                    c.MaxGimmickTypes = 3;
+                    c.Arena(0, 0, 30, 30, true, true, true, true);
+                    c.Turntable(0, 0, 5, true, 45);
+                    c.SpeedFloor(0, 10, new Vector2(3, 3), true);
+                    c.SpeedFloor(10, 0, new Vector2(3, 3), true);
+                    c.SpeedFloor(0, -10, new Vector2(3, 3), true);
+                    c.SpeedFloor(-10, 0, new Vector2(3, 3), true);
+                    c.SpeedFloor(10, 10, new Vector2(3, 3), false);
+                    c.SpeedFloor(-10, 10, new Vector2(3, 3), false);
+                    c.SpeedFloor(10, -10, new Vector2(3, 3), false);
+                    c.SpeedFloor(-10, -10, new Vector2(3, 3), false);
+                    c.AreaCircle(0, 0, 2.5f);
+                    // 各辺の壁にかぶせる
+                    c.AreaRect(0, 13, 6, 3);
+                    c.AreaRect(0, -13, 6, 3);
+                    c.AreaRect(13, 0, 3, 6);
+                    c.AreaRect(-13, 0, 3, 6);
+                    c.AreaCircle(7, 0, 1.5f);
+                    c.Spawns(new Vector2(-6, 6), new Vector2(6, 6), new Vector2(-6, -6), new Vector2(6, -6));
+                });
+
+            Add("渡し舟の大河", 24,
+                "南北に流れる大河(奈落)で東西の岸が分かれ、二艘の木のパレットが岸の間を往復する。河の中央に小島。両岸の扇風機が河へ向けて風を送る。",
+                "対岸へ渡る手段はパレットだけで、乗っている間は逃げ場がない。岸の扇風機は河へ向けて吹くので、岸の端で撃ち合うと風に押されて河へ落ちる。小島の補給所は危険だが積み木が湧きやすく、パレットの往復に合わせて乗り込むタイミングが勝負。",
+                c =>
+                {
+                    c.Arena(-10, 0, 12, 24, true, true, false, true);
+                    c.Arena(10, 0, 12, 24, true, true, true, false);
+                    c.Floor(0, 0, 3, 3);
+                    c.MovingFloor(new Vector2(2.9f, 2.9f), MovingFloorGimmick.LoopMode.PingPong, 2.0f, 1.2f, new Vector2(-2.5f, 7), new Vector2(2.5f, 7));
+                    c.MovingFloor(new Vector2(2.9f, 2.9f), MovingFloorGimmick.LoopMode.PingPong, 2.0f, 1.2f, new Vector2(2.5f, -7), new Vector2(-2.5f, -7));
+                    c.Fan(new Vector2(-15, 0), new Vector2(-15, 0), Vector3.right, 10, 4, 10, 0);
+                    c.Fan(new Vector2(15, 0), new Vector2(15, 0), Vector3.left, 10, 4, 10, 0);
+                    c.AreaRect(-10, 8, 6, 4);
+                    c.AreaRect(-10, -8, 6, 4);
+                    c.AreaRect(10, 8, 6, 4);
+                    c.AreaRect(10, -8, 6, 4);
+                    c.AreaCircle(0, 0, 1.2f);
+                    // 扇風機の前
+                    c.AreaCircle(-11, 0, 1.5f);
+                    c.AreaCircle(11, 0, 1.5f);
+                    c.Spawns(new Vector2(-13, 4), new Vector2(-13, -4), new Vector2(13, 4), new Vector2(13, -4));
+                });
+
+            Add("ワープ群島", 24,
+                "奈落に浮かぶ四つの島。橋はなく、島の間はワープゲートでしか行き来できない。各島の中央にバンパー。",
+                "内側の角のゲート(グループ0)はどの島へ飛ぶかランダム、外側の角のゲートはプレイヤーだけを対角の島へ送る。積み木は内側のゲートでしか運べないので、島ごとの積み木の偏りが生まれる。ゲートから出た直後を狙い撃ちされやすく、出口の光を見て待ち伏せる・逃げる駆け引きが中心になる。",
+                c =>
+                {
+                    c.Arena(8, 8, 10, 10, true, false, true, false);
+                    c.Arena(-8, 8, 10, 10, true, false, false, true);
+                    c.Arena(8, -8, 10, 10, false, true, true, false);
+                    c.Arena(-8, -8, 10, 10, false, true, false, true);
+                    foreach (var p in new[] { new Vector2(8, 8), new Vector2(-8, 8), new Vector2(8, -8), new Vector2(-8, -8) }) c.Bumper(p.x, p.y, 1.2f);
+                    // 内側の角: どこへ飛ぶか分からないゲート(どちらも・ランダム)
+                    c.WarpGate(5.5f, 5.5f, 0, 0, WarpGateGimmick.TargetType.Both, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.Keep);
+                    c.WarpGate(-5.5f, 5.5f, 0, 0, WarpGateGimmick.TargetType.Both, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.Keep);
+                    c.WarpGate(5.5f, -5.5f, 0, 0, WarpGateGimmick.TargetType.Both, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.Keep);
+                    c.WarpGate(-5.5f, -5.5f, 0, 0, WarpGateGimmick.TargetType.Both, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.Keep);
+                    // 外側の角: 対角の島へ(プレイヤーのみ)
+                    c.WarpGate(10.5f, 10.5f, 0, 1, WarpGateGimmick.TargetType.Players, WarpGateGimmick.Selection.Sequential, WarpGateGimmick.Orientation.Keep);
+                    c.WarpGate(-10.5f, -10.5f, 0, 1, WarpGateGimmick.TargetType.Players, WarpGateGimmick.Selection.Sequential, WarpGateGimmick.Orientation.Keep);
+                    c.WarpGate(-10.5f, 10.5f, 0, 2, WarpGateGimmick.TargetType.Players, WarpGateGimmick.Selection.Sequential, WarpGateGimmick.Orientation.Keep);
+                    c.WarpGate(10.5f, -10.5f, 0, 2, WarpGateGimmick.TargetType.Players, WarpGateGimmick.Selection.Sequential, WarpGateGimmick.Orientation.Keep);
+                    c.AreaCircle(11, 6, 1.5f);
+                    c.AreaCircle(-11, 6, 1.5f);
+                    c.AreaCircle(11, -6, 1.5f);
+                    c.AreaCircle(-11, -6, 1.5f);
+                    c.AreaCircle(6, 11, 1.5f);
+                    c.AreaCircle(-6, -11, 1.5f);
+                    c.Spawns(new Vector2(5, 9), new Vector2(-9, 5), new Vector2(9, -5), new Vector2(-5, -9));
+                });
+
+            Add("砲台の砦", 26,
+                "東西に向かい合う二基の回転砲台が首を振りながら積み木を撃ち出す。中央の南北の線には、波のように立ち上がるせり上がり塀。",
+                "砲台は持ち主なしの弾を扇状にばらまくので、誰の手柄にもならない流れ弾が常に飛び交う。中央の塀が立っている間は反対側の砲台の弾が防がれ、下がった所からは弾が抜けてくる。塀の動きを見て、砲台の弾から身を隠しつつ積み木を集める立ち回りが求められる。",
+                c =>
+                {
+                    c.Arena(0, 0, 30, 26, true, true, true, true);
+                    c.Cannon(-8, 0, 90, TumikiCannon.RotationMode.Swing, 1, 3);
+                    c.Cannon(8, 0, 270, TumikiCannon.RotationMode.Swing, 1, 3);
+                    for (int i = 0; i < 10; i++) c.RisingWall(0, -9 + i * 2, new Vector2(1.2f, 2), 1.5f, i * 0.3f);
+                    c.AreaCircle(-8, 8, 2);
+                    c.AreaCircle(8, 8, 2);
+                    c.AreaCircle(-8, -8, 2);
+                    c.AreaCircle(8, -8, 2);
+                    // 東西の壁にかぶせる
+                    c.AreaRect(-13, 0, 3, 6);
+                    c.AreaRect(13, 0, 3, 6);
+                    c.Spawns(new Vector2(-4, 5), new Vector2(4, -5), new Vector2(-4, -5), new Vector2(4, 5));
+                });
+
+            Add("シューター回廊", 26,
+                "四隅のシューターレーンが、中央の回転台へ向けて斜めに積み木を撃ち出す。",
+                "レーンに積み木を運べば必ず中央へ向けて飛ぶが、回転台の上を通ると弾道が曲がり、どこへ抜けるかは回転の向き次第。落ちていた積み木は持ち主なしで飛ぶので、自分で殴った積み木をレーンへ打ち込むと手柄を保ったまま撃ち出せる。レーンの前に立つと流れ弾の通り道になるので注意。",
+                c =>
+                {
+                    c.Arena(0, 0, 32, 24, true, true, true, true);
+                    c.Turntable(0, 0, 4, true, 50);
+                    c.ShooterLane(-12, -8, 45, new Vector2(2.5f, 3));
+                    c.ShooterLane(12, 8, 225, new Vector2(2.5f, 3));
+                    c.ShooterLane(12, -8, 315, new Vector2(2.5f, 3));
+                    c.ShooterLane(-12, 8, 135, new Vector2(2.5f, 3));
+                    c.AreaCircle(0, 0, 2);
+                    // 南北・東西の壁にかぶせる
+                    c.AreaRect(0, 10, 8, 3);
+                    c.AreaRect(0, -10, 8, 3);
+                    c.AreaRect(14.5f, 0, 3, 6);
+                    c.AreaRect(-14.5f, 0, 3, 6);
+                    c.AreaCircle(7, 0, 1.5f);
+                    c.Spawns(new Vector2(-7, 4), new Vector2(7, -4), new Vector2(-7, -4), new Vector2(7, 4));
+                });
+
+            Add("氷と泥の庭", 26,
+                "加速床と減速床が市松模様に並ぶ庭。中央に大きなバンパー、四隅に小さなバンパー。",
+                "加速床(オレンジ)を踏むと体も弾も一気に速くなり、減速床(青緑)では泥にはまったように遅くなる。止まっている積み木も加速床の上では向いている方向へ走り出すので、床の色を見て積み木の行き先を読む必要がある。中央のバンパーにはじかれて加速床へ飛び込むと、そのまま壁まで滑っていく。",
+                c =>
+                {
+                    c.MaxGimmickTypes = 3;
+                    c.Arena(0, 0, 28, 28, true, true, true, true);
+                    c.SpeedFloor(6, 6, new Vector2(4, 4), true);
+                    c.SpeedFloor(-6, 6, new Vector2(4, 4), true);
+                    c.SpeedFloor(6, -6, new Vector2(4, 4), true);
+                    c.SpeedFloor(-6, -6, new Vector2(4, 4), true);
+                    c.SpeedFloor(0, 8, new Vector2(3, 3), false);
+                    c.SpeedFloor(0, -8, new Vector2(3, 3), false);
+                    c.SpeedFloor(8, 0, new Vector2(3, 3), false);
+                    c.SpeedFloor(-8, 0, new Vector2(3, 3), false);
+                    c.Bumper(0, 0, 1.6f);
+                    c.Bumper(11, 11, 1.2f);
+                    c.Bumper(-11, 11, 1.2f);
+                    c.Bumper(11, -11, 1.2f);
+                    c.Bumper(-11, -11, 1.2f);
+                    c.AreaCircle(0, 4, 1.5f);
+                    c.AreaCircle(0, -4, 1.5f);
+                    c.AreaCircle(4, 0, 1.5f);
+                    c.AreaCircle(-4, 0, 1.5f);
+                    // 南北の壁にかぶせる
+                    c.AreaRect(0, 12.5f, 6, 2);
+                    c.AreaRect(0, -12.5f, 6, 2);
+                    c.Spawns(new Vector2(-11, 4), new Vector2(11, -4), new Vector2(4, 11), new Vector2(-4, -11));
+                });
+
+            Add("流れる足場の工場", 26,
+                "中央に四角い大穴が空いた工場。穴の中を二枚のパレットが同じ向きに周回し、外周の四隅のシューターレーンが壁沿いに時計回りに積み木を送る。",
+                "外周の積み木はレーンからレーンへと時計回りに運ばれ続け、レーンの先に立つ相手を襲う。穴を突っ切るにはパレットに乗るしかなく、周回のタイミングを外すと奈落へ落ちる。パレットの上から外周の相手を撃つか、外周を回って積み木を集めるかの選択になる。",
+                c =>
+                {
+                    // 遊べる範囲 32×32m。中央 12×12m の穴を残して床を並べ、四方に壁
+                    c.Floor(0, 11.5f, 34, 11);
+                    c.Floor(0, -11.5f, 34, 11);
+                    c.Floor(-11.5f, 0, 11, 12);
+                    c.Floor(11.5f, 0, 11, 12);
+                    c.Wall(0, 16.5f, 34, 1);
+                    c.Wall(0, -16.5f, 34, 1);
+                    c.Wall(16.5f, 0, 1, 32);
+                    c.Wall(-16.5f, 0, 1, 32);
+                    // 同じ経路・同じ速さで、反対側から周回を始める(ぶつからない)
+                    c.MovingFloor(new Vector2(2.9f, 2.9f), MovingFloorGimmick.LoopMode.Loop, 2.5f, 1.0f,
+                        new Vector2(-4.5f, -4.5f), new Vector2(4.5f, -4.5f), new Vector2(4.5f, 4.5f), new Vector2(-4.5f, 4.5f));
+                    c.MovingFloor(new Vector2(2.9f, 2.9f), MovingFloorGimmick.LoopMode.Loop, 2.5f, 1.0f,
+                        new Vector2(4.5f, 4.5f), new Vector2(-4.5f, 4.5f), new Vector2(-4.5f, -4.5f), new Vector2(4.5f, -4.5f));
+                    c.ShooterLane(-12, -12, 0, new Vector2(2.5f, 3));
+                    c.ShooterLane(-12, 12, 90, new Vector2(2.5f, 3));
+                    c.ShooterLane(12, 12, 180, new Vector2(2.5f, 3));
+                    c.ShooterLane(12, -12, 270, new Vector2(2.5f, 3));
+                    c.AreaRect(0, 11, 8, 3);
+                    c.AreaRect(0, -11, 8, 3);
+                    c.AreaRect(11, 0, 3, 8);
+                    c.AreaRect(-11, 0, 3, 8);
+                    c.AreaCircle(14, 8, 1.5f);
+                    c.AreaCircle(-14, -8, 1.5f);
+                    c.Spawns(new Vector2(-9, 9), new Vector2(9, 9), new Vector2(-9, -9), new Vector2(9, -9));
+                });
+
+            Add("嵐のワープ", 24,
+                "東西に長い闘技場。両端の扇風機が南北に往復しながら中央へ風を送る。四隅寄りにどちらも送るワープゲート、南北の中央に積み木だけを送り向きを反転させるゲート。",
+                "風に押されてゲートへ流され、思わぬ場所へ飛ばされるのがこのステージの事故の元。南北の積み木専用ゲートはゲートの向きを基準に回すので、北のゲートに飛び込んだ弾は南のゲートから反対向きに飛び出す。風の切れ目とゲートの位置を覚えれば、遠くの相手を奇襲できる。",
+                c =>
+                {
+                    c.Arena(0, 0, 34, 20, true, true, true, true);
+                    c.Fan(new Vector2(-16, 6), new Vector2(-16, -6), Vector3.right, 14, 4, 12, 2);
+                    c.Fan(new Vector2(16, -6), new Vector2(16, 6), Vector3.left, 14, 4, 12, 2);
+                    c.WarpGate(-8, 6, 0, 0, WarpGateGimmick.TargetType.Both, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.Keep);
+                    c.WarpGate(8, 6, 0, 0, WarpGateGimmick.TargetType.Both, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.Keep);
+                    c.WarpGate(-8, -6, 0, 0, WarpGateGimmick.TargetType.Both, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.Keep);
+                    c.WarpGate(8, -6, 0, 0, WarpGateGimmick.TargetType.Both, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.Keep);
+                    c.WarpGate(0, 7, 0, 1, WarpGateGimmick.TargetType.Blocks, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.RelativeToGate);
+                    c.WarpGate(0, -7, 180, 1, WarpGateGimmick.TargetType.Blocks, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.RelativeToGate);
+                    c.AreaCircle(0, 0, 2.5f);
+                    c.AreaCircle(-4, 0, 1.2f);
+                    // 四隅(壁にかぶせる)
+                    c.AreaRect(-12, 8.5f, 4, 2);
+                    c.AreaRect(12, 8.5f, 4, 2);
+                    c.AreaRect(-12, -8.5f, 4, 2);
+                    c.AreaRect(12, -8.5f, 4, 2);
+                    c.Spawns(new Vector2(-4, 4), new Vector2(4, -4), new Vector2(4, 4), new Vector2(-4, -4));
+                });
+
+            Add("総力戦の闘技場", 28,
+                "中央の回転砲台を、交互に立ち上がるせり上がり塀が囲む。四隅には加速床。",
+                "砲台から扇状にばらまかれる積み木は、塀が下がっている面からしか外へ出てこない。塀が上がると中の積み木は閉じ込められ、塀の上は砲台を見下ろす高台になる。四隅の加速床で勢いをつけた弾や体が中央へ飛び込み、砲台のまわりは常に乱戦になる。",
+                c =>
+                {
+                    c.MaxGimmickTypes = 3;
+                    c.Arena(0, 0, 30, 30, true, true, true, true);
+                    c.Cannon(0, 0, 0, TumikiCannon.RotationMode.Spin, 1, 4);
+                    // 砲台を囲む塀(北・南は横長、東・西は縦長)。隣どうしで開始をずらして交互に立ち上がる
+                    c.RisingWall(-2, 5, new Vector2(2, 1), 1.5f, 0.0f);
+                    c.RisingWall(2, 5, new Vector2(2, 1), 1.5f, 2.0f);
+                    c.RisingWall(5, 2, new Vector2(1, 2), 1.5f, 4.0f);
+                    c.RisingWall(5, -2, new Vector2(1, 2), 1.5f, 6.0f);
+                    c.RisingWall(2, -5, new Vector2(2, 1), 1.5f, 0.0f);
+                    c.RisingWall(-2, -5, new Vector2(2, 1), 1.5f, 2.0f);
+                    c.RisingWall(-5, -2, new Vector2(1, 2), 1.5f, 4.0f);
+                    c.RisingWall(-5, 2, new Vector2(1, 2), 1.5f, 6.0f);
+                    c.SpeedFloor(10, 10, new Vector2(3, 3), true);
+                    c.SpeedFloor(-10, 10, new Vector2(3, 3), true);
+                    c.SpeedFloor(10, -10, new Vector2(3, 3), true);
+                    c.SpeedFloor(-10, -10, new Vector2(3, 3), true);
+                    // 各辺の壁にかぶせる
+                    c.AreaRect(0, 12.5f, 8, 3);
+                    c.AreaRect(0, -12.5f, 8, 3);
+                    c.AreaRect(12.5f, 0, 3, 8);
+                    c.AreaRect(-12.5f, 0, 3, 8);
+                    c.AreaCircle(0, 8, 1.5f);
+                    c.AreaCircle(0, -8, 1.5f);
+                    c.Spawns(new Vector2(-8, 3), new Vector2(8, -3), new Vector2(3, 8), new Vector2(-3, -8));
                 });
 
             //----------------------------------------

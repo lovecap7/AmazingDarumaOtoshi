@@ -5,7 +5,7 @@ public class BlockController : MonoBehaviour
 {
     [SerializeField] float speed = 2.0f;
     [SerializeField] float deceleration = 0.2f;          // 減速量(単位/秒)。大きいほど早く止まる
-    [SerializeField] float stopThreshold = 0.05f;         // この速度を下回ったら停止とみなす
+    [SerializeField] float stopThreshold = 0.5f;         // この速度を下回ったら停止とみなす
 
     float currentSpeed; // 現在の速度(毎ステップ減衰する)
 
@@ -15,8 +15,11 @@ public class BlockController : MonoBehaviour
     // 現在のbehaviorを外部から参照するための公開プロパティ(MagnetBehaviorが相手の挙動を判定するのに使う)
     public IBlockBehavior Behavior => behavior;
 
+    // 飛行が終わって止まったときに通知する(FadeBehaviorなどが元の状態に戻すために購読する)
+    public event Action OnFlightEnded;
+
     // テスト用：インスペクターで挙動を選べるようにする
-    public enum BehaviorType { Normal, Iwa,HebiLeft, HebiRight, UnBreak,Homing,Ziguzagu,Grow,Bomb, Magnet }
+    public enum BehaviorType { Normal, Iwa,HebiLeft, HebiRight, UnBreak,Homing,Ziguzagu,Grow,Bomb, Magnet,Fade }
     [SerializeField] BehaviorType behaviorType = BehaviorType.Normal;
     [SerializeField] float hebiTurnSpeed = 60.0f; // テスト用：へびだるの曲がる強さ(度/秒)。大きいほど急カーブになる
     [SerializeField] float homingStartTurnSpeed = 270f;  // テスト用：ホーミング発射直後の旋回速度(度/秒)
@@ -30,6 +33,9 @@ public class BlockController : MonoBehaviour
     [SerializeField] float magnetStrength = 10.0f;  // テスト用：磁力の強さ
     [SerializeField] float magnetRepelStrength = 8.0f;  // テスト用：反発する力の強さ(最も近いとき)
     [SerializeField] float magnetMinDistance = 0.5f;    // テスト用：反発が最大になる距離
+    [SerializeField] float fadeDelay = 0.5f;     // テスト用：薄くなり始めるまでの時間(秒)
+    [SerializeField] float fadeDuration = 0.8f;  // テスト用：薄くなりきるまでの時間(秒)
+    [SerializeField] float fadeMinAlpha = 0.12f; // テスト用：最も薄いときのアルファ値
     public bool isFlying {  get; private set; } // 現在飛行中かどうか trueの場合は攻撃判定が発生する
 
     // 開始時点で飛行中だったかを記録する
@@ -89,6 +95,7 @@ public class BlockController : MonoBehaviour
             case BehaviorType.Grow: return new GrowBehavior(this, growRate, growMaxMultiplier);
             case BehaviorType.Bomb: return new BombBehavior(explosionRadius);
             case BehaviorType.Magnet: return new MagnetBehavior(this, magnetRange, magnetStrength, magnetRepelStrength, magnetMinDistance);
+            case BehaviorType.Fade: return new FadeBehavior(this, fadeDelay, fadeDuration, fadeMinAlpha);
             case BehaviorType.Normal:
             default: return new NormalBehavior();
         }
@@ -114,7 +121,7 @@ public class BlockController : MonoBehaviour
     // newDir: 新しい進行方向 / speedRatio: 現在速度に掛ける倍率(1で維持、小さいほど減速)
     public void Bounce(Vector3 newDir, float speedRatio)
     {
-        Vector3 flat = new Vector3(newDir.x, 0f, newDir.z);
+        Vector3 flat = new Vector3(newDir.x, 0.0f, newDir.z);
         if (flat.sqrMagnitude < 0.0001f) return; // 水平方向がなければ何もしない
         direction = flat.normalized;
         currentSpeed *= speedRatio;
@@ -160,6 +167,7 @@ public class BlockController : MonoBehaviour
         v.x = 0.0f;
         v.z = 0.0f;
         rb.linearVelocity = v;
+        OnFlightEnded?.Invoke(); //
     }
 
     private void OnCollisionEnter(Collision collision)
@@ -175,13 +183,10 @@ public class BlockController : MonoBehaviour
         // 壁に当たったら積み木を反射させる
         if (collision.gameObject.CompareTag("Wall"))
         {
-            // direction = Vector3.Reflect(direction, collision.contacts[0].normal); // behaviorに委譲したため不要
-
             // 接触法線を水平方向だけにする
             // (壁の縁や傾きでYが混ざると、反射後の水平速度が落ちて止まったように見えるため)
             Vector3 wallNormal = collision.GetContact(0).normal;
-            wallNormal.y = 0f;
-            // if (wallNormal.sqrMagnitude < 0.0001f) return; // 反射できずに止まる原因になったため、保険の処理に変更
+            wallNormal.y = 0.0f;
             if (wallNormal.sqrMagnitude < 0.0001f)
             {
                 // めり込み等で法線が上下を向いたときは、壁の軸のうち進行方向と最も向かい合う向きを法線の代わりにする
@@ -193,10 +198,7 @@ public class BlockController : MonoBehaviour
             // (同じ壁との接触イベントが続けて来たとき、2回反射して壁の方へ戻ってしまうのを防ぐ)
             if (Vector3.Dot(direction, wallNormal) >= 0f) return;
 
-            // direction = Vector3.Reflect(direction, collision.contacts[0].normal); // behaviorに委譲したため不要
-
             hasHit = true; // 壁ヒットでも二重判定を防ぐため統一して立てる
-            // if (behavior.OnWallHit(direction, collision.contacts[0].normal, out var newDirection)) // 加工した法線を使うため変更
             if (behavior.OnWallHit(direction, wallNormal, out var newDirection))
             {
                 direction = newDirection; // 反射するキャラ(Normal等)
@@ -235,7 +237,6 @@ public class BlockController : MonoBehaviour
                 lastContactNormal = collision.GetContact(0).normal;
 
                 hasHit = true;
-                // other.Launch(other.transform.position - transform.position); // behaviorに委譲したため不要
 
                 Debug.Log($"攻撃ヒット 色:{info.Color}");
 
@@ -266,7 +267,7 @@ public class BlockController : MonoBehaviour
 
         foreach (var a in axes)
         {
-            Vector3 flat = new Vector3(a.x, 0f, a.z).normalized;
+            Vector3 flat = new Vector3(a.x, 0.0f, a.z).normalized;
             float d = Vector3.Dot(dir, flat);
             if (d < bestDot)
             {
