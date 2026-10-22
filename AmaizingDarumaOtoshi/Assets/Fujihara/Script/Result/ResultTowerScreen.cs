@@ -46,8 +46,6 @@ public class ResultTowerScreen : MonoBehaviour
     [SerializeField] string drawText = "ひきわけ！";
 
     [Header("演出")]
-    [Tooltip("「トン」「ポンッ！」などの擬音（字幕）をこの画面で出す")]
-    [SerializeField] bool showOnomatopoeia = true;
     [Tooltip("演出中に決定ボタンを押したときの早送りの速さ")]
     [SerializeField] float skipSpeed = 4f;
     [Tooltip("演出が終わってから、この秒数操作がないと自動で次へ（0で無効）")]
@@ -116,7 +114,6 @@ public class ResultTowerScreen : MonoBehaviour
     RectTransform uiRoot;
     TextMeshProUGUI titleText, countText, resultText, statsText;
     CanvasGroup titleGroup, countGroup, resultGroup, hintGroup;
-    readonly List<GameObject> pops = new List<GameObject>();
     float countPunch;
 
     // ---- 動き ----
@@ -528,7 +525,6 @@ public class ResultTowerScreen : MonoBehaviour
         t.wobble = 1.2f;
 
         Vector3 at = t.root.TransformPoint(to);
-        Pop("ポテッ", at + new Vector3(1.1f, 0.3f, 0f), 64f, Palette[2], 12f);
         ToyKit.Emit(puff, at - Vector3.up * HeadR, Quaternion.Euler(-90f, 0f, 0f), 8);
         shake = Mathf.Max(shake, 0.12f);
         Play(SoundSynth.Pickup, 0.9f, 0.7f);
@@ -596,7 +592,6 @@ public class ResultTowerScreen : MonoBehaviour
         ToyKit.Emit(puff, at, Quaternion.Euler(-90f, 0f, 0f), 4);
         shake = Mathf.Max(shake, 0.05f);
         Play(SoundSynth.Pickup, 0.7f, Mathf.Min(0.85f + 0.06f * index, 1.7f));
-        if (index % 2 == 0) Pop("トン", at + new Vector3(1.1f, 0.3f, 0f), 46f, Palette[(index + 2) % Palette.Length], UnityEngine.Random.Range(-12f, 12f));
         if (t == towers[0])
         {
             // タイムは最後の1個で本当の点数を出す（上限より多く取っていたとき）
@@ -632,7 +627,6 @@ public class ResultTowerScreen : MonoBehaviour
         t.wobble = 1.4f;
 
         Vector3 at = t.root.TransformPoint(local);
-        Pop("ポンッ！", at + new Vector3(1.3f, 0.7f, 0f), 110f, Gold, -10f, 0.7f);
         ToyKit.Emit(sparkle, at + Vector3.up * 0.3f, Quaternion.Euler(-90f, 0f, 0f), 50);
         ToyKit.Emit(confetti, at + Vector3.up * 0.4f, Quaternion.Euler(-90f, 0f, 0f), 80);
         shake = 0.4f;
@@ -681,13 +675,6 @@ public class ResultTowerScreen : MonoBehaviour
     {
         camPos = pos; camLook = look; camFov = fov;
         if (snap) { curPos = pos; curLook = look; curFov = fov; }
-    }
-
-    void Pop(string text, Vector3 world, float size, Color color, float angle, float hold = 0.45f)
-    {
-        if (!showOnomatopoeia) return;
-        var local = ToyKit.WorldToCanvas(cam, uiRoot, world);
-        ToyKit.Pop(this, uiRoot, font, popMat, text, local, size, color, angle, hold, pops);
     }
 
     // 効果音（試合と同じ仮の音。音量はメニューのサウンド設定に従う）

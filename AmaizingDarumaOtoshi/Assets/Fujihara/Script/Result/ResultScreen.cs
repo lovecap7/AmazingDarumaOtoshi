@@ -38,8 +38,6 @@ public class ResultScreen : MonoBehaviour
     [SerializeField] string drawText = "ひきわけ！";
 
     [Header("演出")]
-    [Tooltip("「コトン」「カコーン！」などの擬音（字幕）をこの画面で出す")]
-    [SerializeField] bool showOnomatopoeia = true;
     [Tooltip("演出中に決定ボタンを押したときの早送りの速さ")]
     [SerializeField] float skipSpeed = 5f;
     [Tooltip("演出が終わってから、この秒数操作がないと自動で次へ（0で無効）")]
@@ -85,7 +83,7 @@ public class ResultScreen : MonoBehaviour
     readonly List<Renderer> shafts = new List<Renderer>();
     Color ambSky, ambEquator, ambGround;
     Mesh blockMesh;
-    Material letterMat, popMat;
+    Material letterMat;
     ParticleSystem confetti, puff, sparkle;
     Transform groundRing;
     Material ringMat;
@@ -97,7 +95,6 @@ public class ResultScreen : MonoBehaviour
     // ---- UI ----
     RectTransform uiRoot;
     CanvasGroup infoGroup, hintGroup;
-    readonly List<GameObject> pops = new List<GameObject>();
 
     // ---- 動き ----
     float baseSpeed = 1f, slow = 1f;    // 早送り・スローモーション
@@ -168,7 +165,6 @@ public class ResultScreen : MonoBehaviour
     {
         blockMesh = ToyKit.RoundedBox(new Vector3(BlockW, BlockH, BlockD), 0.14f, 10);
         letterMat = ToyKit.LetterMaterial(font);
-        popMat = ToyKit.PopMaterial(letterMat);
 
         cam = ToyKit.CreateCamera();
         ToyKit.CreateLights();
@@ -328,7 +324,6 @@ public class ResultScreen : MonoBehaviour
                 Vector3 at = first.column.TransformPoint(blk.localPosition) - Vector3.up * BlockH * 0.5f;
                 ToyKit.Emit(puff, at, Quaternion.Euler(-90f, 0f, 0f), 4);
                 shake = Mathf.Max(shake, 0.08f);
-                if (index % 2 == 0) Pop("コトン", at + new Vector3(1.1f, 0.3f, 0f), 50f, Palette[(index + 2) % Palette.Length], UnityEngine.Random.Range(-12f, 12f));
             }));
             yield return Wait(Mathf.Lerp(0.34f, 0.18f, b / (float)Mathf.Max(1, n - 1)));   // だんだん速く
         }
@@ -340,7 +335,6 @@ public class ResultScreen : MonoBehaviour
         first.face.root.gameObject.SetActive(true);
         yield return DropIn(first.face.root, first.headBase, 4f, 0.3f, () =>
         {
-            Pop("ポテッ", first.column.TransformPoint(first.headBase) + new Vector3(1.0f, 0.4f, 0f), 60f, Palette[2], 12f);
             shake = Mathf.Max(shake, 0.1f);
         });
         yield return Wait(0.5f);
@@ -415,7 +409,6 @@ public class ResultScreen : MonoBehaviour
         // 文字の積み木が1個ずつ落ちてきて並ぶ（最初のかたまりは名前「1P」など）
         yield return Wait(0.2f);
         yield return TextRow(text);
-        Pop(isDraw ? "ドンッ！" : "ドンッ！！", new Vector3(-4.6f, TextRowY + 0.9f, TextRowZ), 120f, Palette[0], -8f, 0.9f);
         shake = 0.35f;
         ToyKit.Emit(sparkle, new Vector3(0f, TextRowY, TextRowZ - 0.8f), Quaternion.Euler(-90f, 0f, 0f), 40);
 
@@ -489,7 +482,6 @@ public class ResultScreen : MonoBehaviour
         p.headBase -= Vector3.up * BlockH;
         p.column.position += Vector3.up * BlockH;
 
-        Pop("カコーン！", contact + new Vector3(-0.4f, 1.3f, -0.3f), 110f, Palette[1], -8f);
         ToyKit.Emit(confetti, contact, Quaternion.Euler(-30f, 90f, 0f), 40);
         ToyKit.Emit(sparkle, contact, Quaternion.Euler(0f, 90f, 0f), 20);
         shake = 0.6f;
@@ -524,7 +516,6 @@ public class ResultScreen : MonoBehaviour
         }
         p.column.position = end;
 
-        Pop("ストン", end + new Vector3(1.4f, 0.5f, 0f), 64f, Palette[4], 10f);
         ToyKit.Emit(puff, end + Vector3.up * 0.05f, Quaternion.Euler(-90f, 0f, 0f), 12);
         StartCoroutine(Ring(end + Vector3.up * 0.02f));
         shake = Mathf.Max(shake, 0.3f);
@@ -624,14 +615,6 @@ public class ResultScreen : MonoBehaviour
     {
         camPos = pos; camLook = look; camFov = fov;
         if (snap) { curPos = pos; curLook = look; curFov = fov; }
-    }
-
-    void Pop(string text, Vector3 world, float size, Color color, float angle, float hold = 0.45f)
-    {
-        // Inspector でオフにしているときはこの画面の擬音を出さない
-        if (!showOnomatopoeia) return;
-        var local = ToyKit.WorldToCanvas(cam, uiRoot, world);
-        ToyKit.Pop(this, uiRoot, font, popMat, text, local, size, color, angle, hold, pops);
     }
 
     // ================= 毎フレーム =================
