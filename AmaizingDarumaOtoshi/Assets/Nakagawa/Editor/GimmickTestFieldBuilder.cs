@@ -1,4 +1,4 @@
-using Nakahira;
+﻿using Nakahira;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -507,7 +507,7 @@ namespace Nakagawa.EditorTools
         }
 
         // 当たり判定のない見た目だけの部品
-        static GameObject Visual(PrimitiveType type, string name, Transform parent, Vector3 position, Vector3 euler, Vector3 scale, Material mat)
+        internal static GameObject Visual(PrimitiveType type, string name, Transform parent, Vector3 position, Vector3 euler, Vector3 scale, Material mat)
         {
             var go = GameObject.CreatePrimitive(type);
             go.name = name;
@@ -534,22 +534,22 @@ namespace Nakagawa.EditorTools
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
-        static void SavePrefab(GameObject root, string name)
+        internal static void SavePrefab(GameObject root, string name)
         {
             PrefabUtility.SaveAsPrefabAsset(root, $"{kPrefabDir}/{name}.prefab");
             Object.DestroyImmediate(root);
         }
 
-        static GameObject LoadPrefab(string name) => Load<GameObject>($"{kPrefabDir}/{name}.prefab");
+        internal static GameObject LoadPrefab(string name) => Load<GameObject>($"{kPrefabDir}/{name}.prefab");
 
         static T Load<T>(string path) where T : Object => AssetDatabase.LoadAssetAtPath<T>(path);
 
         // Nakahira のマテリアルを元に色だけ変えたものを Nakagawa に作る(既にあれば上書き)
-        static Material OpaqueMaterial(string name, Color color) => DerivedMaterial(name, kOpaqueTemplate, color);
+        internal static Material OpaqueMaterial(string name, Color color) => DerivedMaterial(name, kOpaqueTemplate, color);
         static Material TransparentMaterial(string name, Color color) => DerivedMaterial(name, kTransparentTemplate, color);
         static Material ParticleMaterial(string name) => DerivedMaterial(name, kParticleTemplate, Color.white);
 
-        static Material DerivedMaterial(string name, string templatePath, Color color)
+        internal static Material DerivedMaterial(string name, string templatePath, Color color)
         {
             string path = $"{kMaterialDir}/{name}.mat";
             var template = Load<Material>(templatePath);
@@ -570,7 +570,7 @@ namespace Nakagawa.EditorTools
             return mat;
         }
 
-        static void EnsureFolder(string path)
+        internal static void EnsureFolder(string path)
         {
             if (AssetDatabase.IsValidFolder(path)) return;
             int slash = path.LastIndexOf('/');
