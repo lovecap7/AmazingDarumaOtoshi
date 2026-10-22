@@ -28,8 +28,6 @@ namespace Nakahira
         [Min(0.0f)] public float OpponentAvoidRadius = 3.0f;
         [Tooltip("相手の近くにある積み木のコスト(相手に近いほど大きくなる)")]
         [Min(0.0f)] public float OpponentPenalty = 6.0f;
-        [Tooltip("途中に壁がある積み木のコスト")]
-        [Min(0.0f)] public float WallPenalty = 8.0f;
 
         [Header("積む:ジャンプ")]
         [Tooltip("ジャンプする距離の誤差(割合)。大きいほど跳ぶのが早すぎたり遅すぎたりする")]
@@ -37,12 +35,12 @@ namespace Nakahira
         [Tooltip("着地を狙う位置の誤差(m)")]
         [Min(0.0f)] public float AimError = 0.1f;
 
-        [Header("足場")]
+        [Header("道・足場")]
+        [Tooltip("積み木までの道(奈落・壁を迂回する道)を求め直す間隔(秒)")]
+        [Min(0.05f)] public float RepathInterval = 0.3f;
         [Tooltip("進む先の足元に地面があるか確かめる距離(m)。移動速度×0.1秒ぶんを足して使う")]
         [Min(0.0f)] public float EdgeLookAhead = 0.6f;
         [Tooltip("足元からこの深さ(m)までに地面がなければ奈落とみなす")]
         [Min(0.1f)] public float GroundProbeDepth = 2.0f;
-        [Tooltip("積み木までの道に奈落がないか確かめる間隔(m)")]
-        [Min(0.1f)] public float PathSampleStep = 0.5f;
     }
 }

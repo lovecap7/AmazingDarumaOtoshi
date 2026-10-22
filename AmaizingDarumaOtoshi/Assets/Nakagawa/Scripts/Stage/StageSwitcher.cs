@@ -140,6 +140,8 @@ namespace Nakagawa
             }
             // 床の配置が変わったので、継ぎ目の判定に使う床の一覧を作り直す
             FloorSeamFilter.MarkDirty();
+            // CPU が迂回する道のナビメッシュも作り直す
+            CpuNavMesh.MarkDirty();
 
             StageEntry stage = m_stages[m_index];
             var points = stage.SpawnPoints;

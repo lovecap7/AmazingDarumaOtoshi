@@ -1,19 +1,24 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.AI;
 
 namespace Nakahira
 {
     // CPU の行動「積む」:近くの積み木を選び、落下しながら触れるようにジャンプして拾う
     //  ・狙うのは落ちている積み木と、攻撃判定のない(ゆっくり)動いている積み木
-    //  ・相手の近く・途中に壁がある積み木は後回しにし、途中に奈落がある積み木は狙わない
+    //  ・奈落・壁はナビメッシュ(CpuNavMesh)の道で迂回する。近さは歩く道の長さで比べ、歩いて行けない積み木は狙わない
+    //  ・相手の近くにある積み木は後回しにする
     //  ・ジャンプの高さ・重力と移動速度から、落ちてくるときにちょうど積み木に届く距離で跳ぶ
+    //    (跳ぶのは道の最後のまっすぐな区間だけ。奈落の向こうへは跳ばない)
     public class CpuCollect
     {
-        // 狙う積み木の候補(距離と相手からのコストだけで並べたもの)
+        // 狙う積み木の候補
         struct Candidate
         {
             public TumikiBlock Block;
-            public float Cost;
+            public float Distance;      // まっすぐの距離(道の長さはこれ以上になる)
+            public float OpponentCost;
+            public float LowerBound => Distance + OpponentCost;
         }
 
         // 積み木の上下の速さがこれ未満なら、置かれている(落ちてくる途中ではない)とみなす
@@ -24,11 +29,18 @@ namespace Nakahira
         const float kMaxLeadTime = 2.0f;
         // 空中で狙う位置の真上に止まるための減速を始める時間(秒)
         const float kAirBrakeTime = 0.1f;
+        // 道の終わりが積み木からこの距離(m)以内なら、歩いて行けるとみなす(積み木が床の縁にあっても拾えるように)
+        const float kGoalTolerance = 1.0f;
+        // 道の曲がり角にこの距離(m)まで近づいたら、次の曲がり角へ向かう
+        const float kCornerReach = 0.35f;
+        // 1回選び直すときに道を求める積み木の最大数(近い順。重くならないように)
+        const int kMaxPathQueries = 12;
 
         TumikiBlock m_target;
         Rigidbody m_targetRb;
         float m_thinkTimer;
         float m_chaseTime;
+        float m_repathTimer;
         // 狙いごとの腕前のぶれ(狙い直すたびに決め直す)
         float m_jumpDistanceScale = 1.0f;
         Vector3 m_aimOffset;
@@ -37,15 +49,32 @@ namespace Nakahira
         readonly List<Candidate> m_candidates = new List<Candidate>();
         readonly List<TumikiBlock> m_expired = new List<TumikiBlock>();
 
+        // 狙っている積み木までの道(曲がり角。0番は道を求めたときの位置)
+        NavMeshPath m_path;           // MonoBehaviour の初期化中には作れないので、使うときに作る
+        NavMeshPath m_queryPath;      // 候補を比べるとき用
+        readonly Vector3[] m_corners = new Vector3[64];
+        int m_cornerCount;
+        int m_cornerIndex;
+
         // 狙っている積み木(なければnull)
         public TumikiBlock Target => m_target;
         // 着地を狙っている位置(デバッグ表示用)
         public Vector3 AimPoint { get; private set; }
+        // 今たどっている道(デバッグ表示用)
+        public int RouteCount => m_cornerCount;
+        public int RouteIndex => m_cornerIndex;
+        public Vector3 RouteCorner(int i) => m_corners[i];
 
         // 積み木を集める操作を cmd に書く。集める必要がない・拾える積み木がないときは false(cmd は変えない)
         // opponents: 相手の位置
         public bool Tick(DarumaCharacter self, CpuParams p, List<Vector3> opponents, float dt, ref DarumaCommand cmd)
         {
+            if (m_path == null)
+            {
+                m_path = new NavMeshPath();
+                m_queryPath = new NavMeshPath();
+            }
+
             if (self.Stack.Count >= p.CollectUntil)
             {
                 ClearTarget();
@@ -76,6 +105,9 @@ namespace Nakahira
                 return false;
             }
 
+            m_repathTimer -= dt;
+            if (m_repathTimer <= 0.0f) UpdateRoute(self, p);
+
             Steer(self, p, ref cmd);
             return true;
         }
@@ -89,7 +121,7 @@ namespace Nakahira
             ForgetExpiredGiveUps();
             Vector3 pos = self.transform.position;
 
-            // 距離と相手からのコストで並べ、近い順に足場・壁を調べる(レイキャストの数を減らす)
+            // まっすぐの距離(道の長さの下限)で並べ、近い順に道を求める(道を求める回数を減らす)
             m_candidates.Clear();
             foreach (var block in TumikiBlock.All)
             {
@@ -98,21 +130,24 @@ namespace Nakahira
                 float dist = FlatDistance(pos, bp);
                 if (dist > p.SearchRadius) continue;
                 if (!CanReachHeight(self, bp)) continue;
-                m_candidates.Add(new Candidate { Block = block, Cost = dist + OpponentCost(bp, p, opponents) });
+                m_candidates.Add(new Candidate { Block = block, Distance = dist, OpponentCost = OpponentCost(bp, p, opponents) });
             }
-            m_candidates.Sort((a, b) => a.Cost.CompareTo(b.Cost));
+            m_candidates.Sort((a, b) => a.LowerBound.CompareTo(b.LowerBound));
 
             TumikiBlock best = null;
             float bestCost = float.MaxValue;
             float currentCost = float.MaxValue;
+            int queries = 0;
             foreach (var c in m_candidates)
             {
-                // 壁のコストは足されるだけなので、並べたコストが今の一番以上ならこれ以降は調べなくてよい
+                bool isCurrent = c.Block == m_target;
+                // 道の長さはまっすぐの距離以上なので、下限が今の一番以上ならこれ以降は調べなくてよい
                 // (ただし今狙っている積み木のコストは、乗り換えるか決めるのに必要)
-                if (c.Cost >= bestCost && c.Block != m_target) continue;
-                if (!TryGetPathCost(pos, c.Block.transform.position, p, out float pathCost)) continue;
-                float cost = c.Cost + pathCost;
-                if (c.Block == m_target) currentCost = cost;
+                if (!isCurrent && (c.LowerBound >= bestCost || queries >= kMaxPathQueries)) continue;
+                queries++;
+                if (!TryGetPathLength(pos, c.Block.transform.position, p, m_queryPath, out float length)) continue;
+                float cost = length + c.OpponentCost;
+                if (isCurrent) currentCost = cost;
                 if (cost < bestCost)
                 {
                     bestCost = cost;
@@ -122,10 +157,10 @@ namespace Nakahira
 
             // 今の狙いを続けられるなら、十分に良い積み木があるときだけ乗り換える(迷わないように)
             if (m_target != null && currentCost < float.MaxValue && bestCost > currentCost - p.SwitchMargin) return;
-            if (best != m_target) SetTarget(best, p);
+            if (best != m_target) SetTarget(best, self, p);
         }
 
-        private void SetTarget(TumikiBlock block, CpuParams p)
+        private void SetTarget(TumikiBlock block, DarumaCharacter self, CpuParams p)
         {
             m_target = block;
             m_targetRb = block != null ? block.GetComponent<Rigidbody>() : null;
@@ -133,12 +168,14 @@ namespace Nakahira
             m_jumpDistanceScale = 1.0f + Random.Range(-p.JumpDistanceError, p.JumpDistanceError);
             Vector2 offset = Random.insideUnitCircle * p.AimError;
             m_aimOffset = new Vector3(offset.x, 0.0f, offset.y);
+            if (block != null) UpdateRoute(self, p);
         }
 
         private void ClearTarget()
         {
             m_target = null;
             m_targetRb = null;
+            m_cornerCount = 0;
         }
 
         // 拾いに行ってよい積み木か(落ちている・攻撃判定なしで動いている積み木。諦めたものは除く)
@@ -162,14 +199,12 @@ namespace Nakahira
             return cost;
         }
 
-        // 積み木までの道のコスト。途中や積み木の下に奈落があれば false
-        private static bool TryGetPathCost(Vector3 from, Vector3 blockPos, CpuParams p, out float cost)
+        // 積み木まで歩いて行ける道の長さ。積み木の下が奈落・歩いて行けないときは false
+        private static bool TryGetPathLength(Vector3 from, Vector3 blockPos, CpuParams p, NavMeshPath path, out float length)
         {
-            cost = 0.0f;
+            length = 0.0f;
             if (!CpuSensor.HasGround(blockPos, p.GroundProbeDepth)) return false;
-            if (!CpuSensor.HasGroundAlong(from, blockPos, p.PathSampleStep, p.GroundProbeDepth)) return false;
-            if (CpuSensor.HasWallBetween(from, blockPos)) cost += p.WallPenalty;
-            return true;
+            return CpuNavMesh.TryFindPath(from, blockPos, kGoalTolerance, path, out length);
         }
 
         private void ForgetExpiredGiveUps()
@@ -183,14 +218,37 @@ namespace Nakahira
         }
 
         //========================================
-        // 近づいて跳ぶ
+        // 道をたどって近づき、跳ぶ
         //========================================
+
+        // 今の位置から狙っている積み木までの道を求め直す(道が見つからなければ、まっすぐ向かう)
+        private void UpdateRoute(DarumaCharacter self, CpuParams p)
+        {
+            m_repathTimer = p.RepathInterval;
+            m_cornerCount = 0;
+            m_cornerIndex = 0;
+            if (m_target == null) return;
+            if (!CpuNavMesh.TryFindPath(self.transform.position, m_target.transform.position, kGoalTolerance, m_path, out _)) return;
+            m_cornerCount = m_path.GetCornersNonAlloc(m_corners);
+            m_cornerIndex = Mathf.Min(1, m_cornerCount);
+        }
 
         private void Steer(DarumaCharacter self, CpuParams p, ref DarumaCommand cmd)
         {
             Vector3 pos = self.transform.position;
-            Vector3 blockPos = m_target.transform.position;
             float speed = Mathf.Max(0.1f, self.MoveSpeed);
+
+            // 道の曲がり角を順にたどる。最後の曲がり角(積み木のそば)の手前までは、そこへ向かって歩くだけ
+            while (m_cornerIndex < m_cornerCount - 1 && FlatDistance(pos, m_corners[m_cornerIndex]) < kCornerReach) m_cornerIndex++;
+            if (m_cornerIndex < m_cornerCount - 1)
+            {
+                AimPoint = m_corners[m_cornerIndex];
+                Walk(pos, m_corners[m_cornerIndex], speed, p, ref cmd);
+                return;
+            }
+
+            // 最後のまっすぐな区間:積み木を狙って跳ぶ
+            Vector3 blockPos = m_target.transform.position;
             float reach = ReachTime(self, blockPos);
 
             // 動いている積み木は、届くころの位置を狙う(届く時間は予想した位置までの距離で求め直す)
@@ -239,9 +297,26 @@ namespace Nakahira
                 return;
             }
 
-            // 進む先が奈落なら止まる(拾えないまま時間が経てば諦めて別の積み木を探す)
-            Vector3 ahead = pos + new Vector3(dir.x, 0.0f, dir.y) * (p.EdgeLookAhead + speed * 0.1f);
-            cmd.Move = CpuSensor.HasGround(ahead, p.GroundProbeDepth) ? dir : Vector2.zero;
+            Walk(pos, aim, speed, p, ref cmd);
+        }
+
+        // destination へ歩く。進む先(destination より手前)が奈落なら止まる
+        // (拾えないまま時間が経てば諦めて別の積み木を探す)
+        private static void Walk(Vector3 pos, Vector3 destination, float speed, CpuParams p, ref DarumaCommand cmd)
+        {
+            Vector3 to = destination - pos;
+            to.y = 0.0f;
+            float dist = to.magnitude;
+            if (dist < 0.001f)
+            {
+                cmd.Move = Vector2.zero;
+                return;
+            }
+            Vector3 dir = to / dist;
+            // 曲がり角の先は調べない(道は曲がり角で向きを変えるので、その先が奈落でも落ちない)
+            float lookAhead = Mathf.Min(p.EdgeLookAhead + speed * 0.1f, dist);
+            bool safe = CpuSensor.HasGround(pos + dir * lookAhead, p.GroundProbeDepth);
+            cmd.Move = safe ? new Vector2(dir.x, dir.z) : Vector2.zero;
         }
 
         // 跳んでから、落ちてくる途中で積み木の上面の高さに届くまでの時間(秒)

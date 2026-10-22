@@ -65,8 +65,15 @@ namespace Nakahira
             TumikiBlock target = m_collect.Target;
             if (self == null || target == null) return;
 
+            // たどっている道(通り過ぎた曲がり角は除く)
             Gizmos.color = Color.cyan;
-            Gizmos.DrawLine(self.transform.position + Vector3.up, target.transform.position);
+            Vector3 from = self.transform.position;
+            for (int i = m_collect.RouteIndex; i < m_collect.RouteCount; i++)
+            {
+                Vector3 corner = m_collect.RouteCorner(i);
+                Gizmos.DrawLine(from + Vector3.up * 0.1f, corner + Vector3.up * 0.1f);
+                from = corner;
+            }
             Gizmos.DrawWireSphere(target.transform.position, TumikiBlock.kRadius);
             Gizmos.color = Color.yellow;
             Gizmos.DrawWireSphere(m_collect.AimPoint, 0.15f);
