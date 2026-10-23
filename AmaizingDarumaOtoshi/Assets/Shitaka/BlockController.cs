@@ -19,7 +19,7 @@ public class BlockController : MonoBehaviour
     public event Action OnFlightEnded;
 
     // テスト用：インスペクターで挙動を選べるようにする
-    public enum BehaviorType { Normal, Iwa,HebiLeft, HebiRight, UnBreak,Homing,Ziguzagu,Grow,Bomb, Magnet,Fade }
+    public enum BehaviorType { Normal, Iwa,HebiLeft, HebiRight, UnBreak,Homing,Ziguzagu,Grow,Bomb, Magnet,Fade, Boomerang }
     [SerializeField] BehaviorType behaviorType = BehaviorType.Normal;
     [SerializeField] float hebiTurnSpeed = 60.0f; // テスト用：へびだるの曲がる強さ(度/秒)。大きいほど急カーブになる
     [SerializeField] float homingStartTurnSpeed = 270f;  // テスト用：ホーミング発射直後の旋回速度(度/秒)
@@ -36,6 +36,10 @@ public class BlockController : MonoBehaviour
     [SerializeField] float fadeDelay = 0.5f;     // テスト用：薄くなり始めるまでの時間(秒)
     [SerializeField] float fadeDuration = 0.8f;  // テスト用：薄くなりきるまでの時間(秒)
     [SerializeField] float fadeMinAlpha = 0.12f; // テスト用：最も薄いときのアルファ値
+    [SerializeField] Transform boomerangReturnTarget;    // テスト用：戻る先。未設定なら発射した位置に戻る
+    [SerializeField] float boomerangRadius = 15.0f;          // テスト用：弧の半径
+    [SerializeField] bool boomerangCurveLeft = true;        // テスト用：左に曲がるか(falseなら右)
+    [SerializeField] float boomerangArriveDistance = 0.8f;  // テスト用：戻ったとみなす距離
     public bool isFlying {  get; private set; } // 現在飛行中かどうか trueの場合は攻撃判定が発生する
 
     // 開始時点で飛行中だったかを記録する
@@ -96,6 +100,7 @@ public class BlockController : MonoBehaviour
             case BehaviorType.Bomb: return new BombBehavior(explosionRadius);
             case BehaviorType.Magnet: return new MagnetBehavior(this, magnetRange, magnetStrength, magnetRepelStrength, magnetMinDistance);
             case BehaviorType.Fade: return new FadeBehavior(this, fadeDelay, fadeDuration, fadeMinAlpha);
+            case BehaviorType.Boomerang: return new BoomerangBehavior(this, boomerangReturnTarget, boomerangRadius, boomerangCurveLeft, boomerangArriveDistance);
             case BehaviorType.Normal:
             default: return new NormalBehavior();
         }

@@ -192,13 +192,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ClubOpeningMovie
   playMovie: 1
-  phrases:
-  - "\u3042\u306E\u590F\u3001"
-  - "\u4EF2\u9593\u3068\u51FA\u4F1A\u3063\u305F\u3002"
-  - "\u4E00\u6483\u306B\u3001\u3059\u3079\u3066\u3092\u3002"
-  - "\u9858\u3044\u3092\u8FBC\u3081\u3066\u3002"
-  - "\u8CA0\u3051\u3089\u308C\u306A\u3044\u3002"
-  - "\u3042\u306E\u65E5\u306E\u7D04\u675F\u3092\u2014\u2014"
+  shakeStrength: 1
+  rushShake: 1
 --- !u!1 &1114148917
 GameObject:
   m_ObjectHideFlags: 0
