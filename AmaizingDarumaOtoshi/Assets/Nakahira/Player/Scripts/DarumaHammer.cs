@@ -85,6 +85,13 @@ namespace Nakahira
         // 当たり判定が届く距離(見た目のハンマーの長さ × 倍率)
         float HitReach => (m_armLength + m_hammerHalfWidth) * m_params.HitReachScale;
         public bool IsShooting => m_action == Action.Shot;
+        public bool IsSweeping => m_action == Action.Sweep;
+        // 今の動作(薙ぎ払い・股抜きショット)を始めてから進んだ時間(秒)。ボタンを押したフレームではまだ 0
+        public float ActionTime => m_time;
+        // 薙ぎ払いにかかる時間(秒)
+        public float SweepDuration => m_params.SweepDuration;
+        // 薙ぎ払いがキャラクターに当たる、中心同士の水平の距離(届く距離 + 体の半径)
+        public float CharacterHitDistance => HitReach + DarumaCharacter.kBodyRadius;
         // 股抜きショットを振り始めてから弾が出るまでの間(持ち主は向きを変えて狙いを調整できる)
         public bool IsAimingShot => m_action == Action.Shot && !m_shotFired;
 

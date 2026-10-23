@@ -13,13 +13,52 @@ MonoBehaviour:
   m_Name: Cpu_Default
   m_EditorClassIdentifier: Assembly-CSharp::Nakahira.CpuParams
   ThinkInterval: 0.2
+  StateStickiness: 0.1
+  MinStateTime: 0.5
+  UrgentScore: 0.75
+  AttentionCapacity: 1
+  AttentionDecay: 0.25
+  AttentionOnKnockToZero: 0.95
+  AttentionOnDodge: 0.2
+  AttentionOnHit: 0.3
+  AttentionOnProjectile: 0.3
+  MeleeThreshold: 0.9
+  FleeThreshold: 0.6
+  GhostFleeThreshold: 0.9
+  TargetStackWeight: 1
+  TargetDistanceWeight: 1
+  TargetDistanceRange: 10
+  TargetRuleWeight: 0.5
+  MeleeScore: 0.65
+  MeleeEnterDistance: 3
+  MeleeChaseDistance: 6
+  MeleeChaseTime: 3
+  MeleeRangeRatio: 0.85
+  SwingIntervalMin: 0.2
+  SwingIntervalMax: 0.6
+  DodgeChance: 0.8
+  DodgeReaction: 0.05
+  CircleChance: 0.6
+  StrafeChance: 0.6
+  MeleePickupRadius: 1.5
+  CollectScore: 0.5
   CollectUntil: 10
   SearchRadius: 25
   SwitchMargin: 1.5
   GiveUpTime: 4
   GiveUpCooldown: 3
-  OpponentAvoidRadius: 3
-  OpponentPenalty: 6
+  CollectThreatClearance: 5
+  GhostAvoidRadius: 3
+  GhostAvoidPenalty: 6
+  ContestRadius: 2
+  AdvantageMargin: 1
+  YieldCooldown: 3
+  FleeEnterDistance: 4
+  FleeExitDistance: 7
+  FleeStackGap: 3
+  StackThreatUrgency: 0.8
+  GhostThreatUrgency: 0.95
+  FleeSafetyMargin: 1
   JumpDistanceError: 0.1
   AimError: 0.1
   RepathInterval: 0.3

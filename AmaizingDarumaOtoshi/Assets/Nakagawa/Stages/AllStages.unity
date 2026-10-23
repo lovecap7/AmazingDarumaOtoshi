@@ -133017,6 +133017,8 @@ MonoBehaviour:
   m_dummyCount: 0
   m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
   m_dummyStartBlocks: 5
+  m_cpuCount: 0
+  m_cpuParams: {fileID: 0}
   m_addDebugView: 1
   m_respawnAppearTime: 0.8
   m_startCountdown: 3

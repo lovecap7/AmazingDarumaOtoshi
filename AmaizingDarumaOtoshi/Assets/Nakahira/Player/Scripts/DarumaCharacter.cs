@@ -140,6 +140,7 @@ namespace Nakahira
         public bool IsInvincible => m_invincibleTimer > 0.0f;
         public float MoveSpeed => Mathf.Max(m_minMoveSpeed, m_baseMoveSpeed - m_stack.Count * m_speedLossPerBlock);
         public JumpParams JumpParams => m_jumpParams;
+        public DarumaHammer Hammer => m_hammer;
         // ヒットストップ中は1未満(移動・落下・ハンマーがスローになる)
         public float LocalTimeScale => Mathf.Max(0.01f, m_hitStop.TimeScale);
 
