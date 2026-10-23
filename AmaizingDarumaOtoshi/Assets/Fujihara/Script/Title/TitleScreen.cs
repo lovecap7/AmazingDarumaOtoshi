@@ -36,12 +36,15 @@ public partial class TitleScreen : MonoBehaviour
 
     [Header("ロゴの配置")]
     [SerializeField] float[] logoRowY = { 5.75f, 4.55f };
+    [SerializeField] float logoX = 0f;
     [SerializeField] float logoZ = 2f;
     [SerializeField] float logoSpacing = 1.95f;
 
     [Header("ボタンの配置")]
     [SerializeField] float buttonX = 3.6f;
     [SerializeField] float buttonZ = -0.6f;
+    [Tooltip("ON：ボタンを頭の下に横から差し込み、頭をボタンの上に乗せる（だるま落としの逆）。buttonX/Z は 0 にする")]
+    [SerializeField] bool headOnButtons = false;
 
     [Header("最終カメラ")]
     [SerializeField] Vector3 finalCamPos = new Vector3(0.6f, 2.8f, -12f);
@@ -155,9 +158,28 @@ public partial class TitleScreen : MonoBehaviour
 
     void OnDestroy() => Time.timeScale = 1f;
 
+    // ---- 前に流すもの（オープニングムービーなど）を待つ ----
+    bool held, skipAfterHold;
+
+    // Start より前（Awake）に呼ぶと、Release されるまで演出を始めない（入力も受け付けない）
+    public void Hold() => held = true;
+
+    // skipToEnd なら、だるま落としの演出は飛ばしてタイトル画面の完成形から始める
+    public void Release(bool skipToEnd)
+    {
+        held = false;
+        skipAfterHold = skipToEnd;
+    }
+
     // ================= 演出の台本 =================
     IEnumerator Cinematic()
     {
+        while (held) yield return null;
+        if (skipAfterHold)
+        {
+            SkipToEnd();
+            yield break;
+        }
         phase = Phase.Cinematic;
         int n = blocks.Length;
 
@@ -285,7 +307,7 @@ public partial class TitleScreen : MonoBehaviour
     IEnumerator Reveal()
     {
         pulseStart = sim;
-        Emit(confetti, new Vector3(0f, 8.5f, logoZ - 1f), Quaternion.Euler(90f, 0f, 0f), 160);
+        Emit(confetti, new Vector3(logoX, 8.5f, logoZ - 1f), Quaternion.Euler(90f, 0f, 0f), 160);
         bloomPulse = Mathf.Max(bloomPulse, 0.3f);
         for (float t = 0f; t < 1.4f; t += Time.unscaledDeltaTime)
         {
@@ -354,6 +376,7 @@ public partial class TitleScreen : MonoBehaviour
     // ================= 入力・ボタン =================
     void HandleInput()
     {
+        if (held) return;
         bool submit = MenuInput.Submit(), cancel = MenuInput.Cancel(), click = MenuInput.AnyClick();
         bool up = MenuInput.Up(), down = MenuInput.Down();
         var mouse = Mouse.current;
@@ -369,10 +392,10 @@ public partial class TitleScreen : MonoBehaviour
 
             case Phase.Ready:
                 int hover = mouse != null && (mouseMoved || click) ? ButtonUnderMouse(mouse.position.ReadValue()) : -1;
-                if (hover >= 0) cursor = hover;
+                if (hover >= 0 && hover != cursor) { cursor = hover; MenuSounds.Cursor(); }
 
-                if (up) cursor = (cursor + buttons.Length - 1) % buttons.Length;
-                else if (down) cursor = (cursor + 1) % buttons.Length;
+                if (up) { cursor = (cursor + buttons.Length - 1) % buttons.Length; MenuSounds.Cursor(); }
+                else if (down) { cursor = (cursor + 1) % buttons.Length; MenuSounds.Cursor(); }
                 else if (submit || (click && hover >= 0)) Select(cursor);
                 else if (attractDelay > 0f && Time.unscaledTime - lastInputTime > attractDelay
                          && Application.CanStreamedLevelBeLoaded(SceneManager.GetActiveScene().name))   // Build Settings に入っているときだけ
@@ -404,6 +427,9 @@ public partial class TitleScreen : MonoBehaviour
         {
             selected = index;
             selectedTime = sim;
+            // はじめる＝積み木を飛ばしたときの音、おわる＝決定の音
+            if (index == 0) MenuSounds.Play(MatchSounds.Instance.Knock);
+            else MenuSounds.Decide();
             SlowMo(0.15f, 0.12f);
             var contact = ButtonContact(index);
             Emit(confetti, contact, Quaternion.Euler(-30f, 90f, 0f), 50);
@@ -551,6 +577,8 @@ public partial class TitleScreen : MonoBehaviour
         float hp = (sim - headHopStart) / 0.3f;
         if (hp > 0f && hp < 1f) y += headHopHeight * 4f * hp * (1f - hp);
 
+        if (headOnButtons) y += HeadLift();
+
         head.position = new Vector3(0f, y, 0f);
         head.rotation = headRot;
         head.localScale = s;
@@ -573,6 +601,15 @@ public partial class TitleScreen : MonoBehaviour
             float t = (sim - buttonsStart - order * 0.35f) / 0.45f;
             float d = Mathf.Clamp01(t);
             Vector3 pos = slot + Vector3.up * 9f * (1f - d * d);
+            if (headOnButtons)
+            {
+                // 上のボタンから順に、いちばん下へ右から差し込む（差し込まれた分だけ上のボタンと頭が持ち上がる）
+                t = InsertProgress(i);
+                d = Mathf.Clamp01(t);
+                float above = 0f;
+                for (int j = i + 1; j < count; j++) above += InsertLift(j);
+                pos = new Vector3(slot.x + 10f * (1f - d) * (1f - d), bh * 0.5f + bh * above, slot.z);
+            }
             Vector3 s = Vector3.one;
 
             if (t >= 1f && !buttonLanded[i])
@@ -665,6 +702,25 @@ public partial class TitleScreen : MonoBehaviour
         return new Vector3(buttonX, (buttons.Length - 1 - i) * bh + bh * 0.5f, buttonZ);
     }
 
+    // headOnButtons のとき：ボタン i を差し込む進み具合（0→1 で横から滑り込む）と、その分の持ち上がり（0→1）
+    float InsertProgress(int i) => (sim - buttonsStart - i * 0.4f) / 0.3f;
+    float InsertLift(int i) => buttonsShown ? Mathf.SmoothStep(0f, 1f, InsertProgress(i) * 2f) : 0f;
+
+    float HeadLift()
+    {
+        float bh = ButtonSize.y * buttonScale;
+        float lift = 0f;
+        for (int i = 0; i < buttons.Length; i++) lift += InsertLift(i);
+        lift *= bh;
+        // 選んだボタンが抜けたら、その上と一緒にストンと落ちる
+        if (selected >= 0)
+        {
+            float dd = Mathf.Clamp01((sim - selectedTime - HangTime) / 0.12f);
+            lift -= bh * dd * dd;
+        }
+        return lift;
+    }
+
     Vector3 ButtonContact(int i)
     {
         var slot = ButtonSlot(i);
@@ -680,7 +736,7 @@ public partial class TitleScreen : MonoBehaviour
         int row = i < lineTop.Length ? 0 : 1;
         int col = row == 0 ? i : i - lineTop.Length;
         int count = row == 0 ? lineTop.Length : lineBottom.Length;
-        return new Vector3((col - (count - 1) * 0.5f) * logoSpacing, logoRowY[Mathf.Min(row, logoRowY.Length - 1)], logoZ);
+        return new Vector3(logoX + (col - (count - 1) * 0.5f) * logoSpacing, logoRowY[Mathf.Min(row, logoRowY.Length - 1)], logoZ);
     }
 
     bool AllButtonsLanded()

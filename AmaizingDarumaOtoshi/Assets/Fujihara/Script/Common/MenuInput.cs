@@ -70,6 +70,17 @@ public static class MenuInput
         return false;
     }
 
+    // B（キャンセル）を押し続けているあいだ true（早送りなど）
+    public static bool CancelHeld()
+    {
+        var k = Keyboard.current;
+        if (k != null && (k.escapeKey.isPressed || k.backspaceKey.isPressed)) return true;
+        foreach (var g in Gamepad.all)
+            if (g.buttonEast.isPressed) return true;
+        var m = Mouse.current;
+        return m != null && m.rightButton.isPressed;
+    }
+
     public static bool AnyClick()
     {
         var m = Mouse.current;

@@ -16,3 +16,7 @@ MonoBehaviour:
   decide: {fileID: 8300000, guid: b6d0769405a1e46469803ee036a0542f, type: 3}
   cancel: {fileID: 8300000, guid: ba07f28fcf1dbed4cb7767d93647f7e2, type: 3}
   candidates: []
+  titleBgm: {fileID: 0}
+  menuBgm: {fileID: 0}
+  selectBgm: {fileID: 0}
+  bgmCandidates: []
