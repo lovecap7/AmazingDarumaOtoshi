@@ -18,7 +18,7 @@ namespace Nakahira
         [Min(1.0f)] public float SearchRadius = 25.0f;
         [Tooltip("狙っている積み木を別の積み木に変えるのは、こちらの方がこの距離(m)ぶん以上近いときだけ(迷わないように)")]
         [Min(0.0f)] public float SwitchMargin = 1.5f;
-        [Tooltip("同じ積み木をこの時間(秒)追っても拾えなければ、しばらく諦める")]
+        [Tooltip("積み木に近づけないままこの時間(秒)が経ったら、しばらく諦める(遠回りの道でも、進んでいる間は諦めない)")]
         [Min(0.5f)] public float GiveUpTime = 4.0f;
         [Tooltip("諦めた積み木を狙わない時間(秒)")]
         [Min(0.0f)] public float GiveUpCooldown = 3.0f;

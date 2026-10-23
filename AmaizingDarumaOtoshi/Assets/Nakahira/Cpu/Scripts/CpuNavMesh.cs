@@ -7,6 +7,7 @@ namespace Nakahira
 {
     // CPU が奈落・壁を迂回する道を求めるためのナビメッシュ
     // ステージごとに焼き込まず、最初に道を聞かれたときにシーンの当たり判定から作る(積み木・キャラクター・トリガーは除く)
+    // バンパーの周りは余裕を持って歩けないエリアにする(触れるとはじかれて落ちるため)
     // 道を求めるだけで NavMeshAgent は使わない(動きは DarumaCharacter の物理のまま)
     // ステージの床の配置が変わったら MarkDirty を呼ぶと、次に道を聞かれたときに作り直す
     public static class CpuNavMesh
@@ -19,12 +20,24 @@ namespace Nakahira
         const float kAgentSlope = 40.0f;
         // 道の始点を探す範囲(ジャンプ中でも足元の床が見つかるように、ジャンプの高さより大きくする)
         const float kStartSampleRadius = 2.5f;
+        // 触れると危ないギミック(バンパー)の周りに、体の半径に加えて空ける距離(m)
+        const float kHazardMargin = 0.5f;
+        // ナビメッシュの「歩けない」エリア
+        const int kNotWalkableArea = 1;
+
+        // 触れると危ないギミックの範囲(水平の円)
+        struct Hazard
+        {
+            public Vector3 Center;
+            public float Radius;
+        }
 
         static NavMeshDataInstance s_instance;
         static bool s_dirty = true;
         static readonly List<NavMeshBuildSource> s_sources = new List<NavMeshBuildSource>();
         static readonly List<NavMeshBuildMarkup> s_markups = new List<NavMeshBuildMarkup>();
         static readonly Vector3[] s_corners = new Vector3[64];
+        static readonly List<Hazard> s_hazards = new List<Hazard>();
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         static void ResetStatics()
@@ -61,6 +74,17 @@ namespace Nakahira
             return true;
         }
 
+        // pos(水平)が、触れると危ないギミックから clearance m 以内か(体の半径は含めないので呼ぶ側で足す)
+        public static bool IsNearHazard(Vector3 pos, float clearance)
+        {
+            EnsureBuilt();
+            foreach (var hazard in s_hazards)
+            {
+                if (FlatDistance(pos, hazard.Center) < hazard.Radius + clearance) return true;
+            }
+            return false;
+        }
+
         private static void EnsureBuilt()
         {
             if (!s_dirty && s_instance.valid) return;
@@ -83,6 +107,7 @@ namespace Nakahira
                     || col.GetComponentInParent<TumikiBlock>() != null
                     || col.GetComponentInParent<DarumaCharacter>() != null;
             });
+            AddHazards();
 
             NavMeshBuildSettings settings = NavMesh.GetSettingsByID(0);
             // 体の半径ぶん床の縁から離れた道になる(奈落ぎわを歩かない)
@@ -94,6 +119,29 @@ namespace Nakahira
             NavMeshData data = NavMeshBuilder.BuildNavMeshData(settings, s_sources, bounds, Vector3.zero, Quaternion.identity);
             if (data != null) s_instance = NavMesh.AddNavMeshData(data);
             s_sources.Clear();
+        }
+
+        // 触れると危ないギミック(バンパー:触れるとはじかれて奈落に落ちることがある)を覚え、
+        // その周りを余裕を持って歩けないエリアにする(体の半径ぶんだけだと、道がぎりぎりを通って触れてしまう)
+        private static void AddHazards()
+        {
+            s_hazards.Clear();
+            foreach (var bumper in Object.FindObjectsByType<Nakagawa.BumperGimmick>())
+            {
+                foreach (var col in bumper.GetComponentsInChildren<Collider>())
+                {
+                    if (col.isTrigger) continue;
+                    Bounds b = col.bounds;
+                    s_hazards.Add(new Hazard { Center = b.center, Radius = Mathf.Max(b.extents.x, b.extents.z) });
+                    s_sources.Add(new NavMeshBuildSource
+                    {
+                        shape = NavMeshBuildSourceShape.Box,
+                        size = b.size + new Vector3(kHazardMargin * 2.0f, kAgentHeight, kHazardMargin * 2.0f),
+                        transform = Matrix4x4.Translate(b.center),
+                        area = kNotWalkableArea,
+                    });
+                }
+            }
         }
 
         private static void Remove()

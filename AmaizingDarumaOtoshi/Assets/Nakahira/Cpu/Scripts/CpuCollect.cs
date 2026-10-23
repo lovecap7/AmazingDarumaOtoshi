@@ -6,7 +6,7 @@ namespace Nakahira
 {
     // CPU の行動「積む」:近くの積み木を選び、落下しながら触れるようにジャンプして拾う
     //  ・狙うのは落ちている積み木と、攻撃判定のない(ゆっくり)動いている積み木
-    //  ・奈落・壁はナビメッシュ(CpuNavMesh)の道で迂回する。近さは歩く道の長さで比べ、歩いて行けない積み木は狙わない
+    //  ・奈落・壁・バンパーはナビメッシュ(CpuNavMesh)の道で迂回する。近さは歩く道の長さで比べ、歩いて行けない積み木は狙わない
     //  ・相手の近くにある積み木は後回しにする
     //  ・ジャンプの高さ・重力と移動速度から、落ちてくるときにちょうど積み木に届く距離で跳ぶ
     //    (跳ぶのは道の最後のまっすぐな区間だけ。奈落の向こうへは跳ばない)
@@ -35,12 +35,28 @@ namespace Nakahira
         const float kCornerReach = 0.35f;
         // 1回選び直すときに道を求める積み木の最大数(近い順。重くならないように)
         const int kMaxPathQueries = 12;
+        // 積み木までの残りの道がこの長さ(m)以上縮んだら、近づいているとみなす(諦めるまでの時間を数え直す)
+        const float kProgressDistance = 0.5f;
+        // 落ちている積み木(回転台などで運ばれている)の位置を、測った速度で先読みする最大の時間(秒)
+        // (運ばれる向きは変わっていくので、長く先読みしすぎない)
+        const float kMaxCarriedLeadTime = 0.6f;
+        // 測った速度をなめらかにする速さ(大きいほど今の速度にすぐ合わせる)
+        const float kVelocitySmoothing = 15.0f;
+        // 触れると危ないギミック(バンパー)からこの距離(m)以内の積み木は、拾いに行くと触れてしまうので狙わない(体の半径+余裕)
+        const float kHazardClearance = DarumaCharacter.kBodyRadius + 0.3f;
 
         TumikiBlock m_target;
         Rigidbody m_targetRb;
         float m_thinkTimer;
+        // 近づけていない時間(残りの道が縮むたびに 0 に戻す)
         float m_chaseTime;
+        // 狙ってから一番近づいたときの、残りの道の長さ
+        float m_closestRemaining;
         float m_repathTimer;
+        // 狙っている積み木の、位置の変化から測った水平の速度(ギミックで運ばれている分も含む)
+        Vector3 m_targetVelocity;
+        Vector3 m_targetLastPos;
+        float m_targetLastSampleTime = -1.0f;
         // 狙いごとの腕前のぶれ(狙い直すたびに決め直す)
         float m_jumpDistanceScale = 1.0f;
         Vector3 m_aimOffset;
@@ -96,7 +112,7 @@ namespace Nakahira
             }
             if (m_target == null) return false;
 
-            // 長く追っても拾えない積み木は、しばらく諦める
+            // 近づけないまま時間が経った積み木は、しばらく諦める(道を進んでいる間は諦めない)
             m_chaseTime += dt;
             if (m_chaseTime > p.GiveUpTime)
             {
@@ -108,6 +124,7 @@ namespace Nakahira
             m_repathTimer -= dt;
             if (m_repathTimer <= 0.0f) UpdateRoute(self, p);
 
+            MeasureTargetVelocity();
             Steer(self, p, ref cmd);
             return true;
         }
@@ -165,6 +182,9 @@ namespace Nakahira
             m_target = block;
             m_targetRb = block != null ? block.GetComponent<Rigidbody>() : null;
             m_chaseTime = 0.0f;
+            m_closestRemaining = float.MaxValue;
+            m_targetVelocity = Vector3.zero;
+            m_targetLastSampleTime = -1.0f;
             m_jumpDistanceScale = 1.0f + Random.Range(-p.JumpDistanceError, p.JumpDistanceError);
             Vector2 offset = Random.insideUnitCircle * p.AimError;
             m_aimOffset = new Vector3(offset.x, 0.0f, offset.y);
@@ -199,11 +219,12 @@ namespace Nakahira
             return cost;
         }
 
-        // 積み木まで歩いて行ける道の長さ。積み木の下が奈落・歩いて行けないときは false
+        // 積み木まで歩いて行ける道の長さ。積み木の下が奈落・バンパーのすぐそば・歩いて行けないときは false
         private static bool TryGetPathLength(Vector3 from, Vector3 blockPos, CpuParams p, NavMeshPath path, out float length)
         {
             length = 0.0f;
             if (!CpuSensor.HasGround(blockPos, p.GroundProbeDepth)) return false;
+            if (CpuNavMesh.IsNearHazard(blockPos, kHazardClearance)) return false;
             return CpuNavMesh.TryFindPath(from, blockPos, kGoalTolerance, path, out length);
         }
 
@@ -228,9 +249,16 @@ namespace Nakahira
             m_cornerCount = 0;
             m_cornerIndex = 0;
             if (m_target == null) return;
-            if (!CpuNavMesh.TryFindPath(self.transform.position, m_target.transform.position, kGoalTolerance, m_path, out _)) return;
+            if (!CpuNavMesh.TryFindPath(self.transform.position, m_target.transform.position, kGoalTolerance, m_path, out float remaining)) return;
             m_cornerCount = m_path.GetCornersNonAlloc(m_corners);
             m_cornerIndex = Mathf.Min(1, m_cornerCount);
+
+            // 遠回りの道でも、進んでいる間は諦めない
+            if (remaining < m_closestRemaining - kProgressDistance)
+            {
+                m_closestRemaining = remaining;
+                m_chaseTime = 0.0f;
+            }
         }
 
         private void Steer(DarumaCharacter self, CpuParams p, ref DarumaCommand cmd)
@@ -258,12 +286,12 @@ namespace Nakahira
                 for (int i = 0; i < 2; i++)
                 {
                     float lead = FlatDistance(pos, predicted) / speed + reach;
-                    predicted = m_target.PredictPosition(Mathf.Min(lead, kMaxLeadTime));
+                    predicted = PredictTarget(lead);
                 }
             }
             else
             {
-                predicted = m_target.PredictPosition(reach * 0.5f);
+                predicted = PredictTarget(reach * 0.5f);
             }
             Vector3 aim = predicted + m_aimOffset;
             AimPoint = aim;
@@ -298,6 +326,35 @@ namespace Nakahira
             }
 
             Walk(pos, aim, speed, p, ref cmd);
+        }
+
+        // 狙っている積み木の速度を、物理の1ステップごとの位置の変化から測る
+        // (回転台・風などで運ばれている分は Rigidbody の速度に表れないことがあるため)
+        private void MeasureTargetVelocity()
+        {
+            float now = Time.fixedTime;
+            if (now == m_targetLastSampleTime) return;   // 物理が進んでいない(位置が変わらない)フレームは測らない
+            Vector3 pos = m_target.transform.position;
+            if (m_targetLastSampleTime >= 0.0f)
+            {
+                Vector3 v = (pos - m_targetLastPos) / (now - m_targetLastSampleTime);
+                v.y = 0.0f;
+                float t = 1.0f - Mathf.Exp(-kVelocitySmoothing * (now - m_targetLastSampleTime));
+                m_targetVelocity = Vector3.Lerp(m_targetVelocity, v, t);
+            }
+            m_targetLastPos = pos;
+            m_targetLastSampleTime = now;
+        }
+
+        // 狙っている積み木の seconds 秒後の位置の予想
+        // 飛んでいる積み木は減速して止まるところまで、落ちている積み木は測った速度で(運ばれている分)
+        private Vector3 PredictTarget(float seconds)
+        {
+            if (m_target.CurrentState == TumikiBlock.State.Flying)
+            {
+                return m_target.PredictPosition(Mathf.Min(seconds, kMaxLeadTime));
+            }
+            return m_target.transform.position + m_targetVelocity * Mathf.Min(seconds, kMaxCarriedLeadTime);
         }
 
         // destination へ歩く。進む先(destination より手前)が奈落なら止まる

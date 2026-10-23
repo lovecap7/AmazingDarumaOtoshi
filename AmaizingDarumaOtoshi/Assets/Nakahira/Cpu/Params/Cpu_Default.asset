@@ -20,9 +20,8 @@ MonoBehaviour:
   GiveUpCooldown: 3
   OpponentAvoidRadius: 3
   OpponentPenalty: 6
-  WallPenalty: 8
   JumpDistanceError: 0.1
   AimError: 0.1
+  RepathInterval: 0.3
   EdgeLookAhead: 0.6
   GroundProbeDepth: 2
-  PathSampleStep: 0.5
