@@ -12,7 +12,7 @@ using Object = UnityEngine.Object;
 
 namespace Nakagawa.EditorTools
 {
-    // 対戦ステージ(本編 Stage01〜 / デバッグ DebugStage01〜)を、ステージをまとめたシーン(Assets/Nakagawa/Stages/AllStages.unity)の中に生成する
+    // 対戦ステージ(本編 Stage01〜 / デバッグ DebugStage01〜 / 追加ギミックの確認 GimmickDebugStage01〜)を、ステージをまとめたシーン(Assets/Nakagawa/Stages/AllStages.unity)の中に生成する
     // 各ステージはこのファイルの定義(床・壁・ギミック・積み木の生成エリア・出現位置・説明)から作るので、数値を直して作り直せる
     // 床はすべて同じ高さ(段差なし)。床の穴・壁のない縁は奈落(落ちると脱落)
     // 開いているシーンには触れない(別のシーンを追加で開いて組み立て、保存して閉じる)
@@ -59,8 +59,32 @@ namespace Nakagawa.EditorTools
         [MenuItem("Nakagawa/Stages/Build Main Stages Into AllStages")]
         public static void BuildMainStages()
         {
-            BuildIntoCombined(def => !def.Id.StartsWith(kDebugPrefix));
+            BuildIntoCombined(def => !IsDebugStage(def.Id));
         }
+
+        // 追加ギミックを試すステージ(GimmickDebugStage01〜)だけを作り直す。他のステージはそのまま
+        [MenuItem("Nakagawa/Stages/Build Gimmick Debug Stages Into AllStages")]
+        public static void BuildGimmickDebugStages()
+        {
+            BuildIntoCombined(def => def.Id.StartsWith(kGimmickDebugPrefix));
+        }
+
+        // 追加ギミックと元からあるギミックを組み合わせたデバッグステージ(DebugStage21〜30)だけを作り直す。他のステージはそのまま
+        [MenuItem("Nakagawa/Stages/Build Debug Stages 21-30 Into AllStages")]
+        public static void BuildDebugStages21To30()
+        {
+            BuildIntoCombined(def => InNumberRange(def.Id, kDebugPrefix, 21, 30));
+        }
+
+        // id が「接頭辞 + 通し番号」で、番号が from〜to か
+        static bool InNumberRange(string id, string prefix, int from, int to)
+        {
+            if (!id.StartsWith(prefix) || !int.TryParse(id.Substring(prefix.Length), out int n)) return false;
+            return n >= from && n <= to;
+        }
+
+        // デバッグ用のステージか(DebugStage01〜 / GimmickDebugStage01〜)。並び順・作り直しの対象の判定に使う
+        public static bool IsDebugStage(string id) => id.Contains(kDebugPrefix);
 
         // 条件に合うステージを一時的なシーンに組み立て、まとめたシーンへ移す(一時的なシーンは保存しない)
         static void BuildIntoCombined(Predicate<StageDef> filter)
@@ -70,6 +94,7 @@ namespace Nakagawa.EditorTools
             {
                 GimmickTestFieldBuilder.BuildSpawnAssets();
             }
+            if (!AdditionalGimmickBuilder.PrefabsExist()) AdditionalGimmickBuilder.BuildAll();
             EnsureFolder(kStageDir);
             SetupTumikiPrefab();
 
@@ -96,6 +121,8 @@ namespace Nakagawa.EditorTools
         // ステージの id の接頭辞(デバッグステージ / 本編)
         public const string kDebugPrefix = "DebugStage";
         public const string kStagePrefix = "Stage";
+        // 追加ギミックを試すステージ(名前に kDebugPrefix を含むので、デバッグステージとして扱われる)
+        public const string kGimmickDebugPrefix = "Gimmick" + kDebugPrefix;
 
         // 背景の id(BackdropBuilder の定義)
         const string kChanomaBackdrop = "Chanoma";
@@ -547,6 +574,267 @@ namespace Nakagawa.EditorTools
                 });
 
             //----------------------------------------
+            // デバッグステージ(DebugStage21〜30)。追加ギミック(せり上がり塀・加速床/減速床・移動床・ワープゲート・
+            // シューターレーン・回転砲台)と、元からあるギミックを組み合わせたステージ
+            //----------------------------------------
+
+            Add("波打つ防波堤", 26,
+                "南北の陣地を、東西に一列に並んだせり上がり塀が仕切る。塀は西から東へ波のように順番に立ち上がる。四隅寄りにバンパー。",
+                "塀が下がっている所だけが通り道になり、その切れ目は西から東へ流れていく。塀が立っている間は弾が跳ね返るので、切れ目を狙って撃ち込むか、塀の上に乗って高台から撃つかの駆け引きになる。切れ目を追って走ると、バンパーにはじかれて塀の前に押し戻されることもある。",
+                c =>
+                {
+                    c.Arena(0, 0, 28, 24, true, true, true, true);
+                    for (int i = 0; i < 13; i++) c.RisingWall(-12 + i * 2, 0, new Vector2(2, 1.2f), 1.5f, i * 0.25f);
+                    c.Bumper(-8, 6, 1.2f);
+                    c.Bumper(8, 6, 1.2f);
+                    c.Bumper(-8, -6, 1.2f);
+                    c.Bumper(8, -6, 1.2f);
+                    c.AreaCircle(0, 6, 2.5f);
+                    c.AreaCircle(0, -6, 2.5f);
+                    // 四隅(壁にかぶせる)
+                    c.AreaRect(-12, 10.5f, 4, 3);
+                    c.AreaRect(12, 10.5f, 4, 3);
+                    c.AreaRect(-12, -10.5f, 4, 3);
+                    c.AreaRect(12, -10.5f, 4, 3);
+                    c.Spawns(new Vector2(-11, 4), new Vector2(11, -4), new Vector2(-4, -9), new Vector2(4, 9));
+                });
+
+            Add("加速サーキット", 26,
+                "中央の回転台を囲む周回路。各辺の中央に加速床、四隅に減速床が置かれている。",
+                "加速床で一気に速くなった体と弾は、隅の減速床でがくんと落ちる。速さの変わり目で相手との距離が急に縮まったり開いたりするので、周回の流れを読んで待ち伏せるのが強い。中央の回転台に飛び込んだ弾は曲がりながら飛び出し、思わぬ方向から飛んでくる。",
+                c =>
+                {
+                    c.MaxGimmickTypes = 3;
+                    c.Arena(0, 0, 30, 30, true, true, true, true);
+                    c.Turntable(0, 0, 5, true, 45);
+                    c.SpeedFloor(0, 10, new Vector2(3, 3), true);
+                    c.SpeedFloor(10, 0, new Vector2(3, 3), true);
+                    c.SpeedFloor(0, -10, new Vector2(3, 3), true);
+                    c.SpeedFloor(-10, 0, new Vector2(3, 3), true);
+                    c.SpeedFloor(10, 10, new Vector2(3, 3), false);
+                    c.SpeedFloor(-10, 10, new Vector2(3, 3), false);
+                    c.SpeedFloor(10, -10, new Vector2(3, 3), false);
+                    c.SpeedFloor(-10, -10, new Vector2(3, 3), false);
+                    c.AreaCircle(0, 0, 2.5f);
+                    // 各辺の壁にかぶせる
+                    c.AreaRect(0, 13, 6, 3);
+                    c.AreaRect(0, -13, 6, 3);
+                    c.AreaRect(13, 0, 3, 6);
+                    c.AreaRect(-13, 0, 3, 6);
+                    c.AreaCircle(7, 0, 1.5f);
+                    c.Spawns(new Vector2(-6, 6), new Vector2(6, 6), new Vector2(-6, -6), new Vector2(6, -6));
+                });
+
+            Add("渡し舟の大河", 24,
+                "南北に流れる大河(奈落)で東西の岸が分かれ、二艘の木のパレットが岸の間を往復する。河の中央に小島。両岸の扇風機が河へ向けて風を送る。",
+                "対岸へ渡る手段はパレットだけで、乗っている間は逃げ場がない。岸の扇風機は河へ向けて吹くので、岸の端で撃ち合うと風に押されて河へ落ちる。小島の補給所は危険だが積み木が湧きやすく、パレットの往復に合わせて乗り込むタイミングが勝負。",
+                c =>
+                {
+                    c.Arena(-10, 0, 12, 24, true, true, false, true);
+                    c.Arena(10, 0, 12, 24, true, true, true, false);
+                    c.Floor(0, 0, 3, 3);
+                    c.MovingFloor(new Vector2(2.9f, 2.9f), MovingFloorGimmick.LoopMode.PingPong, 2.0f, 1.2f, new Vector2(-2.5f, 7), new Vector2(2.5f, 7));
+                    c.MovingFloor(new Vector2(2.9f, 2.9f), MovingFloorGimmick.LoopMode.PingPong, 2.0f, 1.2f, new Vector2(2.5f, -7), new Vector2(-2.5f, -7));
+                    c.Fan(new Vector2(-15, 0), new Vector2(-15, 0), Vector3.right, 10, 4, 10, 0);
+                    c.Fan(new Vector2(15, 0), new Vector2(15, 0), Vector3.left, 10, 4, 10, 0);
+                    c.AreaRect(-10, 8, 6, 4);
+                    c.AreaRect(-10, -8, 6, 4);
+                    c.AreaRect(10, 8, 6, 4);
+                    c.AreaRect(10, -8, 6, 4);
+                    c.AreaCircle(0, 0, 1.2f);
+                    // 扇風機の前
+                    c.AreaCircle(-11, 0, 1.5f);
+                    c.AreaCircle(11, 0, 1.5f);
+                    c.Spawns(new Vector2(-13, 4), new Vector2(-13, -4), new Vector2(13, 4), new Vector2(13, -4));
+                });
+
+            Add("ワープ群島", 24,
+                "奈落に浮かぶ四つの島。橋はなく、島の間はワープゲートでしか行き来できない。各島の中央にバンパー。",
+                "内側の角のゲート(グループ0)はどの島へ飛ぶかランダム、外側の角のゲートはプレイヤーだけを対角の島へ送る。積み木は内側のゲートでしか運べないので、島ごとの積み木の偏りが生まれる。ゲートから出た直後を狙い撃ちされやすく、出口の光を見て待ち伏せる・逃げる駆け引きが中心になる。",
+                c =>
+                {
+                    c.Arena(8, 8, 10, 10, true, false, true, false);
+                    c.Arena(-8, 8, 10, 10, true, false, false, true);
+                    c.Arena(8, -8, 10, 10, false, true, true, false);
+                    c.Arena(-8, -8, 10, 10, false, true, false, true);
+                    foreach (var p in new[] { new Vector2(8, 8), new Vector2(-8, 8), new Vector2(8, -8), new Vector2(-8, -8) }) c.Bumper(p.x, p.y, 1.2f);
+                    // 内側の角: どこへ飛ぶか分からないゲート(どちらも・ランダム)
+                    c.WarpGate(5.5f, 5.5f, 0, 0, WarpGateGimmick.TargetType.Both, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.Keep);
+                    c.WarpGate(-5.5f, 5.5f, 0, 0, WarpGateGimmick.TargetType.Both, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.Keep);
+                    c.WarpGate(5.5f, -5.5f, 0, 0, WarpGateGimmick.TargetType.Both, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.Keep);
+                    c.WarpGate(-5.5f, -5.5f, 0, 0, WarpGateGimmick.TargetType.Both, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.Keep);
+                    // 外側の角: 対角の島へ(プレイヤーのみ)
+                    c.WarpGate(10.5f, 10.5f, 0, 1, WarpGateGimmick.TargetType.Players, WarpGateGimmick.Selection.Sequential, WarpGateGimmick.Orientation.Keep);
+                    c.WarpGate(-10.5f, -10.5f, 0, 1, WarpGateGimmick.TargetType.Players, WarpGateGimmick.Selection.Sequential, WarpGateGimmick.Orientation.Keep);
+                    c.WarpGate(-10.5f, 10.5f, 0, 2, WarpGateGimmick.TargetType.Players, WarpGateGimmick.Selection.Sequential, WarpGateGimmick.Orientation.Keep);
+                    c.WarpGate(10.5f, -10.5f, 0, 2, WarpGateGimmick.TargetType.Players, WarpGateGimmick.Selection.Sequential, WarpGateGimmick.Orientation.Keep);
+                    c.AreaCircle(11, 6, 1.5f);
+                    c.AreaCircle(-11, 6, 1.5f);
+                    c.AreaCircle(11, -6, 1.5f);
+                    c.AreaCircle(-11, -6, 1.5f);
+                    c.AreaCircle(6, 11, 1.5f);
+                    c.AreaCircle(-6, -11, 1.5f);
+                    c.Spawns(new Vector2(5, 9), new Vector2(-9, 5), new Vector2(9, -5), new Vector2(-5, -9));
+                });
+
+            Add("砲台の砦", 26,
+                "東西に向かい合う二基の回転砲台が首を振りながら積み木を撃ち出す。中央の南北の線には、波のように立ち上がるせり上がり塀。",
+                "砲台は持ち主なしの弾を扇状にばらまくので、誰の手柄にもならない流れ弾が常に飛び交う。中央の塀が立っている間は反対側の砲台の弾が防がれ、下がった所からは弾が抜けてくる。塀の動きを見て、砲台の弾から身を隠しつつ積み木を集める立ち回りが求められる。",
+                c =>
+                {
+                    c.Arena(0, 0, 30, 26, true, true, true, true);
+                    c.Cannon(-8, 0, 90, TumikiCannon.RotationMode.Swing, 1, 3);
+                    c.Cannon(8, 0, 270, TumikiCannon.RotationMode.Swing, 1, 3);
+                    for (int i = 0; i < 10; i++) c.RisingWall(0, -9 + i * 2, new Vector2(1.2f, 2), 1.5f, i * 0.3f);
+                    c.AreaCircle(-8, 8, 2);
+                    c.AreaCircle(8, 8, 2);
+                    c.AreaCircle(-8, -8, 2);
+                    c.AreaCircle(8, -8, 2);
+                    // 東西の壁にかぶせる
+                    c.AreaRect(-13, 0, 3, 6);
+                    c.AreaRect(13, 0, 3, 6);
+                    c.Spawns(new Vector2(-4, 5), new Vector2(4, -5), new Vector2(-4, -5), new Vector2(4, 5));
+                });
+
+            Add("シューター回廊", 26,
+                "四隅のシューターレーンが、中央の回転台へ向けて斜めに積み木を撃ち出す。",
+                "レーンに積み木を運べば必ず中央へ向けて飛ぶが、回転台の上を通ると弾道が曲がり、どこへ抜けるかは回転の向き次第。落ちていた積み木は持ち主なしで飛ぶので、自分で殴った積み木をレーンへ打ち込むと手柄を保ったまま撃ち出せる。レーンの前に立つと流れ弾の通り道になるので注意。",
+                c =>
+                {
+                    c.Arena(0, 0, 32, 24, true, true, true, true);
+                    c.Turntable(0, 0, 4, true, 50);
+                    c.ShooterLane(-12, -8, 45, new Vector2(2.5f, 3));
+                    c.ShooterLane(12, 8, 225, new Vector2(2.5f, 3));
+                    c.ShooterLane(12, -8, 315, new Vector2(2.5f, 3));
+                    c.ShooterLane(-12, 8, 135, new Vector2(2.5f, 3));
+                    c.AreaCircle(0, 0, 2);
+                    // 南北・東西の壁にかぶせる
+                    c.AreaRect(0, 10, 8, 3);
+                    c.AreaRect(0, -10, 8, 3);
+                    c.AreaRect(14.5f, 0, 3, 6);
+                    c.AreaRect(-14.5f, 0, 3, 6);
+                    c.AreaCircle(7, 0, 1.5f);
+                    c.Spawns(new Vector2(-7, 4), new Vector2(7, -4), new Vector2(-7, -4), new Vector2(7, 4));
+                });
+
+            Add("氷と泥の庭", 26,
+                "加速床と減速床が市松模様に並ぶ庭。中央に大きなバンパー、四隅に小さなバンパー。",
+                "加速床(オレンジ)を踏むと体も弾も一気に速くなり、減速床(青緑)では泥にはまったように遅くなる。止まっている積み木も加速床の上では向いている方向へ走り出すので、床の色を見て積み木の行き先を読む必要がある。中央のバンパーにはじかれて加速床へ飛び込むと、そのまま壁まで滑っていく。",
+                c =>
+                {
+                    c.MaxGimmickTypes = 3;
+                    c.Arena(0, 0, 28, 28, true, true, true, true);
+                    c.SpeedFloor(6, 6, new Vector2(4, 4), true);
+                    c.SpeedFloor(-6, 6, new Vector2(4, 4), true);
+                    c.SpeedFloor(6, -6, new Vector2(4, 4), true);
+                    c.SpeedFloor(-6, -6, new Vector2(4, 4), true);
+                    c.SpeedFloor(0, 8, new Vector2(3, 3), false);
+                    c.SpeedFloor(0, -8, new Vector2(3, 3), false);
+                    c.SpeedFloor(8, 0, new Vector2(3, 3), false);
+                    c.SpeedFloor(-8, 0, new Vector2(3, 3), false);
+                    c.Bumper(0, 0, 1.6f);
+                    c.Bumper(11, 11, 1.2f);
+                    c.Bumper(-11, 11, 1.2f);
+                    c.Bumper(11, -11, 1.2f);
+                    c.Bumper(-11, -11, 1.2f);
+                    c.AreaCircle(0, 4, 1.5f);
+                    c.AreaCircle(0, -4, 1.5f);
+                    c.AreaCircle(4, 0, 1.5f);
+                    c.AreaCircle(-4, 0, 1.5f);
+                    // 南北の壁にかぶせる
+                    c.AreaRect(0, 12.5f, 6, 2);
+                    c.AreaRect(0, -12.5f, 6, 2);
+                    c.Spawns(new Vector2(-11, 4), new Vector2(11, -4), new Vector2(4, 11), new Vector2(-4, -11));
+                });
+
+            Add("流れる足場の工場", 26,
+                "中央に四角い大穴が空いた工場。穴の中を二枚のパレットが同じ向きに周回し、外周の四隅のシューターレーンが壁沿いに時計回りに積み木を送る。",
+                "外周の積み木はレーンからレーンへと時計回りに運ばれ続け、レーンの先に立つ相手を襲う。穴を突っ切るにはパレットに乗るしかなく、周回のタイミングを外すと奈落へ落ちる。パレットの上から外周の相手を撃つか、外周を回って積み木を集めるかの選択になる。",
+                c =>
+                {
+                    // 遊べる範囲 32×32m。中央 12×12m の穴を残して床を並べ、四方に壁
+                    c.Floor(0, 11.5f, 34, 11);
+                    c.Floor(0, -11.5f, 34, 11);
+                    c.Floor(-11.5f, 0, 11, 12);
+                    c.Floor(11.5f, 0, 11, 12);
+                    c.Wall(0, 16.5f, 34, 1);
+                    c.Wall(0, -16.5f, 34, 1);
+                    c.Wall(16.5f, 0, 1, 32);
+                    c.Wall(-16.5f, 0, 1, 32);
+                    // 同じ経路・同じ速さで、反対側から周回を始める(ぶつからない)
+                    c.MovingFloor(new Vector2(2.9f, 2.9f), MovingFloorGimmick.LoopMode.Loop, 2.5f, 1.0f,
+                        new Vector2(-4.5f, -4.5f), new Vector2(4.5f, -4.5f), new Vector2(4.5f, 4.5f), new Vector2(-4.5f, 4.5f));
+                    c.MovingFloor(new Vector2(2.9f, 2.9f), MovingFloorGimmick.LoopMode.Loop, 2.5f, 1.0f,
+                        new Vector2(4.5f, 4.5f), new Vector2(-4.5f, 4.5f), new Vector2(-4.5f, -4.5f), new Vector2(4.5f, -4.5f));
+                    c.ShooterLane(-12, -12, 0, new Vector2(2.5f, 3));
+                    c.ShooterLane(-12, 12, 90, new Vector2(2.5f, 3));
+                    c.ShooterLane(12, 12, 180, new Vector2(2.5f, 3));
+                    c.ShooterLane(12, -12, 270, new Vector2(2.5f, 3));
+                    c.AreaRect(0, 11, 8, 3);
+                    c.AreaRect(0, -11, 8, 3);
+                    c.AreaRect(11, 0, 3, 8);
+                    c.AreaRect(-11, 0, 3, 8);
+                    c.AreaCircle(14, 8, 1.5f);
+                    c.AreaCircle(-14, -8, 1.5f);
+                    c.Spawns(new Vector2(-9, 9), new Vector2(9, 9), new Vector2(-9, -9), new Vector2(9, -9));
+                });
+
+            Add("嵐のワープ", 24,
+                "東西に長い闘技場。両端の扇風機が南北に往復しながら中央へ風を送る。四隅寄りにどちらも送るワープゲート、南北の中央に積み木だけを送り向きを反転させるゲート。",
+                "風に押されてゲートへ流され、思わぬ場所へ飛ばされるのがこのステージの事故の元。南北の積み木専用ゲートはゲートの向きを基準に回すので、北のゲートに飛び込んだ弾は南のゲートから反対向きに飛び出す。風の切れ目とゲートの位置を覚えれば、遠くの相手を奇襲できる。",
+                c =>
+                {
+                    c.Arena(0, 0, 34, 20, true, true, true, true);
+                    c.Fan(new Vector2(-16, 6), new Vector2(-16, -6), Vector3.right, 14, 4, 12, 2);
+                    c.Fan(new Vector2(16, -6), new Vector2(16, 6), Vector3.left, 14, 4, 12, 2);
+                    c.WarpGate(-8, 6, 0, 0, WarpGateGimmick.TargetType.Both, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.Keep);
+                    c.WarpGate(8, 6, 0, 0, WarpGateGimmick.TargetType.Both, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.Keep);
+                    c.WarpGate(-8, -6, 0, 0, WarpGateGimmick.TargetType.Both, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.Keep);
+                    c.WarpGate(8, -6, 0, 0, WarpGateGimmick.TargetType.Both, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.Keep);
+                    c.WarpGate(0, 7, 0, 1, WarpGateGimmick.TargetType.Blocks, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.RelativeToGate);
+                    c.WarpGate(0, -7, 180, 1, WarpGateGimmick.TargetType.Blocks, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.RelativeToGate);
+                    c.AreaCircle(0, 0, 2.5f);
+                    c.AreaCircle(-4, 0, 1.2f);
+                    // 四隅(壁にかぶせる)
+                    c.AreaRect(-12, 8.5f, 4, 2);
+                    c.AreaRect(12, 8.5f, 4, 2);
+                    c.AreaRect(-12, -8.5f, 4, 2);
+                    c.AreaRect(12, -8.5f, 4, 2);
+                    c.Spawns(new Vector2(-4, 4), new Vector2(4, -4), new Vector2(4, 4), new Vector2(-4, -4));
+                });
+
+            Add("総力戦の闘技場", 28,
+                "中央の回転砲台を、交互に立ち上がるせり上がり塀が囲む。四隅には加速床。",
+                "砲台から扇状にばらまかれる積み木は、塀が下がっている面からしか外へ出てこない。塀が上がると中の積み木は閉じ込められ、塀の上は砲台を見下ろす高台になる。四隅の加速床で勢いをつけた弾や体が中央へ飛び込み、砲台のまわりは常に乱戦になる。",
+                c =>
+                {
+                    c.MaxGimmickTypes = 3;
+                    c.Arena(0, 0, 30, 30, true, true, true, true);
+                    c.Cannon(0, 0, 0, TumikiCannon.RotationMode.Spin, 1, 4);
+                    // 砲台を囲む塀(北・南は横長、東・西は縦長)。隣どうしで開始をずらして交互に立ち上がる
+                    c.RisingWall(-2, 5, new Vector2(2, 1), 1.5f, 0.0f);
+                    c.RisingWall(2, 5, new Vector2(2, 1), 1.5f, 2.0f);
+                    c.RisingWall(5, 2, new Vector2(1, 2), 1.5f, 4.0f);
+                    c.RisingWall(5, -2, new Vector2(1, 2), 1.5f, 6.0f);
+                    c.RisingWall(2, -5, new Vector2(2, 1), 1.5f, 0.0f);
+                    c.RisingWall(-2, -5, new Vector2(2, 1), 1.5f, 2.0f);
+                    c.RisingWall(-5, -2, new Vector2(1, 2), 1.5f, 4.0f);
+                    c.RisingWall(-5, 2, new Vector2(1, 2), 1.5f, 6.0f);
+                    c.SpeedFloor(10, 10, new Vector2(3, 3), true);
+                    c.SpeedFloor(-10, 10, new Vector2(3, 3), true);
+                    c.SpeedFloor(10, -10, new Vector2(3, 3), true);
+                    c.SpeedFloor(-10, -10, new Vector2(3, 3), true);
+                    // 各辺の壁にかぶせる
+                    c.AreaRect(0, 12.5f, 8, 3);
+                    c.AreaRect(0, -12.5f, 8, 3);
+                    c.AreaRect(12.5f, 0, 3, 8);
+                    c.AreaRect(-12.5f, 0, 3, 8);
+                    c.AreaCircle(0, 8, 1.5f);
+                    c.AreaCircle(0, -8, 1.5f);
+                    c.Spawns(new Vector2(-8, 3), new Vector2(8, -3), new Vector2(3, 8), new Vector2(-3, -8));
+                });
+
+            //----------------------------------------
             // 本編のステージ(Stage01〜)。家にある物とその周りをテーマにした背景の上で戦う
             //----------------------------------------
             BeginSeries(kStagePrefix);
@@ -915,6 +1203,68 @@ namespace Nakagawa.EditorTools
                     c.Spawns(new Vector2(-6, 6), new Vector2(6, 6), new Vector2(-6, -6), new Vector2(6, -6));
                 }).Backdrop = kBathBackdrop;
 
+            //----------------------------------------
+            // 追加ギミックの確認用ステージ(GimmickDebugStage01〜)。背景なし・種類の数の制限なし
+            //----------------------------------------
+            BeginSeries(kGimmickDebugPrefix);
+
+            Add("追加ギミック見本市", 30,
+                "追加ギミック6種(せり上がり塀・加速床/減速床・移動床・ワープゲート・シューターレーン・回転砲台)を1つの闘技場にまとめた確認用ステージ。",
+                "北西の塀が波のように立ち上がって壁と高台を作り、北東の加速床・減速床で弾と体の速さが変わる。南西の穴は移動床でしか渡れず、ワープゲートは色(グループ)ごとに行き先が決まっている。東のシューターレーンは乗った積み木を一直線に撃ち出し、中央南の回転砲台は生成命令のたびに積み木を扇状にばらまく。",
+                c =>
+                {
+                    c.MaxGimmickTypes = int.MaxValue;
+
+                    // 遊べる範囲 36×32m。南西に穴(移動床で渡る)を空けた床と、四方の壁
+                    c.Floor(0, 3, 38, 28);
+                    c.Floor(0, -15.5f, 38, 3);
+                    c.Floor(-17, -12.5f, 4, 3);
+                    c.Floor(8, -12.5f, 22, 3);
+                    c.Wall(0, 16.5f, 38, 1);
+                    c.Wall(0, -16.5f, 38, 1);
+                    c.Wall(18.5f, 0, 1, 34);
+                    c.Wall(-18.5f, 0, 1, 34);
+
+                    // 案1: せり上がり塀(北西)。開始を0.3秒ずつずらして、西から東へ波のように立ち上がる
+                    for (int i = 0; i < 5; i++) c.RisingWall(-15 + i * 2, 12, new Vector2(2, 1.5f), 1.5f, i * 0.3f);
+
+                    // 案2: 加速床・減速床(北東)
+                    c.SpeedFloor(4, 12, new Vector2(3, 3), true);
+                    c.SpeedFloor(10, 12, new Vector2(3, 3), false);
+
+                    // 案3: 移動床(南西の穴を往復)
+                    c.MovingFloor(new Vector2(2.9f, 2.9f), MovingFloorGimmick.LoopMode.PingPong, 2.5f, 1.5f,
+                        new Vector2(-13.5f, -12.5f), new Vector2(-4.5f, -12.5f));
+
+                    // 案4: ワープゲート
+                    //  グループ0(どちらも・ランダム): 西・北・南東の3か所
+                    c.WarpGate(-15, 4, 90, 0, WarpGateGimmick.TargetType.Both, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.Keep);
+                    c.WarpGate(0, 9, 180, 0, WarpGateGimmick.TargetType.Both, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.Keep);
+                    c.WarpGate(16, -12.5f, 270, 0, WarpGateGimmick.TargetType.Both, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.Keep);
+                    //  グループ1(プレイヤーのみ・順番)
+                    c.WarpGate(-9, -7, 0, 1, WarpGateGimmick.TargetType.Players, WarpGateGimmick.Selection.Sequential, WarpGateGimmick.Orientation.Keep);
+                    c.WarpGate(8, 4, 0, 1, WarpGateGimmick.TargetType.Players, WarpGateGimmick.Selection.Sequential, WarpGateGimmick.Orientation.Keep);
+                    //  グループ2(積み木のみ・ゲートの向きを基準に回す)
+                    c.WarpGate(-15, -4, 90, 2, WarpGateGimmick.TargetType.Blocks, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.RelativeToGate);
+                    c.WarpGate(16, 10, 270, 2, WarpGateGimmick.TargetType.Blocks, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.RelativeToGate);
+
+                    // 案5: シューターレーン(東: 西向き / 南東: 北向き)
+                    c.ShooterLane(15.5f, 3, 270, new Vector2(2.5f, 3));
+                    c.ShooterLane(12, -7, 0, new Vector2(2.5f, 3));
+
+                    // 案6: 回転砲台(中央南。生成エリアの一種)
+                    c.Cannon(2, -6, 0, TumikiCannon.RotationMode.Spin, 1, 4);
+
+                    // 積み木の生成エリア
+                    c.AreaCircle(0, 2, 2.5f);
+                    c.AreaRect(-11, 8, 6, 3);
+                    c.AreaRect(7, 8.5f, 6, 2.5f);
+                    c.AreaCircle(-11, -2, 2);
+                    c.AreaRect(8, -12.5f, 6, 3);
+                    c.AreaCircle(12, -1, 1.8f);
+                    c.Spawns(new Vector2(-6, 0), new Vector2(6, -1), new Vector2(-2, 6), new Vector2(-3, -6));
+                });
+
             return list;
         }
 
@@ -936,7 +1286,10 @@ namespace Nakagawa.EditorTools
             public readonly List<Vector3> Blockers = new List<Vector3>(); // x, z, 半径
             public readonly List<Vector3> Tables = new List<Vector3>();   // x, z, 半径
             public readonly SortedSet<string> GimmickTypes = new SortedSet<string>();
-            public int Bumpers, Fans, Turntables;
+            // ギミックの種類ごとの数(名前 → 数)
+            public readonly Dictionary<string, int> GimmickCounts = new Dictionary<string, int>();
+            // 1ステージに置いてよいギミックの種類の数(ギミックを試すステージでは増やす)
+            public int MaxGimmickTypes = 2;
             // 床・壁の見た目(背景に合わせる場合。null なら既定)
             public Material FloorMaterial, WallMaterial;
             int m_fanIndex;
@@ -985,8 +1338,15 @@ namespace Nakagawa.EditorTools
                 var go = Place("Bumper", new Vector3(x, 0, z));
                 go.transform.localScale = new Vector3(scale, 1.0f, scale);
                 Blockers.Add(new Vector3(x, z, kBumperBaseRadius * scale * 1.12f)); // 外周のリングまで
-                GimmickTypes.Add("バンパー");
-                Bumpers++;
+                Count("バンパー");
+            }
+
+            // ギミックを1つ数える(説明の「ギミック」の欄と、種類の数の検証に使う)
+            public void Count(string gimmickName)
+            {
+                GimmickTypes.Add(gimmickName);
+                GimmickCounts.TryGetValue(gimmickName, out int n);
+                GimmickCounts[gimmickName] = n + 1;
             }
 
             // speed: 往復の速さ(0なら止まったまま)
@@ -1022,8 +1382,7 @@ namespace Nakagawa.EditorTools
                     Vector2 p = Vector2.Lerp(a, b, (float)i / steps);
                     Blockers.Add(new Vector3(p.x, p.y, 0.8f));
                 }
-                GimmickTypes.Add("扇風機");
-                Fans++;
+                Count("扇風機");
             }
 
             public void Turntable(float x, float z, float radius, bool clockwise, float speed)
@@ -1038,8 +1397,113 @@ namespace Nakagawa.EditorTools
                 so.ApplyModifiedPropertiesWithoutUndo();
                 table.ApplyShape();
                 Tables.Add(new Vector3(x, z, radius));
-                GimmickTypes.Add("回転台");
-                Turntables++;
+                Count("回転台");
+            }
+
+            //---- 追加ギミック(プレハブは AdditionalGimmickBuilder が作る) ----
+
+            int m_movingFloorIndex;
+
+            // せり上がり塀。phaseOffset: 開始のずれ(秒)。並べて少しずつずらすと波のように立ち上がる
+            public void RisingWall(float x, float z, Vector2 size, float height, float phaseOffset)
+            {
+                var go = Place(AdditionalGimmickBuilder.kRisingWall, new Vector3(x, 0, z));
+                var wall = go.GetComponent<RisingWallGimmick>();
+                var so = new SerializedObject(wall);
+                so.FindProperty("m_size").vector2Value = size;
+                so.FindProperty("m_wallHeight").floatValue = height;
+                so.FindProperty("m_phaseOffset").floatValue = phaseOffset;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                wall.ApplyShape();
+                Count("せり上がり塀");
+            }
+
+            public void SpeedFloor(float x, float z, Vector2 size, bool accelerate)
+            {
+                var go = Place(accelerate ? AdditionalGimmickBuilder.kAccelerateFloor : AdditionalGimmickBuilder.kDecelerateFloor, new Vector3(x, 0, z));
+                var floor = go.GetComponent<SpeedFloorGimmick>();
+                var so = new SerializedObject(floor);
+                so.FindProperty("m_size").vector2Value = size;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                floor.ApplyShape();
+                Count(accelerate ? "加速床" : "減速床");
+            }
+
+            // 移動床。points の順に移動する(最初の地点から始める)。床の上面は床と同じ高さ
+            public void MovingFloor(Vector2 size, MovingFloorGimmick.LoopMode mode, float speed, float wait, params Vector2[] points)
+            {
+                var group = new GameObject($"MovingFloor_Group_{m_movingFloorIndex++}").transform;
+                group.SetParent(Gimmicks, false);
+                var go = Place(AdditionalGimmickBuilder.kMovingFloor, new Vector3(points[0].x, 0, points[0].y), group);
+                var floor = go.GetComponent<MovingFloorGimmick>();
+                var so = new SerializedObject(floor);
+                var list = so.FindProperty("m_waypoints");
+                list.arraySize = points.Length;
+                for (int i = 0; i < points.Length; i++)
+                {
+                    var t = new GameObject($"Point{i}").transform;
+                    t.SetParent(group, false);
+                    t.position = new Vector3(points[i].x, 0, points[i].y);
+                    var element = list.GetArrayElementAtIndex(i);
+                    element.FindPropertyRelative("Point").objectReferenceValue = t;
+                    element.FindPropertyRelative("WaitTime").floatValue = -1.0f;
+                }
+                so.FindProperty("m_size").vector2Value = size;
+                so.FindProperty("m_loopMode").enumValueIndex = (int)mode;
+                so.FindProperty("m_speed").floatValue = speed;
+                so.FindProperty("m_waitTime").floatValue = wait;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                floor.ApplyShape();
+                Count("移動床");
+            }
+
+            // ワープゲート。yaw: ゲートの向き(ゲートの向きを基準に回す方式で使う)
+            public void WarpGate(float x, float z, float yaw, int group, WarpGateGimmick.TargetType target,
+                WarpGateGimmick.Selection selection, WarpGateGimmick.Orientation orientation, float radius = 1.0f)
+            {
+                var go = Place(AdditionalGimmickBuilder.kWarpGate, new Vector3(x, 0, z));
+                go.transform.rotation = Quaternion.Euler(0, yaw, 0);
+                go.name = $"WarpGate_G{group}_{target}";
+                var gate = go.GetComponent<WarpGateGimmick>();
+                var so = new SerializedObject(gate);
+                so.FindProperty("m_radius").floatValue = radius;
+                so.FindProperty("m_group").intValue = group;
+                so.FindProperty("m_target").enumValueIndex = (int)target;
+                so.FindProperty("m_selection").enumValueIndex = (int)selection;
+                so.FindProperty("m_orientation").enumValueIndex = (int)orientation;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                gate.ApplyShape();
+                Count("ワープゲート");
+            }
+
+            // シューターレーン。yaw: 飛ばす向き(0 = 北(+Z))。size: 幅×長さ
+            public void ShooterLane(float x, float z, float yaw, Vector2 size)
+            {
+                var go = Place(AdditionalGimmickBuilder.kShooterLane, new Vector3(x, 0, z));
+                go.transform.rotation = Quaternion.Euler(0, yaw, 0);
+                var lane = go.GetComponent<ShooterLaneGimmick>();
+                var so = new SerializedObject(lane);
+                so.FindProperty("m_size").vector2Value = size;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                lane.ApplyShape();
+                Count("シューターレーン");
+            }
+
+            // 回転砲台(生成エリアの一種。TumikiSpawner の命令で積み木を撃つ)。yaw: 首振り・固定の基準の向き
+            public void Cannon(float x, float z, float yaw, TumikiCannon.RotationMode mode, int minAmount, int maxAmount)
+            {
+                var go = Place(AdditionalGimmickBuilder.kCannon, new Vector3(x, 0, z));
+                go.transform.rotation = Quaternion.Euler(0, yaw, 0);
+                var cannon = go.GetComponent<TumikiCannon>();
+                var so = new SerializedObject(cannon);
+                so.FindProperty("m_rotationMode").enumValueIndex = (int)mode;
+                so.FindProperty("m_minAmount").intValue = minAmount;
+                so.FindProperty("m_maxAmount").intValue = maxAmount;
+                float radius = so.FindProperty("m_radius").floatValue;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                cannon.ApplyShape();
+                Blockers.Add(new Vector3(x, z, radius + 0.1f));
+                Count("回転砲台");
             }
 
             public void AreaRect(float x, float z, float w, float d)
@@ -1647,7 +2111,7 @@ namespace Nakagawa.EditorTools
             var problems = new List<string>();
             if (c.SpawnPoints.Count != 4) problems.Add($"出現位置が{c.SpawnPoints.Count}か所");
             if (c.AreaList.Count < kMinSpawnAreas) problems.Add($"生成エリアが{c.AreaList.Count}か所({kMinSpawnAreas}か所以上にする)");
-            if (c.GimmickTypes.Count > 2) problems.Add("ギミックが3種類以上");
+            if (c.GimmickTypes.Count > c.MaxGimmickTypes) problems.Add($"ギミックが{c.GimmickTypes.Count}種類({c.MaxGimmickTypes}種類まで)");
 
             // 出現位置: 床の上で、ギミック・生成エリアと重ならない
             foreach (var p in c.SpawnPoints)
@@ -1715,12 +2179,22 @@ namespace Nakagawa.EditorTools
             return true;
         }
 
+        // 説明の「ギミック」の欄に並べる順
+        static readonly string[] kGimmickOrder =
+        {
+            "扇風機", "バンパー", "回転台", "せり上がり塀", "加速床", "減速床", "移動床", "ワープゲート", "シューターレーン", "回転砲台",
+        };
+
         static string Layout(Ctx c, Rect bounds, int maxBlocks)
         {
+            // 決まった順に並べ、順番の決まっていない種類は後ろに足す
             var gimmicks = new List<string>();
-            if (c.Fans > 0) gimmicks.Add($"扇風機×{c.Fans}");
-            if (c.Bumpers > 0) gimmicks.Add($"バンパー×{c.Bumpers}");
-            if (c.Turntables > 0) gimmicks.Add($"回転台×{c.Turntables}");
+            var order = new List<string>(kGimmickOrder);
+            foreach (var name in c.GimmickCounts.Keys) if (!order.Contains(name)) order.Add(name);
+            foreach (var name in order)
+            {
+                if (c.GimmickCounts.TryGetValue(name, out int n) && n > 0) gimmicks.Add($"{name}×{n}");
+            }
             return $"広さ: {bounds.width}×{bounds.height}m\n" +
                    $"ギミック: {(gimmicks.Count == 0 ? "なし" : string.Join("、", gimmicks))}\n" +
                    $"生成エリア: {c.AreaList.Count}か所({string.Join("、", c.AreaDesc)})\n" +
@@ -1783,7 +2257,8 @@ namespace Nakagawa.EditorTools
             foreach (var raw in File.ReadAllLines(kDocPath))
             {
                 string line = raw.TrimEnd();
-                if (line.StartsWith("| Stage"))
+                // ステージの行(見出しの行・区切りの行は除く)
+                if (line.StartsWith("| ") && !line.StartsWith("| No.") && !line.StartsWith("|---"))
                 {
                     string[] cells = line.Split('|');
                     string id = cells[1].Trim();

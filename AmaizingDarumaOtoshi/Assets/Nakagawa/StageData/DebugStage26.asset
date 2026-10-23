@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9bc7d20817a22f54b80f1965aafc188c, type: 3}
+  m_Name: DebugStage26
+  m_EditorClassIdentifier: Assembly-CSharp::StageData
+  id: DebugStage26
+  displayName: "\u30B7\u30E5\u30FC\u30BF\u30FC\u56DE\u5ECA"
+  description: "\u56DB\u9685\u306E\u30B7\u30E5\u30FC\u30BF\u30FC\u30EC\u30FC\u30F3\u304C\u3001\u4E2D\u592E\u306E\u56DE\u8EE2\u53F0\u3078\u5411\u3051\u3066\u659C\u3081\u306B\u7A4D\u307F\u6728\u3092\u6483\u3061\u51FA\u3059\u3002"
+  color: {r: 0.6, g: 0.8, b: 0.95, a: 1}
+  preview: {fileID: 21300000, guid: 359f0ae3b7853dc4e95634a243bb326d, type: 3}
+  sceneName: AllStages

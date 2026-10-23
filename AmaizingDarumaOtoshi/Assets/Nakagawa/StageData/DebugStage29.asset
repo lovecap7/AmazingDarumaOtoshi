@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9bc7d20817a22f54b80f1965aafc188c, type: 3}
+  m_Name: DebugStage29
+  m_EditorClassIdentifier: Assembly-CSharp::StageData
+  id: DebugStage29
+  displayName: "\u5D50\u306E\u30EF\u30FC\u30D7"
+  description: "\u6771\u897F\u306B\u9577\u3044\u95D8\u6280\u5834\u3002\u4E21\u7AEF\u306E\u6247\u98A8\u6A5F\u304C\u5357\u5317\u306B\u5F80\u5FA9\u3057\u306A\u304C\u3089\u4E2D\u592E\u3078\u98A8\u3092\u9001\u308B\u3002\u56DB\u9685\u5BC4\u308A\u306B\u3069\u3061\u3089\u3082\u9001\u308B\u30EF\u30FC\u30D7\u30B2\u30FC\u30C8\u3001\u5357\u5317\u306E\u4E2D\u592E\u306B\u7A4D\u307F\u6728\u3060\u3051\u3092\u9001\u308A\u5411\u304D\u3092\u53CD\u8EE2\u3055\u305B\u308B\u30B2\u30FC\u30C8\u3002"
+  color: {r: 0.98, g: 0.88, b: 0.55, a: 1}
+  preview: {fileID: 21300000, guid: 471ea9e2b3e1eb449a6323c366c791eb, type: 3}
+  sceneName: AllStages

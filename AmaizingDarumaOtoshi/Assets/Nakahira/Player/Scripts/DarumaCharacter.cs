@@ -23,6 +23,18 @@ namespace Nakahira
         void AddKnockback(Vector3 velocity);
         // このステップの重力の倍率。複数のギミックから要求されたら一番小さい値を使う
         void RequestGravityScale(float scale);
+        // 今の水平方向の速度(加速床などが速さを調べるのに使う。キャラクターは速さの倍率を掛ける前の速度)
+        Vector3 HorizontalVelocity { get; }
+        // このステップの水平の速さの倍率(加速床・減速床など)。向きはそのまま。複数のギミックから要求されたら掛け合わせる
+        // 積み木は速さそのものが変わって残る。キャラクターは移動入力で毎ステップ速さが決まるので、このステップの速度にだけ掛かる
+        void RequestSpeedScale(float scale);
+        // 瞬間移動する(ワープなど)。速さはそのままで、向きと進む方向を水平に yawDegrees だけ回す(上から見て時計回りが正)
+        void Teleport(Vector3 position, float yawDegrees);
+        // ヒットストップ(このものだけスローになり、見た目が震える)
+        void StartHitStop(float duration, float timeScale, float shake);
+        // 一時的にその場で止め、当たり判定をなくす(ワープで移動している間など)。止めている間は CanBeAffected が false になる
+        // 速さ・向き・状態(飛んでいる・攻撃判定・持ち主)は保ち、解除すると止めた時の続きから動く
+        void SetSuspended(bool suspended);
     }
 
     // 脱落の原因(演出・ルールの分岐用)
@@ -114,6 +126,10 @@ namespace Nakahira
         Vector3 m_force;              // 次のステップで加える力(加速度)
         float m_knockbackUp;          // はじかれた上向きの速度(次のステップで1回だけ反映)
         float m_gravityScale = 1.0f;  // 次のステップの重力の倍率
+        float m_speedScale = 1.0f;    // 次のステップの水平の速さの倍率
+        Vector3 m_baseHorizontal;     // 前のステップの、速さの倍率を掛ける前の水平の速度
+        bool m_isSuspended;           // 一時的に止めている(ワープの移動中など)
+        Vector3 m_suspendedVelocity;  // 止めたときの速度(解除すると戻す)
 
         public DarumaStack Stack => m_stack;
         public Collider Body => m_body;
@@ -123,6 +139,8 @@ namespace Nakahira
         public bool CanStartShot => m_isGrounded && !m_jumpRequested;
         public bool IsInvincible => m_invincibleTimer > 0.0f;
         public float MoveSpeed => Mathf.Max(m_minMoveSpeed, m_baseMoveSpeed - m_stack.Count * m_speedLossPerBlock);
+        public JumpParams JumpParams => m_jumpParams;
+        public DarumaHammer Hammer => m_hammer;
         // ヒットストップ中は1未満(移動・落下・ハンマーがスローになる)
         public float LocalTimeScale => Mathf.Max(0.01f, m_hitStop.TimeScale);
 
@@ -169,7 +187,8 @@ namespace Nakahira
 
         private void Update()
         {
-            if (m_commandSource != null)
+            // 止めている間は操作も受け付けない
+            if (m_commandSource != null && !m_isSuspended)
             {
                 ApplyCommand(m_commandSource.ReadCommand());
             }
@@ -206,6 +225,8 @@ namespace Nakahira
 
         private void FixedUpdate()
         {
+            if (m_isSuspended) return;
+
             // 奈落に落ちた
             if (m_rb.position.y < m_killY)
             {
@@ -228,7 +249,14 @@ namespace Nakahira
             UpdateJump(ref v);
             Vector3 external = UpdateExternal(ref v, dt);
 
-            m_rb.linearVelocity = (v + external) * timeScale;
+            // 速さの倍率は水平方向にだけ、このステップの速度に掛ける(次のステップでは移動入力・外からの速度から計算し直す)
+            Vector3 total = v + external;
+            m_baseHorizontal = new Vector3(total.x, 0.0f, total.z);
+            total.x *= m_speedScale;
+            total.z *= m_speedScale;
+            m_speedScale = 1.0f;
+
+            m_rb.linearVelocity = total * timeScale;
             m_appliedTimeScale = timeScale;
 
             // 地上でも自前の重力で速度は負になるので、空中にいることも条件にする
@@ -279,7 +307,7 @@ namespace Nakahira
             // ハンマーを振っている間は向きを固定(打ち返しの方向がブレないように)
             // ただし股抜きショットは弾が出るまで向きを変えて狙える
             bool canTurn = !m_hammer.IsBusy || m_hammer.IsAimingShot;
-            if (moveDir.sqrMagnitude > 0.0001f && !m_hammer.IsBusy)
+            if (moveDir.sqrMagnitude > 0.0001f && canTurn)
             {
                 Quaternion target = Quaternion.LookRotation(moveDir, Vector3.up);
                 m_rb.MoveRotation(Quaternion.Slerp(m_rb.rotation, target, m_turnSpeed * dt));
@@ -480,7 +508,7 @@ namespace Nakahira
         // ギミックからの影響(IGimmickAffectable)
         //========================================
 
-        public bool CanBeAffected => !m_isEliminated;
+        public bool CanBeAffected => !m_isEliminated && !m_isSuspended;
 
         public void AddCarryVelocity(Vector3 velocity)
         {
@@ -506,6 +534,48 @@ namespace Nakahira
         public void RequestGravityScale(float scale)
         {
             m_gravityScale = Mathf.Min(m_gravityScale, scale);
+        }
+
+        public Vector3 HorizontalVelocity => m_baseHorizontal;
+
+        public void RequestSpeedScale(float scale)
+        {
+            m_speedScale *= Mathf.Max(0.0f, scale);
+        }
+
+        // 積まれた段・頭は子なので一緒に移動する
+        public void Teleport(Vector3 position, float yawDegrees)
+        {
+            if (m_isEliminated) return;
+            m_rb.position = position;
+            transform.position = position;
+            if (yawDegrees == 0.0f) return;
+
+            Quaternion turn = Quaternion.Euler(0.0f, yawDegrees, 0.0f);
+            Quaternion rotation = turn * m_rb.rotation;
+            m_rb.rotation = rotation;
+            transform.rotation = rotation;
+            m_knockback = turn * m_knockback;
+            if (m_isSuspended) m_suspendedVelocity = turn * m_suspendedVelocity;
+            else m_rb.linearVelocity = turn * m_rb.linearVelocity;
+        }
+
+        // 止めている間は動かない物として扱い(当たり判定なし)、解除すると止めたときの速度で動き出す
+        public void SetSuspended(bool suspended)
+        {
+            if (m_isEliminated || m_isSuspended == suspended) return;
+            m_isSuspended = suspended;
+            if (suspended)
+            {
+                m_suspendedVelocity = m_rb.linearVelocity;
+                m_rb.linearVelocity = Vector3.zero;
+                m_body.enabled = false;
+                m_rb.isKinematic = true;
+                return;
+            }
+            m_rb.isKinematic = false;
+            m_body.enabled = true;
+            m_rb.linearVelocity = m_suspendedVelocity;
         }
 
         //========================================
