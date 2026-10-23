@@ -20,6 +20,12 @@ public partial class ClubOpeningMovie : MonoBehaviour
 {
     [SerializeField] bool playMovie = true;
 
+    [Header("カメラの揺れ")]
+    [Tooltip("ムービー全体の揺れの強さ（当たったとき・ぶつかったとき・ラッシュ中、すべてにかかる倍率）。0 で揺れなし")]
+    [SerializeField, Range(0f, 3f)] float shakeStrength = 1f;
+    [Tooltip("決勝のラッシュ中に揺れ続ける強さ（当たった瞬間はこれより強く揺れる）")]
+    [SerializeField, Range(0f, 1.5f)] float rushShake = 0.45f;
+
     static readonly Color Red = new Color(0.93f, 0.27f, 0.25f), Blue = new Color(0.22f, 0.55f, 0.95f),
                           Yellow = new Color(0.98f, 0.76f, 0.12f), Green = new Color(0.30f, 0.74f, 0.35f),
                           Shirt = new Color(0.95f, 0.95f, 0.92f),
@@ -318,7 +324,9 @@ public partial class ClubOpeningMovie : MonoBehaviour
             return;
         }
         ffwd = MenuInput.CancelHeld();
-        Time.timeScale = baseScale * (ffwd ? FfwdSpeed : 1f);
+        // ヒットストップ：当たった瞬間だけ、ほんの一瞬止まったように見せる
+        hitStop = Mathf.Max(0f, hitStop - Time.unscaledDeltaTime);
+        Time.timeScale = baseScale * (ffwd ? FfwdSpeed : 1f) * (hitStop > 0f ? 0.04f : 1f);
         if (ffwdMark != null) ffwdMark.alpha = ffwd ? 0.6f + 0.4f * Mathf.Sin(Time.unscaledTime * 10f) : 0f;
         camShake = Mathf.Max(camShake, shakeFloor);
 
@@ -340,11 +348,17 @@ public partial class ClubOpeningMovie : MonoBehaviour
         {
             float lt = mt - shotStart;
             camShake = Mathf.MoveTowards(camShake, 0f, Time.unscaledDeltaTime * 2f);
-            var shake = Random.insideUnitSphere * camShake * 0.15f;
+            var shake = Random.insideUnitSphere * camShake * 0.15f * shakeStrength;
             movieCam.transform.position = camPos(lt) + shake;
             movieCam.transform.LookAt(camLook(lt) + shake * 0.5f);
+            // 当たった瞬間にグッと寄る（ズームパンチ）
+            fovPunch = Mathf.MoveTowards(fovPunch, 0f, Time.unscaledDeltaTime * 45f);
+            movieCam.fieldOfView = shotFov - fovPunch;
         }
+        UpdateRushFx();
     }
+
+    float hitStop, fovPunch, shotFov = 46f;
 
     // ================= 道具 =================
     float shift;   // 途中で足したカットのぶん、それ以降の時刻を後ろへずらす
@@ -363,6 +377,7 @@ public partial class ClubOpeningMovie : MonoBehaviour
         camLook = look;
         shotStart = mt;
         movieCam.fieldOfView = fov;
+        shotFov = fov;
     }
 
     // 白いフラッシュでカットをつなぐ

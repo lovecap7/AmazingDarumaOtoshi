@@ -1,5 +1,6 @@
 ﻿using System.Collections;
 using UnityEngine;
+using UnityEngine.UI;
 
 // オープニングムービーの「全国大会の決勝」。予選と同じ試合場（机の上のトレイ）で、王者と一騎打ち。
 //  1. ある程度積んだ状態で向かい合う（スポットライト・顔見せ）
@@ -58,28 +59,325 @@ public partial class ClubOpeningMovie
         // 駆け寄って、振りまくる
         StartCoroutine(Slide(hero, mid - dir * 1.3f, 0.22f));
         yield return Slide(champ, mid + dir * 1.3f, 0.22f);
-        // ラッシュ：速い振りで交互に打ち合う。王者は首だけに、主人公は最後の1個になるまで
+        // ラッシュ（ドラゴンボールのような超高速の打ち合い）
+        //   H：主人公が当てる　C：王者が当てる　X：ハンマー同士が激突　T：2人が残像を残して瞬間移動し、別の角度で打ち合う
+        //   主人公の H は王者の積み木の数（最後は首だけ）、王者の C は主人公の積み木の数 − 1（最後の1個は残る）
         float r0 = mt;
-        int heroHits = champ.blocks.Count, champHits = hero.blocks.Count - 1;
-        for (int i = 0; i < heroHits; i++) StartCoroutine(HitAfter(hero, champ, i * 0.42f));
-        for (int i = 0; i < champHits; i++) StartCoroutine(HitAfter(champ, hero, 0.21f + i * 0.42f));
-        float rushEnd = Mathf.Max(heroHits, champHits) * 0.42f + 0.5f;
-        shakeFloor = 0.45f;   // ラッシュのあいだはずっと揺らす
-        // 2人の体の高さ（積み木が減るとカメラも下がる）
+        shakeFloor = rushShake;   // ラッシュのあいだはずっと揺らす（強さは Inspector で）
+        SetRushFx(true, hero, champ);
         System.Func<float> bodyH = () => (hero.bodyY + champ.bodyY) * 0.5f;
-        // 低い位置から横に
-        SetShot(lt => mid + side * (4.8f - lt * 0.3f) + Vector3.up * (bodyH() * 0.6f + 0.8f), lt => mid + Vector3.up * (bodyH() * 0.75f + 0.3f), 50f);
-        yield return Until(r0 + 0.8f);
-        // 主人公の肩越し
-        SetShot(lt => hero.Pos - dir * 3.0f + side * 1.6f + Vector3.up * (bodyH() + 1.2f), lt => champ.Pos + Vector3.up * (bodyH() * 0.6f + 0.3f), 48f);
-        yield return Until(r0 + 1.6f);
-        // 王者の肩越し
-        SetShot(lt => champ.Pos + dir * 3.0f + side * 1.6f + Vector3.up * (bodyH() + 1.0f), lt => hero.Pos + Vector3.up * (bodyH() * 0.6f + 0.3f), 48f);
-        yield return Until(r0 + 2.3f);
-        // 上から回り込みながら、飛び散る積み木を見せる
-        SetShot(lt => mid + Quaternion.Euler(0f, -40f + lt * 45f, 0f) * (side * 5.6f) + Vector3.up * 4.4f, lt => mid + Vector3.up * 0.6f, 50f);
-        yield return Until(r0 + rushEnd);
+        System.Func<Vector3> center = () => (hero.Pos + champ.Pos) * 0.5f;
+        System.Func<Vector3> axis = () => Flat(champ.Pos - hero.Pos).normalized;
+        System.Func<Vector3> front = () => FrontSide(hero, champ);
+        // カメラは数カットごとに切り替える（どれも 2 人の位置と向きに追従）
+        System.Func<float, Vector3>[] camPositions =
+        {
+            lt => center() + front() * (4.4f - lt * 0.6f) + Vector3.up * (bodyH() * 0.6f + 0.6f),                        // 低い横
+            lt => hero.Pos - axis() * 2.8f + front() * 1.5f + Vector3.up * (bodyH() + 1.1f),                                // 主人公の肩越し
+            lt => champ.Pos + axis() * 2.8f + front() * 1.5f + Vector3.up * (bodyH() + 1.0f),                               // 王者の肩越し
+            lt => center() + Quaternion.Euler(0f, lt * 70f, 0f) * (front() * 5.2f) + Vector3.up * 4.2f,                      // 上から回り込み
+            lt => center() + front() * 3.8f - axis() * 0.8f + Vector3.up * 0.5f,                                             // 低い位置から見上げる
+        };
+        System.Func<float, Vector3>[] camLooks =
+        {
+            lt => center() + Vector3.up * (bodyH() * 0.75f + 0.3f),
+            lt => champ.Pos + Vector3.up * (bodyH() * 0.6f + 0.3f),
+            lt => hero.Pos + Vector3.up * (bodyH() * 0.6f + 0.3f),
+            lt => center() + Vector3.up * 0.6f,
+            lt => center() + Vector3.up * (bodyH() * 0.7f + 0.3f),
+        };
+        int cut = 0;
+        float nextCut = mt;
+        const string pattern = "THCXHCTHXCHCTXHCHTCHX";
+        foreach (char act in pattern)
+        {
+            if (mt >= nextCut)
+            {
+                SetShot(camPositions[cut % camPositions.Length], camLooks[cut % camLooks.Length], 50f);
+                cut++;
+                nextCut = mt + 1.0f;
+            }
+            switch (act)
+            {
+                case 'H': StartCoroutine(RushHit(hero, champ)); break;
+                case 'C': StartCoroutine(RushHit(champ, hero)); break;
+                case 'X': StartCoroutine(RushClash(hero, champ)); break;
+                case 'T': yield return Teleport(hero, champ); break;
+            }
+            yield return Tween(0.24f, u => { });
+        }
+        yield return Tween(0.4f, u => { });
         shakeFloor = 0f;
+        SetRushFx(false, hero, champ);
+        hero.pivotRot = champ.pivotRot = GHammerIdle;
+    }
+
+    // ================= ラッシュの演出 =================
+    // 超高速の振り（構え 0.05 → 振り抜き 0.05 → 戻し 0.1）
+    IEnumerator FastSwing(GPuppet p, System.Action onHit)
+    {
+        p.swinging = true;
+        yield return Tween(0.05f, u => p.pivotRot = Quaternion.Slerp(GHammerIdle, GHammerWindup, u));
+        MenuSounds.Play(MatchSounds.Instance.Swing, 0.6f);
+        bool hit = false;
+        yield return Tween(0.05f, u =>
+        {
+            p.pivotRot = Quaternion.Euler(Mathf.Lerp(-10f, 15f, u), Mathf.Lerp(125f, -65f, u), 0f);   // 前へ振る
+            if (!hit && u >= 0.5f) { hit = true; onHit?.Invoke(); }
+        });
+        yield return Tween(0.1f, u => p.pivotRot = Quaternion.Slerp(GHammerFollow, GHammerIdle, u));
+        p.swinging = false;
+    }
+
+    IEnumerator RushHit(GPuppet a, GPuppet v)
+    {
+        FacePuppet(a, v.Pos);
+        FacePuppet(v, a.Pos);
+        // 半歩踏み込みながら打つ
+        var from = a.Pos;
+        var step = Flat(v.Pos - a.Pos).normalized * 0.25f;
+        StartCoroutine(Tween(0.1f, u => a.root.position = from + step * Mathf.Sin(u * Mathf.PI)));
+        yield return FastSwing(a, () =>
+        {
+            int before = v.blocks.Count;
+            KnockBottom(a, v);
+            if (v.blocks.Count == before) return;
+            var at = v.Pos + Vector3.up * GBlockH * 0.5f;
+            Impact(at, false);
+            StartCoroutine(Tween(0.12f, u => v.root.position += Flat(v.Pos - a.Pos).normalized * 0.04f));   // 当たった勢いでのけぞる
+        });
+    }
+
+    // ハンマー同士がぶつかる（積み木は減らないが、いちばん派手）
+    IEnumerator RushClash(GPuppet a, GPuppet b)
+    {
+        FacePuppet(a, b.Pos);
+        FacePuppet(b, a.Pos);
+        a.swinging = b.swinging = true;
+        yield return Tween(0.05f, u => a.pivotRot = b.pivotRot = Quaternion.Slerp(GHammerIdle, GHammerWindup, u));
+        MenuSounds.Play(MatchSounds.Instance.Swing, 0.7f);
+        yield return Tween(0.05f, u => a.pivotRot = b.pivotRot = Quaternion.Euler(Mathf.Lerp(-10f, -5f, u), Mathf.Lerp(125f, -28f, u), 0f));
+        var at = (FindPart(a.pivot, "HammerHead").position + FindPart(b.pivot, "HammerHead").position) * 0.5f;
+        MenuSounds.Play(MatchSounds.Instance.Knock);
+        Impact(at, true);
+        Sparks(at, 30, new Color(2.6f, 2.2f, 0.9f));
+        yield return Tween(0.12f, u => a.pivotRot = b.pivotRot = Quaternion.Slerp(GHammerClash, GHammerIdle, u));
+        a.swinging = b.swinging = false;
+    }
+
+    // 当たった瞬間：ヒットストップ・ズームパンチ・白黒のインパクトフレーム・衝撃波の輪
+    int impactCount;
+
+    void Impact(Vector3 at, bool big)
+    {
+        impactCount++;
+        hitStop = big ? 0.09f : 0.05f;
+        fovPunch = big ? 12f : 7f;
+        camShake = Mathf.Max(camShake, big ? 1.4f : 0.9f);
+        // インパクトフレーム：白と黒を交互に一瞬だけ
+        StartCoroutine(FadeFlash(impactCount % 2 == 0 ? Color.white : Color.black, big ? 0.75f : 0.45f, 0f, big ? 0.12f : 0.07f));
+        StartCoroutine(Shockwave(at, big ? 4.5f : 2.6f));
+        if (big) StartCoroutine(Shockwave(at, 7f));
+    }
+
+    IEnumerator Shockwave(Vector3 at, float size)
+    {
+        var q = TitleDressingKit.Quad(setRoot, "Shockwave", at, Vector3.one * 0.2f, null);
+        var m = ToyKit.ParticleMaterial(true, RingTexture());
+        q.GetComponent<Renderer>().sharedMaterial = m;
+        yield return Tween(0.28f, u =>
+        {
+            q.rotation = Quaternion.LookRotation(q.position - movieCam.transform.position);   // いつもカメラの方を向く
+            q.localScale = Vector3.one * Mathf.Lerp(0.3f, size, 1f - (1f - u) * (1f - u));
+            m.SetColor("_BaseColor", new Color(1.8f, 1.6f, 1.1f, 1f - u));
+        });
+        Destroy(q.gameObject);
+    }
+
+    // 残像を残して瞬間移動し、2人の向きを変えて打ち合いを続ける
+    float rushAngle;
+
+    IEnumerator Teleport(GPuppet a, GPuppet b)
+    {
+        rushAngle += Random.Range(60f, 110f) * (Random.value < 0.5f ? -1f : 1f);
+        var c = MatchSet + new Vector3(Random.Range(-1.5f, 1.5f), 0f, Random.Range(-1f, 1f));
+        var axis = Quaternion.Euler(0f, rushAngle, 0f) * Vector3.right;
+        var toA = c - axis * 1.3f;
+        var toB = c + axis * 1.3f;
+        Afterimage(a);
+        Afterimage(b);
+        MenuSounds.Play(MatchSounds.Instance.Jump, 0.8f);
+        var fa = a.Pos;
+        var fb = b.Pos;
+        a.trail.emitting = b.trail.emitting = true;
+        yield return Tween(0.08f, u =>
+        {
+            a.root.position = Vector3.Lerp(fa, toA, u) + Vector3.up * Mathf.Sin(u * Mathf.PI) * 0.6f;
+            b.root.position = Vector3.Lerp(fb, toB, u) + Vector3.up * Mathf.Sin(u * Mathf.PI) * 0.6f;
+        });
+        a.root.position = toA;
+        b.root.position = toB;
+        a.trail.emitting = b.trail.emitting = false;
+        FacePuppet(a, b.Pos);
+        FacePuppet(b, a.Pos);
+        StartCoroutine(Shockwave(toA + Vector3.up * 0.1f, 2f));
+        StartCoroutine(Shockwave(toB + Vector3.up * 0.1f, 2f));
+        camShake = Mathf.Max(camShake, 0.8f);
+    }
+
+    // 体の形をそのまま写した半透明の影を、その場に少し残して消す
+    void Afterimage(GPuppet p)
+    {
+        var ghost = Instantiate(p.root.gameObject, p.root.position, p.root.rotation, setRoot);
+        foreach (var tr in ghost.GetComponentsInChildren<TrailRenderer>(true)) Destroy(tr);
+        foreach (var ps in ghost.GetComponentsInChildren<ParticleSystem>(true)) Destroy(ps.gameObject);
+        var mat = ToyKit.ParticleMaterial(true, null);
+        foreach (var r in ghost.GetComponentsInChildren<Renderer>(true)) { r.sharedMaterial = mat; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; }
+        StartCoroutine(FadeGhost(ghost, mat));
+    }
+
+    IEnumerator FadeGhost(GameObject ghost, Material mat)
+    {
+        yield return Tween(0.35f, u => mat.SetColor("_BaseColor", new Color(1f, 0.9f, 0.6f, 0.55f * (1f - u))));
+        Destroy(ghost);
+    }
+
+    // ラッシュのあいだ：画面の集中線と、2人のオーラ
+    RawImage speedLines;
+    readonly System.Collections.Generic.List<ParticleSystem> auras = new System.Collections.Generic.List<ParticleSystem>();
+    bool rushFx;
+
+    void SetRushFx(bool on, GPuppet a, GPuppet b)
+    {
+        rushFx = on;
+        if (on && speedLines == null)
+        {
+            speedLines = new GameObject("SpeedLines", typeof(RectTransform)).AddComponent<RawImage>();
+            speedLines.transform.SetParent(ui.transform, false);
+            speedLines.transform.SetSiblingIndex(flash.transform.GetSiblingIndex());
+            speedLines.texture = SpeedLineTexture();
+            speedLines.raycastTarget = false;
+            var r = speedLines.rectTransform;
+            r.anchorMin = r.anchorMax = new Vector2(0.5f, 0.5f);
+            r.sizeDelta = new Vector2(2600f, 2600f);   // 画面より大きく（回しても角が出ない）
+        }
+        if (speedLines != null) speedLines.gameObject.SetActive(on);
+        if (on)
+        {
+            auras.Add(MakeAura(a, new Color(1.6f, 0.7f, 0.25f)));
+            auras.Add(MakeAura(b, new Color(0.7f, 0.85f, 1.6f)));
+        }
+        else
+        {
+            foreach (var ps in auras) if (ps != null) ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+            auras.Clear();
+        }
+    }
+
+    void UpdateRushFx()
+    {
+        if (!rushFx || speedLines == null) return;
+        // 集中線は毎コマ角度と大きさを変えて、ガタガタ動いて見えるように
+        speedLines.rectTransform.localEulerAngles = new Vector3(0f, 0f, Random.Range(0f, 360f));
+        speedLines.rectTransform.localScale = Vector3.one * Random.Range(0.95f, 1.12f);
+        speedLines.color = new Color(1f, 1f, 1f, Random.Range(0.55f, 0.85f));
+    }
+
+    // 体のまわりから立ちのぼる光の粒（オーラ）
+    ParticleSystem MakeAura(GPuppet p, Color c)
+    {
+        var go = new GameObject("Aura");
+        go.transform.SetParent(p.root, false);
+        go.transform.localPosition = Vector3.up * 0.2f;
+        go.transform.localRotation = Quaternion.Euler(-90f, 0f, 0f);
+        var ps = go.AddComponent<ParticleSystem>();
+        ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        var main = ps.main;
+        main.loop = true;
+        main.startLifetime = new ParticleSystem.MinMaxCurve(0.25f, 0.5f);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(3f, 6f);
+        main.startSize = new ParticleSystem.MinMaxCurve(0.25f, 0.6f);
+        main.startColor = c;
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.maxParticles = 300;
+        var em = ps.emission; em.rateOverTime = 120f;
+        var shape = ps.shape; shape.shapeType = ParticleSystemShapeType.Circle; shape.radius = 0.55f;
+        var col = ps.colorOverLifetime; col.enabled = true;
+        var g = new Gradient();
+        g.SetKeys(new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
+                  new[] { new GradientAlphaKey(0.9f, 0f), new GradientAlphaKey(0f, 1f) });
+        col.color = g;
+        var r = go.GetComponent<ParticleSystemRenderer>();
+        r.material = ToyKit.ParticleMaterial(true, SoftDot());
+        r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        ps.Play();
+        return ps;
+    }
+
+    static Texture2D softDot, ringTex, speedTex;
+
+    static Texture2D SoftDot()
+    {
+        if (softDot != null) return softDot;
+        const int s = 32;
+        softDot = new Texture2D(s, s, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+        var px = new Color[s * s];
+        for (int y = 0; y < s; y++)
+            for (int x = 0; x < s; x++)
+            {
+                float d = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), new Vector2(s * 0.5f, s * 0.5f)) / (s * 0.5f);
+                px[y * s + x] = new Color(1f, 1f, 1f, Mathf.Clamp01(1f - d) * Mathf.Clamp01(1f - d));
+            }
+        softDot.SetPixels(px);
+        softDot.Apply();
+        return softDot;
+    }
+
+    static Texture2D RingTexture()
+    {
+        if (ringTex != null) return ringTex;
+        const int s = 128;
+        ringTex = new Texture2D(s, s, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+        var px = new Color[s * s];
+        for (int y = 0; y < s; y++)
+            for (int x = 0; x < s; x++)
+            {
+                float d = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), new Vector2(s * 0.5f, s * 0.5f)) / (s * 0.5f);
+                px[y * s + x] = new Color(1f, 1f, 1f, Mathf.Clamp01(1f - Mathf.Abs(d - 0.85f) * 9f));
+            }
+        ringTex.SetPixels(px);
+        ringTex.Apply();
+        return ringTex;
+    }
+
+    // 漫画の集中線：中心は透明、外へ向かって白い線が細く伸びる
+    static Texture2D SpeedLineTexture()
+    {
+        if (speedTex != null) return speedTex;
+        const int s = 512;
+        speedTex = new Texture2D(s, s, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+        var px = new Color[s * s];
+        var rng = new System.Random(9);
+        const int rays = 140;
+        var width = new float[rays];
+        var start = new float[rays];
+        for (int i = 0; i < rays; i++) { width[i] = 0.004f + (float)rng.NextDouble() * 0.012f; start[i] = 0.35f + (float)rng.NextDouble() * 0.25f; }
+        for (int y = 0; y < s; y++)
+            for (int x = 0; x < s; x++)
+            {
+                float dx = (x + 0.5f) / s * 2f - 1f, dy = (y + 0.5f) / s * 2f - 1f;
+                float d = Mathf.Sqrt(dx * dx + dy * dy);
+                float ang = (Mathf.Atan2(dy, dx) / (Mathf.PI * 2f) + 1f) % 1f;
+                int i = Mathf.FloorToInt(ang * rays) % rays;
+                float center = (i + 0.5f) / rays;
+                float off = Mathf.Abs(ang - center) * Mathf.PI * 2f;   // 線の中心からの角度
+                float w = width[i] * (0.4f + d);                        // 外ほど太く
+                float a = off < w && d > start[i] ? Mathf.Clamp01((d - start[i]) / 0.25f) * (1f - off / w) : 0f;
+                px[y * s + x] = new Color(1f, 1f, 1f, a * 0.9f);
+            }
+        speedTex.SetPixels(px);
+        speedTex.Apply();
+        return speedTex;
     }
 
     void SetupFinalField()
