@@ -493,6 +493,39 @@ public static class ToyKit
         return (RectTransform)go.transform;
     }
 
+    // 角丸の四角（9スライス）。角の大きさは Image.pixelsPerUnitMultiplier で変える（小さいほど丸い）
+    static Sprite roundedSprite;
+    public static Sprite RoundedSprite
+    {
+        get
+        {
+            if (roundedSprite != null) return roundedSprite;
+            const int size = 128, r = 60;
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
+            var px = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float cx = Mathf.Clamp(x + 0.5f, r, size - r), cy = Mathf.Clamp(y + 0.5f, r, size - r);
+                    float d = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), new Vector2(cx, cy));
+                    px[y * size + x] = new Color32(255, 255, 255, (byte)(Mathf.Clamp01(r + 0.5f - d) * 255f));
+                }
+            tex.SetPixels32(px);
+            tex.Apply();
+            roundedSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f, 0,
+                                          SpriteMeshType.FullRect, new Vector4(r + 2, r + 2, r + 2, r + 2));
+            return roundedSprite;
+        }
+    }
+
+    // 角丸の UI 画像。radius は角の半径（UI の単位）
+    public static RectTransform UIRounded(string name, Transform parent, Color c, float radius)
+    {
+        var r = UIImage(name, parent, c, RoundedSprite);
+        r.GetComponent<Image>().pixelsPerUnitMultiplier = 62f / Mathf.Max(1f, radius);
+        return r;
+    }
+
     public static TextMeshProUGUI UIText(string name, Transform parent, TMP_FontAsset font, string text, float size, Color c)
     {
         var go = new GameObject(name, typeof(RectTransform));

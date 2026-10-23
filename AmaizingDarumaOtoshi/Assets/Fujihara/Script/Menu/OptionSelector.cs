@@ -21,6 +21,7 @@ public class OptionSelector : Selectable
     int index;
 
     public int Index => index;
+    public int Count => options.Length;
 
     protected override void Awake()
     {

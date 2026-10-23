@@ -300,15 +300,16 @@ public class MatchSelect : MonoBehaviour
         if (phaseFrame != Time.frameCount)
         {
             int n = modeCards.Length;
-            if (MenuInput.Left()) modeIndex = (modeIndex + n - 1) % n;
-            else if (MenuInput.Right()) modeIndex = (modeIndex + 1) % n;
+            if (MenuInput.Left()) { modeIndex = (modeIndex + n - 1) % n; MenuSounds.Cursor(); }
+            else if (MenuInput.Right()) { modeIndex = (modeIndex + 1) % n; MenuSounds.Cursor(); }
             else if (MenuInput.Submit() || MenuInput.Start())
             {
+                MenuSounds.Decide();
                 MatchSetup.Rules.mode = modeCards[modeIndex].mode;
                 GoToRuleSelect();
                 return;
             }
-            else if (MenuInput.Cancel()) { Back(); return; }
+            else if (MenuInput.Cancel()) { MenuSounds.Cancel(); Back(); return; }
         }
 
         // 選んでいるカードは色を付けて大きく
@@ -346,18 +347,20 @@ public class MatchSelect : MonoBehaviour
         var rules = MatchSetup.Rules;
         if (phaseFrame != Time.frameCount)
         {
-            if (MenuInput.Up()) ruleIndex = NextRuleRow(-1);
-            else if (MenuInput.Down()) ruleIndex = NextRuleRow(1);
-            else if (MenuInput.Start()) { GoToCharacterSelect(); return; }
-            else if (MenuInput.Cancel()) { GoToModeSelect(); return; }
+            if (MenuInput.Up()) { ruleIndex = NextRuleRow(-1); MenuSounds.Cursor(); }
+            else if (MenuInput.Down()) { ruleIndex = NextRuleRow(1); MenuSounds.Cursor(); }
+            else if (MenuInput.Start()) { MenuSounds.Decide(); GoToCharacterSelect(); return; }
+            else if (MenuInput.Cancel()) { MenuSounds.Cancel(); GoToModeSelect(); return; }
             else if (MenuInput.Submit())
             {
                 // A：次の項目へ進む（「キャラクターセレクトへ」の上で押したら決定）
-                if (ruleRows[ruleIndex].kind == RuleKind.Next) { GoToCharacterSelect(); return; }
+                if (ruleRows[ruleIndex].kind == RuleKind.Next) { MenuSounds.Decide(); GoToCharacterSelect(); return; }
                 ruleIndex = NextRuleRow(1);
+                MenuSounds.Cursor();
             }
             else if (MenuInput.Left() || MenuInput.Right())
             {
+                MenuSounds.Cursor();
                 // ←→：値を切り替える
                 int dir = MenuInput.Left() ? -1 : 1;
                 var row = ruleRows[ruleIndex];
@@ -478,8 +481,8 @@ public class MatchSelect : MonoBehaviour
         {
             if (FindPlayer(device) != null) continue;
             var s = Read(device);
-            if (s.a || s.start) Join(device);
-            else if (s.b && HumanCount() == 0) { GoToRuleSelect(); return; }
+            if (s.a || s.start) { MenuSounds.Decide(); Join(device); }
+            else if (s.b && HumanCount() == 0) { MenuSounds.Cancel(); GoToRuleSelect(); return; }
         }
 
         bool ready = AllChoseCharacter();
@@ -490,10 +493,11 @@ public class MatchSelect : MonoBehaviour
             var s = Read(p.device);
             MoveCursor(p, s, dt);
 
-            if (s.start && ready && p.holding == null) { GoToStageSelect(); return; }
+            if (s.start && ready && p.holding == null) { MenuSounds.Decide(); GoToStageSelect(); return; }
             if (s.a) PressA(p);
             else if (s.b)
             {
+                MenuSounds.Cancel();
                 if (p.holding != null) Release(p);
                 else if (p.HasCharacter) ClearCharacter(p);
                 else Remove(p);
@@ -518,7 +522,8 @@ public class MatchSelect : MonoBehaviour
 
         if (p.holding != null)
         {
-            if (tile != null) SetCharacter(p.holding, tile);
+            if (tile != null) { MenuSounds.Decide(); SetCharacter(p.holding, tile); }
+            else MenuSounds.Cancel();
             Release(p);
             return;
         }
@@ -530,18 +535,18 @@ public class MatchSelect : MonoBehaviour
             var cpu = slots[i];
             if (cpu != null && cpu.IsCpu && ui.levelRow.gameObject.activeSelf)
             {
-                if (Hit(ui.minus, p.cursor)) { cpu.cpuLevel = Mathf.Max(1, cpu.cpuLevel - 1); return; }
-                if (Hit(ui.plus, p.cursor)) { cpu.cpuLevel = Mathf.Min(9, cpu.cpuLevel + 1); return; }
+                if (Hit(ui.minus, p.cursor)) { cpu.cpuLevel = Mathf.Max(1, cpu.cpuLevel - 1); MenuSounds.Cursor(); return; }
+                if (Hit(ui.plus, p.cursor)) { cpu.cpuLevel = Mathf.Min(9, cpu.cpuLevel + 1); MenuSounds.Cursor(); return; }
             }
         }
 
         foreach (var cpu in slots)
         {
             if (cpu == null || !cpu.IsCpu || cpu.heldBy != null || !cpu.charToken.gameObject.activeSelf) continue;
-            if (Hit(cpu.charToken, p.cursor)) { Grab(p, cpu); return; }
+            if (Hit(cpu.charToken, p.cursor)) { MenuSounds.Decide(); Grab(p, cpu); return; }
         }
 
-        if (tile != null) SetCharacter(p, tile);
+        if (tile != null) { MenuSounds.Decide(); SetCharacter(p, tile); }
     }
 
     void Grab(Player p, Player cpu)
@@ -567,9 +572,10 @@ public class MatchSelect : MonoBehaviour
     void ToggleSlot(Player by, int i)
     {
         var p = slots[i];
-        if (p == null) { AddCpu(i, defaultCpuLevel); return; }
-        if (p.IsCpu) { Remove(p); return; }
-        if (p != by) { ShakeTypeButton(i); return; }
+        if (p == null) { MenuSounds.Decide(); AddCpu(i, defaultCpuLevel); return; }
+        if (p.IsCpu) { MenuSounds.Cancel(); Remove(p); return; }
+        if (p != by) { MenuSounds.Cancel(); ShakeTypeButton(i); return; }
+        MenuSounds.Decide();
 
         // 自分の枠を CPU にする（選んでいたキャラは引き継ぐ。もう一度 A / Start を押せば参加し直せる）
         var character = p.character;
@@ -781,6 +787,7 @@ public class MatchSelect : MonoBehaviour
             if (s.a) Vote(p);
             else if (s.b)
             {
+                MenuSounds.Cancel();
                 if (p.HasVote) Unvote(p);
                 else { BackToCharacterSelect(); return; }
             }
@@ -808,6 +815,7 @@ public class MatchSelect : MonoBehaviour
     {
         var tile = TileAt(stageTiles, p.cursor);
         if (tile == null) return;
+        MenuSounds.Decide();
         p.stage = tile.random ? null : tile.stage;
         p.randomStage = tile.random;
         PlaceToken(p, p.stageToken, tile);
@@ -898,6 +906,7 @@ public class MatchSelect : MonoBehaviour
         {
             int idx = s % n;
             frame.anchoredPosition = cards[idx].rect.anchoredPosition + new Vector2(0f, 20f);
+            MenuSounds.Cursor();
             float progress = s / (float)Mathf.Max(1, steps);
             float interval = Mathf.Lerp(0.06f, 0.5f, progress * progress * progress);
             for (float t = 0f; t < interval; t += Time.unscaledDeltaTime)
@@ -926,6 +935,7 @@ public class MatchSelect : MonoBehaviour
         }
 
         // 決定！
+        MenuSounds.Decide();
         var popText = ToyKit.UIText("Decided", lotteryRoot, font, "けってい！　" + won.displayName, 110f, ToyKit.Palette[0]);
         popText.fontSharedMaterial = popMat;
         ToyKit.Anchor(popText.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, -300f), new Vector2(1600f, 180f));
