@@ -308,12 +308,12 @@ namespace Nakagawa.EditorTools
             }
         }
 
-        // 本編のステージを先に、デバッグステージ(名前が DebugStage で始まる)を後に、それぞれ名前の順に並べる
+        // 本編のステージを先に、デバッグステージ(DebugStage01〜 / GimmickDebugStage01〜)を後に、それぞれ名前の順に並べる
         public static void SortStages(List<StageEntry> stages)
         {
             stages.Sort((a, b) =>
             {
-                bool da = a.name.StartsWith(StageBuilder.kDebugPrefix), db = b.name.StartsWith(StageBuilder.kDebugPrefix);
+                bool da = StageBuilder.IsDebugStage(a.name), db = StageBuilder.IsDebugStage(b.name);
                 if (da != db) return da ? 1 : -1;
                 return string.CompareOrdinal(a.name, b.name);
             });
@@ -463,6 +463,7 @@ namespace Nakagawa.EditorTools
                 StageWallSplitter.RemoveInvisible(stage.transform);
                 foreach (var wall in stage.GetComponentsInChildren<ReflectWall>(true))
                 {
+                    if (StageWallSplitter.IsMovingWall(wall)) continue;
                     Transform t = wall.transform;
                     Vector3 scale = t.localScale;
                     Vector3 pos = t.localPosition;
