@@ -73,6 +73,18 @@ namespace Nakahira
         [Tooltip("殴り合いの最中に、この距離(m)以内で相手の間合いの外にある積み木は拾う")]
         [Min(0.0f)] public float MeleePickupRadius = 1.5f;
 
+        [Header("殴る:焦り(集中度の割合が高いと、無意味に連打してしまう)")]
+        [Tooltip("集中度の割合がこれを超えると焦り始める(焦りは 0〜1。割合 1 で最大)")]
+        [Range(0.0f, 1.0f)] public float PanicStart = 0.4f;
+        [Tooltip("いちばん焦ったときの振る間隔(秒)の最大(連打)")]
+        [Min(0.0f)] public float PanicSwingInterval = 0.05f;
+        [Tooltip("いちばん焦ったとき、届かない距離でも振ってしまう余分な距離(m)")]
+        [Min(0.0f)] public float PanicReachSlack = 1.5f;
+        [Tooltip("いちばん焦ったとき、意味もなく跳ぶ回数(1秒あたり)")]
+        [Min(0.0f)] public float PanicJumpRate = 2.5f;
+        [Tooltip("いちばん焦ったとき、かわすジャンプの遅れに足される最大のずれ(秒)")]
+        [Min(0.0f)] public float PanicDodgeJitter = 0.2f;
+
         [Header("積む")]
         [Tooltip("積むのやりたさ(拾える積み木があるとき)")]
         [Range(0.0f, 1.0f)] public float CollectScore = 0.5f;
