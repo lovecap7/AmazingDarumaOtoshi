@@ -7,6 +7,7 @@ namespace Nakahira
     //  中身  :間合いまで近づいて振る(振る間隔をあける)/相手の振りはジャンプでかわして着地後すぐ反撃/
     //          回り込む(間合いの中で相手を右側に置くように横へ動きながら振る/振られたら跳びながら相手の背中側へ回る)/
     //          すぐそばの安全な積み木は拾う/逃げた相手は少しだけ追う
+    //  焦り  :集中度の割合が高いほど、ハンマーを連打する・届かない/当たらない時にも振る・意味もなく跳ぶ・かわすのが遅れる
     //  終わる:差が開いて不利になった・相手が離れた(MeleeChaseDistance・MeleeChaseTime)・相手が幽霊/復活待ち/無敵になった
     public class CpuMeleeState : CpuState
     {
@@ -49,8 +50,11 @@ namespace Nakahira
         float m_dodgeJumpTime = -1.0f;
         // かわしたあと、着地したらすぐ反撃する
         bool m_counterReady;
-        // 次の1回を、横へ動きながら振るか(振るたびに CircleChance で決め直す)
+        // 次の1回を、横へ動きながら振るか(振るたびに StrafeChance で決め直す)
         bool m_circling;
+        // 次の1回を、焦って雑に振るか(振るたびに焦りの強さで決め直す)
+        // 雑に振る番は、相手が跳んでいても・自分が跳んでいても・届かなくても・向きが合わなくても振ってしまう
+        bool m_sloppy;
         // かわすジャンプの最中に、相手の背中側へ回り込むか
         bool m_dodgeCircle;
 
@@ -110,16 +114,30 @@ namespace Nakahira
             m_chaseTime = dist > reach ? m_chaseTime + c.DeltaTime : 0.0f;
 
             UpdateDodge(c, o, ref cmd);
+
+            // 焦り:意味もなく跳んでしまう(疲れは足さない)
+            float panic = Panic(c);
+            if (!cmd.Jump && self.IsGrounded && Time.time - m_dodgeJumpTime >= kJustJumpedTime
+                && Random.value < panic * p.PanicJumpRate * c.DeltaTime)
+            {
+                cmd.Jump = true;
+                m_dodgeJumpTime = Time.time;
+            }
+
             // 跳んだ直後は、物理が進むまで接地のままに見えるので、少しの間は空中として扱う
             bool justJumped = Time.time - m_dodgeJumpTime < kJustJumpedTime;
             if (cmd.Jump || !self.IsGrounded || justJumped)
             {
+                // 雑に振る番なら、空中でも振ってしまう(空中で振っても当たらない)
+                if (m_sloppy) TrySwing(c, o, reach, false, ref cmd);
                 bool jump = cmd.Jump;
+                bool sweep = cmd.Sweep;
                 // かわしている最中:相手の背中側へ回り込む/すぐそばの安全な積み木の上に降りる/相手の方を向く
                 if (m_dodgeCircle && MoveToBack(c, o, range, ref cmd)) { }
                 else if (TryPickupNearby(c, o, ref cmd)) { }
                 else Face(c, o.Position, ref cmd);
                 cmd.Jump |= jump;
+                cmd.Sweep |= sweep;
                 return true;
             }
             m_dodgeCircle = false;
@@ -161,10 +179,18 @@ namespace Nakahira
         // 回り込む
         //========================================
 
-        // 次の1回を、横へ動きながら振るか決める
+        // 次の1回を、横へ動きながら振るか・焦って雑に振るか決める
         private void RollCircling(CpuContext c)
         {
             m_circling = Random.value < c.Params.StrafeChance;
+            m_sloppy = Random.value < Panic(c);
+        }
+
+        // 焦り(0〜1)。集中度の割合が PanicStart を超えると上がり始め、割合 1 で最大
+        private static float Panic(CpuContext c)
+        {
+            float start = c.Params.PanicStart;
+            return Mathf.Clamp01((c.LoadRatio - start) / Mathf.Max(0.01f, 1.0f - start));
         }
 
         // 相手の正面から見た自分の角度(度。相手の右が +、左が −。相手のハンマーは右から左へ振る)
@@ -277,23 +303,31 @@ namespace Nakahira
 
         private bool TrySwing(CpuContext c, CpuOpponent o, float reach, bool counter, ref DarumaCommand cmd)
         {
-            if (c.Self.Hammer.IsBusy || o.IsAirborne) return false;
+            CpuParams p = c.Params;
+            if (c.Self.Hammer.IsBusy) return false;
             if (!counter && Time.time < m_nextSwingTime) return false;
+            // 落ち着いていれば、相手が跳んでいる間(当たらない)は振らない。焦って雑に振る番なら振ってしまう
+            if (o.IsAirborne && !m_sloppy) return false;
 
-            // 相手の少し先の位置が、間合いの中・正面にあるか
+            // 相手の少し先の位置が、間合いの中・正面にあるか(雑に振る番は、届かなくても・向きが合わなくても振る)
             Vector3 predicted = o.Position + o.Velocity * kLeadTime;
             Vector3 to = predicted - c.Position;
             to.y = 0.0f;
-            if (to.magnitude > reach - 0.1f) return false;
+            float panic = Panic(c);
+            float reachLimit = reach - 0.1f + (m_sloppy ? panic * p.PanicReachSlack : 0.0f);
+            if (to.magnitude > reachLimit) return false;
             Vector3 forward = c.Self.transform.forward;
             forward.y = 0.0f;
-            if (Vector3.Angle(forward, to) > kSwingAngle) return false;
+            if (!m_sloppy && Vector3.Angle(forward, to) > kSwingAngle) return false;
 
             cmd.Sweep = true;
             m_lastSwingTime = Time.time;
             Face(c, predicted, ref cmd);
-            m_nextSwingTime = Time.time + c.Self.Hammer.SweepDuration + Random.Range(c.Params.SwingIntervalMin, c.Params.SwingIntervalMax);
-            // 次の1回を回り込むか決め直す
+            // 振る間隔:焦っているほど短く(連打)
+            float calm = Random.Range(p.SwingIntervalMin, p.SwingIntervalMax);
+            float mash = Random.Range(0.0f, p.PanicSwingInterval);
+            m_nextSwingTime = Time.time + c.Self.Hammer.SweepDuration + Mathf.Lerp(calm, mash, panic);
+            // 次の1回を回り込むか・雑に振るか決め直す
             RollCircling(c);
             return true;
         }
@@ -310,13 +344,15 @@ namespace Nakahira
                 // 疲れているほど(集中度の割合が高いほど)気づけない
                 if (inReach && c.Self.IsGrounded && Random.value < c.Params.DodgeChance * c.Alertness)
                 {
-                    m_dodgeTime = Time.time + c.Params.DodgeReaction;
+                    // 焦っているほど、跳ぶのが遅れる(間に合わないこともある)
+                    float jitter = Random.Range(0.0f, c.Params.PanicDodgeJitter) * Panic(c);
+                    m_dodgeTime = Time.time + c.Params.DodgeReaction + jitter;
                 }
             }
 
             if (m_dodgeTime < 0.0f || Time.time < m_dodgeTime) return;
-            // 間に合わなくなったら(相手が振り終わる頃)やめる
-            if (Time.time - m_targetSwingStart > kDodgeWindow + c.Params.DodgeReaction || !c.Self.IsGrounded)
+            // 相手が振り終わってからでは跳ばない(焦って遅れたジャンプは、かわせなくても跳ぶ)
+            if (Time.time - m_targetSwingStart > kDodgeWindow + c.Params.DodgeReaction + c.Params.PanicDodgeJitter || !c.Self.IsGrounded)
             {
                 m_dodgeTime = -1.0f;
                 return;
