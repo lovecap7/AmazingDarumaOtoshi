@@ -55,7 +55,17 @@ namespace Nakagawa
         int m_index = -1;
         bool m_switching;
 
-        public int CurrentIndex => m_index;
+        // ステージの切り替えを始める(前のステージの片付けの前)。ネット対戦などの拡張用
+        public event System.Action SwitchStarting;
+        // ステージを表示した(有効にしたステージの番号)。ネット対戦などの拡張用
+        public event System.Action<int> StageApplied;
+        public int StageCount => m_stages != null ? m_stages.Length : 0;
+
+        // 片付けやキャラクターの出し直しをせず、表示するステージだけを切り替える(ネット対戦のクライアント用)
+        public void ShowStage(int index) => ApplyStage(index);
+
+        
+public int CurrentIndex => m_index;
         public StageEntry Current => m_index >= 0 ? m_stages[m_index] : null;
         bool DebugEnabled => m_debugInConfiguredMatch || m_match == null || !m_match.IsConfigured;
 
@@ -116,6 +126,7 @@ namespace Nakagawa
         private IEnumerator SwitchRoutine(int index)
         {
             m_switching = true;
+            SwitchStarting?.Invoke();
 
             // 前のステージのキャラクター・幽霊・積み木を片付ける(破棄はフレームの終わりなので1フレーム待つ)
             if (m_match != null) m_match.ClearBodies();
@@ -170,6 +181,7 @@ namespace Nakagawa
             }
 
             Debug.Log($"[StageSwitcher] {stage.DisplayName} ({m_index + 1}/{m_stages.Length})");
+            StageApplied?.Invoke(m_index);
         }
 
         private int Wrap(int index)
