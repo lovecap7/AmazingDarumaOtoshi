@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Reflection;
 using UnityEditor;
 using UnityEngine;
@@ -48,10 +48,11 @@ public class MenuSoundsEditor : Editor
         Field("titleBgm", "T. タイトル", () => s.titleBgm);
         Field("menuBgm", "M. メニュー", () => s.menuBgm);
         Field("selectBgm", "S. セレクト", () => s.selectBgm);
+        Field("matchBgm", "G. 試合", () => s.matchBgm);
         serializedObject.ApplyModifiedProperties();
 
         EditorGUILayout.Space(10);
-        EditorGUILayout.LabelField("BGM の候補（▶ で試聴、T / M / S でその画面に入れる）", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("BGM の候補（▶ で試聴、T / M / S / G でその画面に入れる）", EditorStyles.boldLabel);
         for (int i = 0; i < s.bgmCandidates.Count; i++)
         {
             var clip = s.bgmCandidates[i];
@@ -60,11 +61,12 @@ public class MenuSoundsEditor : Editor
                 using (new EditorGUI.DisabledScope(clip == null))
                 {
                     if (GUILayout.Button("▶", GUILayout.Width(28))) Preview(clip);
-                    bool used = clip != null && (s.titleBgm == clip || s.menuBgm == clip || s.selectBgm == clip);
+                    bool used = clip != null && (s.titleBgm == clip || s.menuBgm == clip || s.selectBgm == clip || s.matchBgm == clip);
                     EditorGUILayout.LabelField(clip != null ? clip.name : "（空欄）", used ? EditorStyles.boldLabel : EditorStyles.label);
                     if (Slot("T", clip != null && s.titleBgm == clip)) Assign(s, ref s.titleBgm, clip);
                     if (Slot("M", clip != null && s.menuBgm == clip)) Assign(s, ref s.menuBgm, clip);
                     if (Slot("S", clip != null && s.selectBgm == clip)) Assign(s, ref s.selectBgm, clip);
+                    if (Slot("G", clip != null && s.matchBgm == clip)) Assign(s, ref s.matchBgm, clip);
                 }
             }
         }

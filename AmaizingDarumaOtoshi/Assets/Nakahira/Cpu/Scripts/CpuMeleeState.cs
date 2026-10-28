@@ -8,6 +8,8 @@ namespace Nakahira
     //          回り込む(間合いの中で相手を右側に置くように横へ動きながら振る/振られたら跳びながら相手の背中側へ回る)/
     //          すぐそばの安全な積み木は拾う/逃げた相手は少しだけ追う
     //  焦り  :集中度の割合が高いほど、ハンマーを連打する・届かない/当たらない時にも振る・意味もなく跳ぶ・かわすのが遅れる
+    //  首だけ:自分が 0 段(一撃でやられる)なら、相手が背を向けている(相手のハンマーが届かない角度にいる)ときだけ殴りに行く。
+    //          途中で振り向かれたら、相手の間合いの外まで離れてやめる
     //  終わる:差が開いて不利になった・相手が離れた(MeleeChaseDistance・MeleeChaseTime)・相手が幽霊/復活待ち/無敵になった
     public class CpuMeleeState : CpuState
     {
@@ -34,6 +36,10 @@ namespace Nakahira
         const float kStrafeRadialGain = 2.0f;
         // 横へ動く先に床があるか確かめる距離(m)
         const float kStrafeLookAhead = 0.8f;
+        // 自分が首だけのとき、振り向かれたら相手の間合いからこの距離(m)だけ外まで離れてからやめる
+        const float kExposedRetreatMargin = 1.0f;
+        // かわすジャンプで下がるときの移動入力の大きさ(少しだけ下がる。着地後すぐ反撃できる距離に残る)
+        const float kDodgeBackInput = 0.4f;
 
         readonly CpuPickupMotor m_pickup = new CpuPickupMotor();
         readonly CpuPathFollower m_route = new CpuPathFollower();
@@ -57,6 +63,9 @@ namespace Nakahira
         bool m_sloppy;
         // かわすジャンプの最中に、相手の背中側へ回り込むか
         bool m_dodgeCircle;
+        // 回り込まないときに、跳びながら動く向き(横へずれる・少し下がる。m_hasDodgeMove が false なら真上に跳ぶ)
+        bool m_hasDodgeMove;
+        Vector2 m_dodgeMove;
 
         public override string Name => "殴る";
         public MatchPlayer Target => m_target;
@@ -80,6 +89,7 @@ namespace Nakahira
             m_lastTargetSweeping = false;
             m_lastTargetStack = o != null ? o.StackCount : -1;
             m_dodgeCircle = false;
+            m_hasDodgeMove = false;
             RollCircling(c);
             m_pickup.Clear();
             m_route.Clear();
@@ -87,6 +97,13 @@ namespace Nakahira
 
         public override void Exit(CpuContext c)
         {
+            // 相手が間合いの外へ逃げて終わったなら覚えておく(撃つの「追い撃ち」で使う)
+            CpuOpponent o = m_target != null && c.Self != null ? c.Perception.Find(m_target) : null;
+            if (o != null && !o.IsGhost && o.FlatDistance > c.Self.Hammer.CharacterHitDistance)
+            {
+                c.FledTarget = m_target;
+                c.FledTime = Time.time;
+            }
             m_target = null;
             m_pickup.Clear();
             m_route.Clear();
@@ -96,6 +113,15 @@ namespace Nakahira
         {
             CpuOpponent o = m_target != null ? c.Perception.Find(m_target) : null;
             if (!CanContinue(c, o)) return false;
+
+            // 首だけなのに相手がこちらを向いている:うかつに打ち合わず、相手の間合いの外まで離れる
+            // (離れ切ったら CanContinue が false になって終わる。相手の振りはかわす)
+            if (IsExposed(c, o))
+            {
+                UpdateDodge(c, o, ref cmd);
+                Retreat(c, o, ref cmd);
+                return true;
+            }
 
             // 自分が相手を 1段 → 0段(首だけ)にした瞬間:あと一撃に夢中になる(集中度を足す)
             if (m_lastTargetStack >= 1 && o.StackCount == 0 && Time.time - m_lastSwingTime < kKnockAttributionTime)
@@ -135,12 +161,14 @@ namespace Nakahira
                 // かわしている最中:相手の背中側へ回り込む/すぐそばの安全な積み木の上に降りる/相手の方を向く
                 if (m_dodgeCircle && MoveToBack(c, o, range, ref cmd)) { }
                 else if (TryPickupNearby(c, o, ref cmd)) { }
+                else if (m_hasDodgeMove) cmd.Move = m_dodgeMove;
                 else Face(c, o.Position, ref cmd);
                 cmd.Jump |= jump;
                 cmd.Sweep |= sweep;
                 return true;
             }
             m_dodgeCircle = false;
+            m_hasDodgeMove = false;
 
             // 着地した:かわしたあとなら、空振りした相手にすぐ反撃する
             bool counter = m_counterReady;
@@ -186,12 +214,8 @@ namespace Nakahira
             m_sloppy = Random.value < Panic(c);
         }
 
-        // 焦り(0〜1)。集中度の割合が PanicStart を超えると上がり始め、割合 1 で最大
-        private static float Panic(CpuContext c)
-        {
-            float start = c.Params.PanicStart;
-            return Mathf.Clamp01((c.LoadRatio - start) / Mathf.Max(0.01f, 1.0f - start));
-        }
+        // 焦り(0〜1)。CpuContext.Panic と同じ
+        private static float Panic(CpuContext c) => c.Panic;
 
         // 相手の正面から見た自分の角度(度。相手の右が +、左が −。相手のハンマーは右から左へ振る)
         private static float BearingFromOpponent(CpuContext c, CpuOpponent o, out Vector3 forward)
@@ -277,6 +301,7 @@ namespace Nakahira
                 if (o.IsGhost || o.IsInvincible) continue;
                 if (o.PathDistance > c.Params.MeleeEnterDistance) continue;
                 if (o.StackDiff <= -c.Params.FleeStackGap) continue;
+                if (IsExposed(c, o)) continue;   // 首だけのときは、背を向けている相手だけ
                 float score = CpuAttackTarget.Score(c, o, o.PathDistance);
                 if (o.Player == m_target) score += c.Params.StateStickiness;
                 if (score > bestScore)
@@ -294,7 +319,47 @@ namespace Nakahira
             CpuParams p = c.Params;
             if (o.StackDiff <= -p.FleeStackGap) return false;                 // 不利になった(逃げる)
             if (o.PathDistance > p.MeleeChaseDistance) return false;          // 離れた
+            // 首だけで振り向かれた:相手の間合いの外まで離れたら終わる
+            if (IsExposed(c, o) && o.FlatDistance > o.SweepHitDistance + kExposedRetreatMargin) return false;
             return m_chaseTime <= p.MeleeChaseTime;                           // 追っても間合いに入れない
+        }
+
+        // 自分が首だけ(0 段。一撃でやられる)で、相手がこちらを向いている(相手のハンマーが届く角度にいる)
+        private static bool IsExposed(CpuContext c, CpuOpponent o)
+        {
+            return c.StackCount == 0 && !IsBehind(c, o);
+        }
+
+        // 自分が相手の背中側(相手の薙ぎ払いが届かない角度)にいるか
+        // ハンマーは正面から右 SweepStartYaw → 左 SweepEndYaw まで振る。自分の体の太さの分だけ広めに見る
+        private static bool IsBehind(CpuContext c, CpuOpponent o)
+        {
+            float bearing = BearingFromOpponent(c, o, out _);
+            DarumaHammer hammer = o.Character.Hammer;
+            float dist = Mathf.Max(o.FlatDistance, 0.01f);
+            float margin = Mathf.Atan2(DarumaCharacter.kBodyRadius, dist) * Mathf.Rad2Deg;
+            float right = Mathf.Max(hammer.SweepStartYaw, hammer.SweepEndYaw) + margin;
+            float left = Mathf.Min(hammer.SweepStartYaw, hammer.SweepEndYaw) - margin;
+            return bearing > right || bearing < left;
+        }
+
+        // 相手から離れる(後ろに床がなければ横へ)
+        private static void Retreat(CpuContext c, CpuOpponent o, ref DarumaCommand cmd)
+        {
+            Vector3 away = c.Position - o.Position;
+            away.y = 0.0f;
+            if (away.sqrMagnitude < 0.0001f) away = -c.Self.transform.forward;
+            away.Normalize();
+            Vector3 side = Vector3.Cross(Vector3.up, away);
+            Vector3[] dirs = { away, (away + side).normalized, (away - side).normalized, side, -side };
+            foreach (var dir in dirs)
+            {
+                if (!CpuSensor.HasGround(c.Position + dir * kStrafeLookAhead, c.Params.GroundProbeDepth)) continue;
+                bool jump = cmd.Jump;
+                cmd.Move = new Vector2(dir.x, dir.z);
+                cmd.Jump = jump;
+                return;
+            }
         }
 
         //========================================
@@ -362,8 +427,23 @@ namespace Nakahira
             m_dodgeJumpTime = Time.time;
             m_counterReady = true;
             c.AddLoad(c.Params.AttentionOnDodge);
-            // 跳びながら相手の背中側へ回り込むか
+            // 跳びながら相手の背中側へ回り込むか。回り込まないなら、跳びながら横へずれる・少し下がることもある
             m_dodgeCircle = Random.value < c.Params.CircleChance;
+            m_hasDodgeMove = !m_dodgeCircle && CpuDodgeMove.Roll(c) && PickDodgeMove(c, o, out m_dodgeMove);
+            if (m_hasDodgeMove) cmd.Move = m_dodgeMove;
+        }
+
+        // かわすジャンプで動く向き:相手の横へずれる(左右はその都度選ぶ)か、少し下がる。どちらを先に試すかもその都度選ぶ
+        private static bool PickDodgeMove(CpuContext c, CpuOpponent o, out Vector2 move)
+        {
+            Vector3 away = c.Position - o.Position;
+            away.y = 0.0f;
+            if (away.sqrMagnitude < 0.0001f) away = -c.Self.transform.forward;
+            Vector3 side = Vector3.Cross(Vector3.up, away) * (Random.value < 0.5f ? 1.0f : -1.0f);
+            Vector2 sideMove = CpuDodgeMove.ToMove(side, 1.0f);
+            Vector2 backMove = CpuDodgeMove.ToMove(away, kDodgeBackInput);
+            if (Random.value < 0.5f) return CpuDodgeMove.TryPick(c, out move, sideMove, -sideMove, backMove);
+            return CpuDodgeMove.TryPick(c, out move, backMove, sideMove, -sideMove);
         }
 
         //========================================

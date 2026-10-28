@@ -59,6 +59,8 @@ public partial class TitleScreen : MonoBehaviour
     const float LetterboxHeight = 90f;
     const float DefaultAperture = 2.8f;
     const float FlyTime = 0.8f;
+    const float IncomingTime = 0.55f;       // ロゴの組み上げ：1個が右の外から収まるまで
+    const float IncomingInterval = 0.14f;   // ロゴの組み上げ：次の1個が飛び出すまで
     const float HangTime = 0.05f;       // 叩き出した後、上の山が宙に残る時間
     const float DropTime = 0.1f;        // 1段落ちる時間
     const float FinalHang = 0.55f;      // 最後の1個を抜いた後、顔が宙に残る時間
@@ -78,6 +80,7 @@ public partial class TitleScreen : MonoBehaviour
     float[] flyStart, landTime, stackYaw;
     Vector3[] flyFrom, tumbleAxis;
     int knocked;
+    bool incoming;      // ロゴの組み上げ中（右の外から飛んでくる）
     float dropStart = -100f;
     float pulseStart = -100f;
 
@@ -159,7 +162,8 @@ public partial class TitleScreen : MonoBehaviour
     void OnDestroy() => Time.timeScale = 1f;
 
     // ---- 前に流すもの（オープニングムービーなど）を待つ ----
-    bool held, skipAfterHold;
+    bool held, skipAfterHold, assembleAfterHold;
+    float assembleDelay;
 
     // Start より前（Awake）に呼ぶと、Release されるまで演出を始めない（入力も受け付けない）
     public void Hold() => held = true;
@@ -171,6 +175,14 @@ public partial class TitleScreen : MonoBehaviour
         skipAfterHold = skipToEnd;
     }
 
+    // だるま落としの演出は飛ばし、ロゴの積み木が右から1個ずつ飛んできて組み上がるところから始める（delay 秒後に1個目）
+    public void ReleaseAssemble(float delay)
+    {
+        held = false;
+        assembleAfterHold = true;
+        assembleDelay = delay;
+    }
+
     // ================= 演出の台本 =================
     IEnumerator Cinematic()
     {
@@ -178,6 +190,11 @@ public partial class TitleScreen : MonoBehaviour
         if (skipAfterHold)
         {
             SkipToEnd();
+            yield break;
+        }
+        if (assembleAfterHold)
+        {
+            yield return AssembleLogo(assembleDelay);
             yield break;
         }
         phase = Phase.Cinematic;
@@ -337,6 +354,7 @@ public partial class TitleScreen : MonoBehaviour
     {
         StopAllCoroutines();
         slowRoutine = null;
+        incoming = false;
         Time.timeScale = 1f;
         speedTarget = 0f;
         swinging = false;
@@ -363,6 +381,50 @@ public partial class TitleScreen : MonoBehaviour
         skipFrame = Time.frameCount;
 
         Cut(Line(finalCamPos, finalCamPos, finalLook, finalLook, finalFov, finalFov, 0.01f));
+        EnterReady();
+    }
+
+    // ロゴの積み木が画面の右の外から1個ずつ（読む順に）飛んできて、ロゴの位置へピタッと収まる。顔は最初から床でニコッ
+    IEnumerator AssembleLogo(float delay)
+    {
+        phase = Phase.Cinematic;
+        int n = blocks.Length;
+        knocked = n;
+        dropStart = headDropStart = headLandTime = headSquashStart = headHopStart = -100f;
+        headLanded = true;
+        var dir = new Vector3(0f, HeadR, 0f) - finalCamPos; dir.y = 0f;
+        headRot = Quaternion.LookRotation(dir);
+        SetHappy(true);
+        fade.color = new Color(1f, 1f, 1f, 0f);
+        subtitle.alpha = 0f;
+        SetLetterbox(0f);
+        Cut(Line(finalCamPos, finalCamPos, finalLook, finalLook, finalFov, finalFov, 0.01f));
+
+        incoming = true;
+        for (int i = 0; i < n; i++)
+        {
+            state[i] = LetterState.Flying;
+            flyStart[i] = sim + delay + i * IncomingInterval;
+            flyFrom[i] = Slot(i) + new Vector3(16f, 0.8f, -1f);
+        }
+        while (state[n - 1] != LetterState.Landed) yield return null;
+        incoming = false;
+
+        // 揃ったらロゴ全体が弾んで紙吹雪、サブタイトル
+        yield return Sim(0.15f);
+        pulseStart = sim;
+        Emit(confetti, new Vector3(logoX, 8.5f, logoZ - 1f), Quaternion.Euler(90f, 0f, 0f), 160);
+        bloomPulse = Mathf.Max(bloomPulse, 0.3f);
+        shake = Mathf.Max(shake, 0.35f);
+        for (float t = 0f; t < 0.8f; t += Time.unscaledDeltaTime)
+        {
+            subtitle.alpha = Mathf.Clamp01(t / 0.6f);
+            yield return null;
+        }
+        subtitle.alpha = 1f;
+
+        ShowButtons();
+        while (!AllButtonsLanded()) yield return null;
         EnterReady();
     }
 
@@ -427,8 +489,8 @@ public partial class TitleScreen : MonoBehaviour
         {
             selected = index;
             selectedTime = sim;
-            // はじめる＝積み木を飛ばしたときの音、おわる＝決定の音
-            if (index == 0) MenuSounds.Play(MatchSounds.Instance.Knock);
+            // はじめる＝撃墜の音、おわる＝決定の音
+            if (index == 0) MenuSounds.Play(MatchSounds.Instance.KO);
             else MenuSounds.Decide();
             SlowMo(0.15f, 0.12f);
             var contact = ButtonContact(index);
@@ -495,15 +557,21 @@ public partial class TitleScreen : MonoBehaviour
 
                 case LetterState.Flying:
                 {
-                    float t = Mathf.Clamp01((sim - flyStart[i]) / FlyTime);
+                    float t = Mathf.Clamp01((sim - flyStart[i]) / (incoming ? IncomingTime : FlyTime));
                     float u = 1f - Mathf.Pow(1f - t, 2.2f);   // 叩かれた直後が一番速い
                     Vector3 p0 = flyFrom[i], p3 = Slot(i);
                     Vector3 p1 = p0 + new Vector3(3.4f, 1.2f, -1.8f);   // 右へ飛び出し、塔の手前を回り込む
                     Vector3 p2 = p3 + new Vector3(0f, 2.0f, -2.4f);
+                    if (incoming)
+                    {
+                        // 右の外から、少し弧を描いて飛んでくる
+                        p1 = p0 + new Vector3(-6f, 1.2f, 0f);
+                        p2 = p3 + new Vector3(2.2f, 0.9f, -0.6f);
+                    }
                     b.t.position = Bezier(p0, p1, p2, p3, u);
                     b.t.rotation = Quaternion.Slerp(Quaternion.Euler(0f, stackYaw[i], 0f), Quaternion.identity, Mathf.SmoothStep(0f, 1f, u))
                                    * Quaternion.AngleAxis(720f * (1f - u) * (1f - u), tumbleAxis[i]);
-                    b.t.localScale = Vector3.one * Mathf.Lerp(stackScale, logoScale, u);
+                    b.t.localScale = Vector3.one * (incoming ? logoScale : Mathf.Lerp(stackScale, logoScale, u));
                     if (t >= 1f)
                     {
                         // ピタッ
@@ -512,6 +580,7 @@ public partial class TitleScreen : MonoBehaviour
                         b.flash = 2.2f;
                         Emit(sparkle, p3 + new Vector3(0f, 0f, -0.8f), Quaternion.Euler(0f, 180f, 0f), 10);
                         shake = Mathf.Max(shake, 0.12f);
+                        if (incoming) MenuSounds.Play(MatchSounds.Instance.HitBlock, 0.6f);
                     }
                     break;
                 }

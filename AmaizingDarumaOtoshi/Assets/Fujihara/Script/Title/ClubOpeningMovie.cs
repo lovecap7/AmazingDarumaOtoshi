@@ -239,7 +239,6 @@ public partial class ClubOpeningMovie : MonoBehaviour
         var toChamp = Flat(champ.Pos - hero.Pos).normalized;
         SetShot(lt => champ.Head + side * (2.4f - lt * 0.8f) + toChamp * 0.9f + Vector3.up * 0.3f, lt => champ.Head - toChamp * 0.7f, 50f);
         StartCoroutine(SlowMo(0.12f, 10f));
-        MenuSounds.Play(MatchSounds.Instance.Swing);
         bool white = false;
         // 振り終わりで、ハンマーの頭が王者の顔の真横（ほぼ触れるところ）にぴたりと来るように、踏み込みの距離と振りの角度を決める
         //   ・横向き：yaw -28 で、頭が2人を結ぶ線の上に来る（GHammerClash と同じ）
@@ -281,7 +280,6 @@ public partial class ClubOpeningMovie : MonoBehaviour
 
     IEnumerator Finish(bool skipped, CoroutineHost host)
     {
-        MenuSounds.Play(MatchSounds.Instance.KO);
         yield return FadeFlash(Color.white, flash.color.a, 1f, skipped ? 0.2f : 1.0f);
         yield return new WaitForSecondsRealtime(0.25f);
 
@@ -296,7 +294,7 @@ public partial class ClubOpeningMovie : MonoBehaviour
         flyers.Clear();
         foreach (var s in snaps) s.Release();
         snaps.Clear();
-        if (title != null) title.Release(true);   // だるま落としの演出は飛ばして、完成形から
+        if (title != null) title.ReleaseAssemble(0.8f);   // だるま落としの演出は飛ばし、白が明けるころにロゴが右から1個ずつ飛んでくる
 
         // 真っ白から、タイトル画面へ
         for (float t = 0f; t < 1.2f; t += Time.unscaledDeltaTime)
@@ -655,7 +653,6 @@ public partial class ClubOpeningMovie : MonoBehaviour
         var back = Quaternion.Euler(-15f, 130f, 0f);
         var follow = Quaternion.Euler(10f, -70f, 0f);
         yield return Tween(windup, u => m.pivot.localRotation = Quaternion.Slerp(idle, back, Mathf.SmoothStep(0f, 1f, u)));
-        MenuSounds.Play(MatchSounds.Instance.Swing);
         bool hit = false;
         yield return Tween(strike, u =>
         {
@@ -684,7 +681,6 @@ public partial class ClubOpeningMovie : MonoBehaviour
         m.blocks.RemoveAt(index);
         b.SetParent(setRoot, true);
         flyers.Add(new Flyer { t = b, v = dir.normalized * 9f * m.s + Vector3.up * 2f, spin = Random.onUnitSphere * 720f, life = 3f });
-        MenuSounds.Play(MatchSounds.Instance.HitBlock);
         camShake = Mathf.Max(camShake, 0.8f);
     }
 
@@ -1004,7 +1000,6 @@ public partial class ClubOpeningMovie : MonoBehaviour
         {
             yield return Tween(0.25f, u => { });
             spots[i].intensity = 60f;
-            MenuSounds.Play(MatchSounds.Instance.BlockHitBlock);
         }
     }
 

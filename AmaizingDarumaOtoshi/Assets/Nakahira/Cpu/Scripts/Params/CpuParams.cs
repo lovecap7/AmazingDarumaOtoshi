@@ -68,6 +68,8 @@ namespace Nakahira
         [Min(0.0f)] public float DodgeReaction = 0.05f;
         [Tooltip("かわすジャンプの最中に、相手のハンマーの届かない背中側へ回り込む確率")]
         [Range(0.0f, 1.0f)] public float CircleChance = 0.6f;
+        [Tooltip("ジャンプでかわすときに、跳びながら動く確率(外れたら真上に跳ぶ)。殴り合いで回り込まないとき(横へずれる・少し下がる)と、弾のジャンプ避け(進路から横へずれる)で使う")]
+        [Range(0.0f, 1.0f)] public float DodgeMoveChance = 0.8f;
         [Tooltip("振る間隔を待つあいだ、相手を右側に置くように横へ動き続ける確率(振るたびに決める)")]
         [Range(0.0f, 1.0f)] public float StrafeChance = 0.6f;
         [Tooltip("殴り合いの最中に、この距離(m)以内で相手の間合いの外にある積み木は拾う")]
@@ -84,6 +86,77 @@ namespace Nakahira
         [Min(0.0f)] public float PanicJumpRate = 2.5f;
         [Tooltip("いちばん焦ったとき、かわすジャンプの遅れに足される最大のずれ(秒)")]
         [Min(0.0f)] public float PanicDodgeJitter = 0.2f;
+
+        [Header("攻めに行く・待つ(盤面に拾える積み木がない・積み終わったとき)")]
+        [Tooltip("攻めに行く(有利な相手へ近づく)のやりたさ。待つより高く、殴る・撃つ・逃げるより低く")]
+        [Range(0.0f, 1.0f)] public float ApproachScore = 0.45f;
+        [Tooltip("待つ(積み木の供給を待つ)のやりたさ。積み木がないときの積む(0.05 + StateStickiness)より高く、攻めに行くより低く")]
+        [Range(0.0f, 1.0f)] public float WaitScore = 0.3f;
+        [Tooltip("待つ場所を選ぶとき、この距離(m)以内の相手を数える(近いほど重い)")]
+        [Min(0.1f)] public float WaitDangerRadius = 10.0f;
+        [Tooltip("待つ場所を選ぶときの相手の重み:幽霊")]
+        [Min(0.0f)] public float WaitGhostWeight = 1.5f;
+        [Tooltip("待つ場所を選ぶときの相手の重み:自分より段数が多い(自分を倒せる)相手")]
+        [Min(0.0f)] public float WaitStrongerWeight = 1.0f;
+        [Tooltip("待つ場所を選ぶときの相手の重み:自分と同じ段数の相手")]
+        [Min(0.0f)] public float WaitEqualWeight = 0.6f;
+        [Tooltip("待つ場所を選ぶときの相手の重み:自分より段数が少ない相手")]
+        [Min(0.0f)] public float WaitWeakerWeight = 0.3f;
+        [Tooltip("供給エリアの縁から 1m 離れるごとの減点(供給の近くで待つように)")]
+        [Min(0.0f)] public float WaitSupplyCost = 0.05f;
+        [Tooltip("待つ場所までの道 1m ごとの減点(遠すぎる場所へ行かないように)")]
+        [Min(0.0f)] public float WaitTravelCost = 0.02f;
+        [Tooltip("待つ場所までの道が供給エリアの中を通るときの減点(通っている間はそのエリアの供給が止まる)")]
+        [Min(0.0f)] public float WaitCrossAreaCost = 0.3f;
+        [Tooltip("今の待つ場所よりこれだけ点数が良い場所があるときだけ移る(迷わないように)")]
+        [Min(0.0f)] public float WaitSwitchMargin = 0.15f;
+        [Tooltip("待つ場所に着いたあと、うろうろする範囲の半径(m)")]
+        [Min(0.0f)] public float WaitWanderRadius = 1.5f;
+        [Tooltip("うろうろしてから次にうろうろするまでの間隔(秒)の最小・最大")]
+        [Min(0.0f)] public float WaitWanderIntervalMin = 1.0f;
+        [Min(0.0f)] public float WaitWanderIntervalMax = 2.5f;
+        [Tooltip("うろうろするときの移動入力の大きさ(ゆっくり歩く)")]
+        [Range(0.05f, 1.0f)] public float WaitWanderInput = 0.4f;
+
+        [Header("撃つ(股抜きショット。撃つと自分が 1 段減る)")]
+        [Tooltip("撃つのやりたさ(殴るより低く、積む + StateStickiness より高く。遠くにしか積み木がないとき、積むから移れるように)")]
+        [Range(0.0f, 1.0f)] public float ShotScore = 0.62f;
+        [Tooltip("集中度の割合がこれより高いと、撃つへは移れない")]
+        [Min(0.0f)] public float ShotThreshold = 0.8f;
+        [Tooltip("残しておきたい段数(序盤の HP)。これより多いときだけ撃つ(熱中していると無視する)")]
+        [Min(0)] public int ShotReserve = 4;
+        [Tooltip("身の回り:この距離(m)以内に拾える積み木があるうちは、撃たずに積む")]
+        [Min(0.0f)] public float ShotNearbyRadius = 5.0f;
+        [Tooltip("この距離(m)以内の相手を撃つ(殴る間合いより遠い相手)")]
+        [Min(0.0f)] public float ShotRange = 8.0f;
+        [Tooltip("撃ったあと、次に撃つまでの間(秒)の最小・最大")]
+        [Min(0.0f)] public float ShotIntervalMin = 0.6f;
+        [Min(0.0f)] public float ShotIntervalMax = 1.2f;
+        [Tooltip("狙いのぶれ(度。この範囲でずれる)。強いほど小さい")]
+        [Min(0.0f)] public float ShotAimError = 3.0f;
+        [Tooltip("ついでに弾く:落ちている積み木を弾けば相手に当たるとき、弾く確率(積み木ごとに決める)")]
+        [Range(0.0f, 1.0f)] public float FlickChance = 0.8f;
+        [Tooltip("ついでに弾く:弾いた積み木が飛ぶ線から、相手(の予想位置)がこの距離(m)以内なら当たるとみなす")]
+        [Min(0.0f)] public float FlickAimWidth = 0.8f;
+        [Tooltip("撃った・弾いたときに足す集中度")]
+        [Min(0.0f)] public float AttentionOnShot = 0.05f;
+        [Tooltip("熱中する確率(撃ち始めるたびに 確率 × 焦り で決める)。熱中すると残しておきたい段数を無視して撃ち続ける")]
+        [Range(0.0f, 1.0f)] public float OverheatChance = 0.6f;
+        [Tooltip("熱中しているときの、次に撃つまでの間(秒)")]
+        [Min(0.0f)] public float OverheatShotInterval = 0.3f;
+        [Tooltip("追い撃ち:殴り合いの相手が逃げてから、この時間(秒)のあいだは近い距離からでも撃つ")]
+        [Min(0.0f)] public float PursuitWindow = 3.0f;
+        [Tooltip("追い撃ちで撃つ最短の距離(m)")]
+        [Min(0.0f)] public float PursuitMinDistance = 3.0f;
+        [Tooltip("乱反射遊び:歩く道の長さがこれ(m)以上の積み木は、拾いに行くには遠すぎるとみなす(道がない積み木も)")]
+        [Min(0.0f)] public float ScatterMinPathLength = 15.0f;
+        [Tooltip("乱反射遊び:拾いに行くには遠すぎる積み木の固まりへ撃ち込む確率(1秒あたり)")]
+        [Range(0.0f, 1.0f)] public float ScatterChancePerSecond = 0.1f;
+        [Tooltip("乱反射遊びで撃つ最大の距離(m)")]
+        [Min(0.0f)] public float ScatterRange = 12.0f;
+        [Tooltip("この半径(m)に ScatterClusterCount 個以上あれば、積み木の固まりとみなす")]
+        [Min(0.0f)] public float ScatterClusterRadius = 2.0f;
+        [Min(1)] public int ScatterClusterCount = 3;
 
         [Header("積む")]
         [Tooltip("積むのやりたさ(拾える積み木があるとき)")]
@@ -126,6 +199,20 @@ namespace Nakahira
         [Range(0.0f, 1.0f)] public float GhostThreatUrgency = 0.95f;
         [Tooltip("逃げながら拾う積み木は、自分が追っ手よりこの距離(m)以上早く着けるものだけ")]
         [Min(0.0f)] public float FleeSafetyMargin = 1.0f;
+
+        [Header("とっさの反応(飛んでくる弾。確率はどれも 余裕(1 − 集中度の割合) を掛けて使う)")]
+        [Tooltip("弾に気づいて反応する確率")]
+        [Range(0.0f, 1.0f)] public float ReactChance = 1.0f;
+        [Tooltip("ジャンプ乗り(落ちてくる途中で弾に触れて積む。一番難しい)を選ぶ確率")]
+        [Range(0.0f, 1.0f)] public float CatchChance = 0.7f;
+        [Tooltip("打ち返しを選ぶ確率(ジャンプ乗りを選ばなかったとき)")]
+        [Range(0.0f, 1.0f)] public float ReturnChance = 0.8f;
+        [Tooltip("弾に気づいてから動けるまでの遅れ(秒)")]
+        [Min(0.0f)] public float ReflexReaction = 0.05f;
+        [Tooltip("跳ぶ・振るタイミングのずれ(秒。この範囲でばらつく)")]
+        [Min(0.0f)] public float ReflexTimingError = 0.01f;
+        [Tooltip("この時間(秒)先までに当たる弾に反応する")]
+        [Min(0.1f)] public float ReflexHorizon = 1.0f;
 
         [Header("積む:ジャンプ")]
         [Tooltip("ジャンプする距離の誤差(割合)。大きいほど跳ぶのが早すぎたり遅すぎたりする")]

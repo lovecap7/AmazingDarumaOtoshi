@@ -35,7 +35,7 @@ namespace Nakahira
         {
             if (c.StackCount >= c.Params.CollectUntil) return 0.0f;
             // 拾える積み木がなくても、ほかにやることがなければ積む(待つ)
-            return HasAnyCollectable() ? c.Params.CollectScore : c.Params.CollectScore * 0.1f;
+            return CpuBlockSearch.HasAnyCollectable() ? c.Params.CollectScore : c.Params.CollectScore * 0.1f;
         }
 
         public override void Enter(CpuContext c)
@@ -151,15 +151,6 @@ namespace Nakahira
             Vector3 bp = block.transform.position;
             if (CpuBlockSearch.ShouldYield(m_context, bp)) return float.PositiveInfinity;
             return CpuBlockSearch.GhostCost(m_context, bp);
-        }
-
-        private static bool HasAnyCollectable()
-        {
-            foreach (var block in TumikiBlock.All)
-            {
-                if (CpuBlockSearch.IsCollectable(block)) return true;
-            }
-            return false;
         }
 
         public override void DrawGizmos(CpuContext c)

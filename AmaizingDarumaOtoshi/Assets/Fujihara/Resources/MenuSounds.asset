@@ -18,5 +18,12 @@ MonoBehaviour:
   candidates: []
   titleBgm: {fileID: 0}
   menuBgm: {fileID: 0}
-  selectBgm: {fileID: 0}
-  bgmCandidates: []
+  selectBgm: {fileID: 8300000, guid: 92737cad00720604c91c97df3edb4e0d, type: 3}
+  matchBgm: {fileID: 0}
+  bgmCandidates:
+  - {fileID: 8300000, guid: 7505648df79a58f438edd01ab7a82436, type: 3}
+  - {fileID: 8300000, guid: fffbb1c199fa60644b39aa171062f619, type: 3}
+  - {fileID: 8300000, guid: 3404fa33c85391848962255484b127ea, type: 3}
+  - {fileID: 8300000, guid: adad8c5dd64a53a418027f3c46c7cad5, type: 3}
+  - {fileID: 8300000, guid: 018d66cb499212f40b1ffb0a59911180, type: 3}
+  - {fileID: 8300000, guid: 63e19ed6f2396984d86cc47a5b5b1cd0, type: 3}

@@ -17,3 +17,12 @@ MonoBehaviour:
   color: {r: 0.42, g: 0.75, b: 0.27, a: 1}
   portrait: {fileID: 0}
   prefab: {fileID: 0}
+  passiveColor: 2
+  passiveCount: 2
+  passiveName: "\u3059\u3070\u3084\u3055UP"
+  passiveText: "\u7DD1\u306E\u7A4D\u307F\u6728\u30922\u500B\u7A4D\u3080\u3068\u3001\u6B69\u304F\u306E\u304C\u901F\u304F\u306A\u308B"
+  hammerPower: 2
+  hammerSpeed: 5
+  hammerReach: 3
+  specialName: "\u3078\u3073\u306B\u3089\u307F"
+  specialText: "\u524D\u306B\u3044\u308B\u76F8\u624B\u3092\u3001\u5C11\u3057\u306E\u3042\u3044\u3060\u52D5\u3051\u306A\u304F\u3059\u308B"

@@ -39,8 +39,49 @@ MonoBehaviour:
   DodgeChance: 0.8
   DodgeReaction: 0.05
   CircleChance: 0.6
+  DodgeMoveChance: 0.8
   StrafeChance: 0.6
   MeleePickupRadius: 1.5
+  PanicStart: 0.4
+  PanicSwingInterval: 0.05
+  PanicReachSlack: 1.5
+  PanicJumpRate: 2.5
+  PanicDodgeJitter: 0.2
+  ApproachScore: 0.45
+  WaitScore: 0.3
+  WaitDangerRadius: 10
+  WaitGhostWeight: 1.5
+  WaitStrongerWeight: 1
+  WaitEqualWeight: 0.6
+  WaitWeakerWeight: 0.3
+  WaitSupplyCost: 0.05
+  WaitTravelCost: 0.02
+  WaitCrossAreaCost: 0.3
+  WaitSwitchMargin: 0.15
+  WaitWanderRadius: 1.5
+  WaitWanderIntervalMin: 1
+  WaitWanderIntervalMax: 2.5
+  WaitWanderInput: 0.4
+  ShotScore: 0.62
+  ShotThreshold: 0.8
+  ShotReserve: 4
+  ShotNearbyRadius: 5
+  ShotRange: 8
+  ShotIntervalMin: 0.6
+  ShotIntervalMax: 1.2
+  ShotAimError: 3
+  FlickChance: 0.8
+  FlickAimWidth: 0.8
+  AttentionOnShot: 0.05
+  OverheatChance: 0.6
+  OverheatShotInterval: 0.3
+  PursuitWindow: 3
+  PursuitMinDistance: 3
+  ScatterMinPathLength: 15
+  ScatterChancePerSecond: 0.1
+  ScatterRange: 12
+  ScatterClusterRadius: 2
+  ScatterClusterCount: 3
   CollectScore: 0.5
   CollectUntil: 10
   SearchRadius: 25
@@ -59,6 +100,12 @@ MonoBehaviour:
   StackThreatUrgency: 0.8
   GhostThreatUrgency: 0.95
   FleeSafetyMargin: 1
+  ReactChance: 1
+  CatchChance: 0.7
+  ReturnChance: 0.8
+  ReflexReaction: 0.05
+  ReflexTimingError: 0.01
+  ReflexHorizon: 1
   JumpDistanceError: 0.1
   AimError: 0.1
   RepathInterval: 0.3

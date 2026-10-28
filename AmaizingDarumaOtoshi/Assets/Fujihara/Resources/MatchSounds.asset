@@ -16,4 +16,12 @@ MonoBehaviour:
   hitBlock: {fileID: 8300000, guid: 76548ba859b11a8469b62ef0991a0e84, type: 3}
   knock: {fileID: 8300000, guid: 134f23bee96e81a4691d5da8fde41ceb, type: 3}
   ko: {fileID: 8300000, guid: 23b67cafc04fffa4e942af16e6a9e643, type: 3}
+  returnHits:
+  - {fileID: 8300000, guid: 1dbc0d73c5fcdd74a9d1240658c9b9ae, type: 3}
+  - {fileID: 8300000, guid: 4022c7287fa08b44788212eed2c75cb5, type: 3}
+  - {fileID: 8300000, guid: ade99bb16f7888d4c84435eb07cb2596, type: 3}
+  - {fileID: 8300000, guid: ef34aa35a1137104eab980d2227d72d4, type: 3}
+  - {fileID: 8300000, guid: 2ddd9c547e9dbb34b93b99409251826d, type: 3}
+  returnPitchStep: 1
+  returnPitchMax: 12
   candidates: []
