@@ -19,8 +19,12 @@ public class MatchSounds : ScriptableObject
     [Tooltip("首を飛ばして撃墜したとき（空欄なら仮の音）")]
     public AudioClip ko;
 
-    [Tooltip("打ち返したときの音。打ち返し1回目は①、それを打ち返すと②、③、④、5回目からはずっと最後の音。空欄なら「積み木に当たった音」を高くして鳴らす")]
+    [Tooltip("打ち返したときの音。打ち返し1回目は①、それを打ち返すと②、③…と上がり、段数を超えたらずっと最後の音。空欄なら「積み木に当たった音」を高くして鳴らす")]
     public AudioClip[] returnHits = new AudioClip[4];
+    [Tooltip("最後の段を超えた打ち返しで、1回ごとに上げる音の高さ（半音）。0 なら上げない")]
+    [Range(0f, 3f)] public float returnPitchStep = 1f;
+    [Tooltip("最後の段から、どこまで高くするか（半音。12 で1オクターブ上）")]
+    [Range(0f, 24f)] public float returnPitchMax = 12f;
 
     [Tooltip("聞き比べ用の候補の音。Inspector の「候補の音」で ▶ 試聴し、1〜4 のボタンでその場面に入れる（試合では鳴らない）")]
     public System.Collections.Generic.List<AudioClip> candidates = new System.Collections.Generic.List<AudioClip>();
@@ -36,6 +40,15 @@ public class MatchSounds : ScriptableObject
     {
         if (returnHits == null || returnHits.Length == 0 || count <= 0) return null;
         return returnHits[Mathf.Min(count, returnHits.Length) - 1];
+    }
+
+    // 打ち返した回数（1〜）の音の高さ（倍率）。最後の段までは 1、そこから1回ごとに returnPitchStep 半音ずつ上げる（returnPitchMax まで）
+    public float ReturnPitch(int count)
+    {
+        int over = count - (returnHits != null ? returnHits.Length : 0);
+        if (over <= 0) return 1f;
+        float semitones = Mathf.Min(over * returnPitchStep, returnPitchMax);
+        return Mathf.Pow(2f, semitones / 12f);
     }
 
     // ---- 設定しない音（仮の音のまま） ----

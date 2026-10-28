@@ -122,12 +122,22 @@ public class RallyDemo : MonoBehaviour
     {
         var s = MatchSounds.Instance;
         var clip = h.ReturnCount > 0 ? s.ReturnHit(h.ReturnCount) : null;
-        Play(clip != null ? clip : s.HitBlock);
+        if (clip != null) Play(clip, s.ReturnPitch(h.ReturnCount));
+        else Play(s.HitBlock);
     }
 
-    void Play(AudioClip clip)
+    // 音の高さを変えて鳴らすので、前の音の余韻まで高さが変わらないよう AudioSource を交互に使う
+    AudioSource[] sources;
+    int nextSource;
+
+    void Play(AudioClip clip, float pitch = 1f)
     {
-        if (clip != null) audioSource.PlayOneShot(clip, MatchSounds.Instance.SeVolume);
+        if (clip == null) return;
+        if (sources == null) sources = new[] { audioSource, gameObject.AddComponent<AudioSource>() };
+        var src = sources[nextSource];
+        nextSource = (nextSource + 1) % sources.Length;
+        src.pitch = pitch;
+        src.PlayOneShot(clip, MatchSounds.Instance.SeVolume);
     }
 
     // このシーンだけ、打ち返す向きの決め方を「向いている向き」にする（設定アセットは書き換えず、実行中の複製を使う）

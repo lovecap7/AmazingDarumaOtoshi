@@ -489,8 +489,8 @@ public partial class TitleScreen : MonoBehaviour
         {
             selected = index;
             selectedTime = sim;
-            // はじめる＝積み木を飛ばしたときの音、おわる＝決定の音
-            if (index == 0) MenuSounds.Play(MatchSounds.Instance.Knock);
+            // はじめる＝撃墜の音、おわる＝決定の音
+            if (index == 0) MenuSounds.Play(MatchSounds.Instance.KO);
             else MenuSounds.Decide();
             SlowMo(0.15f, 0.12f);
             var contact = ButtonContact(index);

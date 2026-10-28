@@ -13,9 +13,12 @@ using UnityEngine.UI;
 // ・左に「たたかう／サウンド／ビデオ／クレジット／やめる」の積み木が縦に積まれ、てっぺんにスマイル
 //   ハンマーが選択中の積み木の横で構える（カーソル）
 // ・右の看板に、選択中の項目の設定や説明が暗いプレビューで出ている
-// ・サウンド／ビデオ：ハンマーで叩き出すと積み木が看板の上に乗り、上の山はストンと1段落ちる
+// ・たたかう／サウンド／ビデオ：ハンマーで叩き出すと積み木が看板の上に乗り、上の山はストンと1段落ちる
 //   看板にスポットライトが当たって操作できるようになる。左の山は暗くなる。キャンセルで元に戻る
-// ・クレジット：背景をボカしてスタッフロール ・やめる：画面外へ叩き飛ばして終了 ・たたかう：準備中
+//   たたかう（battleStyle = Board のとき）：看板で「ローカル／オンライン」を選ぶ
+// ・たたかう（battleStyle = KnockTwice のとき）：画面外へ叩き飛ばすと、右から「ローカル」「オンライン」の積み木が
+//   飛んできて山の横に積まれる。選んだ方をもう一度叩き飛ばしてシーンへ。B で2つは飛んでいき、たたかうが戻ってくる
+// ・クレジット：背景をボカしてスタッフロール ・やめる：画面外へ叩き飛ばして終了
 // 共通の部品は ToyKit。
 public class MainMenu : MonoBehaviour
 {
@@ -27,14 +30,21 @@ public class MainMenu : MonoBehaviour
     [SerializeField] Sprite knobSprite;
 
     [Header("シーン")]
-    [Tooltip("「たたかう」で移動するシーン（キャラクターセレクト）")]
+    [Tooltip("「たたかう」→「ローカル」で移動するシーン（キャラクターセレクト）")]
     [SerializeField] string battleSceneName = "SelectScene";
+    [Tooltip("「たたかう」→「オンライン」で移動するシーン。空欄（または Build Settings に無い）なら「じゅんびちゅう」と出す")]
+    [SerializeField] string onlineSceneName = "";
+
+    public enum BattleStyle { KnockTwice, Board }
+    [Tooltip("たたかうの選び方。KnockTwice：叩き飛ばすと「ローカル／オンライン」の積み木が飛んできて、もう一度叩く　Board：看板のボタンで選ぶ")]
+    [SerializeField] BattleStyle battleStyle = BattleStyle.KnockTwice;
 
     [Header("項目（上から。並びは固定：たたかう／サウンド／ビデオ／クレジット／やめる）")]
     [SerializeField] string[] labels = { "たたかう", "サウンド", "ビデオ", "クレジット", "やめる" };
+    [Tooltip("看板の説明（たたかう・サウンド・ビデオは看板に操作画面が出るので使わない）")]
     [SerializeField] string[] descriptions =
     {
-        "だるまを積んで、飛ばして、\n最後の一人を落とせ！",
+        "",
         "",
         "",
         "このゲームを\nつくった人たち",
@@ -57,8 +67,8 @@ public class MainMenu : MonoBehaviour
     const float FlyTime = 0.6f, HangTime = 0.05f, DropTime = 0.12f, ReturnTime = 0.55f;
     const float IdleYaw = -32f, CursorOffset = 0.3f, CursorScale = 1.06f;
 
-    enum Phase { Browse, Hitting, Flying, Panel, Returning, Credits, Leaving }
-    enum Content { Sound, Video, Description }
+    enum Phase { Browse, Hitting, Flying, Panel, Returning, Credits, Leaving, Choose, ChoiceLeaving, ChoiceBack }
+    enum Content { Battle, Sound, Video, Description }
 
     Phase phase;
     float sim;
@@ -100,6 +110,7 @@ public class MainMenu : MonoBehaviour
     float camFov = 40f, shake;
     static readonly Vector3 BrowsePos = new Vector3(-0.3f, 2.5f, -10.5f), BrowseLook = new Vector3(-0.3f, 2.2f, 0.5f);
     static readonly Vector3 PanelPos = new Vector3(1.9f, 3.0f, -8.2f), PanelLook = new Vector3(2.4f, 2.9f, 1f);
+    static readonly Vector3 ChoicePos = new Vector3(2.1f, 2.05f, -7.6f), ChoiceLook = new Vector3(2.1f, 1.7f, 1f);   // ローカル／オンラインの積み木と看板を正面から
 
     // ---- UI ----
     RectTransform overlay;
@@ -107,10 +118,30 @@ public class MainMenu : MonoBehaviour
     TextMeshProUGUI hintText;
     CanvasGroup titleGroup;
     CreditRoll credits;
-    CanvasGroup soundGroup, videoGroup, descGroup;
-    TextMeshProUGUI descText, boardTitle;
+    CanvasGroup battleGroup, soundGroup, videoGroup, descGroup;
+    TextMeshProUGUI descText, boardTitle, battleNote;
     Image boardDim;
-    Selectable soundFirst, videoFirst;
+    Selectable battleFirst, soundFirst, videoFirst;
+    bool starting;                  // たたかうでローカル／オンラインを決めた（シーン移動まで操作しない）
+    float noteTime = -100f;         // 「じゅんびちゅう」を出した時刻
+
+    // ---- たたかう（KnockTwice）：ローカル／オンラインの積み木 ----
+    static readonly string[] ChoiceLabels = { "ローカル", "オンライン" };
+    static readonly string[] ChoiceDescriptions = { "この画面で\nみんなで あそぶ", "ネットで\nだれかと あそぶ" };
+    static readonly Vector3 ChoiceBase = new Vector3(1.6f, 0f, -1.2f);   // 2つの積み木を積む場所（山の右。間にハンマーが入る）
+    const float ChoiceFlyIn = 0.5f;
+    Transform[] choiceBlocks;
+    Material[] choiceMats;
+    Color[] choiceColors;
+    float[] choiceArrive, choiceOffset, choiceScale;
+    bool[] choiceLanded;
+    int choiceCursor;
+    int choiceOut = -1;                 // 叩き飛ばした方
+    float choiceImpact = -100f, choiceAway = -100f, choiceWobble = -100f;
+    int choiceWobbleIdx = -1;
+    bool battleOut, battleBack;         // たたかうが画面外にいる／戻ってくるところ
+    float battleBackTime = -100f;
+    Mesh menuMesh;
     GameObject panelSelected;   // 看板の中でいま選んでいる行（行を移ったときの音用）
 
     float BH => BlockSize.y;
@@ -129,7 +160,7 @@ public class MainMenu : MonoBehaviour
     void BuildStage()
     {
         var blockMesh = ToyKit.RoundedBox(new Vector3(ToyKit.BlockW, ToyKit.BlockH, ToyKit.BlockD), 0.14f, 10);
-        var menuMesh = ToyKit.RoundedBox(BlockSize, 0.16f, 10);
+        menuMesh = ToyKit.RoundedBox(BlockSize, 0.16f, 10);
         letterMat = ToyKit.LetterMaterial(font);
 
         cam = ToyKit.CreateCamera();
@@ -152,6 +183,22 @@ public class MainMenu : MonoBehaviour
             blocks[i] = ToyKit.CreateBlock(labels[i], blockColors[i], menuMesh, new Vector2(2.3f, 0.6f), BlockSize.z, font, letterMat, out blockMats[i]);
             blocks[i].gameObject.AddComponent<BoxCollider>().size = BlockSize;
             scaleNow[i] = 1f;
+        }
+
+        // ローカル／オンラインの積み木（たたかうを叩き飛ばすと飛んでくる。最初は隠しておく）
+        choiceBlocks = new Transform[2];
+        choiceMats = new Material[2];
+        choiceColors = new[] { ToyKit.Palette[0], ToyKit.Palette[5] };
+        choiceArrive = new float[2];
+        choiceOffset = new float[2];
+        choiceScale = new float[2];
+        choiceLanded = new bool[2];
+        for (int i = 0; i < 2; i++)
+        {
+            choiceBlocks[i] = ToyKit.CreateBlock(ChoiceLabels[i], choiceColors[i], menuMesh, new Vector2(2.3f, 0.6f), BlockSize.z, font, letterMat, out choiceMats[i]);
+            choiceBlocks[i].gameObject.AddComponent<BoxCollider>().size = BlockSize;
+            choiceBlocks[i].gameObject.SetActive(false);
+            choiceScale[i] = 1f;
         }
 
         face = ToyKit.CreateHead();
@@ -208,6 +255,7 @@ public class MainMenu : MonoBehaviour
         boardTitle = ToyKit.UIText("Title", root, font, "", 64f, ToyKit.Ink);
         ToyKit.Anchor(boardTitle.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -70f), new Vector2(1000f, 100f));
 
+        battleGroup = BuildBattlePanel(root);
         soundGroup = BuildSoundPanel(root);
         videoGroup = BuildVideoPanel(root);
 
@@ -222,6 +270,215 @@ public class MainMenu : MonoBehaviour
         // プレビュー中に暗くする幕（最前面）
         boardDim = ToyKit.UIImage("Dim", root, new Color(0.2f, 0.15f, 0.15f, 0.5f), uiSprite).GetComponent<Image>();
         ToyKit.Stretch(boardDim.rectTransform);
+    }
+
+    // たたかう：ローカル／オンラインの大きなボタン2つ
+    CanvasGroup BuildBattlePanel(Transform root)
+    {
+        var group = Group("Battle", root);
+        var names = new[] { "ローカル", "オンライン" };
+        var subs = new[] { "この画面で みんなで あそぶ", "ネットで だれかと あそぶ" };
+        var colors = new[] { ToyKit.Palette[0], ToyKit.Palette[4] };
+        var buttons = new Button[2];
+        for (int i = 0; i < 2; i++)
+        {
+            // 色の付いたカード（いつも見える）＋ 選んだときに光る板（Tint）
+            var card = ToyKit.UIRounded("Card_" + names[i], group.transform, Color.Lerp(colors[i], Color.white, 0.55f), 36f);
+            ToyKit.Anchor(card, new Vector2(0.5f, 0.5f), new Vector2(0f, 120f - i * 250f), new Vector2(1100f, 210f));
+            var hl = ToyKit.UIRounded("Highlight", card, Color.white, 36f);
+            ToyKit.Stretch(hl);
+            hl.GetComponent<Image>().raycastTarget = true;
+
+            var label = ToyKit.UIText("Label", card, font, names[i], 84f, Color.Lerp(colors[i], ToyKit.Ink, 0.55f));
+            label.fontStyle = FontStyles.Bold;
+            ToyKit.Anchor(label.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 26f), new Vector2(1000f, 110f));
+            var sub = ToyKit.UIText("Sub", card, font, subs[i], 40f, ToyKit.Ink);
+            ToyKit.Anchor(sub.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, -58f), new Vector2(1000f, 60f));
+
+            var b = card.gameObject.AddComponent<Button>();
+            Tint(b, hl.GetComponent<Image>());
+            int index = i;
+            b.onClick.AddListener(() => ChooseBattle(index));
+            buttons[i] = b;
+        }
+        Chain(buttons);
+        battleFirst = buttons[0];
+
+        // オンラインがまだ遊べないときのお知らせ
+        battleNote = ToyKit.UIText("Note", group.transform, font, "オンラインは じゅんびちゅう！", 46f, new Color(0.85f, 0.25f, 0.2f));
+        battleNote.fontStyle = FontStyles.Bold;
+        ToyKit.Anchor(battleNote.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, 45f), new Vector2(1100f, 70f));
+        battleNote.alpha = 0f;
+        return group;
+    }
+
+    void ChooseBattle(int index)
+    {
+        bool knockTwice = battleStyle == BattleStyle.KnockTwice;
+        if (knockTwice ? phase != Phase.Choose : phase != Phase.Panel || outIdx != Battle || starting) return;
+        bool online = index == 1;
+        string scene = online ? onlineSceneName : battleSceneName;
+        if (string.IsNullOrEmpty(scene) || !Application.CanStreamedLevelBeLoaded(scene))
+        {
+            // まだ遊べない：お知らせを出して、看板（KnockTwice ならその積み木）がぷるっと揺れる
+            MenuSounds.Cancel();
+            noteTime = sim;
+            boardPunch = sim;
+            if (knockTwice) { choiceWobbleIdx = index; choiceWobble = sim; }
+            return;
+        }
+        if (knockTwice) StartCoroutine(KnockChoice(index, scene));
+        else StartCoroutine(StartBattle(scene));
+    }
+
+    // ================= たたかう（KnockTwice） =================
+    // たたかうを叩き飛ばしたあと：右から「オンライン」（下）→「ローカル」（上）の順に飛んできて積まれる
+    IEnumerator BringChoices()
+    {
+        battleOut = true;
+        yield return new WaitForSecondsRealtime(0.35f);
+        for (int i = 0; i < 2; i++)
+        {
+            choiceArrive[i] = sim + (i == 1 ? 0f : 0.18f);
+            choiceLanded[i] = false;
+            choiceOffset[i] = 0f;
+            choiceScale[i] = 1f;
+            choiceBlocks[i].gameObject.SetActive(true);
+        }
+        choiceOut = -1;
+        choiceCursor = 0;
+        choiceAway = -100f;
+        phase = Phase.Choose;
+    }
+
+    bool ChoicesReady => phase == Phase.Choose && choiceLanded[0] && choiceLanded[1];
+
+    // 選んだ方をもう一度叩き飛ばして、そのシーンへ
+    IEnumerator KnockChoice(int index, string scene)
+    {
+        phase = Phase.ChoiceLeaving;
+        yield return Swing(0.22f, -82f);
+        MenuSounds.Play(MatchSounds.Instance.KO);   // 叩き飛ばした瞬間に撃墜の音
+        var contact = ChoiceContact(index);
+        ToyKit.Emit(fx.confetti, contact, Quaternion.Euler(-30f, 90f, 0f), 45);
+        ToyKit.Emit(fx.sparkle, contact, Quaternion.Euler(0f, 90f, 0f), 20);
+        shake = Mathf.Max(shake, 0.6f);
+        post.chroma.intensity.value = 0.5f;
+        SlowMo(0.15f, 0.08f);
+        choiceOut = index;
+        choiceImpact = sim;
+        yield return new WaitForSecondsRealtime(0.5f);
+        Fader.Load(scene);
+    }
+
+    // B：2つは右へ飛んでいき、たたかうが戻ってくる
+    IEnumerator CancelChoices()
+    {
+        phase = Phase.ChoiceBack;
+        MenuSounds.Cancel();
+        choiceAway = sim;
+        yield return new WaitForSecondsRealtime(0.35f);
+        foreach (var b in choiceBlocks) b.gameObject.SetActive(false);
+        battleBack = true;
+        battleBackTime = sim;
+    }
+
+    void UpdateChoices()
+    {
+        float follow = 1f - Mathf.Exp(-16f * Time.deltaTime);
+        for (int i = 0; i < 2; i++)
+        {
+            var b = choiceBlocks[i];
+            if (!b.gameObject.activeSelf) continue;
+            bool isCursor = ChoicesReady && i == choiceCursor || phase == Phase.ChoiceLeaving && i == choiceCursor && choiceOut < 0;
+            choiceOffset[i] = Mathf.Lerp(choiceOffset[i], isCursor ? CursorOffset : 0f, follow);
+            choiceScale[i] = Mathf.Lerp(choiceScale[i], isCursor ? CursorScale : 1f, follow);
+
+            Vector3 slot = ChoiceSlot(i);
+            Vector3 pos = slot + Vector3.right * choiceOffset[i];
+            Quaternion rot = Quaternion.identity;
+            Vector3 s = Vector3.one * choiceScale[i];
+
+            // 飛んでくる
+            float t = Mathf.Clamp01((sim - choiceArrive[i]) / ChoiceFlyIn);
+            if (t < 1f)
+            {
+                float u = 1f - Mathf.Pow(1f - t, 2.2f);
+                Vector3 from = slot + new Vector3(13f, 3f, -1f);
+                pos = ToyKit.Bezier(from, from + new Vector3(-5f, 2f, 0f), slot + new Vector3(1.5f, 1.6f, 0f), slot, u);
+                rot = Quaternion.AngleAxis(540f * (1f - u), Vector3.forward);
+            }
+            else if (!choiceLanded[i])
+            {
+                // ドスン
+                choiceLanded[i] = true;
+                ToyKit.Emit(fx.puff, slot - Vector3.up * BH * 0.5f, Quaternion.Euler(-90f, 0f, 0f), 8);
+                shake = Mathf.Max(shake, 0.3f);
+                MenuSounds.Play(MatchSounds.Instance.BlockHitBlock, 0.7f);
+            }
+            if (t >= 1f) s = Vector3.Scale(s, ToyKit.SquashVec(ToyKit.Squash((sim - choiceArrive[i] - ChoiceFlyIn) / 0.35f, 0.18f)));
+
+            // 下（オンライン）が叩き出されたら、上はストンと落ちる
+            if (choiceOut == 1 && i == 0)
+            {
+                float d = Mathf.Clamp01((sim - choiceImpact - HangTime) / DropTime);
+                pos.y -= BH * d * d;
+            }
+            // まだ遊べない：ぷるぷる
+            if (i == choiceWobbleIdx)
+            {
+                float w = (sim - choiceWobble) / 0.45f;
+                if (w > 0f && w < 1f)
+                {
+                    float a = Mathf.Sin(w * Mathf.PI * 4f) * (1f - w);
+                    pos.x += 0.25f * a;
+                    rot = Quaternion.Euler(0f, 0f, -6f * a);
+                }
+            }
+            // 叩き飛ばされた／B で帰っていく：画面の外へ
+            float f = i == choiceOut ? (sim - choiceImpact) / 0.6f : (sim - choiceAway - (i == 0 ? 0f : 0.08f)) / 0.6f;
+            if ((i == choiceOut || phase == Phase.ChoiceBack) && f > 0f)
+            {
+                f = Mathf.Min(f, 2f);
+                pos = slot + new Vector3(14f * f * f + 6f * f, 2f * f, -1.5f * f);
+                rot = Quaternion.Euler(0f, 0f, -540f * f);
+            }
+
+            b.position = pos;
+            b.rotation = rot;
+            b.localScale = s;
+            float glow = isCursor ? 0.08f + 0.05f * Mathf.Sin(Time.unscaledTime * 5f) : 0f;
+            choiceMats[i].SetColor("_EmissionColor", Color.white * glow);
+        }
+    }
+
+    // 上がローカル（0）、下がオンライン（1）
+    Vector3 ChoiceSlot(int i) => ChoiceBase + new Vector3(0f, (1 - i) * BH + BH * 0.5f, 0f);
+
+    Vector3 ChoiceContact(int i)
+    {
+        var s = ChoiceSlot(i);
+        return new Vector3(s.x + CursorOffset - BlockSize.x * CursorScale * 0.5f, s.y, s.z);
+    }
+
+    int ChoiceUnderMouse(Vector2 screen)
+    {
+        if (!Physics.Raycast(cam.ScreenPointToRay(screen), out var hit, 100f)) return -1;
+        for (int i = 0; i < choiceBlocks.Length; i++)
+            if (hit.transform == choiceBlocks[i]) return i;
+        return -1;
+    }
+
+    IEnumerator StartBattle(string scene)
+    {
+        starting = true;
+        MenuSounds.Play(MatchSounds.Instance.KO);
+        boardPunch = sim;
+        shake = Mathf.Max(shake, 0.5f);
+        ToyKit.Emit(fx.confetti, boardCenter + new Vector3(0f, 0.5f, -0.5f), Quaternion.Euler(-60f, 0f, 0f), 50);
+        ToyKit.Emit(fx.sparkle, boardCenter + new Vector3(0f, 0f, -0.5f), Quaternion.Euler(0f, 180f, 0f), 20);
+        yield return new WaitForSecondsRealtime(0.45f);
+        Fader.Load(scene);
     }
 
     CanvasGroup BuildSoundPanel(Transform root)
@@ -432,9 +689,8 @@ public class MainMenu : MonoBehaviour
                 else if (MenuInput.Down()) { cursor = (cursor + 1) % labels.Length; MenuSounds.Cursor(); }
                 else if (MenuInput.Submit() || (click && hover >= 0))
                 {
-                    // たたかう＝積み木を飛ばしたときの音、それ以外＝決定の音
-                    if (cursor == Battle) MenuSounds.Play(MatchSounds.Instance.Knock);
-                    else MenuSounds.Decide();
+                    // たたかう（KnockTwice）は叩き飛ばした瞬間に撃墜の音を鳴らすので、決定の音は重ねない
+                    if (cursor != Battle || battleStyle != BattleStyle.KnockTwice) MenuSounds.Decide();
                     Hit(cursor);
                 }
                 break;
@@ -442,6 +698,7 @@ public class MainMenu : MonoBehaviour
 
             case Phase.Panel:
             {
+                if (starting) break;   // たたかうを決めて、シーンを移るところ
                 // 看板の中で行を移ったらカーソルの音
                 var selected = EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
                 if (selected != null && panelSelected != null && selected != panelSelected) MenuSounds.Cursor();
@@ -455,6 +712,18 @@ public class MainMenu : MonoBehaviour
             case Phase.Credits:
                 if (!credits.IsBusy) phase = Phase.Browse;
                 break;
+
+            case Phase.Choose:
+            {
+                if (!ChoicesReady) break;
+                int hover = mouse != null && (mouseMoved || click) ? ChoiceUnderMouse(mouse.position.ReadValue()) : -1;
+                if (hover >= 0 && hover != choiceCursor) { choiceCursor = hover; MenuSounds.Cursor(); }
+
+                if (MenuInput.Up() || MenuInput.Down()) { choiceCursor = 1 - choiceCursor; MenuSounds.Cursor(); }
+                else if (MenuInput.Submit() || (click && hover >= 0)) ChooseBattle(choiceCursor);
+                else if (MenuInput.Cancel() || (click && BlockUnderMouse(mouse.position.ReadValue()) >= 0)) StartCoroutine(CancelChoices());
+                break;
+            }
         }
     }
 
@@ -486,6 +755,16 @@ public class MainMenu : MonoBehaviour
 
         switch (index)
         {
+            case Battle when battleStyle == BattleStyle.KnockTwice:
+                // 画面外へ叩き飛ばし（撃墜の音）、代わりにローカル／オンラインの積み木が飛んでくる
+                MenuSounds.Play(MatchSounds.Instance.KO);
+                outIdx = index;
+                impactTime = sim;
+                phase = Phase.Leaving;
+                StartCoroutine(BringChoices());
+                break;
+
+            case Battle:
             case Sound:
             case Video:
                 outIdx = index;
@@ -516,15 +795,6 @@ public class MainMenu : MonoBehaviour
                 yield return new WaitForSecondsRealtime(0.35f);
                 credits.Play();
                 phase = Phase.Credits;
-                break;
-
-            default:
-                // たたかう：画面外へ叩き飛ばしてキャラクターセレクトへ
-                outIdx = index;
-                impactTime = sim;
-                phase = Phase.Leaving;
-                yield return new WaitForSecondsRealtime(0.45f);
-                Fader.Load(battleSceneName);
                 break;
         }
     }
@@ -583,10 +853,12 @@ public class MainMenu : MonoBehaviour
         HandleInput();
 
         bool panel = phase == Phase.Panel;
-        dim = Mathf.MoveTowards(dim, panel || phase == Phase.Credits ? 1f : 0f, dt * 3f);
+        bool choosing = phase == Phase.Choose || phase == Phase.ChoiceLeaving;
+        dim = Mathf.MoveTowards(dim, panel || phase == Phase.Credits ? 1f : choosing ? 0.6f : 0f, dt * 3f);
         panelLit = Mathf.MoveTowards(panelLit, panel ? 1f : 0f, dt * 3f);
 
         UpdateBlocks();
+        UpdateChoices();
         UpdateHead();
         UpdateHammer();
         UpdateBoard(dt);
@@ -600,6 +872,8 @@ public class MainMenu : MonoBehaviour
     float DropAmount()
     {
         if (outIdx < 0) return 0f;
+        // たたかうが戻ってくる：先に上の山が持ち上がって隙間を空ける
+        if (battleBack) return 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((sim - battleBackTime) / 0.2f));
         if (phase == Phase.Returning)
             return 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((sim - returnTime) / (ReturnTime * 0.35f)));   // 先に持ち上がって隙間を空ける
         float d = Mathf.Clamp01((sim - impactTime - HangTime) / DropTime);
@@ -634,10 +908,25 @@ public class MainMenu : MonoBehaviour
             {
                 Vector3 p0 = Slot(i), p3 = Dock();
                 Vector3 p1 = p0 + new Vector3(2.6f, 1.4f, -1.8f), p2 = p3 + new Vector3(0f, 1.8f, -1.2f);
-                if (phase == Phase.Leaving)
+                if (battleBack)
                 {
-                    // やめる：画面の外へ吹き飛ぶ
-                    float f = (sim - impactTime) / 0.6f;
+                    // たたかう：画面の外から、くるっと回って元の段へ戻る
+                    float r = Mathf.Clamp01((sim - battleBackTime - 0.05f) / 0.45f);
+                    float f = 1f - (1f - Mathf.Pow(1f - r, 2.2f));
+                    pos = p0 + new Vector3(14f * f * f + 6f * f, 2f * f, -1.5f * f);
+                    rot = Quaternion.Euler(0f, 0f, 540f * f);
+                    if (r >= 1f)
+                    {
+                        battleBack = battleOut = false;
+                        outIdx = -1;
+                        phase = Phase.Browse;
+                        shake = Mathf.Max(shake, 0.25f);
+                    }
+                }
+                else if (phase == Phase.Leaving || battleOut)
+                {
+                    // やめる・たたかう：画面の外へ吹き飛ぶ
+                    float f = Mathf.Min((sim - impactTime) / 0.6f, 2f);
                     pos = p0 + new Vector3(14f * f * f + 6f * f, 2f * f, -1.5f * f);
                     rot = Quaternion.Euler(0f, 0f, -540f * f);
                 }
@@ -692,7 +981,7 @@ public class MainMenu : MonoBehaviour
         ToyKit.Emit(fx.sparkle, Dock(), Quaternion.Euler(-90f, 0f, 0f), 14);
         shake = Mathf.Max(shake, 0.25f);
 
-        var first = outIdx == Sound ? soundFirst : videoFirst;
+        var first = outIdx == Battle ? battleFirst : outIdx == Sound ? soundFirst : videoFirst;
         if (EventSystem.current != null && first != null) EventSystem.current.SetSelectedGameObject(first.gameObject);
     }
 
@@ -732,8 +1021,10 @@ public class MainMenu : MonoBehaviour
             float sway = Mathf.Sin(Time.unscaledTime * 1.7f) * 3f;
             hammerYaw = Mathf.LerpUnclamped(14f, IdleYaw + sway, ToyKit.EaseOutBack(t));
         }
-        if (!swinging && phase != Phase.Leaving)
-            hammerPos = Vector3.Lerp(hammerPos, ToyKit.HammerPivot(Contact(cursor), hammerScale), 1f - Mathf.Exp(-12f * Time.deltaTime));
+        // ローカル／オンラインを選んでいる間は、その積み木の横で構える
+        bool choosing = phase == Phase.Choose || phase == Phase.ChoiceLeaving;
+        if (!swinging && phase != Phase.Leaving && !(phase == Phase.ChoiceLeaving && choiceOut >= 0))
+            hammerPos = Vector3.Lerp(hammerPos, ToyKit.HammerPivot(choosing ? ChoiceContact(choiceCursor) : Contact(cursor), hammerScale), 1f - Mathf.Exp(-12f * Time.deltaTime));
         hammer.position = hammerPos;
         hammer.rotation = Quaternion.Euler(0f, hammerYaw, 0f);
     }
@@ -742,15 +1033,31 @@ public class MainMenu : MonoBehaviour
     {
         // 何を映すか：操作中はその項目、それ以外はカーソルの項目のプレビュー
         int item = (phase == Phase.Panel || phase == Phase.Flying || phase == Phase.Returning) && outIdx >= 0 ? outIdx : cursor;
-        Content content = item == Sound ? Content.Sound : item == Video ? Content.Video : Content.Description;
-        if (content == Content.Description) descText.text = descriptions[Mathf.Clamp(item, 0, descriptions.Length - 1)];
-        boardTitle.text = outIdx >= 0 && phase == Phase.Panel ? "" : labels[item];
+        bool choosing = phase == Phase.Choose || phase == Phase.ChoiceLeaving || phase == Phase.ChoiceBack;
+        Content content = item == Battle && battleStyle == BattleStyle.Board ? Content.Battle
+                        : item == Sound ? Content.Sound : item == Video ? Content.Video : Content.Description;
+        if (content == Content.Description)
+        {
+            if (choosing)
+            {
+                // ローカル／オンラインを選んでいる間：選んでいる方の説明（遊べないときはお知らせも）
+                string note = sim - noteTime < 2f ? "\n<color=#D94033><size=65%>オンラインは じゅんびちゅう！</size></color>" : "";
+                descText.text = ChoiceDescriptions[choiceCursor] + note;
+            }
+            else descText.text = item == Battle ? "ローカル か オンライン で\nたたかう" : descriptions[Mathf.Clamp(item, 0, descriptions.Length - 1)];
+        }
+        boardTitle.text = outIdx >= 0 && phase == Phase.Panel ? "" : choosing ? ChoiceLabels[choiceCursor] : labels[item];
 
+        Fade(battleGroup, content == Content.Battle, dt);
         Fade(soundGroup, content == Content.Sound, dt);
         Fade(videoGroup, content == Content.Video, dt);
         Fade(descGroup, content == Content.Description, dt);
+        battleGroup.interactable = battleGroup.blocksRaycasts = phase == Phase.Panel && outIdx == Battle && !starting;
         soundGroup.interactable = soundGroup.blocksRaycasts = phase == Phase.Panel && outIdx == Sound;
         videoGroup.interactable = videoGroup.blocksRaycasts = phase == Phase.Panel && outIdx == Video;
+        // 「じゅんびちゅう」は2秒出して消える
+        float nt = sim - noteTime;
+        battleNote.alpha = nt < 1.6f ? 1f : Mathf.Clamp01(1f - (nt - 1.6f) / 0.4f);
 
         boardDim.color = new Color(0.2f, 0.15f, 0.15f, 0.5f * (1f - panelLit));
         boardLight.intensity = panelLit * 35f;
@@ -764,12 +1071,14 @@ public class MainMenu : MonoBehaviour
     void UpdateCamera(float dt)
     {
         bool focusBoard = phase == Phase.Panel || phase == Phase.Flying;
-        Vector3 pos = focusBoard ? PanelPos : BrowsePos;
-        Vector3 look = focusBoard ? PanelLook : BrowseLook;
+        // ローカル／オンラインを選んでいる間は、2つの積み木と看板に寄る
+        bool focusChoice = phase == Phase.Choose || phase == Phase.ChoiceLeaving;
+        Vector3 pos = focusChoice ? ChoicePos : focusBoard ? PanelPos : BrowsePos;
+        Vector3 look = focusChoice ? ChoiceLook : focusBoard ? PanelLook : BrowseLook;
         float k = 1f - Mathf.Exp(-3.5f * dt);
         camPos = Vector3.Lerp(camPos, pos, k);
         camLook = Vector3.Lerp(camLook, look, k);
-        camFov = Mathf.Lerp(camFov, focusBoard ? 38f : 40f, k);
+        camFov = Mathf.Lerp(camFov, focusChoice || focusBoard ? 38f : 40f, k);
 
         float tt = Time.unscaledTime;
         Vector3 drift = new Vector3(Mathf.PerlinNoise(tt * 0.21f, 1.3f) - 0.5f, Mathf.PerlinNoise(2.7f, tt * 0.17f) - 0.5f, 0f) * 0.1f;
@@ -781,15 +1090,17 @@ public class MainMenu : MonoBehaviour
 
         // クレジット中は全体を大きくボカす
         bool blurAll = phase == Phase.Credits || credits.IsBusy;
-        float focus = blurAll ? 0.6f : Vector3.Distance(camPos, focusBoard ? boardCenter : new Vector3(stackX * 0.4f, 2f, 0.5f));
+        Vector3 subject = focusChoice ? ChoiceSlot(0) : focusBoard ? boardCenter : new Vector3(stackX * 0.4f, 2f, 0.5f);
+        float focus = blurAll ? 0.6f : Vector3.Distance(camPos, subject);
         post.dof.focusDistance.value = Mathf.Lerp(post.dof.focusDistance.value, focus, k * 2f);
-        post.dof.aperture.value = Mathf.Lerp(post.dof.aperture.value, blurAll ? 1f : focusBoard ? 2f : 3.2f, k * 2f);
+        post.dof.aperture.value = Mathf.Lerp(post.dof.aperture.value, blurAll ? 1f : focusBoard || focusChoice ? 2f : 3.2f, k * 2f);
     }
 
     void UpdateUI()
     {
         titleGroup.alpha = 1f - dim;
-        hintText.text = phase == Phase.Panel ? "上下：えらぶ　左右：かえる　B：もどる"
+        hintText.text = phase == Phase.Panel && outIdx == Battle || phase == Phase.Choose ? "上下：えらぶ　A：けってい　B：もどる"
+                      : phase == Phase.Panel ? "上下：えらぶ　左右：かえる　B：もどる"
                       : phase == Phase.Credits ? "" : "上下：えらぶ　A：けってい";
     }
 
