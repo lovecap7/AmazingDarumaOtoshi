@@ -833,6 +833,20 @@ namespace Nakahira
             m_ignoreTimer = m_ignoreTime;
         }
 
+        // この当たり判定とは今当たらないようにしているか(撃った本人・打ち返した本人など)
+        public bool IsIgnoring(Collider col) => col != null && m_ignored.Contains(col);
+
+        // 攻撃判定がなくなるまでの残り時間の予想(秒)。減速だけを考える(攻撃判定がなければ 0)
+        public float HarmfulTimeLeft
+        {
+            get
+            {
+                if (!IsHarmful) return 0.0f;
+                if (m_params.Deceleration <= 0.0f) return float.PositiveInfinity;
+                return (Speed - m_params.HarmlessSpeed) / m_params.Deceleration;
+            }
+        }
+
         // 今当たらないようにしている相手(撃った本人など)に、さらに長く当たらないようにする
         public void ExtendIgnore(float time)
         {

@@ -121092,6 +121092,8 @@ MonoBehaviour:
   - {fileID: 362302899}
   - {fileID: 507910259}
   - {fileID: 2009570414}
+  m_next: 0
+  m_subscribed: 0
 --- !u!1 &1110689242
 GameObject:
   m_ObjectHideFlags: 0

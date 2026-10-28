@@ -92,6 +92,11 @@ namespace Nakahira
         public float SweepDuration => m_params.SweepDuration;
         // 薙ぎ払いがキャラクターに当たる、中心同士の水平の距離(届く距離 + 体の半径)
         public float CharacterHitDistance => HitReach + DarumaCharacter.kBodyRadius;
+        // 薙ぎ払いが積み木に当たる、中心同士の水平の距離(届く距離 + 積み木の半径)
+        public float BlockHitDistance => HitReach + TumikiBlock.kRadius;
+        // 薙ぎ払いで振り始める角度・振り終わる角度(度。持ち主の正面から、右が +)
+        public float SweepStartYaw => m_sweepStartYaw;
+        public float SweepEndYaw => m_sweepEndYaw;
         // 股抜きショットを振り始めてから弾が出るまでの間(持ち主は向きを変えて狙いを調整できる)
         public bool IsAimingShot => m_action == Action.Shot && !m_shotFired;
 

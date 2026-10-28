@@ -127,6 +127,20 @@ namespace Nakahira
         [Tooltip("逃げながら拾う積み木は、自分が追っ手よりこの距離(m)以上早く着けるものだけ")]
         [Min(0.0f)] public float FleeSafetyMargin = 1.0f;
 
+        [Header("とっさの反応(飛んでくる弾。確率はどれも 余裕(1 − 集中度の割合) を掛けて使う)")]
+        [Tooltip("弾に気づいて反応する確率")]
+        [Range(0.0f, 1.0f)] public float ReactChance = 1.0f;
+        [Tooltip("ジャンプ乗り(落ちてくる途中で弾に触れて積む。一番難しい)を選ぶ確率")]
+        [Range(0.0f, 1.0f)] public float CatchChance = 0.7f;
+        [Tooltip("打ち返しを選ぶ確率(ジャンプ乗りを選ばなかったとき)")]
+        [Range(0.0f, 1.0f)] public float ReturnChance = 0.8f;
+        [Tooltip("弾に気づいてから動けるまでの遅れ(秒)")]
+        [Min(0.0f)] public float ReflexReaction = 0.05f;
+        [Tooltip("跳ぶ・振るタイミングのずれ(秒。この範囲でばらつく)")]
+        [Min(0.0f)] public float ReflexTimingError = 0.01f;
+        [Tooltip("この時間(秒)先までに当たる弾に反応する")]
+        [Min(0.1f)] public float ReflexHorizon = 1.0f;
+
         [Header("積む:ジャンプ")]
         [Tooltip("ジャンプする距離の誤差(割合)。大きいほど跳ぶのが早すぎたり遅すぎたりする")]
         [Range(0.0f, 1.0f)] public float JumpDistanceError = 0.1f;
