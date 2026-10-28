@@ -8,7 +8,8 @@ namespace Nakahira
     //   ・ジャンプ乗り:落ちてくる途中で弾に触れるように跳ぶ(被弾せずに積める)
     //   ・打ち返し  :ハンマーが弾の方向を通る瞬間に、弾が届く距離にあるように振る。
     //                 弾がハンマーの届く角度の外なら、必要なだけ向きを変える(狙いは考えない)
-    //   ・ジャンプ避け:弾が通り過ぎる間、足が弾より上にあるように跳ぶ
+    //   ・ジャンプ避け:弾が通り過ぎる間、足が弾より上にあるように跳ぶ。
+    //                 DodgeMoveChance で跳びながら動く(弾の進路に横向きなら状態の移動のまま、でなければ進路から横へずれる)
     //  弾ごとに一度だけ「反応するか・どれで反応するか」を決める。確率は集中度(疲れ)が高いほど下がる
     //  反応すると決めたら集中度を足す。反応の最中は、状態が出したジャンプ・薙ぎ払いを止める
     public class CpuReflex
@@ -34,6 +35,11 @@ namespace Nakahira
         const float kAfterAction = 0.4f;
         // 向きを変えるための、ごく小さい移動入力
         const float kTurnInput = 0.05f;
+        // ジャンプ避けで状態の移動をそのまま続けてよいのは、弾の進路とのなす角がこれ以上(度)のとき
+        // (弾に向かって・弾から逃げる向きに動くと、弾が足の下を通る時刻がずれる。横へ動くのは安全)
+        const float kDodgeKeepMoveMinAngle = 70.0f;
+        // 状態の移動がこの大きさより小さければ、止まっているとみなす
+        const float kDodgeKeepMoveMinInput = 0.3f;
 
         // 当たる弾の予想(時間は今からの秒数)
         struct Threat
@@ -51,6 +57,9 @@ namespace Nakahira
         float m_timingError;
         bool m_executed;
         float m_executedTime;
+        // ジャンプ避けで跳びながら動く向き(m_hasDodgeMove が false なら真上に跳ぶ)
+        bool m_hasDodgeMove;
+        Vector2 m_dodgeMove;
         // 反応するか決めた弾(反応しないと決めた弾も含む。弾ごとに一度だけ決める)
         readonly HashSet<TumikiBlock> m_decided = new HashSet<TumikiBlock>();
         readonly List<TumikiBlock> m_forget = new List<TumikiBlock>();
@@ -61,6 +70,7 @@ namespace Nakahira
         public void Reset()
         {
             m_block = null;
+            m_hasDodgeMove = false;
             m_decided.Clear();
         }
 
@@ -104,13 +114,16 @@ namespace Nakahira
                         if (canAct && jumpIn <= c.DeltaTime * 0.5f && c.Self.IsGrounded)
                         {
                             cmd.Jump = true;
+                            // ジャンプ避けは、動きながら跳ぶこともある(真上に跳ぶだけだと機械的に見えるため)
+                            m_hasDodgeMove = m_action == Action.Dodge && CpuDodgeMove.Roll(c) && PickDodgeMove(c, cmd.Move, out m_dodgeMove);
+                            if (m_hasDodgeMove) cmd.Move = m_dodgeMove;
                             Execute();
                         }
                     }
                     else if (!c.Self.IsGrounded)
                     {
-                        // 空中では弾の通り道に留まる
-                        cmd.Move = Vector2.zero;
+                        // 空中では弾の通り道に留まる(ジャンプ避けで動くと決めたら、その向きへ動き続ける)
+                        cmd.Move = m_action == Action.Dodge && m_hasDodgeMove ? m_dodgeMove : Vector2.zero;
                     }
                     break;
 
@@ -161,6 +174,7 @@ namespace Nakahira
             m_noticeTime = Time.time;
             m_timingError = Random.Range(-p.ReflexTimingError, p.ReflexTimingError);
             m_executed = false;
+            m_hasDodgeMove = false;
             c.AddLoad(p.AttentionOnProjectile);
         }
 
@@ -320,6 +334,37 @@ namespace Nakahira
             Vector3 to = position - c.Position;
             to.y = 0.0f;
             return Vector3.SignedAngle(forward, to, Vector3.up);
+        }
+
+        // ジャンプ避けで跳びながら動く向き
+        //  1. 状態が動こうとしていた向き(積み木へ向かう途中など)が、弾の進路に対して横向きならそのまま進む
+        //  2. そうでなければ、弾の進路から横へずれる向き(今いる側へ。だめなら反対側)
+        private bool PickDodgeMove(CpuContext c, Vector2 stateMove, out Vector2 move)
+        {
+            Vector3 bulletDir = m_block.HorizontalVelocity;
+            bulletDir.y = 0.0f;
+            if (bulletDir.sqrMagnitude < 0.0001f)
+            {
+                move = Vector2.zero;
+                return false;
+            }
+            bulletDir.Normalize();
+
+            Vector2 keep = Vector2.zero;
+            if (stateMove.magnitude >= kDodgeKeepMoveMinInput)
+            {
+                Vector3 sm = new Vector3(stateMove.x, 0.0f, stateMove.y);
+                float angle = Vector3.Angle(bulletDir, sm);
+                if (angle >= kDodgeKeepMoveMinAngle && angle <= 180.0f - kDodgeKeepMoveMinAngle) keep = Vector2.ClampMagnitude(stateMove, 1.0f);
+            }
+
+            // 弾の進路から見て、自分がいる側
+            Vector3 rel = c.Position - m_block.transform.position;
+            rel.y = 0.0f;
+            Vector3 side = rel - bulletDir * Vector3.Dot(rel, bulletDir);
+            if (side.sqrMagnitude < 0.0001f) side = Vector3.Cross(Vector3.up, bulletDir) * (Random.value < 0.5f ? 1.0f : -1.0f);
+            Vector2 away = CpuDodgeMove.ToMove(side, 1.0f);
+            return CpuDodgeMove.TryPick(c, out move, keep, away, -away);
         }
 
         private void Execute()

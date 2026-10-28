@@ -92,6 +92,16 @@ namespace Nakahira
         public float ActionTime => m_time;
         // 薙ぎ払いにかかる時間(秒)
         public float SweepDuration => m_params.SweepDuration;
+        // 股抜きショットの弾速
+        public float ShotSpeed => m_params.ShotSpeed;
+        // 薙ぎ払いで落ちている積み木を弾いたときの弾速
+        public float SweepLaunchSpeed => m_params.SweepLaunchSpeed;
+        // 薙ぎ払いで弾いた積み木を飛ばせる向きの最大角度(度。持ち主の正面から左右)
+        public float MaxLaunchAngle => m_maxReturnAngle;
+        // 足元からこの高さにある物(中心)に、薙ぎ払いが当たるか
+        public bool IsAtSweepHeight(float heightFromFeet) => Mathf.Abs(heightFromFeet - m_sweepHeight) <= m_hitHeightRange;
+        // 股抜きショットを振り始めてから弾が出るまでの時間(秒)
+        public float ShotFireDelay => m_params.ShotDuration * Mathf.Clamp01((m_shotStartPitch - m_shotHitPitch) / (m_shotStartPitch - m_shotEndPitch));
         // 薙ぎ払いがキャラクターに当たる、中心同士の水平の距離(届く距離 + 体の半径)
         public float CharacterHitDistance => HitReach + DarumaCharacter.kBodyRadius;
         // 薙ぎ払いが積み木に当たる、中心同士の水平の距離(届く距離 + 積み木の半径)
@@ -109,7 +119,22 @@ namespace Nakahira
             m_character = m_owner as DarumaCharacter;
         }
 
-        public bool TrySweep()
+        // ネット対戦のクライアント用: 振る見た目だけ動かし、当たり判定・弾の発射はしない(結果はホストから届く)
+        // ローカルプレイでは常に false
+        public bool ViewOnly { get; set; }
+
+        // ネット対戦のクライアント用: ホストで始まった動作の見た目を最初から再生する
+        public void PlayVisual(bool shot)
+        {
+            m_action = shot ? Action.Shot : Action.Sweep;
+            m_time = 0.0f;
+            m_prevSweepYaw = m_sweepStartYaw;
+            m_shotFired = false;
+            m_hitThisSwing.Clear();
+        }
+
+        
+public bool TrySweep()
         {
             if (IsBusy) return false;
             m_action = Action.Sweep;
@@ -139,7 +164,7 @@ namespace Nakahira
 
             if (m_action == Action.Sweep)
             {
-                DetectSweepHits();
+                if (!ViewOnly) DetectSweepHits();
                 if (m_time >= m_params.SweepDuration) m_action = Action.None;
             }
             else if (m_action == Action.Shot)
@@ -147,7 +172,7 @@ namespace Nakahira
                 if (!m_shotFired && CurrentShotPitch() <= m_shotHitPitch)
                 {
                     m_shotFired = true;
-                    FireShot();
+                    if (!ViewOnly) FireShot();
                 }
                 if (m_time >= m_params.ShotDuration) m_action = Action.None;
             }

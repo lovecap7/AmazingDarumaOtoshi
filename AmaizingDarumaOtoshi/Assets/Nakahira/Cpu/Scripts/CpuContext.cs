@@ -25,6 +25,20 @@ namespace Nakahira
         // 反応できる確率に掛ける倍率(疲れていないと 1、容量いっぱいで 0)
         public float Alertness => 1.0f - Mathf.Clamp01(LoadRatio);
 
+        // 殴り合いの相手が間合いの外へ逃げた(殴るが終わった)ときの相手と時刻。撃つの「追い撃ち」で使う
+        public MatchPlayer FledTarget { get; set; }
+        public float FledTime { get; set; } = -100.0f;
+
+        // 焦り(0〜1)。集中度の割合が PanicStart を超えると上がり始め、割合 1 で最大
+        public float Panic
+        {
+            get
+            {
+                float start = Params.PanicStart;
+                return Mathf.Clamp01((LoadRatio - start) / Mathf.Max(0.01f, 1.0f - start));
+            }
+        }
+
         // 疲れの上限(容量に対する割合。いつまでも回復しないことがないように)
         const float kMaxLoadRatio = 1.5f;
 

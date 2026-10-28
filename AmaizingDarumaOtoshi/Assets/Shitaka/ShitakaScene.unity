@@ -337,6 +337,11 @@ MonoBehaviour:
   boomerangRadius: 1.5
   boomerangCurveLeft: 1
   boomerangArriveDistance: 1
+  gravityRadius: 3
+  gravityStrength: 12
+  gravityDuration: 2.5
+  gravityDeadZone: 0.4
+  gravityEdgeRatio: 0.4
   rehitIgnoreTime: 0.2
 --- !u!54 &264285117
 Rigidbody:
@@ -696,7 +701,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BlockInfo
   color: 0
-  attackPower: 0
+  attackPower: 2
 --- !u!54 &557762075
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -739,7 +744,7 @@ MonoBehaviour:
   speed: 20
   deceleration: 0.2
   stopThreshold: 1
-  behaviorType: 10
+  behaviorType: 12
   hebiTurnSpeed: 60
   homingStartTurnSpeed: 270
   homingGuidanceDuration: 1.5
@@ -759,6 +764,11 @@ MonoBehaviour:
   boomerangRadius: 5
   boomerangCurveLeft: 1
   boomerangArriveDistance: 1
+  gravityRadius: 10
+  gravityStrength: 30
+  gravityDuration: 2.5
+  gravityDeadZone: 0.4
+  gravityEdgeRatio: 0.4
   rehitIgnoreTime: 0.2
 --- !u!65 &557762078
 BoxCollider:
@@ -1011,6 +1021,11 @@ MonoBehaviour:
   boomerangRadius: 1.5
   boomerangCurveLeft: 1
   boomerangArriveDistance: 1
+  gravityRadius: 3
+  gravityStrength: 12
+  gravityDuration: 2.5
+  gravityDeadZone: 0.4
+  gravityEdgeRatio: 0.4
   rehitIgnoreTime: 0.2
 --- !u!54 &759035617
 Rigidbody:
@@ -1276,7 +1291,7 @@ MonoBehaviour:
   speed: 20
   deceleration: 0.1
   stopThreshold: 0.1
-  behaviorType: 11
+  behaviorType: 0
   hebiTurnSpeed: 60
   homingStartTurnSpeed: 270
   homingGuidanceDuration: 1.5
@@ -1296,6 +1311,11 @@ MonoBehaviour:
   boomerangRadius: 5
   boomerangCurveLeft: 1
   boomerangArriveDistance: 1
+  gravityRadius: 3
+  gravityStrength: 12
+  gravityDuration: 2.5
+  gravityDeadZone: 0.4
+  gravityEdgeRatio: 0.4
   rehitIgnoreTime: 0.2
 --- !u!65 &792966896
 BoxCollider:
@@ -1408,6 +1428,11 @@ MonoBehaviour:
   boomerangRadius: 1.5
   boomerangCurveLeft: 1
   boomerangArriveDistance: 1
+  gravityRadius: 3
+  gravityStrength: 12
+  gravityDuration: 2.5
+  gravityDeadZone: 0.4
+  gravityEdgeRatio: 0.4
   rehitIgnoreTime: 0.2
 --- !u!54 &803537026
 Rigidbody:
@@ -1600,6 +1625,11 @@ MonoBehaviour:
   boomerangRadius: 1.5
   boomerangCurveLeft: 1
   boomerangArriveDistance: 1
+  gravityRadius: 3
+  gravityStrength: 12
+  gravityDuration: 2.5
+  gravityDeadZone: 0.4
+  gravityEdgeRatio: 0.4
   rehitIgnoreTime: 0.2
 --- !u!54 &1032551247
 Rigidbody:
@@ -1792,6 +1822,11 @@ MonoBehaviour:
   boomerangRadius: 1.5
   boomerangCurveLeft: 1
   boomerangArriveDistance: 1
+  gravityRadius: 3
+  gravityStrength: 12
+  gravityDuration: 2.5
+  gravityDeadZone: 0.4
+  gravityEdgeRatio: 0.4
   rehitIgnoreTime: 0.2
 --- !u!54 &1076914364
 Rigidbody:
@@ -1984,6 +2019,11 @@ MonoBehaviour:
   boomerangRadius: 1.5
   boomerangCurveLeft: 1
   boomerangArriveDistance: 1
+  gravityRadius: 3
+  gravityStrength: 12
+  gravityDuration: 2.5
+  gravityDeadZone: 0.4
+  gravityEdgeRatio: 0.4
   rehitIgnoreTime: 0.2
 --- !u!54 &1098038425
 Rigidbody:
@@ -2268,6 +2308,11 @@ MonoBehaviour:
   boomerangRadius: 1.5
   boomerangCurveLeft: 1
   boomerangArriveDistance: 1
+  gravityRadius: 3
+  gravityStrength: 12
+  gravityDuration: 2.5
+  gravityDeadZone: 0.4
+  gravityEdgeRatio: 0.4
   rehitIgnoreTime: 0.2
 --- !u!65 &1141642620
 BoxCollider:
@@ -2776,6 +2821,11 @@ MonoBehaviour:
   boomerangRadius: 1.5
   boomerangCurveLeft: 1
   boomerangArriveDistance: 1
+  gravityRadius: 3
+  gravityStrength: 12
+  gravityDuration: 2.5
+  gravityDeadZone: 0.4
+  gravityEdgeRatio: 0.4
   rehitIgnoreTime: 0.2
 --- !u!54 &1536202398
 Rigidbody:
@@ -3120,6 +3170,11 @@ MonoBehaviour:
   boomerangRadius: 1.5
   boomerangCurveLeft: 1
   boomerangArriveDistance: 1
+  gravityRadius: 3
+  gravityStrength: 12
+  gravityDuration: 2.5
+  gravityDeadZone: 0.4
+  gravityEdgeRatio: 0.4
   rehitIgnoreTime: 0.2
 --- !u!54 &1796746307
 Rigidbody:
@@ -3405,6 +3460,11 @@ MonoBehaviour:
   boomerangRadius: 1.5
   boomerangCurveLeft: 1
   boomerangArriveDistance: 1
+  gravityRadius: 3
+  gravityStrength: 12
+  gravityDuration: 2.5
+  gravityDeadZone: 0.4
+  gravityEdgeRatio: 0.4
   rehitIgnoreTime: 0.2
 --- !u!65 &2023414662
 BoxCollider:
