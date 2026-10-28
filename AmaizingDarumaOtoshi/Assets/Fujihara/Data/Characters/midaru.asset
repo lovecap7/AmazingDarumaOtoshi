@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c8a751e747833b74c9fdf9b27cff5e69, type: 3}
+  m_Name: midaru
+  m_EditorClassIdentifier: Assembly-CSharp::CharacterData
+  id: midaru
+  displayName: "\u307f\u3060\u308b"
+  color: {r: 0.25, g: 0.8, b: 0.3, a: 1}
+  portrait: {fileID: 0}
+  prefab: {fileID: 9069936943766670842, guid: f955d31825f341a9adbec0ee941a91f7, type: 3}
+  passiveColor: 2
+  passiveCount: 0
+  passiveName: "\u30db\u30fc\u30df\u30f3\u30b0"
+  passiveText: "\u7dd1\u8272\u306e\u7a4d\u307f\u6728\u304c\u76f8\u624b\u3092\u8ffd\u3044\u304b\u3051\u3066\u98db\u3076"
+  hammerPower: 3
+  hammerSpeed: 3
+  hammerReach: 3
+  specialName: "\u307f\u3060\u308b\u4e71\u821e"
+  specialText: "\u7dd1\u306e\u98a8\u3092\u307e\u3068\u3044\u3001\u76f8\u624b\u3092\u8ffd\u3044\u304b\u3051\u308b\u7a4d\u307f\u6728\u3092\u9023\u7d9a\u3067\u6295\u3052\u308b"
