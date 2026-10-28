@@ -34,6 +34,22 @@ namespace Nakahira
             return !(block.CurrentState == TumikiBlock.State.Flying && block.IsHarmful);
         }
 
+        // 盤面に拾える積み木が1つでもあるか
+        public static bool HasAnyCollectable()
+        {
+            foreach (var block in TumikiBlock.All)
+            {
+                if (IsCollectable(block)) return true;
+            }
+            return false;
+        }
+
+        // 積むが選ばれない場面か(盤面に拾える積み木がない・積み終わった)。攻めに行く・待つで使う
+        public static bool NothingToCollect(CpuContext c)
+        {
+            return c.StackCount >= c.Params.CollectUntil || !HasAnyCollectable();
+        }
+
         // 拾いに行く候補(拾える・諦めていない・探す範囲内・跳んで届く高さ)を集め、まっすぐの距離 + extraCost の小さい順に並べる
         // extraCost が無限大の積み木は除く
         public static void Gather(CpuContext c, List<Candidate> results, Func<TumikiBlock, float> extraCost)
