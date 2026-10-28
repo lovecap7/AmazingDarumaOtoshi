@@ -6,7 +6,8 @@ namespace Nakahira
     // 試合では MatchPlayer と同じGameObjectに付ける(操作する体は MatchPlayer から取る)。
     // キャラクターに直接付けた場合はそのキャラクターを動かす
     //
-    // 知る(CpuPerception) → 決める(ここ) → 状態(積む・逃げる・殴る) → 動きの部品(道をたどる・跳んで拾う)
+    // 知る(CpuPerception) → 決める(ここ) → 状態(積む・逃げる・殴る) → とっさの反応(CpuReflex。弾が来たら割り込む)
+    // → 動きの部品(道をたどる・跳んで拾う)
     // 決める:ThinkInterval ごとに各状態のやりたさを比べ、一番高い状態にする
     //  ・今の状態には StateStickiness を足す(ころころ変えない)
     //  ・選んでから MinStateTime の間は変えない(UrgentScore 以上のやりたさなら変える)
@@ -25,6 +26,7 @@ namespace Nakahira
         readonly CpuCollectState m_collect = new CpuCollectState();
         readonly CpuFleeState m_flee = new CpuFleeState();
         readonly CpuMeleeState m_melee = new CpuMeleeState();
+        readonly CpuReflex m_reflex = new CpuReflex();
         CpuState[] m_states;
         CpuState m_current;
         float m_stateTime;
@@ -41,6 +43,8 @@ namespace Nakahira
 
         // 今の状態の名前(デバッグ表示用。なければ空)
         public string StateName => m_current != null ? m_current.Name : "";
+        // 今のとっさの反応(デバッグ表示用)
+        public CpuReflex.Action ReflexAction => m_reflex.Current;
         // 集中度(認識の疲れ)の割合(デバッグ表示用)
         public float LoadRatio => m_params != null ? m_context.LoadRatio : 0.0f;
 
@@ -71,6 +75,7 @@ namespace Nakahira
                 m_lastSelf = self;
                 m_lastStackCount = self.Stack.Count;
                 m_context.ResetLoad();
+                m_reflex.Reset();
             }
 
             m_context.DecayLoad();
@@ -101,6 +106,9 @@ namespace Nakahira
                 cmd = new DarumaCommand();
                 if (m_current != null) m_current.Tick(m_context, ref cmd);
             }
+
+            // とっさの反応:飛んでくる弾に、どの状態の最中でも割り込む
+            m_reflex.Apply(m_context, ref cmd);
             return cmd;
         }
 

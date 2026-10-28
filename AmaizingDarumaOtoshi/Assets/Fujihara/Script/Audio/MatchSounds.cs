@@ -19,6 +19,9 @@ public class MatchSounds : ScriptableObject
     [Tooltip("首を飛ばして撃墜したとき（空欄なら仮の音）")]
     public AudioClip ko;
 
+    [Tooltip("打ち返したときの音。打ち返し1回目は①、それを打ち返すと②、③、④、5回目からはずっと最後の音。空欄なら「積み木に当たった音」を高くして鳴らす")]
+    public AudioClip[] returnHits = new AudioClip[4];
+
     [Tooltip("聞き比べ用の候補の音。Inspector の「候補の音」で ▶ 試聴し、1〜4 のボタンでその場面に入れる（試合では鳴らない）")]
     public System.Collections.Generic.List<AudioClip> candidates = new System.Collections.Generic.List<AudioClip>();
 
@@ -28,11 +31,18 @@ public class MatchSounds : ScriptableObject
     public AudioClip Knock => knock != null ? knock : SoundSynth.HitCharacter;
     public AudioClip KO => ko != null ? ko : SoundSynth.KO;
 
+    // 打ち返した回数（1〜）の音。①〜④を順に、5回目からはずっと④（入っていなければ null）
+    public AudioClip ReturnHit(int count)
+    {
+        if (returnHits == null || returnHits.Length == 0 || count <= 0) return null;
+        return returnHits[Mathf.Min(count, returnHits.Length) - 1];
+    }
+
     // ---- 設定しない音（仮の音のまま） ----
     public float BgmVolume => 0.45f;
     public float SeVolume => 0.9f;
     public float HurryPitch => 1.06f;   // 残り10秒で BGM を少し速く・高くする倍率
-    public AudioClip Bgm => SoundSynth.Bgm;
+    public AudioClip Bgm => MenuSounds.Instance != null && MenuSounds.Instance.matchBgm != null ? MenuSounds.Instance.matchBgm : SoundSynth.Bgm;
     public AudioClip BlockHitBlock => SoundSynth.BlockHitBlock;
     public AudioClip Pickup => SoundSynth.Pickup;
     public AudioClip Jump => SoundSynth.Jump;

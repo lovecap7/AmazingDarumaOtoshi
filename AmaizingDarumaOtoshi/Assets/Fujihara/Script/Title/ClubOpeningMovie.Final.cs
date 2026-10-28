@@ -38,13 +38,10 @@ public partial class ClubOpeningMovie
         SetShot(lt => mid + side * (6.0f - lt * 0.6f) + Vector3.up * 4.0f, lt => mid + Vector3.up * 3.4f, 44f);
         StartCoroutine(Tween(0.35f, u => hero.pivotRot = champ.pivotRot = Quaternion.Slerp(GHammerIdle, GHammerWindup, Mathf.SmoothStep(0f, 1f, u))));
         yield return Until(t0 + 2.95f);
-        MenuSounds.Play(MatchSounds.Instance.Swing);
         // 角度をそのまま補間して前へ振る（Slerp だと体の後ろを回る）
         yield return Tween(0.12f, u => hero.pivotRot = champ.pivotRot = Quaternion.Euler(Mathf.Lerp(-10f, -5f, u), Mathf.Lerp(125f, -28f, u), 0f));
         var clashAt = (FindPart(hero.pivot, "HammerHead").position + FindPart(champ.pivot, "HammerHead").position) * 0.5f;
         Sparks(clashAt, 40, new Color(2.4f, 2f, 0.8f));
-        MenuSounds.Play(MatchSounds.Instance.Knock);
-        MenuSounds.Play(MatchSounds.Instance.HitBlock);
         StartCoroutine(FadeFlash(Color.white, 0.6f, 0f, 0.2f));
         camShake = 1.2f;
         StartCoroutine(SlowMo(0.12f, 0.45f));
@@ -118,7 +115,6 @@ public partial class ClubOpeningMovie
     {
         p.swinging = true;
         yield return Tween(0.05f, u => p.pivotRot = Quaternion.Slerp(GHammerIdle, GHammerWindup, u));
-        MenuSounds.Play(MatchSounds.Instance.Swing, 0.6f);
         bool hit = false;
         yield return Tween(0.05f, u =>
         {
@@ -144,7 +140,10 @@ public partial class ClubOpeningMovie
             if (v.blocks.Count == before) return;
             var at = v.Pos + Vector3.up * GBlockH * 0.5f;
             Impact(at, false);
-            StartCoroutine(Tween(0.12f, u => v.root.position += Flat(v.Pos - a.Pos).normalized * 0.04f));   // 当たった勢いでのけぞる
+            // 当たった勢いで少しのけぞって戻る（足し算にするとヒットストップ中のフレーム数だけ離れていくので、元の位置からの量で動かす）
+            var back = Flat(v.Pos - a.Pos).normalized * 0.3f;
+            var vFrom = v.Pos;
+            StartCoroutine(Tween(0.2f, u => v.root.position = vFrom + back * Mathf.Sin(u * Mathf.PI)));
         });
     }
 
@@ -155,10 +154,8 @@ public partial class ClubOpeningMovie
         FacePuppet(b, a.Pos);
         a.swinging = b.swinging = true;
         yield return Tween(0.05f, u => a.pivotRot = b.pivotRot = Quaternion.Slerp(GHammerIdle, GHammerWindup, u));
-        MenuSounds.Play(MatchSounds.Instance.Swing, 0.7f);
         yield return Tween(0.05f, u => a.pivotRot = b.pivotRot = Quaternion.Euler(Mathf.Lerp(-10f, -5f, u), Mathf.Lerp(125f, -28f, u), 0f));
         var at = (FindPart(a.pivot, "HammerHead").position + FindPart(b.pivot, "HammerHead").position) * 0.5f;
-        MenuSounds.Play(MatchSounds.Instance.Knock);
         Impact(at, true);
         Sparks(at, 30, new Color(2.6f, 2.2f, 0.9f));
         yield return Tween(0.12f, u => a.pivotRot = b.pivotRot = Quaternion.Slerp(GHammerClash, GHammerIdle, u));
@@ -206,7 +203,6 @@ public partial class ClubOpeningMovie
         var toB = c + axis * 1.3f;
         Afterimage(a);
         Afterimage(b);
-        MenuSounds.Play(MatchSounds.Instance.Jump, 0.8f);
         var fa = a.Pos;
         var fb = b.Pos;
         a.trail.emitting = b.trail.emitting = true;
@@ -394,6 +390,9 @@ public partial class ClubOpeningMovie
         matchRoot.gameObject.SetActive(true);
         matchRunning = true;
         nextDrop = float.MaxValue;   // 決勝は空から積み木を降らせない
+        // バンパーも落ちている積み木もない平らな試合場にして、2人だけを目立たせる
+        flatField = true;
+        if (bumperRoot != null) bumperRoot.gameObject.SetActive(false);
 
         // 主人公（託された紫のハンマー）と王者（銀の顔、黒いハンマー）
         fHero = CreateGPuppet(Red, true);
@@ -408,20 +407,6 @@ public partial class ClubOpeningMovie
         Place(fChamp, L(1f, 0f), 7);
         FacePuppet(fHero, fChamp.Pos);
         FacePuppet(fChamp, fHero.Pos);
-
-        // まわりにいくつか積み木が落ちている（試合場らしく）
-        var rng = new System.Random(31);
-        for (int i = 0; i < 10; i++)
-        {
-            var want = L(((float)rng.NextDouble() * 2f - 1f) * (TrayHalfW - 1f), ((float)rng.NextDouble() * 2f - 1f) * (TrayHalfD - 1f));
-            if (Flat(want - MatchSet).magnitude < 3f) continue;
-            var spot = FreeSpot(want);
-            if (!spot.HasValue) continue;
-            var b = CreateGBlock((Nakahira.TumikiColor)(i % 4));
-            b.position = spot.Value + Vector3.up * GBlockH * 0.5f;
-            b.rotation = Quaternion.Euler(0f, rng.Next(360), 0f);
-            looseBlocks.Add(b);
-        }
 
         // 全国大会らしく：奥に横断幕、上から2本のスポットライト（最初は消えている）
         var banner = Box(setRoot, "FinalBanner", MatchSet + new Vector3(0f, 3.6f, 8.6f), new Vector3(9f, 1.6f, 0.05f), ToyKit.Lit(new Color(0.85f, 0.12f, 0.1f), 0.3f));
@@ -450,7 +435,6 @@ public partial class ClubOpeningMovie
         {
             yield return Tween(0.25f, u => { });
             lg.intensity = 60f;
-            MenuSounds.Play(MatchSounds.Instance.BlockHitBlock);
         }
     }
 
@@ -490,7 +474,8 @@ public partial class ClubOpeningMovie
         v.blocks.RemoveAt(0);
         b.SetParent(matchRoot, true);
         AddFire(b);
-        ToTumble(b, d * Random.Range(5f, 8f) + s * Random.Range(-5f, 5f) + Vector3.up * Random.Range(4f, 7f));
+        // 場外まで大きく飛ばす（試合場に残して2人の邪魔にならないように）
+        ToTumble(b, d * Random.Range(10f, 14f) + s * Random.Range(-4f, 4f) + Vector3.up * Random.Range(5f, 7f));
         Sparks(b.position, 18, new Color(2f, 1.4f, 0.5f));
         // 当たった勢いで、積み木のかけらも飛び散る
         var mat = b.GetComponent<Renderer>().sharedMaterial;
@@ -503,7 +488,6 @@ public partial class ClubOpeningMovie
             chip.GetComponent<Renderer>().sharedMaterial = mat;
             flyers.Add(new Flyer { t = chip, v = d * Random.Range(3f, 7f) + s * Random.Range(-6f, 6f) + Vector3.up * Random.Range(3f, 7f), spin = Random.onUnitSphere * 800f, life = 1.2f });
         }
-        MenuSounds.Play(MatchSounds.Instance.HitBlock);
         camShake = Mathf.Max(camShake, 0.6f);
     }
 

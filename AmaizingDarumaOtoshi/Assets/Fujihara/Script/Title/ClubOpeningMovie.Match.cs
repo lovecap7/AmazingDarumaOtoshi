@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using Nakahira;
 using UnityEngine;
@@ -60,9 +60,12 @@ public partial class ClubOpeningMovie
     readonly List<GShot> gShots = new List<GShot>();
     readonly List<GTumble> tumbles = new List<GTumble>();
     bool matchRunning;
-    float nextDrop, pickupSoundTime;
+    float nextDrop;
     Material smokeMat, fireMat;
     readonly Vector2[] bumpers = { new Vector2(-5f, 3.2f), new Vector2(5f, 3.2f), new Vector2(-5.5f, -3f), new Vector2(5.5f, -3f) };
+    Transform bumperRoot;
+    // 決勝：バンパーなしの平らな試合場。飛んだ積み木はふちで跳ね返らず、場外へ落ちて消える（2人を目立たせる）
+    bool flatField;
 
     Vector3 L(float x, float z) => MatchSet + new Vector3(x, 0f, z);
 
@@ -90,7 +93,6 @@ public partial class ClubOpeningMovie
         yield return Until(t0 + 2.9f);
         // 試合開始
         hero.pivotRot = GHammerIdle;
-        MenuSounds.Play(MatchSounds.Instance.StartWhistle);
         foreach (var p in gPuppets) { p.holdFire = false; p.goal = null; }
 
         // ---- 2. 乱戦 ----
@@ -175,7 +177,6 @@ public partial class ClubOpeningMovie
         yield return Swing(hero, () =>
         {
             rival.tremble = false;
-            MenuSounds.Play(MatchSounds.Instance.KO);
             camShake = 1f;
             StartCoroutine(SlowMo(0.15f, 0.5f));
             StartCoroutine(KnockDown(rival, Flat(rival.Pos - hero.Pos).normalized * 2.4f));
@@ -214,7 +215,6 @@ public partial class ClubOpeningMovie
         var given = rival.hammer;
         var fromPos = given.position;
         var fromRot = given.rotation;
-        MenuSounds.Play(MatchSounds.Instance.Pickup);
         yield return Tween(0.45f, u =>
         {
             float e = Mathf.SmoothStep(0f, 1f, u);
@@ -242,7 +242,6 @@ public partial class ClubOpeningMovie
         SetShot(lt => frozenPos, lt => frozenLook, 46f);
         StartCoroutine(SpinIn(paper, 0.55f));
         yield return Until(t0 + 15.85f);
-        MenuSounds.Play(MatchSounds.Instance.Knock);
         camShake = 0.6f;
         yield return Until(t0 + 17.8f);
         paper.gameObject.SetActive(false);
@@ -393,12 +392,13 @@ public partial class ClubOpeningMovie
             p.vel = Vector3.Lerp(p.vel, desired, 1f - Mathf.Exp(-8f * dt));
             var pos = p.Pos + p.vel * dt;
             // バンパーとトレイのふちで止まる
-            foreach (var bp in bumpers)
-            {
-                var c = MatchSet + new Vector3(bp.x, 0f, bp.y);
-                var away = Flat(pos - c);
-                if (away.magnitude < 1.7f) pos = c + away.normalized * 1.7f;
-            }
+            if (!flatField)
+                foreach (var bp in bumpers)
+                {
+                    var c = MatchSet + new Vector3(bp.x, 0f, bp.y);
+                    var away = Flat(pos - c);
+                    if (away.magnitude < 1.7f) pos = c + away.normalized * 1.7f;
+                }
             pos.x = Mathf.Clamp(pos.x, MatchSet.x - TrayHalfW + 0.6f, MatchSet.x + TrayHalfW - 0.6f);
             pos.z = Mathf.Clamp(pos.z, MatchSet.z - TrayHalfD + 0.6f, MatchSet.z + TrayHalfD - 0.6f);
             pos.y = MatchSet.y;
@@ -417,7 +417,6 @@ public partial class ClubOpeningMovie
                     if (Flat(b.position - p.Pos).magnitude > 0.75f) continue;
                     looseBlocks.RemoveAt(i);
                     AttachBlock(p, b);
-                    if (Time.unscaledTime > pickupSoundTime) { MenuSounds.Play(MatchSounds.Instance.Pickup, 0.6f); pickupSoundTime = Time.unscaledTime + 0.15f; }
                     break;
                 }
         }
@@ -458,7 +457,6 @@ public partial class ClubOpeningMovie
                     s.speed *= 1.25f;
                     s.owner = hit;
                     s.reflected = true;
-                    MenuSounds.Play(MatchSounds.Instance.Knock);
                     camShake = Mathf.Max(camShake, 0.8f);
                     s.onReflect?.Invoke();
                     continue;
@@ -479,7 +477,6 @@ public partial class ClubOpeningMovie
 
     void Impact(GPuppet victim, GShot s)
     {
-        MenuSounds.Play(MatchSounds.Instance.HitBlock);
         camShake = Mathf.Max(camShake, 0.5f);
         if (victim.blocks.Count > 0)
         {
@@ -495,7 +492,6 @@ public partial class ClubOpeningMovie
             // 首だけのところに当たった：撃墜（場外へ吹っ飛ぶ）
             victim.out_ = true;
             victim.tremble = false;
-            MenuSounds.Play(MatchSounds.Instance.KO);
             camShake = 1f;
             StartCoroutine(SlowMo(0.3f, 0.4f));
             StartCoroutine(Launch(victim, s.dir));
@@ -536,7 +532,6 @@ public partial class ClubOpeningMovie
             p.root.rotation = startRot * Quaternion.Euler(u * 540f, 0f, 0f);
         });
         p.root.rotation = startRot * Quaternion.Euler(90f, 0f, 0f);   // あお向けに倒れる
-        MenuSounds.Play(MatchSounds.Instance.BlockHitBlock);
     }
 
     void UpdateTumbles(float dt)
@@ -547,6 +542,19 @@ public partial class ClubOpeningMovie
             tb.v += Physics.gravity * dt;
             var pos = tb.t.position + tb.v * dt;
             var lp = pos - MatchSet;
+            if (flatField)
+            {
+                // ふちを越えて場外の机へ落ちたら（トレイの中に落ちても）消す
+                tb.t.position = pos;
+                tb.t.Rotate(tb.spin * dt, Space.World);
+                bool outside = Mathf.Abs(lp.x) > TrayHalfW || Mathf.Abs(lp.z) > TrayHalfD;
+                if (tb.v.y < 0f && lp.y <= (outside ? -0.4f : GBlockH * 0.5f))
+                {
+                    tumbles.RemoveAt(i);
+                    Destroy(tb.t.gameObject);
+                }
+                continue;
+            }
             if (Mathf.Abs(lp.x) > TrayHalfW - 0.5f) { tb.v.x = -tb.v.x * 0.5f; lp.x = Mathf.Sign(lp.x) * (TrayHalfW - 0.5f); }
             if (Mathf.Abs(lp.z) > TrayHalfD - 0.5f) { tb.v.z = -tb.v.z * 0.5f; lp.z = Mathf.Sign(lp.z) * (TrayHalfD - 0.5f); }
             pos = MatchSet + lp;
@@ -589,7 +597,6 @@ public partial class ClubOpeningMovie
             b.position = p.Pos + Vector3.up * GBlockH * 0.5f + dir * 0.7f;
             AddFire(b);
             gShots.Add(new GShot { t = b, dir = dir, speed = 15f, owner = p, onReflect = onReflect });
-            MenuSounds.Play(MatchSounds.Instance.HitBlock, 0.7f);
         });
         p.cooldown = Random.Range(0.8f, 1.6f);
     }
@@ -599,7 +606,6 @@ public partial class ClubOpeningMovie
     {
         p.swinging = true;
         yield return Tween(0.12f, u => p.pivotRot = Quaternion.Slerp(GHammerIdle, GHammerWindup, Mathf.SmoothStep(0f, 1f, u)));
-        MenuSounds.Play(MatchSounds.Instance.Swing, 0.7f);
         bool hit = false;
         yield return Tween(0.08f, u =>
         {
@@ -772,6 +778,7 @@ public partial class ClubOpeningMovie
 
     bool NearBumper(Vector3 local, float r)
     {
+        if (flatField) return false;
         foreach (var bp in bumpers) if (new Vector2(local.x - bp.x, local.z - bp.y).magnitude < r) return true;
         return false;
     }
@@ -807,15 +814,17 @@ public partial class ClubOpeningMovie
         Box(root, "RimE", MatchSet + new Vector3(TrayHalfW + 0.35f, 0.3f, 0f), new Vector3(0.7f, 1.4f, TrayHalfD * 2f), rim);
         Box(root, "RimW", MatchSet + new Vector3(-TrayHalfW - 0.35f, 0.3f, 0f), new Vector3(0.7f, 1.4f, TrayHalfD * 2f), rim);
 
-        // 丸いバンパー（ピンクの台に黄色のふた）
+        // 丸いバンパー（ピンクの台に黄色のふた）。決勝では片づける
         var pink = ToyKit.Lit(new Color(0.95f, 0.4f, 0.5f), 0.5f);
         var yellow = ToyKit.Lit(new Color(1f, 0.82f, 0.25f), 0.5f);
+        bumperRoot = new GameObject("Bumpers").transform;
+        bumperRoot.SetParent(root, false);
         foreach (var bp in bumpers)
         {
             var c = MatchSet + new Vector3(bp.x, 0f, bp.y);
-            Cyl(root, c + Vector3.up * 0.05f, new Vector3(2.7f, 0.05f, 2.7f), yellow);
-            Cyl(root, c + Vector3.up * 0.3f, new Vector3(2.4f, 0.3f, 2.4f), pink);
-            Cyl(root, c + Vector3.up * 0.62f, new Vector3(1.4f, 0.03f, 1.4f), yellow);
+            Cyl(bumperRoot, c + Vector3.up * 0.05f, new Vector3(2.7f, 0.05f, 2.7f), yellow);
+            Cyl(bumperRoot, c + Vector3.up * 0.3f, new Vector3(2.4f, 0.3f, 2.4f), pink);
+            Cyl(bumperRoot, c + Vector3.up * 0.62f, new Vector3(1.4f, 0.03f, 1.4f), yellow);
         }
 
         // 机の上の大きな小物（トレイのまわり）

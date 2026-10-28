@@ -26,6 +26,24 @@ public class MatchSoundsEditor : Editor
                                 "3. 飛ばした積み木が相手に当たったとき／ハンマーで相手の積み木を直接はじき出したとき\n" +
                                 "4. 首を飛ばして撃墜したとき", MessageType.None);
 
+        // ---- 打ち返しの音（回数で変わる） ----
+        EditorGUILayout.Space(10);
+        EditorGUILayout.LabelField("打ち返しの音（1回目→①、2回目→②、3回目→③、4回目から→④）", EditorStyles.boldLabel);
+        serializedObject.Update();
+        var rh = serializedObject.FindProperty("returnHits");
+        if (rh.arraySize < 4) rh.arraySize = 4;
+        for (int i = 0; i < rh.arraySize; i++)
+        {
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                var el = rh.GetArrayElementAtIndex(i);
+                EditorGUILayout.PropertyField(el, new GUIContent((i + 1) + (i == rh.arraySize - 1 ? " 回目〜" : " 回目")));
+                using (new EditorGUI.DisabledScope(el.objectReferenceValue == null))
+                    if (GUILayout.Button("▶", GUILayout.Width(28))) Preview((AudioClip)el.objectReferenceValue);
+            }
+        }
+        serializedObject.ApplyModifiedProperties();
+
         // ---- 候補の音（聞き比べ） ----
         EditorGUILayout.Space(10);
         EditorGUILayout.LabelField("候補の音（▶ で試聴、1〜4 でその場面に入れる）", EditorStyles.boldLabel);

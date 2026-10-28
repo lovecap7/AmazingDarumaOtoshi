@@ -26,8 +26,10 @@ public class MenuSounds : ScriptableObject
     public AudioClip menuBgm;
     [Tooltip("セレクト画面（モード・ルール・キャラ・ステージ）の BGM")]
     public AudioClip selectBgm;
+    [Tooltip("試合（実際に遊んでいる画面）の BGM。入れると試合で鳴る（空欄なら仮の合成 BGM）")]
+    public AudioClip matchBgm;
 
-    [Tooltip("聞き比べ用の BGM 候補。Inspector の「BGM の候補」で ▶ 試聴し、T / M / S のボタンでその画面に入れる")]
+    [Tooltip("聞き比べ用の BGM 候補。Inspector の「BGM の候補」で ▶ 試聴し、T / M / S / G のボタンでその画面に入れる")]
     public System.Collections.Generic.List<AudioClip> bgmCandidates = new System.Collections.Generic.List<AudioClip>();
 
     // ---- 鳴らす ----
