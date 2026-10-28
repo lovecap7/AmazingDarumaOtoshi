@@ -82,6 +82,8 @@ namespace Nakahira
         public static event System.Action<HammerHitInfo> Hit;
 
         public bool IsBusy => m_action != Action.None;
+        // このハンマーの性能。キャラクターのパッシブが、実行時に複製へ差し替えるために使う
+        public HammerParams Params { get => m_params; set => m_params = value; }
         // 当たり判定が届く距離(見た目のハンマーの長さ × 倍率)
         float HitReach => (m_armLength + m_hammerHalfWidth) * m_params.HitReachScale;
         public bool IsShooting => m_action == Action.Shot;

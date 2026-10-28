@@ -16,4 +16,4 @@ MonoBehaviour:
   displayName: "\u3042\u304B\u3060\u308B"
   color: {r: 0.91, g: 0.29, b: 0.25, a: 1}
   portrait: {fileID: 0}
-  prefab: {fileID: 0}
+  prefab: {fileID: 9069936943766670842, guid: 1b40e3ce94eb73de3295fe933d28580b, type: 3}
