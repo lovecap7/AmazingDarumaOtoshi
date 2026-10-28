@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c8a751e747833b74c9fdf9b27cff5e69, type: 3}
+  m_Name: iwadaru
+  m_EditorClassIdentifier: Assembly-CSharp::CharacterData
+  id: iwadaru
+  displayName: "\u3044\u308f\u3060\u308b"
+  color: {r: 0.5, g: 0.47, b: 0.42, a: 1}
+  portrait: {fileID: 0}
+  prefab: {fileID: 9069936943766670842, guid: 1039ec300b9d4d93beebda1749cfd71a, type: 3}
+  passiveColor: 0
+  passiveCount: 0
+  passiveName: "\u5ca9\u306e\u7a4d\u307f\u6728"
+  passiveText: "\u98db\u3070\u3057\u305f\u7a4d\u307f\u6728\u306f\u4ed6\u306e\u7a4d\u307f\u6728\u3092\u58ca\u3057\u3001\u58c1\u306b\u5f53\u305f\u308b\u3068\u58ca\u308c\u308b"
+  hammerPower: 5
+  hammerSpeed: 2
+  hammerReach: 3
+  specialName: "\u3044\u308f\u3060\u308b\u5d29\u3057"
+  specialText: "\u5730\u9762\u3092\u53e9\u3044\u3066\u5ca9\u306e\u7a4d\u307f\u6728\u3092\u547c\u3073\u51fa\u3057\u3001\u307e\u3068\u3081\u3066\u76f8\u624b\u306b\u3076\u3064\u3051\u308b"
