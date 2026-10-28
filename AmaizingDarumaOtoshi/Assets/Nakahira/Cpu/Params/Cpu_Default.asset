@@ -41,6 +41,11 @@ MonoBehaviour:
   CircleChance: 0.6
   StrafeChance: 0.6
   MeleePickupRadius: 1.5
+  PanicStart: 0.4
+  PanicSwingInterval: 0.05
+  PanicReachSlack: 1.5
+  PanicJumpRate: 2.5
+  PanicDodgeJitter: 0.2
   CollectScore: 0.5
   CollectUntil: 10
   SearchRadius: 25
@@ -59,6 +64,12 @@ MonoBehaviour:
   StackThreatUrgency: 0.8
   GhostThreatUrgency: 0.95
   FleeSafetyMargin: 1
+  ReactChance: 1
+  CatchChance: 0.7
+  ReturnChance: 0.8
+  ReflexReaction: 0.05
+  ReflexTimingError: 0.01
+  ReflexHorizon: 1
   JumpDistanceError: 0.1
   AimError: 0.1
   RepathInterval: 0.3
