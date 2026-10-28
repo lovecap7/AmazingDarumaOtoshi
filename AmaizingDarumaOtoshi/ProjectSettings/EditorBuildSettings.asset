@@ -29,9 +29,6 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/suehara/net test.unity
     guid: 2e9fc7557f1448c4fbeea4b2ecd23ba7
-  - enabled: 1
-    path: Assets/suehara/NetStages.unity
-    guid: 967f1e03ceac953488f1988770324467
   m_configObjects:
     com.unity.dt.app-ui: {fileID: 11400000, guid: 1b1c20d82303e4b5781c3ef50ac1449f, type: 2}
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}

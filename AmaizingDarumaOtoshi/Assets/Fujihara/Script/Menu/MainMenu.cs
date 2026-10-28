@@ -111,7 +111,6 @@ public class MainMenu : MonoBehaviour
     TextMeshProUGUI descText, boardTitle;
     Image boardDim;
     Selectable soundFirst, videoFirst;
-    GameObject panelSelected;   // 看板の中でいま選んでいる行（行を移ったときの音用）
 
     float BH => BlockSize.y;
 
@@ -228,45 +227,35 @@ public class MainMenu : MonoBehaviour
     {
         var group = Group("Sound", root);
         var names = new[] { "マスター", "BGM", "効果音" };
-        var colors = new[] { ToyKit.Palette[1], ToyKit.Palette[4], ToyKit.Palette[3] };
         var sliders = new Slider[3];
-        var meters = new RectTransform[3];
         var values = new TMP_Text[3];
         for (int i = 0; i < 3; i++)
         {
             var row = Row(group.transform, 150f - i * 150f, names[i]);
-
-            // 目盛りの積み木を並べる場所。スライダーの当たり判定も同じ広さ
             var sg = new GameObject("Slider", typeof(RectTransform));
             sg.transform.SetParent(row.transform, false);
-            var area = (RectTransform)sg.transform;
-            ToyKit.Anchor(area, new Vector2(0.5f, 0.5f), new Vector2(85f, 0f), new Vector2(510f, 80f));
-            var hit = ToyKit.UIImage("Hit", area, Color.clear); ToyKit.Stretch(hit);
-            hit.GetComponent<Image>().raycastTarget = true;
+            ToyKit.Anchor((RectTransform)sg.transform, new Vector2(0.5f, 0.5f), new Vector2(70f, 0f), new Vector2(560f, 44f));
+            var bg = ToyKit.UIImage("Background", sg.transform, new Color(0.85f, 0.78f, 0.7f), uiSprite); ToyKit.Stretch(bg);
+            var fa = new GameObject("Fill Area", typeof(RectTransform)).GetComponent<RectTransform>();
+            fa.SetParent(sg.transform, false); ToyKit.Stretch(fa); fa.offsetMin = new Vector2(12f, 0f); fa.offsetMax = new Vector2(-12f, 0f);
+            var fill = ToyKit.UIImage("Fill", fa, ToyKit.Palette[1], uiSprite); ToyKit.Stretch(fill); fill.offsetMin = new Vector2(-12f, 0f); fill.offsetMax = new Vector2(12f, 0f);
             var ha = new GameObject("Handle Area", typeof(RectTransform)).GetComponent<RectTransform>();
-            ha.SetParent(area, false); ToyKit.Stretch(ha); ha.offsetMin = new Vector2(23f, 0f); ha.offsetMax = new Vector2(-23f, 0f);
-            var handle = ToyKit.UIImage("Handle", ha, Color.clear);
-            handle.anchorMin = new Vector2(0f, 0f); handle.anchorMax = new Vector2(0f, 1f); handle.sizeDelta = new Vector2(46f, 0f);
+            ha.SetParent(sg.transform, false); ToyKit.Stretch(ha); ha.offsetMin = new Vector2(24f, 0f); ha.offsetMax = new Vector2(-24f, 0f);
+            var handle = ToyKit.UIImage("Handle", ha, ToyKit.Palette[0], knobSprite);
+            handle.GetComponent<Image>().type = Image.Type.Simple;
+            handle.anchorMin = new Vector2(0f, 0f); handle.anchorMax = new Vector2(0f, 1f); handle.sizeDelta = new Vector2(64f, 30f);
 
             var s = sg.AddComponent<Slider>();
-            s.handleRect = handle; s.direction = Slider.Direction.LeftToRight;
+            s.fillRect = fill; s.handleRect = handle; s.direction = Slider.Direction.LeftToRight;
             Tint(s, row.GetComponent<Image>());
             sliders[i] = s;
-            meters[i] = area;
 
-            values[i] = ToyKit.UIText("Value", row.transform, font, "8", 56f, Color.Lerp(colors[i], ToyKit.Ink, 0.35f));
-            values[i].fontStyle = FontStyles.Bold;
-            ToyKit.Anchor(values[i].rectTransform, new Vector2(0.5f, 0.5f), new Vector2(445f, 0f), new Vector2(120f, 100f));
+            values[i] = ToyKit.UIText("Value", row.transform, font, "8", 54f, ToyKit.Ink);
+            ToyKit.Anchor(values[i].rectTransform, new Vector2(0.5f, 0.5f), new Vector2(440f, 0f), new Vector2(120f, 100f));
         }
         Chain(sliders);
         soundFirst = sliders[0];
         group.gameObject.AddComponent<SoundSettingsPanel>().Setup(sliders[0], sliders[1], sliders[2], values[0], values[1], values[2]);
-        // 目盛りは SoundSettingsPanel が 0〜10 に設定してから作る
-        for (int i = 0; i < 3; i++)
-        {
-            meters[i].gameObject.AddComponent<VolumeMeter>().Setup(sliders[i], meters[i], colors[i], new Color(0.88f, 0.82f, 0.74f));
-            sliders[i].onValueChanged.AddListener(_ => MenuSounds.Cursor());
-        }
         return group;
     }
 
@@ -281,20 +270,11 @@ public class MainMenu : MonoBehaviour
             row.GetComponent<Image>().raycastTarget = true;
             var os = row.AddComponent<OptionSelector>();
             Tint(os, row.GetComponent<Image>());
-            // ＜ [ 値 ] ＞ ：値は角丸の板の上、その下に何番目かの丸
-            var pill = ToyKit.UIRounded("ValuePill", row.transform, new Color(0.98f, 0.94f, 0.87f), 36f);
-            ToyKit.Anchor(pill, new Vector2(0.5f, 0.5f), new Vector2(200f, 0f), new Vector2(400f, 92f));
-            var val = ToyKit.UIText("Value", pill, font, "-", 44f, ToyKit.Ink);
-            ToyKit.Anchor(val.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 9f), new Vector2(380f, 64f));
-            var dots = new GameObject("Dots", typeof(RectTransform)).GetComponent<RectTransform>();
-            dots.SetParent(pill, false);
-            ToyKit.Anchor(dots, new Vector2(0.5f, 0f), new Vector2(0f, 16f), new Vector2(380f, 14f));
-            var prev = Arrow(row.transform, "＜", -50f);
-            var next = Arrow(row.transform, "＞", 450f);
+            var prev = Arrow(row.transform, "＜", -60f);
+            var next = Arrow(row.transform, "＞", 460f);
+            var val = ToyKit.UIText("Value", row.transform, font, "-", 48f, ToyKit.Ink);
+            ToyKit.Anchor(val.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(200f, 0f), new Vector2(420f, 100f));
             os.Bind(val, prev, next);
-            os.onValueChanged.AddListener(_ => MenuSounds.Cursor());
-            row.AddComponent<OptionSelectorLook>().Setup(os, pill, (RectTransform)prev.transform, (RectTransform)next.transform, dots,
-                                                         ToyKit.Palette[1], new Color(0.82f, 0.75f, 0.66f));
             sels[i] = os;
         }
         Chain(sels);
@@ -316,7 +296,7 @@ public class MainMenu : MonoBehaviour
 
     GameObject Row(Transform parent, float y, string label)
     {
-        var r = ToyKit.UIRounded("Row_" + label, parent, Color.white, 30f);
+        var r = ToyKit.UIImage("Row_" + label, parent, Color.white, uiSprite);
         ToyKit.Anchor(r, new Vector2(0.5f, 0.5f), new Vector2(0f, y), new Vector2(1100f, 120f));
         var l = ToyKit.UIText("Label", r, font, label, 54f, ToyKit.Ink);
         l.alignment = TextAlignmentOptions.Left;
@@ -326,15 +306,11 @@ public class MainMenu : MonoBehaviour
 
     Button Arrow(Transform parent, string s, float x)
     {
-        // 丸い矢印ボタン（下に影の丸を敷いて、少し浮いて見せる）
-        var shadow = ToyKit.UIRounded(s == "＜" ? "PrevShadow" : "NextShadow", parent, new Color(0.75f, 0.42f, 0.1f), 40f);
-        ToyKit.Anchor(shadow, new Vector2(0.5f, 0.5f), new Vector2(x, -5f), new Vector2(80f, 80f));
-        var a = ToyKit.UIRounded(s == "＜" ? "Prev" : "Next", parent, ToyKit.Palette[1], 40f);
-        ToyKit.Anchor(a, new Vector2(0.5f, 0.5f), new Vector2(x, 0f), new Vector2(80f, 80f));
+        var a = ToyKit.UIImage(s == "＜" ? "Prev" : "Next", parent, ToyKit.Palette[1], uiSprite);
+        ToyKit.Anchor(a, new Vector2(0.5f, 0.5f), new Vector2(x, 0f), new Vector2(84f, 84f));
         var img = a.GetComponent<Image>();
         img.raycastTarget = true;
-        var t = ToyKit.UIText("Text", a, font, s, 46f, Color.white);   // ◀▶ はフォントに無いので全角の＜＞
-        t.fontStyle = FontStyles.Bold;
+        var t = ToyKit.UIText("Text", a, font, s, 48f, ToyKit.Ink);
         ToyKit.Stretch(t.rectTransform);
         var b = a.gameObject.AddComponent<Button>();
         b.targetGraphic = img;
@@ -426,29 +402,18 @@ public class MainMenu : MonoBehaviour
             case Phase.Browse:
             {
                 int hover = mouse != null && (mouseMoved || click) ? BlockUnderMouse(mouse.position.ReadValue()) : -1;
-                if (hover >= 0 && hover != cursor) { cursor = hover; MenuSounds.Cursor(); }
+                if (hover >= 0 && hover != cursor) cursor = hover;
 
-                if (MenuInput.Up()) { cursor = (cursor + labels.Length - 1) % labels.Length; MenuSounds.Cursor(); }
-                else if (MenuInput.Down()) { cursor = (cursor + 1) % labels.Length; MenuSounds.Cursor(); }
-                else if (MenuInput.Submit() || (click && hover >= 0))
-                {
-                    // たたかう＝積み木を飛ばしたときの音、それ以外＝決定の音
-                    if (cursor == Battle) MenuSounds.Play(MatchSounds.Instance.Knock);
-                    else MenuSounds.Decide();
-                    Hit(cursor);
-                }
+                if (MenuInput.Up()) cursor = (cursor + labels.Length - 1) % labels.Length;
+                else if (MenuInput.Down()) cursor = (cursor + 1) % labels.Length;
+                else if (MenuInput.Submit() || (click && hover >= 0)) Hit(cursor);
                 break;
             }
 
             case Phase.Panel:
             {
-                // 看板の中で行を移ったらカーソルの音
-                var selected = EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
-                if (selected != null && panelSelected != null && selected != panelSelected) MenuSounds.Cursor();
-                if (selected != null) panelSelected = selected;
-
                 // B / Esc / 右クリック、または左の山をクリックで戻る
-                if (MenuInput.Cancel() || (click && BlockUnderMouse(mouse.position.ReadValue()) >= 0)) { MenuSounds.Cancel(); Return(); }
+                if (MenuInput.Cancel() || (click && BlockUnderMouse(mouse.position.ReadValue()) >= 0)) Return();
                 break;
             }
 
@@ -533,7 +498,6 @@ public class MainMenu : MonoBehaviour
     {
         phase = Phase.Returning;
         returnTime = sim;
-        panelSelected = null;
         if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
         GameSettings.Save();
     }

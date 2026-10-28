@@ -333,10 +333,6 @@ MonoBehaviour:
   fadeDelay: 0.5
   fadeDuration: 0.8
   fadeMinAlpha: 0.12
-  boomerangReturnTarget: {fileID: 0}
-  boomerangRadius: 1.5
-  boomerangCurveLeft: 1
-  boomerangArriveDistance: 1
   rehitIgnoreTime: 0.2
 --- !u!54 &264285117
 Rigidbody:
@@ -755,10 +751,6 @@ MonoBehaviour:
   fadeDelay: 0.25
   fadeDuration: 0.8
   fadeMinAlpha: 0.12
-  boomerangReturnTarget: {fileID: 0}
-  boomerangRadius: 5
-  boomerangCurveLeft: 1
-  boomerangArriveDistance: 1
   rehitIgnoreTime: 0.2
 --- !u!65 &557762078
 BoxCollider:
@@ -1007,10 +999,6 @@ MonoBehaviour:
   fadeDelay: 0.5
   fadeDuration: 0.8
   fadeMinAlpha: 0.12
-  boomerangReturnTarget: {fileID: 0}
-  boomerangRadius: 1.5
-  boomerangCurveLeft: 1
-  boomerangArriveDistance: 1
   rehitIgnoreTime: 0.2
 --- !u!54 &759035617
 Rigidbody:
@@ -1140,7 +1128,6 @@ GameObject:
   - component: {fileID: 792966894}
   - component: {fileID: 792966895}
   - component: {fileID: 792966896}
-  - component: {fileID: 792966897}
   m_Layer: 0
   m_Name: YellowBlock
   m_TagString: Block
@@ -1276,7 +1263,7 @@ MonoBehaviour:
   speed: 20
   deceleration: 0.1
   stopThreshold: 0.1
-  behaviorType: 11
+  behaviorType: 0
   hebiTurnSpeed: 60
   homingStartTurnSpeed: 270
   homingGuidanceDuration: 1.5
@@ -1292,10 +1279,6 @@ MonoBehaviour:
   fadeDelay: 0.5
   fadeDuration: 0.8
   fadeMinAlpha: 0.12
-  boomerangReturnTarget: {fileID: 0}
-  boomerangRadius: 5
-  boomerangCurveLeft: 1
-  boomerangArriveDistance: 1
   rehitIgnoreTime: 0.2
 --- !u!65 &792966896
 BoxCollider:
@@ -1318,18 +1301,6 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1.0000001, y: 2, z: 1.0000002}
   m_Center: {x: 0.000000059604645, y: 0, z: -0.00000008940697}
---- !u!114 &792966897
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 792966887}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f2c73a86cb38db247a625a76e41dac73, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::DebugBlockLauncher
 --- !u!1 &803537023
 GameObject:
   m_ObjectHideFlags: 0
@@ -1404,10 +1375,6 @@ MonoBehaviour:
   fadeDelay: 0.5
   fadeDuration: 0.8
   fadeMinAlpha: 0.12
-  boomerangReturnTarget: {fileID: 0}
-  boomerangRadius: 1.5
-  boomerangCurveLeft: 1
-  boomerangArriveDistance: 1
   rehitIgnoreTime: 0.2
 --- !u!54 &803537026
 Rigidbody:
@@ -1596,10 +1563,6 @@ MonoBehaviour:
   fadeDelay: 0.5
   fadeDuration: 0.8
   fadeMinAlpha: 0.12
-  boomerangReturnTarget: {fileID: 0}
-  boomerangRadius: 1.5
-  boomerangCurveLeft: 1
-  boomerangArriveDistance: 1
   rehitIgnoreTime: 0.2
 --- !u!54 &1032551247
 Rigidbody:
@@ -1788,10 +1751,6 @@ MonoBehaviour:
   fadeDelay: 0.5
   fadeDuration: 0.8
   fadeMinAlpha: 0.12
-  boomerangReturnTarget: {fileID: 0}
-  boomerangRadius: 1.5
-  boomerangCurveLeft: 1
-  boomerangArriveDistance: 1
   rehitIgnoreTime: 0.2
 --- !u!54 &1076914364
 Rigidbody:
@@ -1980,10 +1939,6 @@ MonoBehaviour:
   fadeDelay: 0.5
   fadeDuration: 0.8
   fadeMinAlpha: 0.12
-  boomerangReturnTarget: {fileID: 0}
-  boomerangRadius: 1.5
-  boomerangCurveLeft: 1
-  boomerangArriveDistance: 1
   rehitIgnoreTime: 0.2
 --- !u!54 &1098038425
 Rigidbody:
@@ -2264,10 +2219,6 @@ MonoBehaviour:
   fadeDelay: 0.5
   fadeDuration: 0.8
   fadeMinAlpha: 0.12
-  boomerangReturnTarget: {fileID: 0}
-  boomerangRadius: 1.5
-  boomerangCurveLeft: 1
-  boomerangArriveDistance: 1
   rehitIgnoreTime: 0.2
 --- !u!65 &1141642620
 BoxCollider:
@@ -2772,10 +2723,6 @@ MonoBehaviour:
   fadeDelay: 0.5
   fadeDuration: 0.8
   fadeMinAlpha: 0.12
-  boomerangReturnTarget: {fileID: 0}
-  boomerangRadius: 1.5
-  boomerangCurveLeft: 1
-  boomerangArriveDistance: 1
   rehitIgnoreTime: 0.2
 --- !u!54 &1536202398
 Rigidbody:
@@ -3116,10 +3063,6 @@ MonoBehaviour:
   fadeDelay: 0.5
   fadeDuration: 0.8
   fadeMinAlpha: 0.12
-  boomerangReturnTarget: {fileID: 0}
-  boomerangRadius: 1.5
-  boomerangCurveLeft: 1
-  boomerangArriveDistance: 1
   rehitIgnoreTime: 0.2
 --- !u!54 &1796746307
 Rigidbody:
@@ -3401,10 +3344,6 @@ MonoBehaviour:
   fadeDelay: 0.5
   fadeDuration: 0.8
   fadeMinAlpha: 0.12
-  boomerangReturnTarget: {fileID: 0}
-  boomerangRadius: 1.5
-  boomerangCurveLeft: 1
-  boomerangArriveDistance: 1
   rehitIgnoreTime: 0.2
 --- !u!65 &2023414662
 BoxCollider:

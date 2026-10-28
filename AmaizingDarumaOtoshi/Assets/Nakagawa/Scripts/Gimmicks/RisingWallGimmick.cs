@@ -130,7 +130,7 @@ namespace Nakagawa
         // ステージの切り替えで有効になるたびに最初(開始のずれ)からやり直す
         private void OnEnable()
         {
-            m_time = GimmickClock.StartTime(m_phaseOffset, Period);
+            m_time = m_phaseOffset;
             Evaluate(out m_phase, out m_height);
             if (m_rb != null)
             {
@@ -155,7 +155,7 @@ namespace Nakagawa
         private void FixedUpdate()
         {
             float dt = Time.fixedDeltaTime;
-            m_time = GimmickClock.Step(m_time, dt, m_phaseOffset, Period);
+            m_time += dt;
             Phase before = m_phase;
             Evaluate(out m_phase, out float height);
 

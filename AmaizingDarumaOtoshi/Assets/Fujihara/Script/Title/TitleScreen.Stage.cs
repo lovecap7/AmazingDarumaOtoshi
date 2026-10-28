@@ -85,7 +85,7 @@ public partial class TitleScreen
         subtitle = ToyKit.Text3D(font, new Material(font.material), subtitleText, null, new Vector2(11f, 0.5f), 4f);
         subtitle.color = Ink;
         subtitle.characterSpacing = 30f;
-        subtitle.transform.position = new Vector3(logoX, logoRowY[logoRowY.Length - 1] - 0.98f, logoZ);
+        subtitle.transform.position = new Vector3(0f, logoRowY[logoRowY.Length - 1] - 0.98f, logoZ);
         subtitle.alpha = 0f;
 
         var fx = ToyKit.CreateFx();

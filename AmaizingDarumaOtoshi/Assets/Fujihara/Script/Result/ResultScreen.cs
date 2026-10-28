@@ -645,7 +645,6 @@ public class ResultScreen : MonoBehaviour
         if ((submit && Time.unscaledTime - doneTime > 0.4f) || timeout)
         {
             leaving = true;
-            if (submit) MenuSounds.Decide();
             Fader.Load(nextSceneName);
         }
     }
