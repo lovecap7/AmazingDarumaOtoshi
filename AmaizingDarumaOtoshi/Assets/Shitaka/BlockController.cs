@@ -19,7 +19,7 @@ public class BlockController : MonoBehaviour
     public event Action OnFlightEnded;
 
     // テスト用：インスペクターで挙動を選べるようにする
-    public enum BehaviorType { Normal, Iwa,HebiLeft, HebiRight, UnBreak,Homing,Ziguzagu,Grow,Bomb, Magnet,Fade, Boomerang }
+    public enum BehaviorType { Normal, Iwa,HebiLeft, HebiRight, UnBreak,Homing,Ziguzagu,Grow,Bomb, Magnet,Fade, Boomerang, Gravity }
     [SerializeField] BehaviorType behaviorType = BehaviorType.Normal;
     [SerializeField] float hebiTurnSpeed = 60.0f; // テスト用：へびだるの曲がる強さ(度/秒)。大きいほど急カーブになる
     [SerializeField] float homingStartTurnSpeed = 270f;  // テスト用：ホーミング発射直後の旋回速度(度/秒)
@@ -30,16 +30,22 @@ public class BlockController : MonoBehaviour
     [SerializeField] float growMaxMultiplier = 3.0f; // テスト用：初期サイズに対する最大倍率
     [SerializeField] float explosionRadius = 2.0f; // テスト用：爆発の範囲(半径)
     [SerializeField] float magnetRange = 10.0f;     // テスト用：磁力が届く距離
-    [SerializeField] float magnetStrength = 10.0f;  // テスト用：磁力の強さ
-    [SerializeField] float magnetRepelStrength = 8.0f;  // テスト用：反発する力の強さ(最も近いとき)
+    [SerializeField] float magnetStrength = 20.0f;  // テスト用：磁力の強さ
+    [SerializeField] float magnetRepelStrength = 20.0f;  // テスト用：反発する力の強さ(最も近いとき)
     [SerializeField] float magnetMinDistance = 0.5f;    // テスト用：反発が最大になる距離
-    [SerializeField] float fadeDelay = 0.5f;     // テスト用：薄くなり始めるまでの時間(秒)
+    [SerializeField] float fadeDelay = 0.25f;     // テスト用：薄くなり始めるまでの時間(秒)
     [SerializeField] float fadeDuration = 0.8f;  // テスト用：薄くなりきるまでの時間(秒)
     [SerializeField] float fadeMinAlpha = 0.12f; // テスト用：最も薄いときのアルファ値
     [SerializeField] Transform boomerangReturnTarget;    // テスト用：戻る先。未設定なら発射した位置に戻る
-    [SerializeField] float boomerangRadius = 15.0f;          // テスト用：弧の半径
+    [SerializeField] float boomerangRadius = 5.0f;          // テスト用：弧の半径
     [SerializeField] bool boomerangCurveLeft = true;        // テスト用：左に曲がるか(falseなら右)
-    [SerializeField] float boomerangArriveDistance = 0.8f;  // テスト用：戻ったとみなす距離
+    [SerializeField] float boomerangArriveDistance = 1.0f;  // テスト用：戻ったとみなす距離
+    [SerializeField] float gravityRadius = 10.0f;      // テスト用：井戸の範囲(半径)
+    [SerializeField] float gravityStrength = 12.0f;   // テスト用：引き寄せる強さ(加速度)
+    [SerializeField] float gravityDuration = 2.5f;    // テスト用：井戸が残る時間(秒)
+    [SerializeField] float gravityDeadZone = 0.4f;    // テスト用：中心で止まる距離
+    [SerializeField] float gravityEdgeRatio = 0.4f; // テスト用：範囲の端での強さ(中心を1とした割合)
+
     public bool isFlying {  get; private set; } // 現在飛行中かどうか trueの場合は攻撃判定が発生する
 
     // 開始時点で飛行中だったかを記録する
@@ -101,6 +107,7 @@ public class BlockController : MonoBehaviour
             case BehaviorType.Magnet: return new MagnetBehavior(this, magnetRange, magnetStrength, magnetRepelStrength, magnetMinDistance);
             case BehaviorType.Fade: return new FadeBehavior(this, fadeDelay, fadeDuration, fadeMinAlpha);
             case BehaviorType.Boomerang: return new BoomerangBehavior(this, boomerangReturnTarget, boomerangRadius, boomerangCurveLeft, boomerangArriveDistance);
+            case BehaviorType.Gravity: return new GravityWellBehavior(this, gravityRadius, gravityStrength, gravityDuration, gravityDeadZone, gravityEdgeRatio);
             case BehaviorType.Normal:
             default: return new NormalBehavior();
         }
@@ -172,7 +179,7 @@ public class BlockController : MonoBehaviour
         v.x = 0.0f;
         v.z = 0.0f;
         rb.linearVelocity = v;
-        OnFlightEnded?.Invoke(); //
+        OnFlightEnded?.Invoke(); 
     }
 
     private void OnCollisionEnter(Collision collision)
@@ -281,5 +288,47 @@ public class BlockController : MonoBehaviour
             }
         }
         return best;
+    }
+
+    // 攻撃力の数だけ、当たった積み木(target)とその真上に積み上がっている積み木を飛ばす
+    public void KnockOff(BlockController target, Vector3 dir, float startSpeed = -1.0f)
+    {
+        int count = Mathf.Max(1, info.AttackPower);
+        int launched = 0;
+        BlockController current = target;
+
+        while (current != null && launched < count)
+        {
+            // 飛ばす前に、真上の積み木を見つけておく
+            BlockController above = current.FindBlockAbove(this);
+            current.Launch(dir, startSpeed);
+            launched++;
+            current = above;
+        }
+
+        // テスト用：確認できたら削除してよい
+        Debug.Log($"[KnockOff] 攻撃力 {count} → {launched}個飛ばした", this);
+    }
+
+    // 自分の真上に積まれている積み木を1個探す(なければnull)
+    BlockController FindBlockAbove(BlockController exclude)
+    {
+        Bounds b = GetComponent<Collider>().bounds;
+
+        // 真上1個ぶんの位置に、少し小さめの箱を置いて、重なっている積み木を探す
+        Vector3 center = b.center + Vector3.up * b.size.y;
+        Vector3 halfExtents = b.extents * 0.8f;
+
+        foreach (var c in Physics.OverlapBox(center, halfExtents))
+        {
+            if (!c.CompareTag("Block")) continue;
+
+            var block = c.GetComponent<BlockController>();
+            if (block == null || block == this || block == exclude) continue;
+            if (block.isFlying) continue; // すでに飛んでいる積み木は対象にしない
+
+            return block;
+        }
+        return null;
     }
 }

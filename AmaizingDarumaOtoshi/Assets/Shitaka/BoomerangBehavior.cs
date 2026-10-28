@@ -92,7 +92,7 @@ public class BoomerangBehavior : NormalBehavior
         if (returned) return base.OnBlockHit(self, other);
 
         // 戻るまでは、相手だけを飛ばして、自分は壊れず軌道も変えない
-        other.Launch(other.transform.position - self.transform.position);
+        self.KnockOff(other, other.transform.position - self.transform.position, self.CurrentSpeed);
         return false;
     }
 }

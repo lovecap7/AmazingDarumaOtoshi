@@ -237,9 +237,9 @@ public class MatchAudio : MonoBehaviour
         }
         else
         {
-            // 打ち返し：①→②→③→④、そこからはずっと④（打ち返しの音が入っていれば）
+            // 打ち返し：①→②→③…、最後の段からは最後の音を少しずつ高く（打ち返しの音が入っていれば）
             var ret = m_sounds.ReturnHit(h.ReturnCount);
-            if (ret != null) { Play(ret, 1f, 1f, h.Point); return; }
+            if (ret != null) { Play(ret, 1f, m_sounds.ReturnPitch(h.ReturnCount), h.Point); return; }
             // 振ったハンマーが積み木に当たった（打ち返しの音が無いときは、打ち返すほど高く）
             float pitch = h.ReturnCount > 0 ? Mathf.Min(1.05f + 0.08f * (h.ReturnCount - 1), 1.5f) : 1f;
             Play(m_sounds.HitBlock, 0.9f, pitch, h.Point);

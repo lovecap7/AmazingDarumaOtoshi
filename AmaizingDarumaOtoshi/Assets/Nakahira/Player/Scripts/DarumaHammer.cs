@@ -90,6 +90,16 @@ namespace Nakahira
         public float ActionTime => m_time;
         // 薙ぎ払いにかかる時間(秒)
         public float SweepDuration => m_params.SweepDuration;
+        // 股抜きショットの弾速
+        public float ShotSpeed => m_params.ShotSpeed;
+        // 薙ぎ払いで落ちている積み木を弾いたときの弾速
+        public float SweepLaunchSpeed => m_params.SweepLaunchSpeed;
+        // 薙ぎ払いで弾いた積み木を飛ばせる向きの最大角度(度。持ち主の正面から左右)
+        public float MaxLaunchAngle => m_maxReturnAngle;
+        // 足元からこの高さにある物(中心)に、薙ぎ払いが当たるか
+        public bool IsAtSweepHeight(float heightFromFeet) => Mathf.Abs(heightFromFeet - m_sweepHeight) <= m_hitHeightRange;
+        // 股抜きショットを振り始めてから弾が出るまでの時間(秒)
+        public float ShotFireDelay => m_params.ShotDuration * Mathf.Clamp01((m_shotStartPitch - m_shotHitPitch) / (m_shotStartPitch - m_shotEndPitch));
         // 薙ぎ払いがキャラクターに当たる、中心同士の水平の距離(届く距離 + 体の半径)
         public float CharacterHitDistance => HitReach + DarumaCharacter.kBodyRadius;
         // 薙ぎ払いが積み木に当たる、中心同士の水平の距離(届く距離 + 積み木の半径)

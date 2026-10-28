@@ -15,7 +15,8 @@ public class NormalBehavior:IBlockBehavior
     public virtual bool OnBlockHit(BlockController self, BlockController other)
     {
         // 自分の現在速度を相手に渡す(遅ければ相手も遅く飛ぶ)
-        other.Launch(other.transform.position - self.transform.position, self.CurrentSpeed); // 相手を飛ばす
+        //other.Launch(other.transform.position - self.transform.position, self.CurrentSpeed); // 相手を飛ばす
+        self.KnockOff(other, other.transform.position - self.transform.position, self.CurrentSpeed);
         return true; // 自分は壊れる
     }
 

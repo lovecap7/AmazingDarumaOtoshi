@@ -6,7 +6,7 @@ namespace Nakahira
     // 試合では MatchPlayer と同じGameObjectに付ける(操作する体は MatchPlayer から取る)。
     // キャラクターに直接付けた場合はそのキャラクターを動かす
     //
-    // 知る(CpuPerception) → 決める(ここ) → 状態(積む・逃げる・殴る) → とっさの反応(CpuReflex。弾が来たら割り込む)
+    // 知る(CpuPerception) → 決める(ここ) → 状態(積む・逃げる・殴る・撃つ・攻めに行く・待つ) → とっさの反応(CpuReflex。弾が来たら割り込む)
     // → 動きの部品(道をたどる・跳んで拾う)
     // 決める:ThinkInterval ごとに各状態のやりたさを比べ、一番高い状態にする
     //  ・今の状態には StateStickiness を足す(ころころ変えない)
@@ -26,6 +26,9 @@ namespace Nakahira
         readonly CpuCollectState m_collect = new CpuCollectState();
         readonly CpuFleeState m_flee = new CpuFleeState();
         readonly CpuMeleeState m_melee = new CpuMeleeState();
+        readonly CpuShotState m_shot = new CpuShotState();
+        readonly CpuApproachState m_approach = new CpuApproachState();
+        readonly CpuWaitState m_wait = new CpuWaitState();
         readonly CpuReflex m_reflex = new CpuReflex();
         CpuState[] m_states;
         CpuState m_current;
@@ -50,7 +53,7 @@ namespace Nakahira
 
         private void Awake()
         {
-            m_states = new CpuState[] { m_collect, m_flee, m_melee };
+            m_states = new CpuState[] { m_collect, m_flee, m_melee, m_shot, m_approach, m_wait };
         }
 
         public DarumaCommand ReadCommand()

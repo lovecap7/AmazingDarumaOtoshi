@@ -20,6 +20,8 @@ using UnityEngine.UI;
 //   - 各プレイヤーは自分のカーソルでキャラ（またはランダム）を選ぶ。B で取り消し、何も選んでいなければ B で抜ける
 //   - CPU のコインはプレイヤーがカーソルで掴んで（A）キャラの上に置く（A）と、その CPU のキャラになる。CPU の強さは枠の －／＋
 //   - 参加者全員が選ぶと「じゅんびOK！」。Start / Enter でステージセレクトへ
+//   - 各枠は Y / RB（キーボードは C・Tab）で「キャラ → パッシブ → ハンマー性能 → 必殺技」と表示が切り替わる（LB / Q で戻る）
+//     枠の下の丸をカーソルで押しても切り替わる（CPU の枠も見られる）。中身は CharacterData に書く
 // ・ステージセレクト：プレイヤー（CPU 以外）が自分のカーソルでステージ（またはおまかせ）に投票する
 //   全員が投票したら、マリオカートのように全員の票の中から1つを抽選する。おまかせ票は当たったときにめくれる
 //   投票した人が1人だけ・全員が同じステージに投票したときは、抽選の演出を飛ばしてそのまま決める
@@ -94,6 +96,7 @@ public class MatchSelect : MonoBehaviour
     {
         public Vector2 move;
         public bool a, b, start;
+        public bool next, prev;     // 枠の表示（キャラ／パッシブ／ハンマー／必殺技）を切り替える
     }
 
     // 1人分（プレイヤーまたは CPU）。番号・機器・選んだキャラ・投票したステージを必ずここにまとめて持つ
@@ -136,7 +139,20 @@ public class MatchSelect : MonoBehaviour
         public Image bg, portrait, portraitImage, typeButton;
         public TextMeshProUGUI label, name, device, join, ok, portraitLetter, typeText, level;
         public RectTransform levelRow, minus, plus;
+
+        // 表示の切り替え（0 キャラ／1 パッシブ／2 ハンマー性能／3 必殺技）
+        public int page;
+        public float pageTime = -100f;
+        public RectTransform info, passivePage, hammerPage, specialPage, dotsRow;
+        public TextMeshProUGUI pageTitle, infoEmpty, passiveCount, passiveEffect, specialName, specialText, okSmall;
+        public Image[] passiveIcons, dots;
+        public Image passiveHead;
+        public Image[,] hammerHeads, hammerHandles;
     }
+
+    static readonly string[] PageNames = { "キャラ", "パッシブ", "ハンマー性能", "ひっさつわざ" };
+    static readonly string[] HammerStatNames = { "パワー", "はやさ", "リーチ" };
+    const int PageCount = 4, PassiveIconMax = 9, HammerSteps = 5;
 
     class Chip
     {
@@ -273,7 +289,7 @@ public class MatchSelect : MonoBehaviour
             : phase == Phase.Rule
             ? "↑↓ / A：項目をえらぶ　←→：切り替え　Start：キャラクターセレクトへ　B：モードセレクトへ"
             : phase == Phase.Character
-            ? "A：参加・えらぶ・CPUのコインをつかむ　B：取り消し・抜ける（だれもいなければルールセレクトへ）　Start：次へ"
+            ? "A：参加・えらぶ・CPUのコインをつかむ　B：取り消し・抜ける　Y：せつめい切り替え　Start：次へ"
             : phase == Phase.Stage ? "A：投票　B：取り消し（投票していなければキャラクターセレクトへ）　全員が投票したら抽選！"
             : "";
     }
@@ -493,6 +509,9 @@ public class MatchSelect : MonoBehaviour
             var s = Read(p.device);
             MoveCursor(p, s, dt);
 
+            // Y / RB（キーボードは C・Tab）で次、LB（Q）で前の表示へ（自分の枠だけ）
+            if (s.next || s.prev) TurnPage(panels[p.index], s.next ? 1 : -1);
+
             if (s.start && ready && p.holding == null) { MenuSounds.Decide(); GoToStageSelect(); return; }
             if (s.a) PressA(p);
             else if (s.b)
@@ -532,6 +551,8 @@ public class MatchSelect : MonoBehaviour
         {
             var ui = panels[i];
             if (Hit(ui.typeButton.rectTransform, p.cursor)) { ToggleSlot(p, i); return; }
+            // 枠の下の丸：カーソルで押しても表示が切り替わる（CPU の枠もこれで見られる）
+            if (slots[i] != null && Hit(ui.dotsRow, p.cursor)) { TurnPage(ui, 1); return; }
             var cpu = slots[i];
             if (cpu != null && cpu.IsCpu && ui.levelRow.gameObject.activeSelf)
             {
@@ -547,6 +568,13 @@ public class MatchSelect : MonoBehaviour
         }
 
         if (tile != null) { MenuSounds.Decide(); SetCharacter(p, tile); }
+    }
+
+    void TurnPage(Panel ui, int step)
+    {
+        ui.page = (ui.page + step + PageCount) % PageCount;
+        ui.pageTime = Time.unscaledTime;
+        MenuSounds.Cursor();
     }
 
     void Grab(Player p, Player cpu)
@@ -1042,13 +1070,42 @@ public class MatchSelect : MonoBehaviour
             ui.label.color = !used ? new Color(0.6f, 0.58f, 0.57f) : cpu ? CpuColor : PlayerColors[i % PlayerColors.Length];
             ui.typeText.text = !used ? "なし" : cpu ? "CPU" : "プレイヤー";
             ui.typeButton.color = !used ? new Color(0.75f, 0.73f, 0.72f) : cpu ? CpuColor : PlayerColors[i % PlayerColors.Length];
+            // キャラ（0）以外の表示のときは、顔・名前の代わりに説明を出す
+            int page = used ? ui.page : 0;
+            bool chara = page == 0;
+            bool okNow = used && p.HasCharacter && p.heldBy == null;
             ui.join.gameObject.SetActive(!used);
-            ui.name.gameObject.SetActive(used);
-            ui.device.gameObject.SetActive(used && !cpu);
-            ui.levelRow.gameObject.SetActive(cpu);
-            ui.portrait.gameObject.SetActive(used);
-            ui.ok.gameObject.SetActive(used && p.HasCharacter && p.heldBy == null);
+            ui.name.gameObject.SetActive(used && chara);
+            ui.device.gameObject.SetActive(used && !cpu && chara);
+            ui.levelRow.gameObject.SetActive(cpu && chara);
+            ui.portrait.gameObject.SetActive(used && chara);
+            ui.ok.gameObject.SetActive(okNow);
+            ui.okSmall.gameObject.SetActive(okNow && !chara);
+            ui.dotsRow.gameObject.SetActive(used);
+            ui.info.gameObject.SetActive(used && !chara);
+            for (int d = 0; d < ui.dots.Length; d++)
+            {
+                ui.dots[d].color = d == page ? ToyKit.Ink : new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.25f);
+                ui.dots[d].rectTransform.localScale = Vector3.one * (d == page ? 1.25f : 1f);
+            }
             if (!used) continue;
+
+            if (!chara)
+            {
+                // 説明するキャラ：選んだキャラ。まだなら、カーソルが乗っているキャラ
+                var shown = p.heldBy != null ? null : p.character;
+                bool random = p.heldBy == null && p.randomCharacter;
+                if (shown == null && !random && !cpu && phase == Phase.Character)
+                {
+                    var hover = TileAt(charTiles, p.cursor);
+                    if (hover != null) { shown = hover.character; random = hover.random; }
+                }
+                FillInfo(ui, page, shown, random);
+                // 切り替えた瞬間に少し弾ませる
+                float pt = (Time.unscaledTime - ui.pageTime) / 0.25f;
+                ui.info.localScale = Vector3.one * (pt < 1f ? Mathf.Lerp(0.92f, 1f, 1f - (1f - pt) * (1f - pt)) : 1f);
+                continue;
+            }
 
             if (cpu) ui.level.text = "Lv " + p.cpuLevel;
             else ui.device.text = p.device.displayName + " #" + p.device.deviceId;   // 同じ種類のコントローラーでも見分けられるように
@@ -1063,6 +1120,63 @@ public class MatchSelect : MonoBehaviour
                 if (hover != null && !hover.random) SetPortrait(ui, hover.character.portrait, hover.character.displayName, hover.character.color * 0.75f, Initial(hover.character.displayName));
                 else SetPortrait(ui, null, "えらんでね", new Color(0.92f, 0.9f, 0.88f), "");
             }
+        }
+    }
+
+    // パッシブ・ハンマー性能・必殺技の表示
+    void FillInfo(Panel ui, int page, CharacterData c, bool random)
+    {
+        ui.pageTitle.text = PageNames[page];
+        bool has = c != null;
+        ui.infoEmpty.gameObject.SetActive(!has);
+        ui.infoEmpty.text = random ? "ランダムは\nおたのしみ！" : "キャラをえらぶと\nここに出るよ";
+        ui.passivePage.gameObject.SetActive(has && page == 1);
+        ui.hammerPage.gameObject.SetActive(has && page == 2);
+        ui.specialPage.gameObject.SetActive(has && page == 3);
+        if (!has) return;
+
+        switch (page)
+        {
+            case 1:
+            {
+                // 左：条件の色の積み木を、条件の数だけ縦に積む（てっぺんに顔）＝「これだけ積めばいい」
+                // 右：「3こ積むと」＋ 効果の短い名前
+                int n = Mathf.Min(c.passiveCount, PassiveIconMax);
+                var col = Nakahira.TumikiColorUtil.ToUnityColor(c.passiveColor);
+                const float bottom = -100f, stackMaxH = 104f;
+                float bh = n > 0 ? Mathf.Min(26f, stackMaxH / n) : 0f;
+                float sx = ui.passiveHead.rectTransform.anchoredPosition.x;
+                for (int k = 0; k < ui.passiveIcons.Length; k++)
+                {
+                    var ic = ui.passiveIcons[k];
+                    ic.gameObject.SetActive(k < n);
+                    if (k >= n) continue;
+                    ic.color = col;
+                    ic.rectTransform.sizeDelta = new Vector2(58f, bh - 2f);
+                    ic.rectTransform.anchoredPosition = new Vector2(sx, bottom + bh * (k + 0.5f));
+                }
+                float headR = 15f;
+                ui.passiveHead.rectTransform.anchoredPosition = new Vector2(sx, bottom + bh * n + headR);
+                ui.passiveCount.text = c.passiveCount <= 0 ? "いつも" : c.passiveCount + "こ積むと";
+                ui.passiveEffect.text = string.IsNullOrEmpty(c.passiveName) ? "（未設定）" : c.passiveName;
+                break;
+            }
+            case 2:
+            {
+                int[] values = { c.hammerPower, c.hammerSpeed, c.hammerReach };
+                for (int row = 0; row < 3; row++)
+                    for (int k = 0; k < HammerSteps; k++)
+                    {
+                        bool on = k < values[row];
+                        ui.hammerHeads[row, k].color = on ? ToyKit.Palette[0] : new Color(0.55f, 0.52f, 0.5f, 0.3f);
+                        ui.hammerHandles[row, k].color = on ? new Color(0.93f, 0.8f, 0.55f) : new Color(0.55f, 0.52f, 0.5f, 0.3f);
+                    }
+                break;
+            }
+            case 3:
+                ui.specialName.text = string.IsNullOrEmpty(c.specialName) ? "（未設定）" : c.specialName;
+                ui.specialText.text = c.specialText;
+                break;
         }
     }
 
@@ -1177,6 +1291,8 @@ public class MatchSelect : MonoBehaviour
             s.a = g.buttonSouth.wasPressedThisFrame;
             s.b = g.buttonEast.wasPressedThisFrame;
             s.start = g.startButton.wasPressedThisFrame;
+            s.next = g.buttonNorth.wasPressedThisFrame || g.rightShoulder.wasPressedThisFrame;
+            s.prev = g.leftShoulder.wasPressedThisFrame;
         }
         else if (device is Keyboard k)
         {
@@ -1186,6 +1302,8 @@ public class MatchSelect : MonoBehaviour
             s.start = k.enterKey.wasPressedThisFrame || k.numpadEnterKey.wasPressedThisFrame;
             s.a = k.spaceKey.wasPressedThisFrame || k.zKey.wasPressedThisFrame || s.start;
             s.b = k.escapeKey.wasPressedThisFrame || k.xKey.wasPressedThisFrame || k.backspaceKey.wasPressedThisFrame;
+            s.next = k.cKey.wasPressedThisFrame || k.tabKey.wasPressedThisFrame;
+            s.prev = k.qKey.wasPressedThisFrame;
         }
         return s;
     }
@@ -1607,7 +1725,120 @@ public class MatchSelect : MonoBehaviour
         ui.ok.fontSharedMaterial = popMat;
         ui.ok.rectTransform.localRotation = Quaternion.Euler(0f, 0f, -12f);
         ToyKit.Anchor(ui.ok.rectTransform, new Vector2(1f, 1f), new Vector2(0f, 0f), new Vector2(160f, 80f));
+
+        BuildPanelInfo(ui, r, w);
         return ui;
+    }
+
+    // 枠の説明の表示（パッシブ・ハンマー性能・必殺技）。Y で キャラ → パッシブ → ハンマー → 必殺技 と切り替える
+    void BuildPanelInfo(Panel ui, RectTransform r, float w)
+    {
+        var faded = new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.7f);
+        var center = new Vector2(0.5f, 0.5f);
+
+        ui.info = new GameObject("Info", typeof(RectTransform)).GetComponent<RectTransform>();
+        ui.info.SetParent(r, false);
+        ToyKit.Stretch(ui.info);
+        ui.pageTitle = ToyKit.UIText("PageTitle", ui.info, font, "", 28f, faded);
+        ui.pageTitle.enableAutoSizing = true; ui.pageTitle.fontSizeMin = 18f; ui.pageTitle.fontSizeMax = 28f;
+        ToyKit.Anchor(ui.pageTitle.rectTransform, center, new Vector2(0f, 38f), new Vector2(w - 40f, 36f));
+        ui.infoEmpty = ToyKit.UIText("Empty", ui.info, font, "", 30f, faded);
+        ToyKit.Anchor(ui.infoEmpty.rectTransform, center, new Vector2(0f, -35f), new Vector2(w - 40f, 100f));
+
+        // パッシブ：左に条件の積み木を縦に積み、右に「3こ積むと」＋ 効果の短い名前
+        ui.passivePage = SubPage("Passive", ui.info);
+        float stackX = -w * 0.5f + 64f;
+        ui.passiveIcons = new Image[PassiveIconMax];
+        for (int k = 0; k < PassiveIconMax; k++)
+        {
+            var ic = ToyKit.UIImage("Block" + k, ui.passivePage, Color.white, uiSprite);
+            ToyKit.Anchor(ic, center, new Vector2(stackX, 0f), new Vector2(46f, 20f));
+            var o = ic.gameObject.AddComponent<Outline>(); o.effectColor = ToyKit.Ink; o.effectDistance = new Vector2(2f, -2f);
+            ui.passiveIcons[k] = ic.GetComponent<Image>();
+        }
+        var face = ToyKit.UIImage("Face", ui.passivePage, new Color(0.99f, 0.85f, 0.18f), knobSprite);
+        face.GetComponent<Image>().type = Image.Type.Simple;
+        ToyKit.Anchor(face, center, new Vector2(stackX, 0f), new Vector2(30f, 30f));
+        var ho = face.gameObject.AddComponent<Outline>(); ho.effectColor = ToyKit.Ink; ho.effectDistance = new Vector2(2f, -2f);
+        ui.passiveHead = face.GetComponent<Image>();
+
+        float textX = (stackX + 45f + w * 0.5f - 15f) * 0.5f, textW = w * 0.5f - 15f - (stackX + 45f);
+        ui.passiveCount = ToyKit.UIText("Condition", ui.passivePage, font, "", 28f, new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.8f));
+        ToyKit.Anchor(ui.passiveCount.rectTransform, center, new Vector2(textX, -22f), new Vector2(textW, 36f));
+        ui.passiveEffect = ToyKit.UIText("Effect", ui.passivePage, font, "", 46f, ToyKit.Ink);
+        ui.passiveEffect.fontStyle = FontStyles.Bold;
+        ui.passiveEffect.enableAutoSizing = true; ui.passiveEffect.fontSizeMin = 24f; ui.passiveEffect.fontSizeMax = 46f;
+        ToyKit.Anchor(ui.passiveEffect.rectTransform, center, new Vector2(textX, -66f), new Vector2(textW, 56f));
+
+        // ハンマー性能：パワー／はやさ／リーチ を、ハンマーのアイコン5段階で
+        ui.hammerPage = SubPage("Hammer", ui.info);
+        ui.hammerHeads = new Image[3, HammerSteps];
+        ui.hammerHandles = new Image[3, HammerSteps];
+        float x0 = -w * 0.5f + 165f;
+        float stepX = Mathf.Min(46f, (w * 0.5f - 25f - x0) / (HammerSteps - 0.5f));
+        for (int row = 0; row < 3; row++)
+        {
+            float y = 6f - row * 42f;
+            var label = ToyKit.UIText("Stat" + row, ui.hammerPage, font, HammerStatNames[row], 28f, ToyKit.Ink);
+            label.alignment = TextAlignmentOptions.Left;
+            ToyKit.Anchor(label.rectTransform, center, new Vector2(-w * 0.5f + 80f, y), new Vector2(120f, 40f));
+            for (int k = 0; k < HammerSteps; k++)
+            {
+                float x = x0 + k * stepX;
+                // 柄を先に置いて、頭をその上に重ねる（小さなハンマーの形）
+                var handle = ToyKit.UIImage("Handle", ui.hammerPage, Color.white);
+                ToyKit.Anchor(handle, center, new Vector2(x, y - 9f), new Vector2(6f, 18f));
+                var head = ToyKit.UIImage("Head", ui.hammerPage, Color.white, uiSprite);
+                ToyKit.Anchor(head, center, new Vector2(x, y + 5f), new Vector2(Mathf.Min(34f, stepX - 6f), 18f));
+                ui.hammerHandles[row, k] = handle.GetComponent<Image>();
+                ui.hammerHeads[row, k] = head.GetComponent<Image>();
+            }
+        }
+
+        // 必殺技：名前 ＋ 1文
+        ui.specialPage = SubPage("Special", ui.info);
+        ui.specialName = ToyKit.UIText("Name", ui.specialPage, font, "", 40f, ToyKit.Ink);
+        ui.specialName.fontStyle = FontStyles.Bold;
+        ui.specialName.enableAutoSizing = true; ui.specialName.fontSizeMin = 22f; ui.specialName.fontSizeMax = 40f;
+        ToyKit.Anchor(ui.specialName.rectTransform, center, new Vector2(0f, 0f), new Vector2(w - 30f, 52f));
+        ui.specialText = InfoText("Text", ui.specialPage, w, -60f, 64f);
+
+        // 下の丸：いまどの表示か（カーソルで押しても切り替わる）
+        ui.dotsRow = new GameObject("Dots", typeof(RectTransform)).GetComponent<RectTransform>();
+        ui.dotsRow.SetParent(r, false);
+        ToyKit.Anchor(ui.dotsRow, new Vector2(0.5f, 0f), new Vector2(0f, 20f), new Vector2(PageCount * 26f + 30f, 30f));
+        ui.dots = new Image[PageCount];
+        for (int d = 0; d < PageCount; d++)
+        {
+            var dot = ToyKit.UIImage("Dot" + d, ui.dotsRow, ToyKit.Ink, knobSprite);
+            dot.GetComponent<Image>().type = Image.Type.Simple;
+            ToyKit.Anchor(dot, center, new Vector2((d - (PageCount - 1) * 0.5f) * 26f, 0f), new Vector2(14f, 14f));
+            ui.dots[d] = dot.GetComponent<Image>();
+        }
+
+        // 説明を出している間の「OK!」（顔が隠れるので右下に小さく。説明の文字と重ならない高さ）
+        ui.okSmall = ToyKit.UIText("OKSmall", r, font, "OK!", 32f, ToyKit.Palette[0]);
+        ui.okSmall.fontSharedMaterial = popMat;
+        ui.okSmall.rectTransform.localRotation = Quaternion.Euler(0f, 0f, -10f);
+        ToyKit.Anchor(ui.okSmall.rectTransform, new Vector2(1f, 0f), new Vector2(-50f, 19f), new Vector2(90f, 40f));
+        ui.info.gameObject.SetActive(false);
+    }
+
+    static RectTransform SubPage(string name, Transform parent)
+    {
+        var page = new GameObject(name, typeof(RectTransform)).GetComponent<RectTransform>();
+        page.SetParent(parent, false);
+        ToyKit.Stretch(page);
+        return page;
+    }
+
+    TextMeshProUGUI InfoText(string name, Transform parent, float w, float y, float h)
+    {
+        var t = ToyKit.UIText(name, parent, font, "", 24f, new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.85f));
+        t.textWrappingMode = TextWrappingModes.Normal;
+        t.enableAutoSizing = true; t.fontSizeMin = 14f; t.fontSizeMax = 24f;
+        ToyKit.Anchor(t.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, y), new Vector2(w - 30f, h));
+        return t;
     }
 
     RectTransform SmallButton(Transform parent, string text, Vector2 pos)
