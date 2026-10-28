@@ -16,11 +16,21 @@ namespace Yurube
         [Tooltip("ショット時の赤の数と弾速をConsoleに出す(テスト用)")]
         [SerializeField] bool m_logShotSpeed = true;
 
+        [Header("弾速の見た目")]
+        [Tooltip("発射時に残光トレイルとマズルフラッシュを出す")]
+        [SerializeField] bool m_enableShotVisuals = true;
+        [Tooltip("自分が飛ばした積み木を探す範囲(m)")]
+        [SerializeField] float m_searchRadius = 3.0f;
+        [Tooltip("トレイル・フラッシュに使うマテリアル(未設定なら Sprites/Default)")]
+        [SerializeField] Material m_effectMaterial;
+
         DarumaCharacter m_character;
         DarumaHammer m_hammer;
         HammerParams m_params;
         float m_baseShotSpeed;
         bool m_wasShooting;
+        readonly Collider[] m_overlaps = new Collider[32];
+        static Material s_fallbackEffectMaterial;
 
         private void Awake()
         {
@@ -55,6 +65,48 @@ namespace Yurube
 
             int red = m_character.Stack != null ? m_character.Stack.CountColor(TumikiColor.Red) : 0;
             m_params.ShotSpeed = Mathf.Min(m_baseShotSpeed + red * m_shotSpeedPerRedBlock, m_maxShotSpeed);
+        }
+
+        // 弾速の見た目: 飛び始めた自分の積み木に残光トレイルを付け、発射時はマズルフラッシュを出す
+        private void FixedUpdate()
+        {
+            if (!m_enableShotVisuals || m_character == null || !m_character.CanBeAffected) return;
+
+            Vector3 center = m_character.transform.position + Vector3.up * 0.5f;
+            int count = Physics.OverlapSphereNonAlloc(center, m_searchRadius, m_overlaps, ~0, QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < count; i++)
+            {
+                var block = m_overlaps[i].GetComponentInParent<TumikiBlock>();
+                if (block == null) continue;
+                if (block.CurrentState != TumikiBlock.State.Flying) continue;
+                // 自分が飛ばした積み木だけ
+                if (!ReferenceEquals(block.Owner, m_character)) continue;
+
+                var trail = block.GetComponent<AkadaruShotTrail>();
+                // この発射でまだ付けていなければ付ける(投げ直しでもまた付く)
+                if (trail != null && trail.ConsumedLaunch) continue;
+                if (trail == null) trail = block.gameObject.AddComponent<AkadaruShotTrail>();
+
+                // 弾が出る位置(キャラクターの正面)を渡す
+                Vector3 muzzle = m_character.transform.position
+                    + Vector3.up * (TumikiBlock.kHeight * 0.5f)
+                    + m_character.transform.forward * (DarumaCharacter.kBodyRadius + TumikiBlock.kRadius + 0.05f);
+                trail.Begin(EffectMaterial, m_baseShotSpeed > 0.0f ? m_baseShotSpeed : 10.0f, m_maxShotSpeed, muzzle);
+            }
+        }
+
+        private Material EffectMaterial
+        {
+            get
+            {
+                if (m_effectMaterial != null) return m_effectMaterial;
+                if (s_fallbackEffectMaterial == null)
+                {
+                    var shader = Shader.Find("Sprites/Default");
+                    if (shader != null) s_fallbackEffectMaterial = new Material(shader);
+                }
+                return s_fallbackEffectMaterial;
+            }
         }
     }
 }

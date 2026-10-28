@@ -18,6 +18,10 @@ namespace Yurube
         [Tooltip("青の数と移動速度をConsoleに出す(テスト用)")]
         [SerializeField] bool m_logMoveSpeed = true;
 
+        [Header("移動速度の見た目")]
+        [Tooltip("風の粒・残像に使うマテリアル(FireParticle など。未設定なら自動生成)")]
+        [SerializeField] Material m_effectMaterial;
+
         DarumaCharacter m_character;
         int m_lastBlue = -1;
         float m_lastLoggedSpeed = -1.0f;
@@ -25,6 +29,11 @@ namespace Yurube
         private void Awake()
         {
             m_character = GetComponent<DarumaCharacter>();
+
+            // 移動速度UPを見た目で出す(青い風・残像)
+            var effect = GetComponent<AodaruSpeedEffect>();
+            if (effect == null) effect = gameObject.AddComponent<AodaruSpeedEffect>();
+            effect.Init(m_effectMaterial);
         }
 
         // 表示用。青の数か移動速度が変わったときだけ出す(毎フレームのログで埋もれないように)

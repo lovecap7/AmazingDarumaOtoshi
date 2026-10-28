@@ -734,3 +734,4 @@ MonoBehaviour:
   m_shotSpeedPerRedBlock: 1
   m_maxShotSpeed: 60
   m_logShotSpeed: 1
+  m_effectMaterial: {fileID: 2100000, guid: dd619cf70c425c048af5157405cb98d5, type: 2}

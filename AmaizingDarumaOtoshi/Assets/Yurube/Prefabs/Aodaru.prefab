@@ -734,3 +734,4 @@ MonoBehaviour:
   m_speedPerBlueBlock: 1
   m_maxMoveSpeed: 12
   m_logMoveSpeed: 1
+  m_effectMaterial: {fileID: 2100000, guid: dd619cf70c425c048af5157405cb98d5, type: 2}
