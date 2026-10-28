@@ -121086,14 +121086,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 640e4eebc61dca94d86294d04bdcf92c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NetStageSpawner
-  m_characterPrefab: {fileID: 5991966503971363099, guid: 98dfe1d631da6fc429ba3618bb53aa46, type: 3}
+  m_characterPrefab: {fileID: 121768460714129420, guid: 1803147ddfd19db4a973ecca4a785268, type: 3}
   m_spawnPoints:
   - {fileID: 34296879}
   - {fileID: 362302899}
   - {fileID: 507910259}
   - {fileID: 2009570414}
-  m_next: 0
-  m_subscribed: 0
 --- !u!1 &1110689242
 GameObject:
   m_ObjectHideFlags: 0
