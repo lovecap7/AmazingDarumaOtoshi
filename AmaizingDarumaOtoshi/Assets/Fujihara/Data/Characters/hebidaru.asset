@@ -16,11 +16,11 @@ MonoBehaviour:
   displayName: "\u3078\u3073\u3060\u308B"
   color: {r: 0.42, g: 0.75, b: 0.27, a: 1}
   portrait: {fileID: 0}
-  prefab: {fileID: 0}
+  prefab: {fileID: 9069936943766670842, guid: f2e3cfdcbee8b0e1da488ff618f151fc, type: 3}
   passiveColor: 2
-  passiveCount: 2
-  passiveName: "\u3059\u3070\u3084\u3055UP"
-  passiveText: "\u7DD1\u306E\u7A4D\u307F\u6728\u30922\u500B\u7A4D\u3080\u3068\u3001\u6B69\u304F\u306E\u304C\u901F\u304F\u306A\u308B"
+  passiveCount: 0
+  passiveName: "\u86c7\u884c"
+  passiveText: "\u81ea\u5206\u306e\u7a4d\u307f\u6728\u3092\u98db\u3070\u3059\u3068\u3001\u5de6\u53f3\u306b\u86c7\u884c\u3059\u308b"
   hammerPower: 2
   hammerSpeed: 5
   hammerReach: 3

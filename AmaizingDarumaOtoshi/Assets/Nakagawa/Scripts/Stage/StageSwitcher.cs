@@ -26,6 +26,8 @@ namespace Nakagawa
         // DarumaMatch に登録してあるステージ範囲(ステージの見本から設定を写す)
         [SerializeField] StageArea m_stageArea;
         [SerializeField] Camera m_camera;
+        [Tooltip("ステージごとのカメラの設定(StageCameraTuner で保存した物)。設定のあるステージは CameraPoint の代わりに使う")]
+        [SerializeField] StageCameraPresets m_cameraPresets;
 
         [Header("デバッグ入力")]
         [SerializeField] Key m_prevKey = Key.LeftArrow;
@@ -54,6 +56,8 @@ namespace Nakagawa
 
         int m_index = -1;
         bool m_switching;
+        // カメラの既定の視野角(ステージごとの設定に視野角がないときに使う)
+        float m_defaultFov = -1.0f;
 
         // ステージの切り替えを始める(前のステージの片付けの前)。ネット対戦などの拡張用
         public event System.Action SwitchStarting;
@@ -67,10 +71,12 @@ namespace Nakagawa
         
 public int CurrentIndex => m_index;
         public StageEntry Current => m_index >= 0 ? m_stages[m_index] : null;
+        public StageCameraPresets CameraPresets => m_cameraPresets;
         bool DebugEnabled => m_debugInConfiguredMatch || m_match == null || !m_match.IsConfigured;
 
         private void Awake()
         {
+            if (m_camera != null) m_defaultFov = m_camera.fieldOfView;
             int index = s_pendingIndex >= 0 ? s_pendingIndex : m_startIndex;
             if (s_pendingIndex < 0 && !string.IsNullOrEmpty(s_requestedId))
             {
@@ -172,16 +178,62 @@ public int CurrentIndex => m_index;
                 JsonUtility.FromJsonOverwrite(JsonUtility.ToJson(stage.StageArea), m_stageArea);
             }
 
-            if (stage.CameraPoint != null && m_camera != null)
+            if (GetCameraPose(stage, out Vector3 cameraPosition, out Quaternion cameraRotation, out float cameraFov))
             {
-                // プレイヤーを追うカメラなら、追う基準の位置を変える
-                var follow = m_camera.GetComponent<MatchCamera>();
-                if (follow != null) follow.SetBasePose(stage.CameraPoint.position, stage.CameraPoint.rotation);
-                else m_camera.transform.SetPositionAndRotation(stage.CameraPoint.position, stage.CameraPoint.rotation);
+                ApplyCameraPose(cameraPosition, cameraRotation, cameraFov);
             }
 
             Debug.Log($"[StageSwitcher] {stage.DisplayName} ({m_index + 1}/{m_stages.Length})");
             StageApplied?.Invoke(m_index);
+        }
+
+        // ステージを映すカメラの位置・向き・視野角。保存した設定(StageCameraPresets)があればそれを、なければステージの CameraPoint を使う
+        // usePreset: false なら保存した設定を使わず、ステージの CameraPoint(ステージを作ったときの値)を返す
+        public bool GetCameraPose(StageEntry stage, out Vector3 position, out Quaternion rotation, out float fov, bool usePreset = true)
+        {
+            position = Vector3.zero;
+            rotation = Quaternion.identity;
+            fov = DefaultFov;
+            if (stage == null) return false;
+            var preset = usePreset && m_cameraPresets != null && stage.Info != null ? m_cameraPresets.Find(stage.Info.Id) : null;
+            if (preset != null)
+            {
+                position = preset.Position;
+                rotation = preset.Rotation;
+                if (preset.Fov > 0.0f) fov = preset.Fov;
+                return true;
+            }
+            if (stage.CameraPoint == null) return false;
+            position = stage.CameraPoint.position;
+            rotation = stage.CameraPoint.rotation;
+            return true;
+        }
+
+        // カメラを指定の位置・向き・視野角にする(プレイヤーを追うカメラなら、追う基準を変える)
+        public void ApplyCameraPose(Vector3 position, Quaternion rotation, float fov)
+        {
+            if (m_camera == null) return;
+            var follow = m_camera.GetComponent<MatchCamera>();
+            if (follow != null)
+            {
+                follow.SetBasePose(position, rotation);
+                if (fov > 0.0f) follow.SetBaseFov(fov);
+            }
+            else
+            {
+                m_camera.transform.SetPositionAndRotation(position, rotation);
+                if (fov > 0.0f) m_camera.fieldOfView = fov;
+            }
+        }
+
+        // カメラの既定の視野角(シーンに置いたカメラの値)
+        public float DefaultFov
+        {
+            get
+            {
+                if (m_defaultFov <= 0.0f && m_camera != null) m_defaultFov = m_camera.fieldOfView;
+                return m_defaultFov;
+            }
         }
 
         private int Wrap(int index)
