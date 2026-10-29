@@ -1,0 +1,47 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ce3a5fd96dee5bf48b4e64dd3ca32ce5, type: 3}
+  m_Name: StageCameraPresets
+  m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.StageCameraPresets
+  m_presets:
+  - StageId: DebugStage21
+    Position: {x: 0, y: 21.6, z: -22.8}
+    Euler: {x: 40, y: -0, z: -0}
+    Fov: 45
+  - StageId: DebugStage22
+    Position: {x: 0, y: 23.097656, z: -27.143414}
+    Euler: {x: 40.000008, y: 0, z: 0}
+    Fov: 45
+  - StageId: DebugStage23
+    Position: {x: 0, y: 20.79508, z: -23.15516}
+    Euler: {x: 40.000008, y: 0, z: 0}
+    Fov: 45
+  - StageId: DebugStage24
+    Position: {x: 0, y: 20.145731, z: -24.173346}
+    Euler: {x: 40.000008, y: 0, z: 0}
+    Fov: 45
+  - StageId: DebugStage25
+    Position: {x: 0, y: 22.216936, z: -24.975046}
+    Euler: {x: 40.000008, y: 0, z: 0}
+    Fov: 45
+  - StageId: DebugStage26
+    Position: {x: 0, y: 21.830683, z: -23.722677}
+    Euler: {x: 40.000008, y: 0, z: 0}
+    Fov: 45
+  - StageId: DebugStage27
+    Position: {x: 0, y: 20.122406, z: -24.472254}
+    Euler: {x: 40.000008, y: 0, z: 0}
+    Fov: 45
+  - StageId: DebugStage28
+    Position: {x: 0, y: 23.074339, z: -28.108982}
+    Euler: {x: 40.000008, y: 0, z: 0}
+    Fov: 45
