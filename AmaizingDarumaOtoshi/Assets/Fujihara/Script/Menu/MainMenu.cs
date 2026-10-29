@@ -9,7 +9,8 @@ using UnityEngine.InputSystem.UI;
 using UnityEngine.Rendering.Universal;
 using UnityEngine.UI;
 
-// メインメニュー。タイトルと同じおもちゃの世界で見せる。
+// メインメニュー。タイトルと同じおもちゃの世界で見せる（MenuScene は TitleClubRoomDressing で部室にしている）。
+// ・始まり（dropIn）：項目の積み木が下（やめる）から順に上から降ってきて積み上がり、最後に顔が乗る（A で飛ばせる）
 // ・左に「たたかう／サウンド／ビデオ／クレジット／やめる」の積み木が縦に積まれ、てっぺんにスマイル
 //   ハンマーが選択中の積み木の横で構える（カーソル）
 // ・右の看板に、選択中の項目の設定や説明が暗いプレビューで出ている
@@ -34,6 +35,9 @@ public class MainMenu : MonoBehaviour
     [SerializeField] string battleSceneName = "SelectScene";
     [Tooltip("「たたかう」→「オンライン」で移動するシーン。空欄（または Build Settings に無い）なら「じゅんびちゅう」と出す")]
     [SerializeField] string onlineSceneName = "";
+
+    [Tooltip("始まったとき、項目の積み木を下から順に上から降らせて積む（A で飛ばせる）")]
+    [SerializeField] bool dropIn = true;
 
     public enum BattleStyle { KnockTwice, Board }
     [Tooltip("たたかうの選び方。KnockTwice：叩き飛ばすと「ローカル／オンライン」の積み木が飛んできて、もう一度叩く　Board：看板のボタンで選ぶ")]
@@ -67,7 +71,14 @@ public class MainMenu : MonoBehaviour
     const float FlyTime = 0.6f, HangTime = 0.05f, DropTime = 0.12f, ReturnTime = 0.55f;
     const float IdleYaw = -32f, CursorOffset = 0.3f, CursorScale = 1.06f;
 
-    enum Phase { Browse, Hitting, Flying, Panel, Returning, Credits, Leaving, Choose, ChoiceLeaving, ChoiceBack }
+    enum Phase { Intro, Browse, Hitting, Flying, Panel, Returning, Credits, Leaving, Choose, ChoiceLeaving, ChoiceBack }
+
+    // ---- 始まり：積み木が上から降ってくる ----
+    const float DropFall = 0.38f, DropHeight = 9f, DropInterval = 0.16f;
+    float[] dropAt;                 // それぞれの積み木が落ち始める時刻（sim）
+    bool[] dropLanded;
+    float headDropAt = -100f;
+    bool headDropLanded = true;
     enum Content { Battle, Sound, Video, Description }
 
     Phase phase;
@@ -151,7 +162,69 @@ public class MainMenu : MonoBehaviour
         BuildStage();
         camPos = BrowsePos; camLook = BrowseLook;
         hammerPos = ToyKit.HammerPivot(Contact(cursor), hammerScale);
+
+        int n = blocks.Length;
+        dropAt = new float[n];
+        dropLanded = new bool[n];
+        if (dropIn)
+        {
+            // 下の積み木（やめる）から順に、上から降ってきて積み上がる。最後に顔
+            phase = Phase.Intro;
+            for (int i = 0; i < n; i++) dropAt[i] = 0.55f + (n - 1 - i) * DropInterval;
+            headDropAt = 0.55f + n * DropInterval + 0.1f;
+            headDropLanded = false;
+            hammerPos = OffscreenHammer();
+        }
+        else
+        {
+            phase = Phase.Browse;
+            for (int i = 0; i < n; i++) { dropAt[i] = -100f; dropLanded[i] = true; }
+        }
         StartCoroutine(FadeIn());
+    }
+
+    // 始まりの間、ハンマーは画面の左の外で待つ
+    Vector3 OffscreenHammer() => ToyKit.HammerPivot(Contact(cursor), hammerScale) + new Vector3(-8f, 0f, 0f);
+
+    // 降ってくる高さ（0 で着地）
+    float DropOffset(float at)
+    {
+        if (sim < at) return DropHeight;
+        float u = Mathf.Clamp01((sim - at) / DropFall);
+        return DropHeight * (1f - u * u);
+    }
+
+    float DropSquash(float at) => ToyKit.Squash((sim - at - DropFall) / 0.3f, 0.18f);
+
+    // 着地の音と土けむり。全部（顔も）着地したらメニューを操作できる
+    void UpdateIntro()
+    {
+        if (phase != Phase.Intro) return;
+        for (int i = 0; i < blocks.Length; i++)
+        {
+            if (dropLanded[i] || sim < dropAt[i] + DropFall) continue;
+            dropLanded[i] = true;
+            ToyKit.Emit(fx.puff, Slot(i) - Vector3.up * BH * 0.5f, Quaternion.Euler(-90f, 0f, 0f), 6);
+            shake = Mathf.Max(shake, 0.2f);
+            MenuSounds.Play(MatchSounds.Instance.BlockHitBlock, 0.7f);
+        }
+        if (!headDropLanded && sim >= headDropAt + DropFall)
+        {
+            headDropLanded = true;
+            ToyKit.Emit(fx.sparkle, new Vector3(stackX, labels.Length * BH + ToyKit.HeadR, 0f), Quaternion.Euler(-90f, 0f, 0f), 14);
+            shake = Mathf.Max(shake, 0.3f);
+            MenuSounds.Play(MatchSounds.Instance.BlockHitBlock, 0.9f);
+        }
+        if (headDropLanded && sim >= headDropAt + DropFall + 0.3f) phase = Phase.Browse;
+    }
+
+    // A などで始まりを飛ばす：全部その場に積み上がった状態にする
+    void SkipIntro()
+    {
+        for (int i = 0; i < blocks.Length; i++) { dropAt[i] = -100f; dropLanded[i] = true; }
+        headDropAt = -100f;
+        headDropLanded = true;
+        phase = Phase.Browse;
     }
 
     void OnDestroy() => Time.timeScale = 1f;
@@ -680,6 +753,10 @@ public class MainMenu : MonoBehaviour
 
         switch (phase)
         {
+            case Phase.Intro:
+                if (MenuInput.Submit() || MenuInput.Cancel() || click) SkipIntro();
+                break;
+
             case Phase.Browse:
             {
                 int hover = mouse != null && (mouseMoved || click) ? BlockUnderMouse(mouse.position.ReadValue()) : -1;
@@ -851,6 +928,7 @@ public class MainMenu : MonoBehaviour
         float dt = Time.unscaledDeltaTime;
 
         HandleInput();
+        UpdateIntro();
 
         bool panel = phase == Phase.Panel;
         bool choosing = phase == Phase.Choose || phase == Phase.ChoiceLeaving;
@@ -897,6 +975,9 @@ public class MainMenu : MonoBehaviour
             Vector3 pos = Slot(i) + Vector3.right * offsetX[i];
             Quaternion rot = Quaternion.identity;
             Vector3 s = Vector3.one * scaleNow[i];
+            // 始まり：上から降ってきて、着地でつぶれる
+            pos.y += DropOffset(dropAt[i]);
+            s = Vector3.Scale(s, ToyKit.SquashVec(DropSquash(dropAt[i])));
 
             if (outIdx >= 0 && i < outIdx)
             {
@@ -1006,6 +1087,9 @@ public class MainMenu : MonoBehaviour
 
         Vector3 s = Vector3.one;
         if (outIdx >= 0 && phase != Phase.Returning) s = ToyKit.SquashVec(ToyKit.Squash((sim - impactTime - HangTime - DropTime) / 0.35f, 0.2f));
+        // 始まり：顔は最後に降ってきて、ぽよんとつぶれる
+        y += DropOffset(headDropAt);
+        s = Vector3.Scale(s, ToyKit.SquashVec(ToyKit.Squash((sim - headDropAt - DropFall) / 0.45f, 0.3f)));
         f.root.position = new Vector3(stackX, y, 0f);
         f.root.rotation = headRot;
         f.root.localScale = s;
@@ -1023,7 +1107,8 @@ public class MainMenu : MonoBehaviour
         }
         // ローカル／オンラインを選んでいる間は、その積み木の横で構える
         bool choosing = phase == Phase.Choose || phase == Phase.ChoiceLeaving;
-        if (!swinging && phase != Phase.Leaving && !(phase == Phase.ChoiceLeaving && choiceOut >= 0))
+        if (phase == Phase.Intro) hammerPos = OffscreenHammer();
+        else if (!swinging && phase != Phase.Leaving && !(phase == Phase.ChoiceLeaving && choiceOut >= 0))
             hammerPos = Vector3.Lerp(hammerPos, ToyKit.HammerPivot(choosing ? ChoiceContact(choiceCursor) : Contact(cursor), hammerScale), 1f - Mathf.Exp(-12f * Time.deltaTime));
         hammer.position = hammerPos;
         hammer.rotation = Quaternion.Euler(0f, hammerYaw, 0f);
@@ -1099,7 +1184,8 @@ public class MainMenu : MonoBehaviour
     void UpdateUI()
     {
         titleGroup.alpha = 1f - dim;
-        hintText.text = phase == Phase.Panel && outIdx == Battle || phase == Phase.Choose ? "上下：えらぶ　A：けってい　B：もどる"
+        hintText.text = phase == Phase.Intro ? ""
+                      : phase == Phase.Panel && outIdx == Battle || phase == Phase.Choose ? "上下：えらぶ　A：けってい　B：もどる"
                       : phase == Phase.Panel ? "上下：えらぶ　左右：かえる　B：もどる"
                       : phase == Phase.Credits ? "" : "上下：えらぶ　A：けってい";
     }
