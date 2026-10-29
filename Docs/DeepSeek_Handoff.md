@@ -43,6 +43,7 @@
 | あおだる（演出） | 青い風＋青い残像 | `AodaruSpeedEffect.cs` / `AodaruGhost.cs` |
 | あおだる（必殺技） | 六腕: ハンマーのモデルを6本出し（阿修羅風）、発動時の向きを基準にした3方向から近づく積み木を、操作に関係なくはじき返す（4秒間） | `AodaruSpecial.cs` / `AodaruSixArms.cs` |
 | みだる | 自分が飛ばした緑の積み木が相手をホーミング | `MidaruPassive.cs` / `TumikiHoming.cs` |
+| みだる（必殺技） | ファンネル: ボタンを押すとその場で自分の積み木を撃ち、「積んでいる数」に分裂して近くの敵へ手分けしてホーミング | `MidaruSpecial.cs` / `TumikiHoming.cs` |
 | いわだる | 飛ばした積み木は積み木を壊し、壁で壊れる（岩の破片表示つき） | `IwaPassive.cs` / `IwaBlock.cs`（`IwaImpact` 含む） |
 | きだる | 黄色い積み木を積むと、同じ黄色がもう1個増える（上限10段） | `KidaruPassive.cs` |
 | へびだる | 股抜きショットで飛ばした自分の積み木が左右に蛇行（ハンマーで飛ばした積み木は対象外） | `HebiPassive.cs` / `TumikiZigzag.cs` |

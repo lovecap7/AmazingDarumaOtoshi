@@ -137,6 +137,7 @@ namespace Yurube.Lab
             if (GUILayout.Button("だるきんぐ: 積み木3個", m_button)) PresetDaruKing();
             if (GUILayout.Button("あかだる: 必殺技", m_button)) PresetAkadaruSpecial();
             if (GUILayout.Button("あおだる: 必殺技", m_button)) PresetAodaruSpecial();
+            if (GUILayout.Button("みだる: 必殺技", m_button)) PresetMidaruSpecial();
 
             // ---- 切替 ----
             GUILayout.Space(6.0f);
@@ -354,6 +355,19 @@ namespace Yurube.Lab
             // 5個積むとゲージが満タンになる
             m_lab.AddBlocks(character, TumikiColor.Blue, 5);
             m_lab.SelectedColor = TumikiColor.Blue;
+
+            var special = character != null ? character.GetComponent<ISpecialAbility>() : null;
+            if (special != null) special.TryActivate();
+        }
+
+        void PresetMidaruSpecial()
+        {
+            m_lab.SelectCharacter("midaru");
+            var character = m_lab.Character;
+            m_lab.ClearStack(character);
+            // 5個積むとゲージが満タン。押した瞬間に撃って5発に分裂する
+            m_lab.AddBlocks(character, TumikiColor.Red, 5);
+            m_lab.SelectedColor = TumikiColor.Red;
 
             var special = character != null ? character.GetComponent<ISpecialAbility>() : null;
             if (special != null) special.TryActivate();
