@@ -9,7 +9,7 @@ namespace Yurube
     // 自分の積み木を1個飛ばし、発射地点から伸びる残像ビームに一定時間当たり判定を付ける。
     // ビームが相手に当たると、相手と自分が即死し、積み木は破壊される。
     [RequireComponent(typeof(DarumaCharacter))]
-    public class AkadaruSpecial : MonoBehaviour
+    public class AkadaruSpecial : MonoBehaviour, ISpecialAbility
     {
         [Header("弾")]
         [Tooltip("必殺技の積み木の速さ(m/s)")]
@@ -92,7 +92,12 @@ namespace Yurube
             // 見た目は通常の射撃と同じ AkadaruShotTrail をそのまま使う
             var shotTrail = block.GetComponent<AkadaruShotTrail>();
             if (shotTrail == null) shotTrail = block.gameObject.AddComponent<AkadaruShotTrail>();
-            shotTrail.Begin(m_effectMaterial, m_effectMinSpeed, m_effectMaxSpeed, position);
+            // 必殺技は通常より太く・白く・長く残るレーザーにする
+            shotTrail.BeginSpecial(m_effectMaterial, m_effectMinSpeed, m_effectMaxSpeed, position);
+
+            // 通った地面を一定時間焼け焦げさせる
+            var scorchObject = new GameObject("TronScorch");
+            scorchObject.AddComponent<TronScorchTrail>().Begin(shotTrail);
 
             if (m_logSpecial) Debug.Log("[あかだる] 必殺技トロン発動", this);
             return true;

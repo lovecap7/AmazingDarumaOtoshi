@@ -136,6 +136,7 @@ namespace Yurube.Lab
             if (GUILayout.Button("へびだる: 積んでショット", m_button)) PresetHebi();
             if (GUILayout.Button("だるきんぐ: 積み木3個", m_button)) PresetDaruKing();
             if (GUILayout.Button("あかだる: 必殺技", m_button)) PresetAkadaruSpecial();
+            if (GUILayout.Button("あおだる: 必殺技", m_button)) PresetAodaruSpecial();
 
             // ---- 切替 ----
             GUILayout.Space(6.0f);
@@ -202,7 +203,7 @@ namespace Yurube.Lab
             bool newShowHitbox = GUILayout.Toggle(showHitbox, "当たり判定を表示 (F3)");
             if (newShowHitbox != showHitbox) TronHitboxView.Visible = newShowHitbox;
 
-            var special = character.GetComponent<AkadaruSpecial>();
+            var special = character.GetComponent<ISpecialAbility>();
             if (special != null && GUILayout.Button("必殺技 (L/Y)", m_button)) special.TryActivate();
         }
 
@@ -342,6 +343,19 @@ namespace Yurube.Lab
             m_lab.SelectedColor = TumikiColor.Red;
 
             var special = character != null ? character.GetComponent<AkadaruSpecial>() : null;
+            if (special != null) special.TryActivate();
+        }
+
+        void PresetAodaruSpecial()
+        {
+            m_lab.SelectCharacter("aodaru");
+            var character = m_lab.Character;
+            m_lab.ClearStack(character);
+            // 5個積むとゲージが満タンになる
+            m_lab.AddBlocks(character, TumikiColor.Blue, 5);
+            m_lab.SelectedColor = TumikiColor.Blue;
+
+            var special = character != null ? character.GetComponent<ISpecialAbility>() : null;
             if (special != null) special.TryActivate();
         }
 
