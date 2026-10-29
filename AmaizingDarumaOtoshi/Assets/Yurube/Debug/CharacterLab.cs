@@ -52,6 +52,7 @@ namespace Yurube.Lab
         bool m_dummyInvincible = true;
         Coroutine m_dummyRespawnRoutine;
         DarumaCharacter m_dummyCharacter;
+        Coroutine m_playerRespawnRoutine;
 
         // ---- 外から読むもの(UI用) ----
         public IReadOnlyList<CharacterData> Characters => m_characters;
@@ -247,6 +248,7 @@ namespace Yurube.Lab
         public void SelectCharacter(int index)
         {
             if (m_characters.Count == 0) return;
+            StopPlayerRespawn();
             index = Mathf.Clamp(index, 0, m_characters.Count - 1);
             if (index == m_index && m_character != null) return;
             m_index = index;
@@ -282,7 +284,31 @@ namespace Yurube.Lab
             // キーボードで遊ぶ(DarumaCharacter は Awake で入力元を探すので、あとから差し替える)
             var input = go.AddComponent<KeyboardDarumaInput>();
             character.SetCommandSource(input);
+            character.Eliminated += OnPlayerEliminated;
             m_character = character;
+        }
+
+        // 必殺技の自爆などで倒れたら、少し待って同じキャラを出し直す
+        void OnPlayerEliminated(DarumaCharacter character)
+        {
+            if (!ReferenceEquals(character, m_character)) return;
+            m_character = null;
+            if (m_playerRespawnRoutine == null)
+                m_playerRespawnRoutine = StartCoroutine(RespawnPlayerLater());
+        }
+
+        IEnumerator RespawnPlayerLater()
+        {
+            yield return new WaitForSecondsRealtime(0.8f);
+            m_playerRespawnRoutine = null;
+            RespawnCharacter();
+        }
+
+        void StopPlayerRespawn()
+        {
+            if (m_playerRespawnRoutine == null) return;
+            StopCoroutine(m_playerRespawnRoutine);
+            m_playerRespawnRoutine = null;
         }
 
         public void AddBlocks(DarumaCharacter target, TumikiColor color, int count)

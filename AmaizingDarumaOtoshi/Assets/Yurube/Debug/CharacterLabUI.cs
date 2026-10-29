@@ -89,6 +89,7 @@ namespace Yurube.Lab
 
             GUILayout.Space(6.0f);
             DrawStats();
+            DrawSpecialPanel();
 
             // ---- 積み木 ----
             GUILayout.Space(6.0f);
@@ -134,6 +135,7 @@ namespace Yurube.Lab
             if (GUILayout.Button("きだる: 黄色1個", m_button)) PresetKidaru();
             if (GUILayout.Button("へびだる: 積んでショット", m_button)) PresetHebi();
             if (GUILayout.Button("だるきんぐ: 積み木3個", m_button)) PresetDaruKing();
+            if (GUILayout.Button("あかだる: 必殺技", m_button)) PresetAkadaruSpecial();
 
             // ---- 切替 ----
             GUILayout.Space(6.0f);
@@ -184,13 +186,33 @@ namespace Yurube.Lab
             GUILayout.Label($"飛んでいる積み木: {m_flying}", m_label);
         }
 
+        void DrawSpecialPanel()
+        {
+            var character = m_lab.Character;
+            if (character == null) return;
+            var gauge = character.GetComponent<SpecialGauge>();
+            if (gauge == null) return;
+
+            GUILayout.Space(6.0f);
+            GUILayout.Label("必殺技", m_section);
+            GUILayout.Label($"ゲージ: {gauge.Blocks}/{gauge.BlocksToFill}" + (gauge.IsFull ? "  READY" : ""), m_label);
+            if (GUILayout.Button("ゲージ満タン", m_button)) gauge.Fill();
+
+            bool showHitbox = TronHitboxView.Visible;
+            bool newShowHitbox = GUILayout.Toggle(showHitbox, "当たり判定を表示 (F3)");
+            if (newShowHitbox != showHitbox) TronHitboxView.Visible = newShowHitbox;
+
+            var special = character.GetComponent<AkadaruSpecial>();
+            if (special != null && GUILayout.Button("必殺技 (L/Y)", m_button)) special.TryActivate();
+        }
+
         void DrawHelp()
         {
             string[] lines =
             {
                 "1-9: キャラ切替   R/G/B/Y: 積み木追加   Shift+R/G/B/Y: ダミーに追加   V: 選択色を発射",
-                "WASD: 移動   Space: ジャンプ   J: 薙ぎ払い   K: ショット",
-                "右ドラッグ: 視点回転   ホイール/Z/X: ズーム   Q/E: 回転   F: 追従   T: スロー   P: 位置リセット   H: UI非表示",
+                "WASD: 移動   Space: ジャンプ   J: 薙ぎ払い   K: ショット   L/Y: 必殺技",
+                "右ドラッグ: 視点回転   ホイール/Z/X: ズーム   Q/E: 回転   F: 追従   T: スロー   P: 位置リセット   H: UI非表示   F3: 判定表示",
                 "積み木の−1／全消し／ダミー復活は左パネルのボタン",
             };
             float width = Mathf.Max(200.0f, Screen.width - 40.0f);
@@ -308,6 +330,19 @@ namespace Yurube.Lab
             // 3個積もうとしても、パッシブで2段までに抑えられる
             m_lab.AddBlocks(character, TumikiColor.Red, 3);
             m_lab.SelectedColor = TumikiColor.Red;
+        }
+
+        void PresetAkadaruSpecial()
+        {
+            m_lab.SelectCharacter("akadaru");
+            var character = m_lab.Character;
+            m_lab.ClearStack(character);
+            // 5個積むとゲージが満タンになる
+            m_lab.AddBlocks(character, TumikiColor.Red, 5);
+            m_lab.SelectedColor = TumikiColor.Red;
+
+            var special = character != null ? character.GetComponent<AkadaruSpecial>() : null;
+            if (special != null) special.TryActivate();
         }
 
         static string ColorName(TumikiColor color)

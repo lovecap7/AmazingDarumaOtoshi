@@ -81,6 +81,8 @@ namespace Yurube
                 if (block.CurrentState != TumikiBlock.State.Flying) continue;
                 // 自分が飛ばした積み木だけ
                 if (!ReferenceEquals(block.Owner, m_character)) continue;
+                // 必殺技トロンの積み木には通常の残光を付けない
+                if (block.GetComponent<TronProjectile>() != null) continue;
 
                 var trail = block.GetComponent<AkadaruShotTrail>();
                 // この発射でまだ付けていなければ付ける(投げ直しでもまた付く)
@@ -108,5 +110,8 @@ namespace Yurube
                 return s_fallbackEffectMaterial;
             }
         }
+
+        // 必殺技の残像でも、通常の射撃と同じマテリアルを使う
+        public Material EffectMaterialForSpecial => EffectMaterial;
     }
 }

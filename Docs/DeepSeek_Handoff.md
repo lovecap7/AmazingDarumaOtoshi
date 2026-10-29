@@ -38,13 +38,16 @@
 |---|---|---|---|
 | あかだる | 赤い積み木の数だけ弾速UP（+1.0 m/s / 個、上限60） | `AkadaruPassive.cs` | コミット済み |
 | あかだる（演出） | 弾速に応じた残光トレイル＋マズルフラッシュ／衝撃波 | `AkadaruShotTrail.cs` / `AkadaruShotFlash.cs` | コミット済み |
+| あかだる（必殺技） | トロン: 通常射撃のトレイルに沿って分割判定。壁反射も追従。触れた積み木は壊れ、キャラクターは0.4秒間隔で積み木を1個ずつ失う(0個なら即死)。発動直後0.6秒は自分無敵。F3/ラボで判定表示 | `AkadaruSpecial.cs` / `TronProjectile.cs` / `TronTrailHit.cs` / `TronHitboxView.cs` | **未コミット** |
 | あおだる | 青い積み木の数だけ移動速度UP（+1.0 m/s / 個、上限12） | `AodaruPassive.cs` | コミット済み |
 | あおだる（演出） | 青い風＋青い残像 | `AodaruSpeedEffect.cs` / `AodaruGhost.cs` | コミット済み |
 | みだる | 自分が飛ばした緑の積み木が相手をホーミング | `MidaruPassive.cs` / `TumikiHoming.cs` | コミット済み |
 | いわだる | 飛ばした積み木は積み木を壊し、壁で壊れる（岩の破片表示つき） | `IwaPassive.cs` / `IwaBlock.cs`（`IwaImpact` 含む） | コミット済み |
-| きだる | 黄色い積み木を積むと、同じ黄色がもう1個増える（上限10段） | `KidaruPassive.cs` | **未コミット** |
-| へびだる | 股抜きショットで飛ばした自分の積み木が左右に蛇行（ハンマーで飛ばした積み木は対象外） | `HebiPassive.cs` / `TumikiZigzag.cs` | **未コミット** |
-| だるきんぐ | 積み木は2個まで。3個目を積むと一番上（古い段）が落ちる | `DaruKingPassive.cs` | **未コミット** |
+| きだる | 黄色い積み木を積むと、同じ黄色がもう1個増える（上限10段） | `KidaruPassive.cs` | コミット済み |
+| へびだる | 股抜きショットで飛ばした自分の積み木が左右に蛇行（ハンマーで飛ばした積み木は対象外） | `HebiPassive.cs` / `TumikiZigzag.cs` | コミット済み |
+| だるきんぐ | 積み木は2個まで。3個目を積むと一番上（古い段）が落ちる | `DaruKingPassive.cs` | コミット済み |
+
+必殺技ゲージ: `Assets/Yurube/Script/SpecialGauge.cs`（全キャラ共通。積み木5個で満タン、必殺技を持つキャラのプレハブに付ける）
 
 キャラクターデータ: `Assets/Fujihara/Data/Characters/{akadaru,aodaru,midaru,iwadaru,kidaru,hebidaru,daruking}.asset`
 プレハブ: `Assets/Yurube/Prefabs/{Akadaru,Aodaru,Midaru,Iwa,Kidaru,Hebi,DaruKing}.prefab`
@@ -167,6 +170,7 @@ Unity の Roslyn と、前回ビルド済みの `Assembly-CSharp.dll` を使っ�
 - きだるの実機確認とコミット（ラボの「きだる: 黄色1個」で2段になるか）
 - へびだるの実機確認とコミット（ラボの「へびだる: 積んでショット」で蛇行するか）
 - だるきんぐの実機確認とコミット（ラボの「だるきんぐ: 積み木3個」で2段になるか）
+- あかだるの必殺技トロンの実機確認とコミット（ラボの「あかだる: 必殺技」で相手と自分が即死するか）
 - あかだるの「赤い積み木のときだけ弾速UP」への変更検討（現状は全色）
 - 通信対戦対応（NetworkObject 付与）※共有プレハブに関わるため要相談
 - chara3〜6 の実装（`prefab: {fileID: 0}` のまま）

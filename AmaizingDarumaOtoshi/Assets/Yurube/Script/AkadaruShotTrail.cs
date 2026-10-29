@@ -49,6 +49,15 @@ namespace Yurube
             m_maxSpeed = Mathf.Max(m_minSpeed + 0.01f, maxSpeed);
             ConsumedLaunch = true;
 
+            // 前回の残像が消えかけている場合は片付ける(再発射で新しい演出を出す)
+            if (m_trail != null && !m_trail.emitting)
+            {
+                Destroy(m_trail.gameObject);
+                m_trail = null;
+                m_comet = null;
+                m_light = null;
+            }
+
             CreateEffect(material);
             HideBlockEffects();
             UpdateEffect();
@@ -221,6 +230,38 @@ namespace Yurube
             }
         }
 
+        // いま表示されているトレイルの全点をコピーする(屈折しても判定を追従させるため)
+        public int CopyTrailPositions(Vector3[] buffer)
+        {
+            if (m_trail == null || buffer == null || buffer.Length == 0) return 0;
+            int count = m_trail.positionCount;
+            if (count < 2 || count > buffer.Length) return 0;
+            m_trail.GetPositions(buffer);
+            return count;
+        }
+
+        public float TrailWidth
+        {
+            get
+            {
+                if (m_trail == null) return 0.0f;
+                return Mathf.Max(0.05f, Mathf.Max(m_trail.startWidth, m_trail.endWidth));
+            }
+        }
+
+        // 実際に表示されているトレイルの両端と幅を返す(必殺技の当たり判定を演出に合わせる)
+        public bool TryGetTrailSegment(out Vector3 oldest, out Vector3 newest, out float width)
+        {
+            oldest = newest = Vector3.zero;
+            width = 0.0f;
+            if (m_trail == null || m_trail.positionCount < 2) return false;
+
+            oldest = m_trail.GetPosition(0);
+            newest = m_trail.GetPosition(m_trail.positionCount - 1);
+            width = Mathf.Max(0.05f, Mathf.Max(m_trail.startWidth, m_trail.endWidth));
+            return true;
+        }
+
         private void StopEffect(bool restoreBlockEffects)
         {
             ConsumedLaunch = false;
@@ -239,7 +280,6 @@ namespace Yurube
             if (m_light != null) m_light.enabled = false;
 
             Destroy(m_trail.gameObject, Mathf.Max(m_trail.time, 0.4f) + 0.3f);
-            m_trail = null;
             m_comet = null;
             m_light = null;
         }
