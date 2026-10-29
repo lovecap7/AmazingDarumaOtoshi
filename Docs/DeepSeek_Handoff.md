@@ -37,15 +37,16 @@
 | キャラ | パッシブ | 主なスクリプト | 状態 |
 |---|---|---|---|
 | あかだる | 赤い積み木の数だけ弾速UP（+1.0 m/s / 個、上限60） | `AkadaruPassive.cs` | コミット済み |
-| あかだる（演出） | 弾速に応じた残光トレイル＋マズルフラッシュ／衝撃波 | `AkadaruShotTrail.cs` / `AkadaruShotFlash.cs` | **未コミット** |
+| あかだる（演出） | 弾速に応じた残光トレイル＋マズルフラッシュ／衝撃波 | `AkadaruShotTrail.cs` / `AkadaruShotFlash.cs` | コミット済み |
 | あおだる | 青い積み木の数だけ移動速度UP（+1.0 m/s / 個、上限12） | `AodaruPassive.cs` | コミット済み |
-| あおだる（演出） | 青い風＋青い残像 | `AodaruSpeedEffect.cs` / `AodaruGhost.cs` | **未コミット** |
+| あおだる（演出） | 青い風＋青い残像 | `AodaruSpeedEffect.cs` / `AodaruGhost.cs` | コミット済み |
 | みだる | 自分が飛ばした緑の積み木が相手をホーミング | `MidaruPassive.cs` / `TumikiHoming.cs` | コミット済み |
 | いわだる | 飛ばした積み木は積み木を壊し、壁で壊れる（岩の破片表示つき） | `IwaPassive.cs` / `IwaBlock.cs`（`IwaImpact` 含む） | コミット済み |
+| きだる | 黄色い積み木を積むと、同じ黄色がもう1個増える（上限10段） | `KidaruPassive.cs` | **未コミット** |
 
-キャラクターデータ: `Assets/Fujihara/Data/Characters/{akadaru,aodaru,midaru,iwadaru}.asset`
-プレハブ: `Assets/Yurube/Prefabs/{Akadaru,Aodaru,Midaru,Iwa}.prefab`
-頭マテリアル: `Assets/Yurube/Materials/{AodaruHead,MidaruHead,IwaHead}.mat`
+キャラクターデータ: `Assets/Fujihara/Data/Characters/{akadaru,aodaru,midaru,iwadaru,kidaru}.asset`
+プレハブ: `Assets/Yurube/Prefabs/{Akadaru,Aodaru,Midaru,Iwa,Kidaru}.prefab`
+頭マテリアル: `Assets/Yurube/Materials/{AodaruHead,MidaruHead,IwaHead,KidaruHead}.mat`
 
 ---
 
@@ -161,7 +162,7 @@ Unity の Roslyn と、前回ビルド済みの `Assembly-CSharp.dll` を使っ�
 
 ## 9. 未対応・今後の候補
 
-- あかだる・あおだるの演出（残光トレイル、マズルフラッシュ、青い風、残像）の**コミット**
+- きだるの実機確認とコミット（ラボの「きだる: 黄色1個」で2段になるか）
 - あかだるの「赤い積み木のときだけ弾速UP」への変更検討（現状は全色）
 - 通信対戦対応（NetworkObject 付与）※共有プレハブに関わるため要相談
 - へびだる・chara3〜6 の実装（`prefab: {fileID: 0}` のまま）

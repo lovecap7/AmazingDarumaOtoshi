@@ -76,5 +76,11 @@ namespace Yurube
         {
             return Mathf.Min(m_character.MoveSpeed + blue * m_speedPerBlueBlock, m_maxMoveSpeed);
         }
+
+        // ---- デバッグ表示用(キャラクターラボから読む) ----
+        public int BlueCount => CountBlue();
+        public float EffectiveSpeed => TargetSpeed(CountBlue());
+        public float SpeedPerBlueBlock => m_speedPerBlueBlock;
+        public float MaxMoveSpeed => m_maxMoveSpeed;
     }
 }
