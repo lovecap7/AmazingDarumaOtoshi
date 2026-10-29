@@ -91,6 +91,16 @@ namespace Nakagawa
             }
         }
 
+        // 基準の視野角を変える(ステージ切り替えなど)。すぐにその視野角になる
+        public void SetBaseFov(float fov)
+        {
+            if (m_camera == null) m_camera = GetComponent<Camera>();
+            m_baseFov = fov;
+            m_fovVelocity = 0.0f;
+            m_fov = BaseFov;
+            m_camera.fieldOfView = m_fov;
+        }
+
         private void LateUpdate()
         {
             CollectBodies();

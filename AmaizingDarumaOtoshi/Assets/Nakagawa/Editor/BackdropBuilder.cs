@@ -182,7 +182,87 @@ namespace Nakagawa.EditorTools
                     Description = "下町のもんじゃ焼き屋のテーブル。ステージは大きな鉄板に重ねた鉄の板の上にあり、まわりには土手を作ったもんじゃ・小さなヘラ・具の入ったボウル・ソース・青のり・ラムネ・取り皿が置いてあり、奥の壁には品書きの札と提灯が下がっている。",
                     Build = BuildMonja,
                 },
+                new BackdropDef
+                {
+                    Id = "Clubroom",
+                    Title = "だるま落とし部の部室",
+                    Description = "部室の長机の上。ステージは積んだスコアブックの上にあり、まわりには練習用のだるま落とし・木槌・優勝カップ・スポーツドリンク・タオル・記録用のバインダー・ストップウォッチが置いてあり、奥の壁にはホワイトボードと部旗が掛かっている。",
+                    Build = BuildClubroom,
+                },
+                new BackdropDef
+                {
+                    Id = "Ground",
+                    Title = "放課後の運動場",
+                    Description = "石灰でトラックの線を引いた運動場の土の上。ステージは跳び箱の上にあり、まわりにはサッカーボール・コーン・ハードル・ライン引き・バットとボール・ベースが置いてあり、奥にはバックネットが立っている。",
+                    Build = BuildGround,
+                },
+                new BackdropDef
+                {
+                    Id = "Dojo",
+                    Title = "老舗の道場",
+                    Description = "板張りの道場。ステージは積んだ畳の上にあり、まわりには大きなだるま・太鼓・竹刀掛け・水桶・木刀・座布団・書道の半紙が置いてあり、奥の壁には掛け軸と名札掛けが掛かっている。",
+                    Build = BuildDojo,
+                },
+                new BackdropDef
+                {
+                    Id = "Stadium",
+                    Title = "満員のスタジアム",
+                    Description = "芝生のスタジアムの中央に組んだ特設ステージ。まわりにはテレビカメラ・表彰台・コーナーフラッグ・応援幕があり、奥には観客で埋まったスタンドと照明塔が並んでいる。",
+                    Build = BuildStadium,
+                },
+                new BackdropDef
+                {
+                    Id = "Slope",
+                    Title = "雪のゲレンデ",
+                    Description = "雪の積もったゲレンデ。ステージは積んだ雪と氷のブロックの上にあり、まわりにはもみの木・雪だるま・雪に刺したスキー板・旗門・そりがあり、奥には雪山が連なっている。",
+                    Build = BuildSlope,
+                },
+                new BackdropDef
+                {
+                    Id = "Cruise",
+                    Title = "豪華客船のデッキ",
+                    Description = "チーク材を張った豪華客船のデッキ。ステージは積んだ船体の板の上にあり、まわりにはプール・デッキチェア・パラソル・トロピカルドリンクのテーブル・浮き輪・ロープがあり、奥の手すりの先には海と島が見える。",
+                    Build = BuildCruise,
+                },
+                new BackdropDef
+                {
+                    Id = "Ruins",
+                    Title = "ジャングルの遺跡",
+                    Description = "密林に眠る石畳の遺跡。ステージは積んだ石のブロックの上にあり、まわりには石の頭像・たいまつ・折れた柱・倒れた柱・宝箱・密林の草があり、奥には階段状の神殿がそびえている。",
+                    Build = BuildRuins,
+                },
+                new BackdropDef
+                {
+                    Id = "Space",
+                    Title = "宇宙ステーション",
+                    Description = "金属のパネルを張った宇宙ステーションの区画。ステージは積んだ金属の板の上にあり、まわりには操作盤・酸素ボンベ・ロボットアーム・宇宙服のヘルメット・コンテナ・ケーブルがあり、奥の大窓からは星空と地球が見える。",
+                    Build = BuildSpace,
+                },
             };
+        }
+
+        // 円すい(半径を少しずつ細くした円柱を積む)。位置は底面の中心。色は段ごとに順に使う
+        static void Cone(Ctx c, Transform g, string name, Vector3 basePos, float radius, float height, int steps, params Material[] mats)
+        {
+            float h = height / steps;
+            for (int i = 0; i < steps; i++)
+            {
+                float r = radius * (1.0f - i / (float)steps * 0.85f);
+                c.Cylinder(g, $"{name}_{i}", basePos + new Vector3(0, h * (i + 0.5f), 0), r, h, mats[i % mats.Length]);
+            }
+        }
+
+        // 輪(箱を円周に並べる)。位置は輪の中心。色は輪を mats の数で等分して順に使う
+        static void Ring(Ctx c, Transform g, string name, Vector3 center, float radius, int count, float width, float height, params Material[] mats)
+        {
+            float len = 2 * Mathf.PI * radius / count * 1.08f;
+            for (int i = 0; i < count; i++)
+            {
+                float a = i * Mathf.PI * 2 / count;
+                Vector3 p = center + new Vector3(Mathf.Cos(a) * radius, 0, Mathf.Sin(a) * radius);
+                var rot = Quaternion.LookRotation(new Vector3(-Mathf.Sin(a), 0, Mathf.Cos(a)));
+                c.Prim(PrimitiveType.Cube, g, $"{name}_{i}", p, new Vector3(width, height, len), rot, mats[i * mats.Length / count]);
+            }
         }
 
         // 床の下の支え(板・本を積んだ山)の見た目を設定する
@@ -787,6 +867,974 @@ namespace Nakagawa.EditorTools
                     c.Prim(PrimitiveType.Cylinder, g, $"Handle_{i}", new Vector3(2.8f, T + 0.35f, z), new Vector3(0.45f, 2, 0.45f), Quaternion.Euler(0, 5 * i, 90), handle);
                 }
                 c.Box(g, "Denpyo", new Vector3(-8, T + 0.1f, 1), new Vector3(4.5f, 0.2f, 9), 12, c.Mat("Denpyo", new Color(0.95f, 0.93f, 0.85f), 0.1f));
+            }
+        }
+
+        //----------------------------------------
+        // だるま落とし部の部室
+        //----------------------------------------
+        static void BuildClubroom(Ctx c)
+        {
+            float T = kTableTop;
+            SetSupports(c, StageBackdrop.SupportStyle.BookStack, 1.0f, 1.8f,
+                c.Mat("ScorePage", new Color(0.96f, 0.95f, 0.9f), 0.1f),
+                c.Mat("ScoreRed", new Color(0.72f, 0.18f, 0.16f), 0.3f),
+                c.Mat("ScoreBlack", new Color(0.16f, 0.16f, 0.18f), 0.3f),
+                c.Mat("ScoreBlue", new Color(0.2f, 0.32f, 0.62f), 0.3f));
+            c.FloorMaterial = c.Mat("StageFloor", new Color(0.88f, 0.84f, 0.74f), 0.3f);
+            c.WallMaterial = c.SeeThroughMat("StageWall", new Color(0.7f, 0.2f, 0.18f), 0.5f);
+
+            // 長机(白い天板と金属の縁)と部室の床
+            var desk = c.Group("LongDesk");
+            c.Box(desk, "Top", new Vector3(0, T - 2, 20), new Vector3(220, 4, 160), 0, c.Mat("DeskTop", new Color(0.9f, 0.89f, 0.85f), 0.4f));
+            c.Box(desk, "Frame", new Vector3(0, T - 5, -60.5f), new Vector3(220, 6, 1), 0, c.Mat("DeskFrame", new Color(0.5f, 0.52f, 0.55f), 0.7f, 0.6f));
+            FarFloor(c, "Linoleum", c.Mat("Linoleum", new Color(0.42f, 0.55f, 0.48f), 0.4f));
+
+            // 奥の壁とホワイトボード・部旗・賞状(ステージの奥に合わせて動く。机の奥の端に立てた低い壁)
+            {
+                var g = c.Anchored("BackWall", new Vector2(0, 1), 22);
+                c.Box(g, "Wall", new Vector3(0, T + 14, 1), new Vector3(170, 28, 2), 0, c.Mat("Wall", new Color(0.9f, 0.87f, 0.78f), 0.2f));
+                c.Box(g, "BoardFrame", new Vector3(-24, T + 15, -0.3f), new Vector3(44, 20, 0.6f), 0, c.Mat("BoardFrame", new Color(0.7f, 0.72f, 0.75f), 0.8f, 0.7f));
+                c.Box(g, "Board", new Vector3(-24, T + 15, -0.8f), new Vector3(42, 18, 0.4f), 0, c.Mat("Whiteboard", new Color(0.97f, 0.97f, 0.97f), 0.9f));
+                // 練習メニューの板書の代わりの線
+                var markerBlue = c.Mat("MarkerBlue", new Color(0.15f, 0.3f, 0.75f), 0.3f);
+                var markerRed = c.Mat("MarkerRed", new Color(0.8f, 0.15f, 0.12f), 0.3f);
+                for (int i = 0; i < 5; i++)
+                {
+                    float len = 12 + (i * 7) % 16;
+                    c.Box(g, $"Line_{i}", new Vector3(-42 + len * 0.5f, T + 21.5f - i * 3.2f, -1.05f), new Vector3(len, 0.8f, 0.1f), 0, i == 0 ? markerRed : markerBlue);
+                }
+                // 部旗(赤地に白の帯)
+                c.Box(g, "Banner", new Vector3(16, T + 15, -0.3f), new Vector3(12, 20, 0.4f), 0, c.Mat("Banner", new Color(0.78f, 0.12f, 0.12f), 0.3f));
+                c.Box(g, "BannerBand", new Vector3(16, T + 15, -0.6f), new Vector3(3, 15, 0.3f), 0, c.Mat("BannerBand", new Color(0.97f, 0.95f, 0.9f), 0.2f));
+                // 賞状
+                var certFrame = c.Mat("CertFrame", new Color(0.3f, 0.18f, 0.1f), 0.5f);
+                var cert = c.Mat("Certificate", new Color(0.97f, 0.95f, 0.86f), 0.2f);
+                for (int i = 0; i < 2; i++)
+                {
+                    float x = 36 + i * 15;
+                    c.Box(g, $"CertFrame_{i}", new Vector3(x, T + 17, -0.25f), new Vector3(12, 9, 0.5f), 0, certFrame);
+                    c.Box(g, $"Cert_{i}", new Vector3(x, T + 17, -0.6f), new Vector3(10.6f, 7.6f, 0.3f), 0, cert);
+                }
+            }
+
+            // 練習用のだるま落とし(北西)。色の段の上にだるまの頭
+            {
+                var g = c.Anchored("PracticeDaruma", new Vector2(-0.8f, 1), 12);
+                var cols = new[] { new Color(0.85f, 0.2f, 0.18f), new Color(0.2f, 0.4f, 0.8f), new Color(0.95f, 0.8f, 0.2f), new Color(0.25f, 0.6f, 0.3f), new Color(0.95f, 0.95f, 0.92f) };
+                for (int i = 0; i < cols.Length; i++)
+                {
+                    c.Cylinder(g, $"Block_{i}", new Vector3(0, T + 1.1f + i * 2.2f, 0), 3, 2.2f, c.Mat($"Block{i}", cols[i], 0.5f));
+                }
+                c.Sphere(g, "Head", new Vector3(0, T + 14, 0), new Vector3(6.4f, 6.4f, 6.4f), c.Mat("DarumaRed", new Color(0.85f, 0.12f, 0.1f), 0.7f));
+                c.Sphere(g, "Face", new Vector3(0, T + 14.4f, -2.5f), new Vector3(3.8f, 3.2f, 1.6f), c.Mat("DarumaFace", new Color(0.98f, 0.94f, 0.86f), 0.5f));
+                var eye = c.Mat("DarumaEye", new Color(0.08f, 0.08f, 0.08f), 0.5f);
+                c.Sphere(g, "EyeL", new Vector3(-0.8f, T + 14.8f, -3.2f), new Vector3(0.7f, 0.7f, 0.3f), eye);
+                c.Sphere(g, "EyeR", new Vector3(0.8f, T + 14.8f, -3.2f), new Vector3(0.7f, 0.7f, 0.3f), eye);
+            }
+
+            // 木槌(南。寝かせてある)
+            {
+                var g = c.Anchored("Mallet", new Vector2(0.3f, -1), 5);
+                c.Prim(PrimitiveType.Cylinder, g, "Head", new Vector3(0, T + 1.6f, 0), new Vector3(3.2f, 2.5f, 3.2f), Quaternion.Euler(0, 0, 90), c.Mat("MalletHead", new Color(0.72f, 0.52f, 0.3f), 0.4f));
+                c.Prim(PrimitiveType.Cylinder, g, "Handle", new Vector3(0, T + 0.6f, -5.5f), new Vector3(1, 5, 1), Quaternion.Euler(90, 0, 0), c.Mat("MalletHandle", new Color(0.5f, 0.32f, 0.18f), 0.4f));
+            }
+
+            // 優勝カップ(北東)
+            {
+                var g = c.Anchored("Trophy", new Vector2(0.8f, 1), 12);
+                var gold = c.Mat("Gold", new Color(0.95f, 0.75f, 0.25f), 0.85f, 0.9f);
+                c.Box(g, "Base", new Vector3(0, T + 1.2f, 0), new Vector3(6, 2.4f, 6), 0, c.Mat("TrophyBase", new Color(0.2f, 0.14f, 0.1f), 0.6f));
+                c.Cylinder(g, "Stem", new Vector3(0, T + 4.4f, 0), 0.8f, 4, gold);
+                c.Sphere(g, "Cup", new Vector3(0, T + 8.4f, 0), new Vector3(6, 5.2f, 6), gold);
+                c.Cylinder(g, "Rim", new Vector3(0, T + 10.6f, 0), 2.8f, 0.5f, gold);
+                c.Prim(PrimitiveType.Capsule, g, "HandleL", new Vector3(-3.4f, T + 8.6f, 0), new Vector3(0.8f, 1.8f, 0.8f), Quaternion.Euler(0, 0, 20), gold);
+                c.Prim(PrimitiveType.Capsule, g, "HandleR", new Vector3(3.4f, T + 8.6f, 0), new Vector3(0.8f, 1.8f, 0.8f), Quaternion.Euler(0, 0, -20), gold);
+            }
+
+            // スポーツドリンク(東)
+            {
+                var g = c.Anchored("SportsDrink", new Vector2(1, 0.2f), 9);
+                c.Cylinder(g, "Bottle", new Vector3(0, T + 5.5f, 0), 2.2f, 11, c.Mat("Bottle", new Color(0.82f, 0.9f, 0.97f), 0.9f));
+                c.Cylinder(g, "Label", new Vector3(0, T + 5, 0), 2.25f, 4.5f, c.Mat("DrinkLabel", new Color(0.15f, 0.4f, 0.85f), 0.4f));
+                c.Cylinder(g, "Cap", new Vector3(0, T + 11.5f, 0), 1.1f, 1.2f, c.Mat("BottleCap", new Color(0.15f, 0.4f, 0.85f), 0.5f));
+                c.Cylinder(g, "Cup", new Vector3(5, T + 2.5f, 2), 1.8f, 5, c.Mat("PaperCup", new Color(0.97f, 0.97f, 0.95f), 0.3f));
+            }
+
+            // タオル(西。畳んで置いてある)
+            {
+                var g = c.Anchored("Towel", new Vector2(-1, -0.3f), 7);
+                var towel = c.Box(g, "Towel", new Vector3(0, T + 0.6f, 0), new Vector3(8, 1.2f, 12), 10, c.Mat("Towel", new Color(0.2f, 0.35f, 0.7f), 0.1f));
+                c.Prim(PrimitiveType.Cube, towel.transform, "Band", new Vector3(0, 0.55f, 0), new Vector3(1.02f, 0.1f, 0.18f), Quaternion.identity, c.Mat("TowelBand", new Color(0.97f, 0.97f, 0.95f), 0.1f), true);
+            }
+
+            // 記録用のバインダー(南西。平たい)
+            {
+                var g = c.Anchored("Clipboard", new Vector2(-0.8f, -1), 5);
+                var board = c.Box(g, "Board", new Vector3(0, T + 0.15f, 0), new Vector3(10, 0.3f, 14), -12, c.Mat("Clipboard", new Color(0.55f, 0.38f, 0.22f), 0.4f));
+                c.Prim(PrimitiveType.Cube, board.transform, "Paper", new Vector3(0, 0.6f, -0.04f), new Vector3(0.88f, 0.2f, 0.82f), Quaternion.identity, c.Mat("Paper", new Color(0.97f, 0.97f, 0.95f), 0.1f), true);
+                c.Prim(PrimitiveType.Cube, board.transform, "Clip", new Vector3(0, 1.5f, 0.44f), new Vector3(0.4f, 2.5f, 0.08f), Quaternion.identity, c.Mat("Clip", new Color(0.75f, 0.77f, 0.8f), 0.8f, 0.8f), true);
+                var ink = c.Mat("Ink", new Color(0.2f, 0.2f, 0.25f), 0.1f);
+                for (int i = 0; i < 6; i++)
+                {
+                    c.Prim(PrimitiveType.Cube, board.transform, $"Row_{i}", new Vector3(0, 0.75f, 0.28f - i * 0.11f), new Vector3(0.76f, 0.1f, 0.012f), Quaternion.identity, ink, true);
+                }
+            }
+
+            // ストップウォッチ(南東。平たい)
+            {
+                var g = c.Anchored("Stopwatch", new Vector2(0.9f, -1), 5);
+                var silver = c.Mat("WatchBody", new Color(0.78f, 0.8f, 0.83f), 0.85f, 0.8f);
+                c.Cylinder(g, "Body", new Vector3(0, T + 0.5f, 0), 3, 1, silver);
+                c.Cylinder(g, "Face", new Vector3(0, T + 0.55f, 0), 2.5f, 1.02f, c.Mat("WatchFace", new Color(0.97f, 0.97f, 0.95f), 0.6f));
+                c.Cylinder(g, "Button", new Vector3(0, T + 0.5f, 3.4f), 0.6f, 0.8f, silver);
+                c.Box(g, "Hand", new Vector3(0.6f, T + 1.08f, 0.6f), new Vector3(0.2f, 0.04f, 2), 45, c.Mat("WatchHand", new Color(0.85f, 0.15f, 0.12f), 0.4f));
+            }
+        }
+
+        //----------------------------------------
+        // 放課後の運動場
+        //----------------------------------------
+        static void BuildGround(Ctx c)
+        {
+            float T = kTableTop;
+            // 床の下の支えは跳び箱の段、ステージの床は跳び箱の一番上の白い布
+            SetSupports(c, StageBackdrop.SupportStyle.SlabStack, 1.6f, 2.2f, null,
+                c.Mat("VaultLight", new Color(0.86f, 0.68f, 0.44f), 0.35f),
+                c.Mat("VaultDark", new Color(0.72f, 0.52f, 0.3f), 0.35f));
+            c.FloorMaterial = c.Mat("StageFloor", new Color(0.93f, 0.91f, 0.84f), 0.15f);
+            c.WallMaterial = c.SeeThroughMat("StageWall", new Color(0.25f, 0.45f, 0.78f), 0.4f);
+
+            // グラウンドの土
+            var ground = c.Group("Ground");
+            c.Box(ground, "Soil", new Vector3(0, T - 1, 0), new Vector3(720, 2, 720), 0, c.Mat("Soil", new Color(0.76f, 0.62f, 0.45f), 0.1f));
+            var chalk = c.Mat("Chalk", new Color(0.97f, 0.97f, 0.95f), 0.1f);
+
+            // 石灰で引いたトラックの線(ステージの南北)
+            foreach (var (name, dir) in new[] { ("TrackSouth", -1f), ("TrackNorth", 1f) })
+            {
+                var g = c.Anchored(name, new Vector2(0, dir), 3);
+                for (int i = 0; i < 4; i++) c.Box(g, $"Lane_{i}", new Vector3(0, T + 0.01f, dir * i * 6), new Vector3(400, 0.02f, 0.5f), 0, chalk);
+            }
+
+            // サッカーボール(東)
+            {
+                var g = c.Anchored("SoccerBall", new Vector2(1, 0.2f), 9);
+                Vector3 center = new Vector3(0, T + 4.5f, 0);
+                c.Sphere(g, "Ball", center, new Vector3(9, 9, 9), c.Mat("BallWhite", new Color(0.97f, 0.97f, 0.96f), 0.6f));
+                var black = c.Mat("BallBlack", new Color(0.1f, 0.1f, 0.12f), 0.6f);
+                var dirs = new[] { new Vector3(0, 1, 0), new Vector3(0.9f, 0.3f, 0.3f), new Vector3(-0.6f, 0.4f, -0.7f), new Vector3(0.2f, 0.2f, -0.95f), new Vector3(-0.8f, 0.2f, 0.6f), new Vector3(0.4f, -0.1f, 0.9f), new Vector3(0.8f, -0.3f, -0.5f) };
+                for (int i = 0; i < dirs.Length; i++)
+                {
+                    c.Sphere(g, $"Patch_{i}", center + dirs[i].normalized * 3.5f, new Vector3(2.6f, 2.6f, 2.6f), black);
+                }
+            }
+
+            // コーン(北西)
+            {
+                var g = c.Anchored("Cones", new Vector2(-0.8f, 1), 12);
+                var orange = c.Mat("Cone", new Color(1.0f, 0.45f, 0.1f), 0.5f);
+                var band = c.Mat("ConeBand", new Color(0.97f, 0.97f, 0.95f), 0.5f);
+                var pts = new[] { new Vector3(-6, 0, 2), new Vector3(0, 0, 0), new Vector3(6, 0, -2) };
+                for (int i = 0; i < pts.Length; i++)
+                {
+                    c.Box(g, $"Plate_{i}", pts[i] + new Vector3(0, T + 0.2f, 0), new Vector3(5.5f, 0.4f, 5.5f), 0, orange);
+                    Cone(c, g, $"Cone_{i}", pts[i] + new Vector3(0, T + 0.4f, 0), 2.2f, 8, 6, orange, orange, orange, band, orange, orange);
+                }
+            }
+
+            // ハードル(北東)
+            {
+                var g = c.Anchored("Hurdle", new Vector2(0.8f, 1), 14);
+                var frame = c.Mat("HurdleFrame", new Color(0.75f, 0.77f, 0.8f), 0.8f, 0.7f);
+                foreach (float x in new[] { -7f, 7f })
+                {
+                    c.Box(g, $"Leg_{x}", new Vector3(x, T + 4, 0), new Vector3(0.6f, 8, 0.6f), 0, frame);
+                    c.Box(g, $"Foot_{x}", new Vector3(x, T + 0.2f, 1.5f), new Vector3(0.6f, 0.4f, 5), 0, frame);
+                }
+                var white = c.Mat("HurdleWhite", new Color(0.97f, 0.97f, 0.95f), 0.5f);
+                var black = c.Mat("HurdleBlack", new Color(0.12f, 0.12f, 0.14f), 0.5f);
+                for (int i = 0; i < 5; i++)
+                {
+                    c.Box(g, $"Bar_{i}", new Vector3(-6 + i * 3, T + 7.6f, 0), new Vector3(3, 1.6f, 0.4f), 0, i % 2 == 0 ? white : black);
+                }
+            }
+
+            // ライン引き(北)。後ろに引いた線が伸びている
+            {
+                var g = c.Anchored("LineMarker", new Vector2(-0.15f, 1), 16);
+                var green = c.Mat("MarkerBody", new Color(0.2f, 0.55f, 0.35f), 0.5f);
+                c.Box(g, "Body", new Vector3(0, T + 3.5f, 0), new Vector3(5, 5, 7), 0, green);
+                var wheel = c.Mat("Wheel", new Color(0.15f, 0.15f, 0.17f), 0.4f);
+                c.Prim(PrimitiveType.Cylinder, g, "WheelL", new Vector3(-2.8f, T + 1.5f, -2), new Vector3(3, 0.3f, 3), Quaternion.Euler(0, 0, 90), wheel);
+                c.Prim(PrimitiveType.Cylinder, g, "WheelR", new Vector3(2.8f, T + 1.5f, -2), new Vector3(3, 0.3f, 3), Quaternion.Euler(0, 0, 90), wheel);
+                c.Prim(PrimitiveType.Capsule, g, "Handle", new Vector3(0, T + 8, 5), new Vector3(0.6f, 4, 0.6f), Quaternion.Euler(35, 0, 0), c.Mat("MarkerHandle", new Color(0.7f, 0.72f, 0.75f), 0.7f, 0.6f));
+                c.Box(g, "Line", new Vector3(0, T + 0.012f, 18), new Vector3(1, 0.02f, 30), 0, chalk);
+            }
+
+            // バットとボール(南。寝かせてある)
+            {
+                var g = c.Anchored("Bat", new Vector2(0.2f, -1), 5);
+                var wood = c.Mat("BatWood", new Color(0.85f, 0.7f, 0.48f), 0.6f);
+                c.Prim(PrimitiveType.Capsule, g, "Barrel", new Vector3(-3, T + 0.9f, 0), new Vector3(1.8f, 4, 1.8f), Quaternion.Euler(0, 10, 90), wood);
+                c.Prim(PrimitiveType.Cylinder, g, "Grip", new Vector3(4.5f, T + 0.5f, -1.3f), new Vector3(0.9f, 4, 0.9f), Quaternion.Euler(0, 10, 90), wood);
+                c.Sphere(g, "Ball", new Vector3(-4, T + 1.2f, -4), new Vector3(2.4f, 2.4f, 2.4f), c.Mat("Baseball", new Color(0.97f, 0.96f, 0.92f), 0.4f));
+            }
+
+            // ベース(南西。平たい)
+            {
+                var g = c.Anchored("Base", new Vector2(-0.8f, -1), 5);
+                c.Box(g, "Base", new Vector3(0, T + 0.15f, 0), new Vector3(6, 0.3f, 6), 45, chalk);
+            }
+
+            // バックネット(北の奥)
+            {
+                var g = c.Anchored("Backstop", new Vector2(0, 1), 30);
+                var metal = c.Mat("Fence", new Color(0.55f, 0.58f, 0.6f), 0.7f, 0.7f);
+                for (int i = 0; i <= 8; i++) c.Cylinder(g, $"Post_{i}", new Vector3(-80 + i * 20, T + 15, 0), 0.8f, 30, metal);
+                for (int i = 0; i <= 10; i++) c.Box(g, $"WireH_{i}", new Vector3(0, T + 1 + i * 2.8f, 0), new Vector3(160, 0.2f, 0.2f), 0, metal);
+                for (int i = 0; i <= 53; i++) c.Box(g, $"WireV_{i}", new Vector3(-79.5f + i * 3, T + 15, 0.1f), new Vector3(0.2f, 29, 0.2f), 0, metal);
+            }
+        }
+
+        //----------------------------------------
+        // 老舗の道場
+        //----------------------------------------
+        static void BuildDojo(Ctx c)
+        {
+            float T = kTableTop;
+            SetSupports(c, StageBackdrop.SupportStyle.SlabStack, 1.2f, 1.6f, null,
+                c.Mat("TatamiA", new Color(0.66f, 0.66f, 0.4f), 0.15f),
+                c.Mat("TatamiB", new Color(0.58f, 0.6f, 0.36f), 0.15f));
+            c.FloorMaterial = c.Mat("StageFloor", new Color(0.78f, 0.75f, 0.5f), 0.15f);
+            c.WallMaterial = c.SeeThroughMat("StageWall", new Color(0.32f, 0.2f, 0.1f), 0.5f);
+
+            // 板の間(東西に長い板を南北に並べる)
+            var floor = c.Group("WoodFloor");
+            var boardA = c.Mat("BoardA", new Color(0.72f, 0.55f, 0.35f), 0.6f);
+            var boardB = c.Mat("BoardB", new Color(0.66f, 0.49f, 0.3f), 0.6f);
+            for (int i = -20; i < 20; i++)
+            {
+                c.Box(floor, $"Board_{i + 20}", new Vector3(0, T - 1, i * 8 + 4), new Vector3(400, 2, 8), 0, i % 2 == 0 ? boardA : boardB);
+            }
+
+            // 奥の壁(漆喰と柱)と掛け軸・名札掛け
+            {
+                var g = c.Anchored("BackWall", new Vector2(0, 1), 20);
+                var wood = c.Mat("Pillar", new Color(0.32f, 0.2f, 0.1f), 0.5f);
+                c.Box(g, "Wall", new Vector3(0, T + 15, 1), new Vector3(200, 30, 2), 0, c.Mat("Plaster", new Color(0.93f, 0.91f, 0.85f), 0.15f));
+                c.Box(g, "Beam", new Vector3(0, T + 28.5f, -0.5f), new Vector3(200, 2, 1.5f), 0, wood);
+                c.Box(g, "Baseboard", new Vector3(0, T + 1, -0.5f), new Vector3(200, 2, 1.5f), 0, wood);
+                for (int i = 0; i < 6; i++) c.Box(g, $"Pillar_{i}", new Vector3(-100 + i * 40, T + 15, -0.8f), new Vector3(2.4f, 30, 2), 0, wood);
+                // 掛け軸
+                c.Box(g, "Scroll", new Vector3(0, T + 16, -0.3f), new Vector3(8, 16, 0.3f), 0, c.Mat("ScrollPaper", new Color(0.95f, 0.92f, 0.82f), 0.1f));
+                c.Box(g, "ScrollEdge", new Vector3(0, T + 16, -0.1f), new Vector3(9.5f, 19, 0.2f), 0, c.Mat("ScrollCloth", new Color(0.3f, 0.35f, 0.25f), 0.2f));
+                var rod = c.Mat("ScrollRod", new Color(0.15f, 0.1f, 0.08f), 0.5f);
+                c.Prim(PrimitiveType.Cylinder, g, "RodBottom", new Vector3(0, T + 6.4f, -0.6f), new Vector3(0.8f, 5.5f, 0.8f), Quaternion.Euler(0, 0, 90), rod);
+                var ink = c.Mat("Ink", new Color(0.08f, 0.08f, 0.08f), 0.1f);
+                c.Box(g, "Stroke_0", new Vector3(0, T + 20.5f, -0.5f), new Vector3(1.3f, 4.5f, 0.1f), 0, ink);
+                c.Box(g, "Stroke_1", new Vector3(0.3f, T + 15.5f, -0.5f), new Vector3(4, 1.1f, 0.1f), 0, ink);
+                c.Box(g, "Stroke_2", new Vector3(-0.3f, T + 11.5f, -0.5f), new Vector3(1.1f, 4.5f, 0.1f), 0, ink);
+                // 名札掛け(門下生の木札)
+                var board = c.Mat("NameBoard", new Color(0.55f, 0.38f, 0.2f), 0.4f);
+                var tag = c.Mat("NameTag", new Color(0.88f, 0.78f, 0.58f), 0.3f);
+                c.Box(g, "NameBoard", new Vector3(38, T + 17, -0.4f), new Vector3(28, 13, 0.5f), 0, board);
+                for (int row = 0; row < 2; row++)
+                {
+                    for (int col = 0; col < 7; col++)
+                    {
+                        var t = c.Box(g, $"Tag_{row}_{col}", new Vector3(27.2f + col * 3.6f, T + 20 - row * 6, -0.8f), new Vector3(2.6f, 5, 0.3f), 0, tag);
+                        c.Prim(PrimitiveType.Cube, t.transform, "Name", new Vector3(0, 0.05f, -0.6f), new Vector3(0.18f, 0.65f, 0.4f), Quaternion.identity, ink, true);
+                    }
+                }
+                // 神棚
+                c.Box(g, "Shelf", new Vector3(-36, T + 21, -2.5f), new Vector3(16, 0.8f, 5), 0, c.Mat("Shelf", new Color(0.86f, 0.76f, 0.56f), 0.4f));
+                c.Box(g, "Shrine", new Vector3(-36, T + 23.9f, -2.5f), new Vector3(7, 5, 3), 0, c.Mat("Shrine", new Color(0.9f, 0.82f, 0.62f), 0.4f));
+                c.Box(g, "ShrineRoof", new Vector3(-36, T + 26.9f, -2.5f), new Vector3(9, 1, 4.2f), 0, wood);
+            }
+
+            // 大きなだるま(北西)
+            {
+                var g = c.Anchored("Daruma", new Vector2(-0.8f, 1), 10);
+                c.Sphere(g, "Body", new Vector3(0, T + 5, 0), new Vector3(10, 10.5f, 9), c.Mat("DarumaRed", new Color(0.82f, 0.1f, 0.08f), 0.75f));
+                c.Sphere(g, "Face", new Vector3(0, T + 6.5f, -3.4f), new Vector3(5.6f, 4.6f, 2.4f), c.Mat("DarumaFace", new Color(0.98f, 0.94f, 0.86f), 0.5f));
+                var eye = c.Mat("DarumaEye", new Color(0.08f, 0.08f, 0.08f), 0.5f);
+                c.Sphere(g, "EyeL", new Vector3(-1.2f, T + 7, -4.5f), new Vector3(1.1f, 1.1f, 0.4f), eye);
+                c.Sphere(g, "EyeR", new Vector3(1.2f, T + 7, -4.5f), new Vector3(1.1f, 1.1f, 0.4f), eye);
+                c.Box(g, "Belly", new Vector3(0, T + 3, -4.2f), new Vector3(3, 2, 0.4f), 0, c.Mat("DarumaGold", new Color(0.95f, 0.75f, 0.25f), 0.8f, 0.8f));
+            }
+
+            // 太鼓(北東)。台に横向きに載せてある
+            {
+                var g = c.Anchored("Taiko", new Vector2(0.8f, 1), 12);
+                var stand = c.Mat("TaikoStand", new Color(0.3f, 0.18f, 0.1f), 0.5f);
+                c.Box(g, "StandL", new Vector3(-3.5f, T + 2.5f, 0), new Vector3(1.2f, 5, 8), 0, stand);
+                c.Box(g, "StandR", new Vector3(3.5f, T + 2.5f, 0), new Vector3(1.2f, 5, 8), 0, stand);
+                c.Prim(PrimitiveType.Cylinder, g, "Body", new Vector3(0, T + 9, 0), new Vector3(10, 5, 10), Quaternion.Euler(0, 0, 90), c.Mat("TaikoBody", new Color(0.55f, 0.28f, 0.14f), 0.6f));
+                var skin = c.Mat("TaikoSkin", new Color(0.92f, 0.86f, 0.7f), 0.3f);
+                c.Prim(PrimitiveType.Cylinder, g, "SkinL", new Vector3(-5.05f, T + 9, 0), new Vector3(9.4f, 0.1f, 9.4f), Quaternion.Euler(0, 0, 90), skin);
+                c.Prim(PrimitiveType.Cylinder, g, "SkinR", new Vector3(5.05f, T + 9, 0), new Vector3(9.4f, 0.1f, 9.4f), Quaternion.Euler(0, 0, 90), skin);
+                c.Prim(PrimitiveType.Cylinder, g, "Bachi", new Vector3(0, T + 0.4f, -7), new Vector3(0.7f, 4, 0.7f), Quaternion.Euler(0, 15, 90), c.Mat("Bachi", new Color(0.8f, 0.66f, 0.45f), 0.4f));
+            }
+
+            // 竹刀掛け(西)
+            {
+                var g = c.Anchored("ShinaiRack", new Vector2(-1, 0.1f), 7);
+                var wood = c.Mat("RackWood", new Color(0.45f, 0.3f, 0.16f), 0.5f);
+                c.Box(g, "Base", new Vector3(0, T + 0.5f, 0), new Vector3(4, 1, 14), 0, wood);
+                c.Box(g, "Bar", new Vector3(0, T + 9, 0), new Vector3(1.5f, 1, 14), 0, wood);
+                c.Box(g, "PostN", new Vector3(0, T + 5, 6.5f), new Vector3(1, 9, 1), 0, wood);
+                c.Box(g, "PostS", new Vector3(0, T + 5, -6.5f), new Vector3(1, 9, 1), 0, wood);
+                var bamboo = c.Mat("Bamboo", new Color(0.88f, 0.78f, 0.5f), 0.4f);
+                var grip = c.Mat("ShinaiGrip", new Color(0.95f, 0.93f, 0.88f), 0.2f);
+                for (int i = 0; i < 4; i++)
+                {
+                    float z = -4.2f + i * 2.8f;
+                    c.Cylinder(g, $"Shinai_{i}", new Vector3(0, T + 6, z), 0.45f, 10, bamboo);
+                    c.Cylinder(g, $"Grip_{i}", new Vector3(0, T + 11.5f, z), 0.55f, 3, grip);
+                }
+            }
+
+            // 水桶(東)
+            {
+                var g = c.Anchored("Bucket", new Vector2(1, 0.2f), 8);
+                c.Cylinder(g, "Bucket", new Vector3(0, T + 2.5f, 0), 3.5f, 5, c.Mat("Bucket", new Color(0.78f, 0.62f, 0.4f), 0.4f));
+                var hoop = c.Mat("Hoop", new Color(0.25f, 0.2f, 0.15f), 0.5f);
+                c.Cylinder(g, "HoopTop", new Vector3(0, T + 4, 0), 3.55f, 0.5f, hoop);
+                c.Cylinder(g, "HoopBottom", new Vector3(0, T + 1, 0), 3.55f, 0.5f, hoop);
+                c.Cylinder(g, "Water", new Vector3(0, T + 4.6f, 0), 3.1f, 0.5f, c.Mat("Water", new Color(0.4f, 0.6f, 0.75f), 0.95f));
+                c.Box(g, "Tenugui", new Vector3(5, T + 0.2f, 1), new Vector3(4, 0.4f, 8), 15, c.Mat("Tenugui", new Color(0.25f, 0.3f, 0.6f), 0.1f));
+            }
+
+            // 木刀(南。寝かせてある)
+            {
+                var g = c.Anchored("Bokken", new Vector2(0.2f, -1), 4);
+                var wood = c.Mat("Bokken", new Color(0.62f, 0.4f, 0.22f), 0.6f);
+                for (int i = 0; i < 2; i++)
+                {
+                    c.Box(g, $"Blade_{i}", new Vector3(0, T + 0.4f, i * 2.4f), new Vector3(22, 0.8f, 1.2f), 4 - i * 6, wood);
+                    c.Cylinder(g, $"Tsuba_{i}", new Vector3(-5, T + 0.6f, i * 2.4f + (i == 0 ? 0.35f : -0.5f)), 1.2f, 0.4f, c.Mat("Tsuba", new Color(0.1f, 0.1f, 0.1f), 0.5f));
+                }
+            }
+
+            // 座布団(南東。平たい)
+            {
+                var g = c.Anchored("Zabuton", new Vector2(0.9f, -1), 5);
+                c.Box(g, "Zabuton", new Vector3(0, T + 0.5f, 0), new Vector3(9, 1, 9), 8, c.Mat("Zabuton", new Color(0.45f, 0.18f, 0.35f), 0.2f));
+            }
+
+            // 書道の半紙と筆(南西。平たい)
+            {
+                var g = c.Anchored("Shodo", new Vector2(-0.8f, -1), 5);
+                var paper = c.Box(g, "Hanshi", new Vector3(0, T + 0.1f, 0), new Vector3(8, 0.2f, 11), -8, c.Mat("Hanshi", new Color(0.97f, 0.96f, 0.93f), 0.1f));
+                var ink = c.Mat("Ink", new Color(0.08f, 0.08f, 0.08f), 0.1f);
+                c.Prim(PrimitiveType.Cube, paper.transform, "Stroke_0", new Vector3(0, 0.55f, 0.2f), new Vector3(0.6f, 0.1f, 0.08f), Quaternion.identity, ink, true);
+                c.Prim(PrimitiveType.Cube, paper.transform, "Stroke_1", new Vector3(0, 0.55f, -0.1f), new Vector3(0.1f, 0.1f, 0.6f), Quaternion.identity, ink, true);
+                c.Prim(PrimitiveType.Cylinder, g, "Brush", new Vector3(6, T + 0.4f, 2), new Vector3(0.6f, 4, 0.6f), Quaternion.Euler(0, 20, 90), c.Mat("Brush", new Color(0.55f, 0.4f, 0.2f), 0.4f));
+            }
+        }
+
+        //----------------------------------------
+        // 満員のスタジアム
+        //----------------------------------------
+        static void BuildStadium(Ctx c)
+        {
+            float T = kTableTop;
+            SetSupports(c, StageBackdrop.SupportStyle.SlabStack, 1.2f, 1.8f, null,
+                c.Mat("RigGray", new Color(0.78f, 0.8f, 0.83f), 0.6f, 0.4f),
+                c.Mat("RigNavy", new Color(0.18f, 0.24f, 0.45f), 0.5f, 0.3f));
+            c.FloorMaterial = c.Mat("StageFloor", new Color(0.62f, 0.74f, 0.92f), 0.4f);
+            c.WallMaterial = c.SeeThroughMat("StageWall", new Color(0.92f, 0.94f, 0.98f), 0.7f);
+
+            // 芝生(刈り目の縞)とセンターライン・センターサークル
+            var field = c.Group("Field");
+            var turfA = c.Mat("TurfA", new Color(0.3f, 0.6f, 0.25f), 0.2f);
+            var turfB = c.Mat("TurfB", new Color(0.25f, 0.52f, 0.21f), 0.2f);
+            for (int i = 0; i < 36; i++)
+            {
+                c.Box(field, $"Turf_{i}", new Vector3(0, T - 1, -350 + i * 20), new Vector3(720, 2, 20), 0, i % 2 == 0 ? turfA : turfB);
+            }
+            var line = c.Mat("Line", new Color(0.97f, 0.97f, 0.95f), 0.2f);
+            c.Box(field, "HalfwayLine", new Vector3(0, T + 0.015f, 0), new Vector3(720, 0.02f, 0.8f), 0, line);
+            Ring(c, field, "CenterCircle", new Vector3(0, T + 0.01f, 0), 34, 72, 0.8f, 0.02f, line);
+
+            // 北のスタンド(段の上に観客が並ぶ)と、手前の広告板
+            {
+                var g = c.Anchored("NorthStand", new Vector2(0, 1), 18);
+                var concrete = c.Mat("Concrete", new Color(0.6f, 0.6f, 0.62f), 0.2f);
+                var adCols = new[] { new Color(0.85f, 0.15f, 0.15f), new Color(0.15f, 0.35f, 0.8f), new Color(0.98f, 0.8f, 0.15f), new Color(0.97f, 0.97f, 0.95f) };
+                for (int i = 0; i < 13; i++)
+                {
+                    c.Box(g, $"Ad_{i}", new Vector3(-120 + i * 20, T + 2, -1), new Vector3(20, 4, 1), 0, c.Mat($"Ad{i % adCols.Length}", adCols[i % adCols.Length], 0.5f));
+                }
+                var fanCols = new[] { new Color(0.85f, 0.15f, 0.15f), new Color(0.15f, 0.35f, 0.8f), new Color(0.97f, 0.97f, 0.95f), new Color(0.95f, 0.75f, 0.15f), new Color(0.2f, 0.2f, 0.22f) };
+                var skin = c.Mat("Skin", new Color(0.93f, 0.76f, 0.6f), 0.3f);
+                for (int i = 0; i < 5; i++)
+                {
+                    float h = 4 * (i + 1);
+                    float z = i * 8 + 5;
+                    c.Box(g, $"Tier_{i}", new Vector3(0, T + h * 0.5f, z), new Vector3(260, h, 8), 0, concrete);
+                    for (int j = 0; j < 26; j++)
+                    {
+                        float x = -125 + j * 10 + ((i * 7 + j * 3) % 5 - 2) * 0.6f;
+                        int col = (i * 5 + j * 3) % fanCols.Length;
+                        c.Box(g, $"Fan_{i}_{j}", new Vector3(x, T + h + 2, z), new Vector3(4, 4, 3), 0, c.Mat($"Fan{col}", fanCols[col], 0.3f));
+                        c.Sphere(g, $"FanHead_{i}_{j}", new Vector3(x, T + h + 5.2f, z), new Vector3(2.4f, 2.4f, 2.4f), skin);
+                    }
+                }
+            }
+
+            // 照明塔(北西・北東の奥)
+            {
+                var steel = c.Mat("LightTower", new Color(0.7f, 0.72f, 0.75f), 0.7f, 0.7f);
+                var lamp = c.Mat("Lamp", new Color(1.0f, 0.98f, 0.85f), 0.9f);
+                foreach (var (name, dir) in new[] { ("LightTowerW", new Vector2(-1, 1)), ("LightTowerE", new Vector2(1, 1)) })
+                {
+                    var g = c.Anchored(name, dir, 40);
+                    c.Cylinder(g, "Pole", new Vector3(0, T + 35, 0), 1.5f, 70, steel);
+                    c.Box(g, "Panel", new Vector3(0, T + 72, 0), new Vector3(24, 12, 2), 0, steel);
+                    for (int row = 0; row < 3; row++)
+                    {
+                        for (int col = 0; col < 5; col++)
+                        {
+                            c.Sphere(g, $"Lamp_{row}_{col}", new Vector3(-9.6f + col * 4.8f, T + 68 + row * 4, -1.2f), new Vector3(3.4f, 3.4f, 1.2f), lamp);
+                        }
+                    }
+                }
+            }
+
+            // テレビカメラ(西)。三脚に載せてある
+            {
+                var g = c.Anchored("TvCamera", new Vector2(-1, 0.15f), 9);
+                var black = c.Mat("CameraBody", new Color(0.15f, 0.15f, 0.17f), 0.6f);
+                for (int i = 0; i < 3; i++)
+                {
+                    float a = (90 + i * 120) * Mathf.Deg2Rad;
+                    c.Prim(PrimitiveType.Capsule, g, $"Leg_{i}", new Vector3(Mathf.Cos(a) * 1.6f, T + 4, Mathf.Sin(a) * 1.6f), new Vector3(0.5f, 4.2f, 0.5f), Quaternion.Euler(Mathf.Sin(a) * 20, 0, -Mathf.Cos(a) * 20), black);
+                }
+                c.Box(g, "Body", new Vector3(0, T + 10, 0), new Vector3(4, 4, 7), 0, black);
+                c.Prim(PrimitiveType.Cylinder, g, "Lens", new Vector3(0, T + 10, -4.6f), new Vector3(2.6f, 1.2f, 2.6f), Quaternion.Euler(90, 0, 0), c.Mat("Lens", new Color(0.1f, 0.15f, 0.3f), 0.95f));
+                c.Box(g, "Logo", new Vector3(2.02f, T + 10.5f, 0), new Vector3(0.05f, 1.2f, 3), 0, c.Mat("CameraLogo", new Color(0.85f, 0.15f, 0.15f), 0.5f));
+            }
+
+            // 表彰台(東)
+            {
+                var g = c.Anchored("Podium", new Vector2(1, 0.2f), 9);
+                var white = c.Mat("Podium", new Color(0.95f, 0.95f, 0.95f), 0.5f);
+                c.Box(g, "First", new Vector3(0, T + 3, 0), new Vector3(5, 6, 5), 0, white);
+                c.Box(g, "Second", new Vector3(0, T + 2, 5), new Vector3(5, 4, 5), 0, white);
+                c.Box(g, "Third", new Vector3(0, T + 1.5f, -5), new Vector3(5, 3, 5), 0, white);
+                c.Box(g, "Mark1", new Vector3(-2.52f, T + 3.5f, 0), new Vector3(0.05f, 2, 1.2f), 0, c.Mat("MarkGold", new Color(0.95f, 0.75f, 0.25f), 0.8f, 0.8f));
+                c.Box(g, "Mark2", new Vector3(-2.52f, T + 2.3f, 5), new Vector3(0.05f, 1.6f, 1.2f), 0, c.Mat("MarkSilver", new Color(0.78f, 0.8f, 0.83f), 0.8f, 0.8f));
+                c.Box(g, "Mark3", new Vector3(-2.52f, T + 1.7f, -5), new Vector3(0.05f, 1.4f, 1.2f), 0, c.Mat("MarkBronze", new Color(0.72f, 0.45f, 0.25f), 0.8f, 0.8f));
+            }
+
+            // コーナーフラッグ(北西・北東)
+            {
+                var pole = c.Mat("FlagPole", new Color(0.97f, 0.97f, 0.95f), 0.5f);
+                var flag = c.Mat("CornerFlag", new Color(0.98f, 0.82f, 0.15f), 0.3f);
+                foreach (var (name, dir) in new[] { ("CornerFlagW", new Vector2(-0.9f, 1)), ("CornerFlagE", new Vector2(0.9f, 1)) })
+                {
+                    var g = c.Anchored(name, dir, 8);
+                    c.Cylinder(g, "Pole", new Vector3(0, T + 6, 0), 0.3f, 12, pole);
+                    c.Box(g, "Flag", new Vector3(1.8f, T + 10.5f, 0), new Vector3(3.6f, 2.6f, 0.1f), 0, flag);
+                }
+            }
+
+            // 応援幕(南。芝生に広げてある)
+            {
+                var g = c.Anchored("CheerBanner", new Vector2(0, -1), 3);
+                var banner = c.Box(g, "Banner", new Vector3(0, T + 0.05f, 0), new Vector3(36, 0.1f, 5), 0, c.Mat("CheerBanner", new Color(0.97f, 0.97f, 0.95f), 0.2f));
+                var red = c.Mat("CheerInk", new Color(0.82f, 0.12f, 0.12f), 0.2f);
+                for (int i = 0; i < 6; i++)
+                {
+                    c.Prim(PrimitiveType.Cube, banner.transform, $"Letter_{i}", new Vector3(-0.38f + i * 0.152f, 0.55f, 0), new Vector3(0.09f, 0.1f, 0.6f), Quaternion.identity, red, true);
+                }
+            }
+        }
+
+        //----------------------------------------
+        // 雪のゲレンデ
+        //----------------------------------------
+        static void BuildSlope(Ctx c)
+        {
+            float T = kTableTop;
+            SetSupports(c, StageBackdrop.SupportStyle.SlabStack, 1.0f, 1.6f, null,
+                c.Mat("SnowBlock", new Color(0.94f, 0.96f, 0.98f), 0.3f),
+                c.Mat("IceBlock", new Color(0.72f, 0.85f, 0.95f), 0.85f));
+            c.FloorMaterial = c.Mat("StageFloor", new Color(0.88f, 0.93f, 0.98f), 0.5f);
+            c.WallMaterial = c.SeeThroughMat("StageWall", new Color(0.55f, 0.75f, 0.95f), 0.9f);
+
+            // 雪原と、南に残ったスキーの跡
+            var snow = c.Mat("Snow", new Color(0.95f, 0.96f, 0.98f), 0.3f);
+            c.Box(c.Group("Snowfield"), "Snow", new Vector3(0, T - 1, 0), new Vector3(720, 2, 720), 0, snow);
+            {
+                var g = c.Anchored("SkiTracks", new Vector2(0, -1), 3);
+                var track = c.Mat("SkiTrack", new Color(0.8f, 0.85f, 0.92f), 0.3f);
+                for (int i = 0; i < 3; i++)
+                {
+                    float x = -30 + i * 30;
+                    c.Box(g, $"TrackL_{i}", new Vector3(x - 0.8f, T + 0.01f, 0), new Vector3(0.6f, 0.02f, 40), 25 - i * 15, track);
+                    c.Box(g, $"TrackR_{i}", new Vector3(x + 0.8f, T + 0.01f, 0), new Vector3(0.6f, 0.02f, 40), 25 - i * 15, track);
+                }
+            }
+
+            // もみの木(雪をかぶっている)
+            var trunk = c.Mat("Trunk", new Color(0.4f, 0.27f, 0.16f), 0.3f);
+            var needle = c.Mat("Needle", new Color(0.16f, 0.38f, 0.24f), 0.3f);
+            void Tree(Transform g, string name, Vector3 p, float s)
+            {
+                c.Cylinder(g, $"{name}_Trunk", p + new Vector3(0, T + 2 * s, 0), 1.0f * s, 4 * s, trunk);
+                Cone(c, g, $"{name}_Low", p + new Vector3(0, T + 3 * s, 0), 7 * s, 7 * s, 4, needle);
+                Cone(c, g, $"{name}_Mid", p + new Vector3(0, T + 8 * s, 0), 5.5f * s, 6 * s, 4, needle);
+                Cone(c, g, $"{name}_Top", p + new Vector3(0, T + 12.5f * s, 0), 4 * s, 5 * s, 4, needle, needle, snow, snow);
+            }
+            {
+                var g = c.Anchored("TreesNW", new Vector2(-0.8f, 1), 14);
+                Tree(g, "Tree0", new Vector3(0, 0, 0), 1.0f);
+                Tree(g, "Tree1", new Vector3(-12, 0, 6), 1.3f);
+                Tree(g, "Tree2", new Vector3(10, 0, 10), 0.8f);
+            }
+            {
+                var g = c.Anchored("TreesNE", new Vector2(0.8f, 1), 16);
+                Tree(g, "Tree0", new Vector3(0, 0, 0), 1.2f);
+                Tree(g, "Tree1", new Vector3(12, 0, 8), 0.9f);
+            }
+            {
+                var g = c.Anchored("TreeW", new Vector2(-1, -0.2f), 12);
+                Tree(g, "Tree0", new Vector3(0, 0, 0), 0.9f);
+            }
+
+            // 雪だるま(東)
+            {
+                var g = c.Anchored("Snowman", new Vector2(1, 0.2f), 9);
+                c.Sphere(g, "Bottom", new Vector3(0, T + 3.6f, 0), new Vector3(8, 7.4f, 8), snow);
+                c.Sphere(g, "Middle", new Vector3(0, T + 9, 0), new Vector3(6, 5.6f, 6), snow);
+                c.Sphere(g, "Head", new Vector3(0, T + 13.3f, 0), new Vector3(4.4f, 4.2f, 4.4f), snow);
+                var coal = c.Mat("Coal", new Color(0.1f, 0.1f, 0.1f), 0.4f);
+                c.Sphere(g, "EyeL", new Vector3(-0.8f, T + 13.9f, -2), new Vector3(0.6f, 0.6f, 0.6f), coal);
+                c.Sphere(g, "EyeR", new Vector3(0.8f, T + 13.9f, -2), new Vector3(0.6f, 0.6f, 0.6f), coal);
+                c.Prim(PrimitiveType.Capsule, g, "Nose", new Vector3(0, T + 13.2f, -2.8f), new Vector3(0.6f, 1.2f, 0.6f), Quaternion.Euler(90, 0, 0), c.Mat("Carrot", new Color(0.95f, 0.5f, 0.1f), 0.4f));
+                var red = c.Mat("Scarf", new Color(0.82f, 0.15f, 0.15f), 0.2f);
+                c.Cylinder(g, "Scarf", new Vector3(0, T + 11.4f, 0), 2.6f, 0.9f, red);
+                c.Cylinder(g, "Bucket", new Vector3(0, T + 16.2f, 0), 1.8f, 2.4f, red);
+            }
+
+            // 雪に刺したスキー板とストック(北)
+            {
+                var g = c.Anchored("Skis", new Vector2(-0.1f, 1), 18);
+                var ski = c.Mat("Ski", new Color(0.15f, 0.4f, 0.85f), 0.7f);
+                c.Prim(PrimitiveType.Cube, g, "SkiL", new Vector3(-1, T + 7, 0), new Vector3(1.4f, 16, 0.3f), Quaternion.Euler(0, 0, 5), ski);
+                c.Prim(PrimitiveType.Cube, g, "SkiR", new Vector3(1, T + 7, 0), new Vector3(1.4f, 16, 0.3f), Quaternion.Euler(0, 0, -5), ski);
+                var pole = c.Mat("SkiPole", new Color(0.75f, 0.77f, 0.8f), 0.8f, 0.7f);
+                var basket = c.Mat("PoleBasket", new Color(0.15f, 0.15f, 0.17f), 0.4f);
+                foreach (float x in new[] { 5f, 7f })
+                {
+                    c.Prim(PrimitiveType.Cylinder, g, $"Pole_{x}", new Vector3(x, T + 6, 0), new Vector3(0.4f, 6, 0.4f), Quaternion.Euler(0, 0, (x - 6) * 6), pole);
+                    c.Cylinder(g, $"Basket_{x}", new Vector3(x + (x - 6) * 0.3f, T + 1.5f, 0), 1.0f, 0.2f, basket);
+                }
+            }
+
+            // 旗門(南)。低い旗
+            {
+                var g = c.Anchored("SlalomGates", new Vector2(0.2f, -1), 5);
+                var red = c.Mat("GateRed", new Color(0.85f, 0.15f, 0.15f), 0.4f);
+                var blue = c.Mat("GateBlue", new Color(0.15f, 0.3f, 0.8f), 0.4f);
+                for (int i = 0; i < 2; i++)
+                {
+                    var mat = i == 0 ? red : blue;
+                    float x = -6 + i * 12;
+                    c.Cylinder(g, $"Pole_{i}", new Vector3(x, T + 3, 0), 0.25f, 6, mat);
+                    c.Box(g, $"Flag_{i}", new Vector3(x + 1.5f, T + 4.6f, 0), new Vector3(3, 2.4f, 0.1f), 0, mat);
+                }
+            }
+
+            // そり(南東。平たい)
+            {
+                var g = c.Anchored("Sled", new Vector2(0.9f, -1), 5);
+                var red = c.Mat("Sled", new Color(0.85f, 0.2f, 0.15f), 0.6f);
+                c.Box(g, "Body", new Vector3(0, T + 1, 0), new Vector3(6, 0.8f, 10), -15, red);
+                var runner = c.Mat("Runner", new Color(0.3f, 0.3f, 0.32f), 0.7f, 0.6f);
+                c.Box(g, "RunnerL", new Vector3(-2.6f, T + 0.3f, -0.7f), new Vector3(0.4f, 0.6f, 10.5f), -15, runner);
+                c.Box(g, "RunnerR", new Vector3(2.6f, T + 0.3f, 0.7f), new Vector3(0.4f, 0.6f, 10.5f), -15, runner);
+            }
+
+            // 奥の雪山(とがった山。上の方は雪)
+            {
+                var g = c.Anchored("Mountains", new Vector2(0, 1), 70);
+                var rock = c.Mat("Rock", new Color(0.5f, 0.56f, 0.66f), 0.2f);
+                var peaks = new[] { (new Vector3(-65, 0, 20), 34f, 40f), (new Vector3(5, 0, 40), 44f, 56f), (new Vector3(75, 0, 15), 30f, 36f) };
+                for (int i = 0; i < peaks.Length; i++)
+                {
+                    var (p, radius, height) = peaks[i];
+                    Cone(c, g, $"Mountain_{i}", p + new Vector3(0, T, 0), radius, height, 10, rock, rock, rock, rock, rock, rock, snow, snow, snow, snow);
+                }
+            }
+        }
+
+        //----------------------------------------
+        // 豪華客船のデッキ
+        //----------------------------------------
+        static void BuildCruise(Ctx c)
+        {
+            float T = kTableTop;
+            SetSupports(c, StageBackdrop.SupportStyle.SlabStack, 1.0f, 1.6f, null,
+                c.Mat("HullWhite", new Color(0.95f, 0.95f, 0.95f), 0.6f),
+                c.Mat("HullNavy", new Color(0.15f, 0.22f, 0.42f), 0.6f));
+            c.FloorMaterial = c.Mat("StageFloor", new Color(0.82f, 0.68f, 0.48f), 0.55f);
+            c.WallMaterial = c.SeeThroughMat("StageWall", new Color(0.92f, 0.94f, 0.96f), 0.8f);
+
+            // チーク材のデッキ(東西に長い板を南北に並べる)と海。デッキは北の手すりの少し先で終わり、その先は海
+            var deck = c.Group("Deck");
+            var teakA = c.Mat("TeakA", new Color(0.62f, 0.42f, 0.26f), 0.55f);
+            var teakB = c.Mat("TeakB", new Color(0.56f, 0.37f, 0.22f), 0.55f);
+            for (int i = -32; i < 10; i++)
+            {
+                c.Box(deck, $"Plank_{i + 32}", new Vector3(0, T - 1, i * 5 + 2.5f), new Vector3(400, 2, 5), 0, i % 2 == 0 ? teakA : teakB);
+            }
+            c.Box(deck, "Hull", new Vector3(0, T - 14, 50.5f), new Vector3(400, 26, 1), 0, c.Mat("Hull", new Color(0.95f, 0.95f, 0.95f), 0.6f));
+            FarFloor(c, "Sea", c.Mat("Sea", new Color(0.1f, 0.35f, 0.6f), 0.9f));
+
+            // プール(北)
+            {
+                var g = c.Anchored("Pool", new Vector2(0, 1), 14);
+                var tile = c.Mat("PoolTile", new Color(0.95f, 0.96f, 0.97f), 0.7f);
+                c.Box(g, "RimS", new Vector3(0, T + 0.6f, -13), new Vector3(64, 1.2f, 2), 0, tile);
+                c.Box(g, "RimN", new Vector3(0, T + 0.6f, 13), new Vector3(64, 1.2f, 2), 0, tile);
+                c.Box(g, "RimW", new Vector3(-31, T + 0.6f, 0), new Vector3(2, 1.2f, 24), 0, tile);
+                c.Box(g, "RimE", new Vector3(31, T + 0.6f, 0), new Vector3(2, 1.2f, 24), 0, tile);
+                c.Box(g, "Water", new Vector3(0, T + 0.4f, 0), new Vector3(60, 0.6f, 24), 0, c.Mat("PoolWater", new Color(0.3f, 0.75f, 0.9f), 0.95f));
+                var steel = c.Mat("Ladder", new Color(0.8f, 0.82f, 0.85f), 0.9f, 0.9f);
+                c.Prim(PrimitiveType.Capsule, g, "LadderL", new Vector3(24, T + 3, -13), new Vector3(0.5f, 3, 0.5f), Quaternion.identity, steel);
+                c.Prim(PrimitiveType.Capsule, g, "LadderR", new Vector3(27, T + 3, -13), new Vector3(0.5f, 3, 0.5f), Quaternion.identity, steel);
+            }
+
+            // デッキチェア(東)
+            {
+                var g = c.Anchored("DeckChairs", new Vector2(1, 0.1f), 8);
+                var frame = c.Mat("ChairFrame", new Color(0.95f, 0.95f, 0.95f), 0.6f);
+                var cushion = c.Mat("Cushion", new Color(0.15f, 0.3f, 0.6f), 0.2f);
+                for (int i = 0; i < 2; i++)
+                {
+                    float x = i * 8;
+                    c.Box(g, $"Seat_{i}", new Vector3(x, T + 2.5f, -1), new Vector3(5, 0.8f, 10), 0, frame);
+                    c.Box(g, $"Cushion_{i}", new Vector3(x, T + 3.1f, -1), new Vector3(4.4f, 0.4f, 9.4f), 0, cushion);
+                    c.Prim(PrimitiveType.Cube, g, $"Back_{i}", new Vector3(x, T + 5, 5.8f), new Vector3(5, 0.8f, 6), Quaternion.Euler(-50, 0, 0), frame);
+                    for (int k = 0; k < 4; k++)
+                    {
+                        float lx = x + (k % 2 == 0 ? -2 : 2), lz = k < 2 ? -5 : 3;
+                        c.Box(g, $"Leg_{i}_{k}", new Vector3(lx, T + 1.05f, lz), new Vector3(0.6f, 2.1f, 0.6f), 0, frame);
+                    }
+                }
+            }
+
+            // パラソル(西)
+            {
+                var g = c.Anchored("Parasol", new Vector2(-1, 0.2f), 9);
+                c.Cylinder(g, "Pole", new Vector3(0, T + 8, 0), 0.4f, 16, c.Mat("ParasolPole", new Color(0.85f, 0.85f, 0.85f), 0.7f, 0.5f));
+                c.Cylinder(g, "Base", new Vector3(0, T + 0.5f, 0), 2.5f, 1, c.Mat("ParasolBase", new Color(0.3f, 0.3f, 0.32f), 0.5f));
+                Cone(c, g, "Canopy", new Vector3(0, T + 13, 0), 10, 4.5f, 6,
+                    c.Mat("CanopyWhite", new Color(0.97f, 0.97f, 0.95f), 0.3f),
+                    c.Mat("CanopyRed", new Color(0.85f, 0.2f, 0.2f), 0.3f));
+            }
+
+            // トロピカルドリンクのテーブル(北東)
+            {
+                var g = c.Anchored("DrinkTable", new Vector2(0.8f, 1), 12);
+                var white = c.Mat("TableWhite", new Color(0.95f, 0.95f, 0.95f), 0.6f);
+                c.Cylinder(g, "Top", new Vector3(0, T + 7.25f, 0), 4.5f, 0.5f, white);
+                c.Cylinder(g, "Leg", new Vector3(0, T + 3.5f, 0), 0.5f, 7, white);
+                c.Cylinder(g, "Foot", new Vector3(0, T + 0.2f, 0), 2.5f, 0.4f, white);
+                var glass = c.Mat("DrinkGlass", new Color(0.85f, 0.92f, 0.95f), 0.95f);
+                var cols = new[] { new Color(1.0f, 0.55f, 0.15f), new Color(0.95f, 0.3f, 0.45f) };
+                for (int i = 0; i < 2; i++)
+                {
+                    float x = -1.8f + i * 3.6f;
+                    c.Cylinder(g, $"Glass_{i}", new Vector3(x, T + 9.3f, 0), 1.1f, 3.6f, glass);
+                    c.Cylinder(g, $"Juice_{i}", new Vector3(x, T + 9.1f, 0), 0.95f, 3.0f, c.Mat($"Juice{i}", cols[i], 0.7f));
+                    c.Prim(PrimitiveType.Cylinder, g, $"Straw_{i}", new Vector3(x + 0.4f, T + 11.5f, 0), new Vector3(0.2f, 1.5f, 0.2f), Quaternion.Euler(0, 0, -15), c.Mat("Straw", new Color(0.2f, 0.7f, 0.4f), 0.5f));
+                    c.Sphere(g, $"Fruit_{i}", new Vector3(x - 0.9f, T + 11.2f, 0), new Vector3(1.2f, 1.2f, 0.4f), c.Mat("Lime", new Color(0.55f, 0.85f, 0.25f), 0.5f));
+                }
+            }
+
+            // 浮き輪(南東。平たい)
+            {
+                var g = c.Anchored("Lifebuoy", new Vector2(0.9f, -1), 5);
+                Ring(c, g, "Ring", new Vector3(0, T + 0.7f, 0), 3.2f, 16, 1.8f, 1.4f,
+                    c.Mat("BuoyRed", new Color(0.9f, 0.2f, 0.15f), 0.6f),
+                    c.Mat("BuoyWhite", new Color(0.97f, 0.97f, 0.95f), 0.6f),
+                    c.Mat("BuoyRed", new Color(0.9f, 0.2f, 0.15f), 0.6f),
+                    c.Mat("BuoyWhite", new Color(0.97f, 0.97f, 0.95f), 0.6f));
+            }
+
+            // 巻いたロープ(南西。平たい)
+            {
+                var g = c.Anchored("Rope", new Vector2(-0.8f, -1), 5);
+                var rope = c.Mat("Rope", new Color(0.82f, 0.72f, 0.52f), 0.2f);
+                const int kSegments = 40;
+                for (int i = 0; i < kSegments; i++)
+                {
+                    float a = i / (float)kSegments * Mathf.PI * 2 * 3;
+                    float a2 = (i + 1) / (float)kSegments * Mathf.PI * 2 * 3;
+                    float r = 0.8f + i / (float)kSegments * 3.2f;
+                    float r2 = 0.8f + (i + 1) / (float)kSegments * 3.2f;
+                    Vector3 p1 = new Vector3(Mathf.Cos(a) * r, 0, Mathf.Sin(a) * r);
+                    Vector3 p2 = new Vector3(Mathf.Cos(a2) * r2, 0, Mathf.Sin(a2) * r2);
+                    c.Prim(PrimitiveType.Cube, g, $"Rope_{i}", (p1 + p2) * 0.5f + new Vector3(0, T + 0.5f, 0), new Vector3(0.9f, 0.8f, Vector3.Distance(p1, p2) + 0.2f), Quaternion.LookRotation(p2 - p1), rope);
+                }
+            }
+
+            // 北の手すり(この先は海)
+            {
+                var g = c.Anchored("Railing", new Vector2(0, 1), 32);
+                var white = c.Mat("Railing", new Color(0.96f, 0.96f, 0.96f), 0.7f);
+                for (int i = 0; i <= 40; i++) c.Cylinder(g, $"Post_{i}", new Vector3(-120 + i * 6, T + 3.5f, 0), 0.4f, 7, white);
+                c.Box(g, "RailTop", new Vector3(0, T + 7.2f, 0), new Vector3(242, 0.7f, 0.9f), 0, white);
+                c.Box(g, "RailMid", new Vector3(0, T + 4, 0), new Vector3(242, 0.4f, 0.5f), 0, white);
+            }
+
+            // 遠くの島(海の上)
+            {
+                var g = c.Anchored("Island", new Vector2(0.4f, 1), 120);
+                c.Sphere(g, "Island", new Vector3(0, T - 37, 0), new Vector3(90, 30, 50), c.Mat("Island", new Color(0.3f, 0.55f, 0.3f), 0.2f));
+                c.Sphere(g, "Beach", new Vector3(0, T - 37.3f, 0), new Vector3(104, 8, 60), c.Mat("Beach", new Color(0.93f, 0.85f, 0.62f), 0.2f));
+            }
+        }
+
+        //----------------------------------------
+        // ジャングルの遺跡
+        //----------------------------------------
+        static void BuildRuins(Ctx c)
+        {
+            float T = kTableTop;
+            var stoneGray = c.Mat("StoneGray", new Color(0.55f, 0.53f, 0.48f), 0.2f);
+            var stoneMoss = c.Mat("StoneMoss", new Color(0.46f, 0.5f, 0.4f), 0.2f);
+            var stoneSand = c.Mat("StoneSand", new Color(0.66f, 0.6f, 0.47f), 0.2f);
+            SetSupports(c, StageBackdrop.SupportStyle.SlabStack, 1.2f, 2.0f, null, stoneGray, stoneMoss, stoneSand);
+            c.FloorMaterial = c.Mat("StageFloor", new Color(0.72f, 0.66f, 0.52f), 0.2f);
+            c.WallMaterial = c.SeeThroughMat("StageWall", new Color(0.38f, 0.45f, 0.32f), 0.4f);
+
+            // 密林の土と石畳(石の隙間から土が見える)
+            var ground = c.Group("Ground");
+            c.Box(ground, "Soil", new Vector3(0, T - 2, 0), new Vector3(720, 2, 720), 0, c.Mat("JungleSoil", new Color(0.28f, 0.32f, 0.2f), 0.1f));
+            for (int i = -6; i <= 6; i++)
+            {
+                for (int j = -6; j <= 6; j++)
+                {
+                    var mat = ((i * 3 + j * 5) % 3 + 3) % 3 == 0 ? stoneMoss : (((i + j) & 1) == 0 ? stoneGray : stoneSand);
+                    c.Box(ground, $"Flag_{i + 6}_{j + 6}", new Vector3(i * 16, T - 0.5f, j * 16), new Vector3(15.4f, 1, 15.4f), 0, mat);
+                }
+            }
+
+            // 石の頭像(北西)
+            {
+                var g = c.Anchored("StoneHead", new Vector2(-0.8f, 1), 12);
+                c.Box(g, "Head", new Vector3(0, T + 6, 0), new Vector3(8, 12, 7), 0, stoneGray);
+                c.Box(g, "Brow", new Vector3(0, T + 8.6f, -3.8f), new Vector3(7, 1.2f, 1), 0, stoneGray);
+                var dark = c.Mat("Carving", new Color(0.2f, 0.2f, 0.18f), 0.1f);
+                c.Box(g, "EyeL", new Vector3(-1.8f, T + 7.4f, -3.55f), new Vector3(1.8f, 1, 0.2f), 0, dark);
+                c.Box(g, "EyeR", new Vector3(1.8f, T + 7.4f, -3.55f), new Vector3(1.8f, 1, 0.2f), 0, dark);
+                c.Box(g, "Nose", new Vector3(0, T + 5.6f, -4), new Vector3(1.6f, 3, 1.2f), 0, stoneGray);
+                c.Box(g, "Mouth", new Vector3(0, T + 2.8f, -3.55f), new Vector3(4, 0.8f, 0.2f), 0, dark);
+                c.Sphere(g, "Moss", new Vector3(0, T + 12, 0), new Vector3(8.4f, 2, 7.4f), c.Mat("Moss", new Color(0.3f, 0.48f, 0.2f), 0.1f));
+            }
+
+            // たいまつ(北東・北)
+            {
+                var flame = c.Mat("Flame", new Color(1.0f, 0.5f, 0.1f), 0.9f);
+                var core = c.Mat("FlameCore", new Color(1.0f, 0.85f, 0.3f), 0.9f);
+                var bowl = c.Mat("TorchBowl", new Color(0.3f, 0.25f, 0.2f), 0.5f, 0.4f);
+                foreach (var (name, dir, margin) in new[] { ("TorchNE", new Vector2(0.8f, 1), 12f), ("TorchN", new Vector2(-0.15f, 1), 16f) })
+                {
+                    var g = c.Anchored(name, dir, margin);
+                    c.Cylinder(g, "Pillar", new Vector3(0, T + 5, 0), 1.2f, 10, stoneSand);
+                    c.Cylinder(g, "Bowl", new Vector3(0, T + 10.6f, 0), 2.2f, 1.2f, bowl);
+                    c.Sphere(g, "Flame", new Vector3(0, T + 12.4f, 0), new Vector3(3, 4, 3), flame);
+                    c.Sphere(g, "Core", new Vector3(0, T + 12, -0.4f), new Vector3(1.8f, 2.4f, 1.8f), core);
+                }
+            }
+
+            // 折れた柱(東)
+            {
+                var g = c.Anchored("Columns", new Vector2(1, 0.2f), 9);
+                c.Cylinder(g, "Column", new Vector3(0, T + 6, 0), 2.4f, 12, stoneSand);
+                c.Box(g, "Capital", new Vector3(0, T + 12.5f, 0), new Vector3(6, 1, 6), 0, stoneSand);
+                c.Cylinder(g, "Broken", new Vector3(3, T + 2.5f, 7), 2.4f, 5, stoneMoss);
+                c.Box(g, "Rubble_0", new Vector3(-4, T + 0.8f, -4), new Vector3(2.6f, 1.6f, 2), 25, stoneGray);
+                c.Box(g, "Rubble_1", new Vector3(5, T + 0.6f, -2), new Vector3(1.8f, 1.2f, 2.2f), -15, stoneSand);
+            }
+
+            // 倒れた柱(南。寝かせてある)
+            {
+                var g = c.Anchored("FallenColumn", new Vector2(0.2f, -1), 5);
+                c.Prim(PrimitiveType.Cylinder, g, "Column", new Vector3(0, T + 2, 0), new Vector3(4, 8, 4), Quaternion.Euler(0, 12, 90), stoneGray);
+                c.Box(g, "Rubble", new Vector3(10, T + 0.7f, 1), new Vector3(2.4f, 1.4f, 2.4f), 30, stoneMoss);
+            }
+
+            // 密林の草(西)
+            {
+                var g = c.Anchored("Plants", new Vector2(-1, -0.1f), 8);
+                var leafDark = c.Mat("LeafDark", new Color(0.16f, 0.38f, 0.15f), 0.4f);
+                var leafLight = c.Mat("LeafLight", new Color(0.3f, 0.55f, 0.2f), 0.4f);
+                for (int i = 0; i < 8; i++)
+                {
+                    float a = i * 45;
+                    var leaf = c.Sphere(g, $"Leaf_{i}", new Vector3(Mathf.Cos(a * Mathf.Deg2Rad) * 3, T + 2.5f + (i % 3), Mathf.Sin(a * Mathf.Deg2Rad) * 3), new Vector3(2.6f, 0.4f, 7), i % 2 == 0 ? leafDark : leafLight);
+                    leaf.transform.rotation = Quaternion.Euler(-25, 90 - a, 0);
+                }
+                c.Sphere(g, "Bush", new Vector3(-3, T + 2, 6), new Vector3(8, 5, 7), leafDark);
+            }
+
+            // 宝箱(南東)
+            {
+                var g = c.Anchored("Chest", new Vector2(0.9f, -1), 5);
+                var wood = c.Mat("ChestWood", new Color(0.45f, 0.26f, 0.12f), 0.4f);
+                var gold = c.Mat("Gold", new Color(0.95f, 0.75f, 0.25f), 0.85f, 0.9f);
+                c.Box(g, "Body", new Vector3(0, T + 1.75f, 0), new Vector3(6, 3.5f, 4), -10, wood);
+                c.Prim(PrimitiveType.Cylinder, g, "Lid", new Vector3(0, T + 3.5f, 0), new Vector3(4, 3, 3), Quaternion.Euler(0, -10, 90), wood);
+                c.Box(g, "BandL", new Vector3(-1.9f, T + 2.6f, -0.33f), new Vector3(0.5f, 5.4f, 4.1f), -10, gold);
+                c.Box(g, "BandR", new Vector3(1.9f, T + 2.6f, 0.33f), new Vector3(0.5f, 5.4f, 4.1f), -10, gold);
+                for (int i = 0; i < 4; i++)
+                {
+                    c.Cylinder(g, $"Coin_{i}", new Vector3(-4 + i * 1.6f, T + 0.1f, -3 + (i % 2) * 1.2f), 0.6f, 0.2f, gold);
+                }
+            }
+
+            // 階段状の神殿(北の奥)
+            {
+                var g = c.Anchored("Temple", new Vector2(0, 1), 40);
+                for (int i = 0; i < 6; i++)
+                {
+                    float w = 90 - i * 14;
+                    c.Box(g, $"Step_{i}", new Vector3(0, T + i * 8 + 4, 20), new Vector3(w, 8, w * 0.7f), 0, i % 2 == 0 ? stoneGray : stoneMoss);
+                }
+                c.Box(g, "Shrine", new Vector3(0, T + 54, 20), new Vector3(14, 12, 10), 0, stoneSand);
+            }
+        }
+
+        //----------------------------------------
+        // 宇宙ステーション
+        //----------------------------------------
+        static void BuildSpace(Ctx c)
+        {
+            float T = kTableTop;
+            SetSupports(c, StageBackdrop.SupportStyle.SlabStack, 0.8f, 1.4f, null,
+                c.Mat("PlateLight", new Color(0.7f, 0.72f, 0.76f), 0.7f, 0.6f),
+                c.Mat("PlateDark", new Color(0.35f, 0.37f, 0.42f), 0.7f, 0.6f));
+            c.FloorMaterial = c.Mat("StageFloor", new Color(0.82f, 0.85f, 0.9f), 0.6f, 0.3f);
+            c.WallMaterial = c.SeeThroughMat("StageWall", new Color(0.3f, 0.85f, 0.95f), 0.8f);
+
+            // 金属のパネルの床(継ぎ目の線は縦横で高さをずらす)
+            var floor = c.Group("PanelFloor");
+            c.Box(floor, "Panels", new Vector3(0, T - 1, 0), new Vector3(400, 2, 400), 0, c.Mat("Panel", new Color(0.5f, 0.53f, 0.58f), 0.6f, 0.6f));
+            var seam = c.Mat("Seam", new Color(0.22f, 0.24f, 0.28f), 0.4f);
+            for (int i = -16; i <= 16; i++)
+            {
+                c.Box(floor, $"SeamX_{i + 16}", new Vector3(0, T + 0.01f, i * 12), new Vector3(392, 0.02f, 0.3f), 0, seam);
+                c.Box(floor, $"SeamZ_{i + 16}", new Vector3(i * 12, T + 0.02f, 0), new Vector3(0.3f, 0.02f, 392), 0, seam);
+            }
+
+            // 奥の大窓(星空と地球)
+            {
+                var g = c.Anchored("Window", new Vector2(0, 1), 22);
+                var frame = c.Mat("WindowFrame", new Color(0.3f, 0.32f, 0.36f), 0.6f, 0.6f);
+                c.Box(g, "Wall", new Vector3(0, T + 30, 2), new Vector3(240, 60, 2), 0, frame);
+                c.Box(g, "Space", new Vector3(0, T + 30, 0.8f), new Vector3(150, 44, 0.4f), 0, c.Mat("SpaceBlack", new Color(0.02f, 0.02f, 0.05f), 0.9f));
+                for (int i = 0; i < 4; i++) c.Box(g, $"Mullion_{i}", new Vector3(-56 + i * 37.5f, T + 30, 0.3f), new Vector3(2, 44, 1), 0, frame);
+                var star = c.Mat("Star", new Color(0.97f, 0.97f, 1.0f), 0.9f);
+                var rng = new System.Random(7);
+                for (int i = 0; i < 50; i++)
+                {
+                    float x = (float)rng.NextDouble() * 146 - 73;
+                    float y = (float)rng.NextDouble() * 40 + 10;
+                    float s = 0.4f + (float)rng.NextDouble() * 0.6f;
+                    c.Sphere(g, $"Star_{i}", new Vector3(x, T + y, 0.5f), new Vector3(s, s, 0.1f), star);
+                }
+                c.Sphere(g, "Earth", new Vector3(30, T + 24, 0.45f), new Vector3(28, 28, 0.2f), c.Mat("EarthOcean", new Color(0.15f, 0.4f, 0.85f), 0.8f));
+                var land = c.Mat("EarthLand", new Color(0.3f, 0.6f, 0.3f), 0.4f);
+                c.Sphere(g, "Land_0", new Vector3(24, T + 28, 0.35f), new Vector3(9, 7, 0.1f), land);
+                c.Sphere(g, "Land_1", new Vector3(36, T + 20, 0.35f), new Vector3(7, 9, 0.1f), land);
+                c.Sphere(g, "Cloud", new Vector3(28, T + 18, 0.3f), new Vector3(12, 3, 0.1f), c.Mat("Cloud", new Color(0.97f, 0.97f, 0.98f), 0.5f));
+            }
+
+            // 操作盤(北東)
+            {
+                var g = c.Anchored("Console", new Vector2(0.8f, 1), 12);
+                var body = c.Mat("ConsoleBody", new Color(0.82f, 0.84f, 0.88f), 0.6f, 0.4f);
+                c.Box(g, "Base", new Vector3(0, T + 3, 0), new Vector3(14, 6, 7), 0, body);
+                var panel = c.Prim(PrimitiveType.Cube, g, "Panel", new Vector3(0, T + 7, 1.5f), new Vector3(14, 0.8f, 6), Quaternion.Euler(-30, 0, 0), body);
+                c.Prim(PrimitiveType.Cube, panel.transform, "Screen", new Vector3(-0.2f, 0.55f, 0.05f), new Vector3(0.5f, 0.1f, 0.75f), Quaternion.identity, c.Mat("Screen", new Color(0.1f, 0.35f, 0.55f), 0.95f), true);
+                var cols = new[] { new Color(0.95f, 0.25f, 0.2f), new Color(0.3f, 0.9f, 0.4f), new Color(0.98f, 0.8f, 0.2f) };
+                for (int i = 0; i < 6; i++)
+                {
+                    c.Prim(PrimitiveType.Cube, panel.transform, $"Button_{i}", new Vector3(0.18f + (i % 2) * 0.13f, 0.55f, 0.25f - (i / 2) * 0.25f), new Vector3(0.07f, 0.3f, 0.15f), Quaternion.identity, c.Mat($"Button{i % 3}", cols[i % 3], 0.8f), true);
+                }
+            }
+
+            // 酸素ボンベ(西)
+            {
+                var g = c.Anchored("OxygenTanks", new Vector2(-1, 0.2f), 8);
+                var white = c.Mat("Tank", new Color(0.95f, 0.95f, 0.96f), 0.7f);
+                var band = c.Mat("TankBand", new Color(1.0f, 0.5f, 0.1f), 0.5f);
+                var valve = c.Mat("Valve", new Color(0.6f, 0.62f, 0.66f), 0.8f, 0.8f);
+                for (int i = 0; i < 3; i++)
+                {
+                    float z = -5 + i * 5;
+                    c.Cylinder(g, $"Tank_{i}", new Vector3(0, T + 6, z), 2, 12, white);
+                    c.Sphere(g, $"Dome_{i}", new Vector3(0, T + 12, z), new Vector3(4, 2.4f, 4), white);
+                    c.Cylinder(g, $"Band_{i}", new Vector3(0, T + 8, z), 2.05f, 1, band);
+                    c.Cylinder(g, $"Valve_{i}", new Vector3(0, T + 13.6f, z), 0.6f, 1.2f, valve);
+                }
+            }
+
+            // ロボットアーム(北西)
+            {
+                var g = c.Anchored("RobotArm", new Vector2(-0.8f, 1), 12);
+                var arm = c.Mat("Arm", new Color(0.95f, 0.95f, 0.96f), 0.6f, 0.3f);
+                var joint = c.Mat("Joint", new Color(0.3f, 0.32f, 0.36f), 0.7f, 0.6f);
+                c.Cylinder(g, "Base", new Vector3(0, T + 1, 0), 3.5f, 2, joint);
+                c.Prim(PrimitiveType.Capsule, g, "Arm1", new Vector3(0, T + 6, 0), new Vector3(2, 4.5f, 2), Quaternion.identity, arm);
+                c.Sphere(g, "Joint1", new Vector3(0, T + 10.5f, 0), new Vector3(2.6f, 2.6f, 2.6f), joint);
+                c.Prim(PrimitiveType.Capsule, g, "Arm2", new Vector3(3.2f, T + 12.5f, 0), new Vector3(1.6f, 4, 1.6f), Quaternion.Euler(0, 0, -60), arm);
+                c.Sphere(g, "Joint2", new Vector3(6.2f, T + 14.2f, 0), new Vector3(2, 2, 2), joint);
+                c.Box(g, "ClawL", new Vector3(6.8f, T + 12.6f, -0.7f), new Vector3(0.5f, 2.4f, 0.5f), 0, joint);
+                c.Box(g, "ClawR", new Vector3(6.8f, T + 12.6f, 0.7f), new Vector3(0.5f, 2.4f, 0.5f), 0, joint);
+            }
+
+            // 宇宙服のヘルメット(東)
+            {
+                var g = c.Anchored("Helmet", new Vector2(1, 0.15f), 8);
+                c.Cylinder(g, "NeckRing", new Vector3(0, T + 0.6f, 0), 3, 1.2f, c.Mat("NeckRing", new Color(0.55f, 0.57f, 0.62f), 0.8f, 0.7f));
+                c.Sphere(g, "Shell", new Vector3(0, T + 4.6f, 0), new Vector3(8, 8, 8), c.Mat("HelmetShell", new Color(0.96f, 0.96f, 0.97f), 0.7f));
+                c.Sphere(g, "Visor", new Vector3(0, T + 4.6f, -2.4f), new Vector3(6, 4.4f, 4), c.Mat("Visor", new Color(0.85f, 0.65f, 0.2f), 0.95f, 0.9f));
+            }
+
+            // コンテナ(南東)。黄色と黒の縞
+            {
+                var g = c.Anchored("Crate", new Vector2(0.9f, -1), 5);
+                var crate = c.Box(g, "Crate", new Vector3(0, T + 2, 0), new Vector3(6, 4, 6), 15, c.Mat("Crate", new Color(0.4f, 0.42f, 0.46f), 0.5f, 0.4f));
+                var yellow = c.Mat("Hazard", new Color(0.98f, 0.8f, 0.1f), 0.5f);
+                var black = c.Mat("HazardBlack", new Color(0.1f, 0.1f, 0.12f), 0.5f);
+                for (int i = 0; i < 6; i++)
+                {
+                    c.Prim(PrimitiveType.Cube, crate.transform, $"Stripe_{i}", new Vector3(-0.42f + i * 0.168f, 0.35f, 0), new Vector3(0.168f, 0.15f, 1.02f), Quaternion.identity, i % 2 == 0 ? yellow : black, true);
+                }
+            }
+
+            // 床をはうケーブル(南)
+            {
+                var g = c.Anchored("Cables", new Vector2(0.2f, -1), 4);
+                var cols = new[] { c.Mat("CableRed", new Color(0.85f, 0.2f, 0.15f), 0.6f), c.Mat("CableBlue", new Color(0.2f, 0.4f, 0.85f), 0.6f) };
+                for (int k = 0; k < 2; k++)
+                {
+                    for (int i = 0; i < 8; i++)
+                    {
+                        float x1 = -14 + i * 3.5f, x2 = x1 + 3.5f;
+                        float z1 = Mathf.Sin(i * 0.9f + k) * 1.5f + k * 2.5f, z2 = Mathf.Sin((i + 1) * 0.9f + k) * 1.5f + k * 2.5f;
+                        Vector3 p1 = new Vector3(x1, 0, z1), p2 = new Vector3(x2, 0, z2);
+                        c.Prim(PrimitiveType.Cube, g, $"Cable_{k}_{i}", (p1 + p2) * 0.5f + new Vector3(0, T + 0.35f, 0), new Vector3(0.7f, 0.7f, Vector3.Distance(p1, p2) + 0.3f), Quaternion.LookRotation(p2 - p1), cols[k]);
+                    }
+                }
             }
         }
 
