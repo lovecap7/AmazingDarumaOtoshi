@@ -4,7 +4,7 @@ using Unity.Netcode;
 
 // 持ち主の端末で入力を読み、ホストへ送る。ホストでは IDarumaCommandSource として DarumaCharacter に読まれる。
 // DarumaCharacter と同じ GameObject(プレハブ)に付けておくと、DarumaCharacter.Awake が自動でこれを操作の供給元にする。
-// いまはキーボードのみ(WASD/矢印:移動 Space:ジャンプ J:薙ぎ払い K:ショット)。ゲームパッドは後で足す。
+// 操作はキーボードとゲームパッドの両方(NetPadKeyboardInput)。
 public class NetworkCommandSource : NetworkBehaviour, IDarumaCommandSource
 {
     IDarumaCommandSource m_local;   // 持ち主側の実入力
@@ -15,7 +15,7 @@ public class NetworkCommandSource : NetworkBehaviour, IDarumaCommandSource
     {
         // 持ち主の端末だけ、実際の入力を読む部品を付ける
         // (DarumaCharacter は Awake で供給元を決め済みなので、ここで足しても取り違えない)
-        if (IsOwner) m_local = gameObject.AddComponent<KeyboardDarumaInput>();
+        if (IsOwner) m_local = gameObject.AddComponent<NetPadKeyboardInput>();
     }
 
     void Update()

@@ -259,7 +259,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -6010,7 +6010,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -10109,7 +10109,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -15295,7 +15295,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -18330,7 +18330,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -37554,7 +37554,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -40849,7 +40849,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -44048,7 +44048,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -45607,7 +45607,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -57348,7 +57348,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -57498,7 +57498,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -71013,7 +71013,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -75511,7 +75511,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -77257,7 +77257,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -79876,7 +79876,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -83951,7 +83951,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -88881,7 +88881,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -92422,7 +92422,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -92788,7 +92788,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -98629,7 +98629,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -102658,7 +102658,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -104104,7 +104104,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -109345,7 +109345,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -112554,7 +112554,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -121092,6 +121092,7 @@ MonoBehaviour:
   - {fileID: 362302899}
   - {fileID: 507910259}
   - {fileID: 2009570414}
+  m_switcher: {fileID: 2138902305}
 --- !u!1 &1110689242
 GameObject:
   m_ObjectHideFlags: 0
@@ -132108,7 +132109,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -138213,7 +138214,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -145551,7 +145552,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -146398,7 +146399,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -148735,7 +148736,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -152819,7 +152820,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -156787,7 +156788,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -164201,7 +164202,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -165558,7 +165559,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -167564,7 +167565,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -174713,7 +174714,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -180204,7 +180205,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -187009,7 +187010,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -187248,7 +187249,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -189741,7 +189742,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -197470,7 +197471,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -202084,7 +202085,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -207168,7 +207169,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -210139,7 +210140,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -214935,7 +214936,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -215722,7 +215723,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -217776,7 +217777,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -219605,6 +219606,80 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!1 &2047423252
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2047423254}
+  - component: {fileID: 2047423253}
+  - component: {fileID: 2047423255}
+  m_Layer: 0
+  m_Name: NetStageSync
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &2047423253
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2047423252}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
+  GlobalObjectIdHash: 3306723570
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  m_InScenePlacedDisabledByDefault: 0
+  DeferredDespawnTick: 0
+  Ownership: 1
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  m_InScenePlaced: 1
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 0
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1
+  SyncOwnerTransformWhenParented: 1
+  AllowOwnerToParent: 0
+--- !u!4 &2047423254
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2047423252}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2047423255
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2047423252}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a6763d43b7fa5974dbc9e29c20e799ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NetStageSync
+  ShowTopMostFoldoutHeaderGroup: 1
+  m_switcher: {fileID: 2138902305}
 --- !u!1 &2048204852
 GameObject:
   m_ObjectHideFlags: 0
@@ -223703,7 +223778,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -225680,7 +225755,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -227091,7 +227166,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -229187,7 +229262,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d77eb726d1b80aa4fb9b887930ff58ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakagawa.TumikiSpawner
-  m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
   m_patterns:
   - {fileID: 11400000, guid: e4d58833cc6dd7a4796ba8673189cc49, type: 2}
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
@@ -229768,3 +229843,4 @@ SceneRoots:
   - {fileID: 1109891924}
   - {fileID: 546252140}
   - {fileID: 530128323}
+  - {fileID: 2047423254}

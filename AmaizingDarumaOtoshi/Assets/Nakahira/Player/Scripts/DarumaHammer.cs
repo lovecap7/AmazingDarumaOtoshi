@@ -82,6 +82,8 @@ namespace Nakahira
         public static event System.Action<HammerHitInfo> Hit;
 
         public bool IsBusy => m_action != Action.None;
+        // このハンマーの性能。キャラクターのパッシブが、実行時に複製へ差し替えるために使う
+        public HammerParams Params { get => m_params; set => m_params = value; }
         // 当たり判定が届く距離(見た目のハンマーの長さ × 倍率)
         float HitReach => (m_armLength + m_hammerHalfWidth) * m_params.HitReachScale;
         public bool IsShooting => m_action == Action.Shot;
@@ -117,7 +119,22 @@ namespace Nakahira
             m_character = m_owner as DarumaCharacter;
         }
 
-        public bool TrySweep()
+        // ネット対戦のクライアント用: 振る見た目だけ動かし、当たり判定・弾の発射はしない(結果はホストから届く)
+        // ローカルプレイでは常に false
+        public bool ViewOnly { get; set; }
+
+        // ネット対戦のクライアント用: ホストで始まった動作の見た目を最初から再生する
+        public void PlayVisual(bool shot)
+        {
+            m_action = shot ? Action.Shot : Action.Sweep;
+            m_time = 0.0f;
+            m_prevSweepYaw = m_sweepStartYaw;
+            m_shotFired = false;
+            m_hitThisSwing.Clear();
+        }
+
+        
+public bool TrySweep()
         {
             if (IsBusy) return false;
             m_action = Action.Sweep;
@@ -147,7 +164,7 @@ namespace Nakahira
 
             if (m_action == Action.Sweep)
             {
-                DetectSweepHits();
+                if (!ViewOnly) DetectSweepHits();
                 if (m_time >= m_params.SweepDuration) m_action = Action.None;
             }
             else if (m_action == Action.Shot)
@@ -155,7 +172,7 @@ namespace Nakahira
                 if (!m_shotFired && CurrentShotPitch() <= m_shotHitPitch)
                 {
                     m_shotFired = true;
-                    FireShot();
+                    if (!ViewOnly) FireShot();
                 }
                 if (m_time >= m_params.ShotDuration) m_action = Action.None;
             }
