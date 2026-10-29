@@ -49,8 +49,8 @@ public class BlockController : MonoBehaviour
     [SerializeField] float accelMaxSpeed = 12.0f;  // テスト用：速度の上限
     [SerializeField] int accelMaxBlockHits = 2;    // テスト用：積み木に何回当たったら壊れるか
 
-    int funnelCount = 3;               // テスト用：分裂後の総数。本来はプレイヤーが管理している積み木の数を渡す
-    float funnelSpread = 90.0f;        // テスト用：扇状に広がる角度
+    int funnelCount = 5;               // テスト用：分裂後の総数。本来はプレイヤーが管理している積み木の数を渡す
+    float funnelSpacing = 2.4f;        // テスト用：分身を左右に並べる間隔(積み木の幅に対する倍率)
     float funnelSearchRadius = 15.0f;  // テスト用：狙う相手を探す範囲
     float funnelTurnSpeed = 270.0f;    // テスト用：発射直後の旋回速度(度/秒)
     float funnelDuration = 3.0f;       // テスト用：誘導が切れるまでの時間(秒)
@@ -118,7 +118,7 @@ public class BlockController : MonoBehaviour
             case BehaviorType.Boomerang: return new BoomerangBehavior(this, boomerangReturnTarget, boomerangRadius, boomerangCurveLeft, boomerangArriveDistance);
             case BehaviorType.Gravity: return new GravityWellBehavior(this, gravityRadius, gravityStrength, gravityDuration, gravityDeadZone, gravityEdgeRatio);
             case BehaviorType.Accelerat: return new AcceleratBehavior(this, accelRate, accelMaxSpeed, accelMaxBlockHits);
-            case BehaviorType.Funnel: return new FunnelBehavior(this, funnelCount, funnelSpread, funnelSearchRadius, funnelTurnSpeed, funnelDuration);
+            case BehaviorType.Funnel: return new FunnelBehavior(this, funnelCount, funnelSpacing, funnelSearchRadius, funnelTurnSpeed, funnelDuration);
             case BehaviorType.Normal:
             default: return new NormalBehavior();
         }
