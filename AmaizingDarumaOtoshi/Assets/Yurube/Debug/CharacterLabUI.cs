@@ -133,6 +133,7 @@ namespace Yurube.Lab
             if (GUILayout.Button("いわだる: ダミー5個＋発射", m_button)) PresetIwa();
             if (GUILayout.Button("きだる: 黄色1個", m_button)) PresetKidaru();
             if (GUILayout.Button("へびだる: 積んでショット", m_button)) PresetHebi();
+            if (GUILayout.Button("だるきんぐ: 積み木3個", m_button)) PresetDaruKing();
 
             // ---- 切替 ----
             GUILayout.Space(6.0f);
@@ -297,6 +298,16 @@ namespace Yurube.Lab
                 yield return null;
             }
             if (character != null && character.Hammer != null) character.Hammer.TryShot();
+        }
+
+        void PresetDaruKing()
+        {
+            m_lab.SelectCharacter("daruking");
+            var character = m_lab.Character;
+            m_lab.ClearStack(character);
+            // 3個積もうとしても、パッシブで2段までに抑えられる
+            m_lab.AddBlocks(character, TumikiColor.Red, 3);
+            m_lab.SelectedColor = TumikiColor.Red;
         }
 
         static string ColorName(TumikiColor color)
