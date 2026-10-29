@@ -44,10 +44,11 @@
 | いわだる | 飛ばした積み木は積み木を壊し、壁で壊れる（岩の破片表示つき） | `IwaPassive.cs` / `IwaBlock.cs`（`IwaImpact` 含む） | コミット済み |
 | きだる | 黄色い積み木を積むと、同じ黄色がもう1個増える（上限10段） | `KidaruPassive.cs` | **未コミット** |
 | へびだる | 股抜きショットで飛ばした自分の積み木が左右に蛇行（ハンマーで飛ばした積み木は対象外） | `HebiPassive.cs` / `TumikiZigzag.cs` | **未コミット** |
+| だるきんぐ | 積み木は2個まで。3個目を積むと一番上（古い段）が落ちる | `DaruKingPassive.cs` | **未コミット** |
 
-キャラクターデータ: `Assets/Fujihara/Data/Characters/{akadaru,aodaru,midaru,iwadaru,kidaru,hebidaru}.asset`
-プレハブ: `Assets/Yurube/Prefabs/{Akadaru,Aodaru,Midaru,Iwa,Kidaru,Hebi}.prefab`
-頭マテリアル: `Assets/Yurube/Materials/{AodaruHead,MidaruHead,IwaHead,KidaruHead,HebiHead}.mat`
+キャラクターデータ: `Assets/Fujihara/Data/Characters/{akadaru,aodaru,midaru,iwadaru,kidaru,hebidaru,daruking}.asset`
+プレハブ: `Assets/Yurube/Prefabs/{Akadaru,Aodaru,Midaru,Iwa,Kidaru,Hebi,DaruKing}.prefab`
+頭マテリアル: `Assets/Yurube/Materials/{AodaruHead,MidaruHead,IwaHead,KidaruHead,HebiHead,DaruKingHead}.mat`
 
 ---
 
@@ -165,6 +166,7 @@ Unity の Roslyn と、前回ビルド済みの `Assembly-CSharp.dll` を使っ�
 
 - きだるの実機確認とコミット（ラボの「きだる: 黄色1個」で2段になるか）
 - へびだるの実機確認とコミット（ラボの「へびだる: 積んでショット」で蛇行するか）
+- だるきんぐの実機確認とコミット（ラボの「だるきんぐ: 積み木3個」で2段になるか）
 - あかだるの「赤い積み木のときだけ弾速UP」への変更検討（現状は全色）
 - 通信対戦対応（NetworkObject 付与）※共有プレハブに関わるため要相談
 - chara3〜6 の実装（`prefab: {fileID: 0}` のまま）
