@@ -1,3 +1,4 @@
+using System.Collections;
 using Nakahira;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -131,6 +132,7 @@ namespace Yurube.Lab
             if (GUILayout.Button("みだる: 緑1個＋わざと外して発射", m_button)) PresetMidaru();
             if (GUILayout.Button("いわだる: ダミー5個＋発射", m_button)) PresetIwa();
             if (GUILayout.Button("きだる: 黄色1個", m_button)) PresetKidaru();
+            if (GUILayout.Button("へびだる: 積んでショット", m_button)) PresetHebi();
 
             // ---- 切替 ----
             GUILayout.Space(6.0f);
@@ -272,6 +274,29 @@ namespace Yurube.Lab
             // 黄色を1個積むと、パッシブでもう1個増えて2段になる
             m_lab.AddBlocks(character, TumikiColor.Yellow, 1);
             m_lab.SelectedColor = TumikiColor.Yellow;
+        }
+
+        void PresetHebi()
+        {
+            m_lab.SelectCharacter("hebidaru");
+            var character = m_lab.Character;
+            m_lab.ClearStack(character);
+            m_lab.AddBlocks(character, TumikiColor.Green, 1);
+            m_lab.SelectedColor = TumikiColor.Green;
+            // 生成直後は接地判定がまだなので、動けるようになってからショットする
+            StartCoroutine(ShotWhenReady());
+        }
+
+        IEnumerator ShotWhenReady()
+        {
+            var character = m_lab.Character;
+            float timeout = 1.0f;
+            while (character != null && !character.CanStartShot && timeout > 0.0f)
+            {
+                timeout -= Time.unscaledDeltaTime;
+                yield return null;
+            }
+            if (character != null && character.Hammer != null) character.Hammer.TryShot();
         }
 
         static string ColorName(TumikiColor color)
