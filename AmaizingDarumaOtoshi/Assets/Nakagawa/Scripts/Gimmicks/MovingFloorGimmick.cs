@@ -72,11 +72,70 @@ namespace Nakagawa
         public Vector2 Size => m_size;
         public Vector3 Position => m_rb != null ? m_rb.position : transform.position;
         // 地点で止まっているならその地点の番号、動いているなら -1
-        public int StoppedAt => m_points.Count == 0 ? -1 : (m_stopped || m_waitTimer > 0.0f) ? m_index : -1;
+        public int StoppedAt
+        {
+            get
+            {
+                Evaluate(out int stoppedAt, out _, out _);
+                return stoppedAt;
+            }
+        }
         // 止まっている残りの時間(動いていれば 0。片道の終点などで止まりきりなら無限)
-        public float WaitRemaining => m_stopped ? float.PositiveInfinity : Mathf.Max(0.0f, m_waitTimer);
+        public float WaitRemaining
+        {
+            get
+            {
+                Evaluate(out _, out float remaining, out _);
+                return remaining;
+            }
+        }
         // 次に止まる地点(止まっていれば、次に向かう地点)
-        public int NextStop => m_points.Count < 2 || m_stopped ? m_index : NextIndex();
+        public int NextStop
+        {
+            get
+            {
+                Evaluate(out _, out _, out int next);
+                return next;
+            }
+        }
+
+        // 今の時間から、止まっている地点(動いていれば -1)・止まっている残りの時間・次に止まる地点を求める(CPU 用)
+        private void Evaluate(out int stoppedAt, out float waitRemaining, out int nextStop)
+        {
+            stoppedAt = -1;
+            waitRemaining = 0.0f;
+            nextStop = 0;
+            if (m_points.Count == 0) return;
+            if (m_stopped || m_legs.Count == 0)
+            {
+                stoppedAt = 0;
+                waitRemaining = float.PositiveInfinity;
+                return;
+            }
+            float t = m_time;
+            foreach (var leg in m_legs)
+            {
+                if (t < leg.Wait)
+                {
+                    stoppedAt = leg.From;
+                    waitRemaining = leg.Wait - t;
+                    nextStop = leg.To;
+                    return;
+                }
+                t -= leg.Wait;
+                if (t < leg.Move)
+                {
+                    nextStop = leg.To;
+                    return;
+                }
+                t -= leg.Move;
+            }
+            // 片道の終点に着いて止まりきり
+            int last = m_legs[m_legs.Count - 1].To;
+            stoppedAt = last;
+            waitRemaining = float.PositiveInfinity;
+            nextStop = last;
+        }
         // 繰り返す動きか(片道は最後の地点で止まるので繰り返さない)
         float Period => m_loopMode == LoopMode.OneWay ? 0.0f : m_cycle;
 
