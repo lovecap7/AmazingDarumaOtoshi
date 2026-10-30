@@ -20,7 +20,7 @@ using UnityEngine.UI;
 //   - 各プレイヤーは自分のカーソルでキャラ（またはランダム）を選ぶ。B で取り消し、何も選んでいなければ B で抜ける
 //   - CPU のコインはプレイヤーがカーソルで掴んで（A）キャラの上に置く（A）と、その CPU のキャラになる。CPU の強さは枠の －／＋
 //   - 参加者全員が選ぶと「じゅんびOK！」。Start / Enter でステージセレクトへ
-//   - 各枠は Y / RB（キーボードは C・Tab）で「キャラ → パッシブ → ハンマー性能 → 必殺技」と表示が切り替わる（LB / Q で戻る）
+//   - （showCharacterInfo がオンのときだけ。今はオフ）各枠は Y / RB（キーボードは C・Tab）で「キャラ → パッシブ → ハンマー性能 → 必殺技」と表示が切り替わる（LB / Q で戻る）
 //     枠の下の丸をカーソルで押しても切り替わる（CPU の枠も見られる）。中身は CharacterData に書く
 // ・ステージセレクト（ローカル。stageVote がオフ）：画面右にステージが並び、えらべるのは 1P（一番小さい番号のプレイヤー）だけ
 //   1P のカーソルが乗っているステージが画面左にプレビューされる（右スティック / IJKL で見回せる。触らなければゆっくり回る）
@@ -49,6 +49,8 @@ public class MatchSelect : MonoBehaviour
     [SerializeField, Range(1, 20)] int stageColumns = 7;
     [Tooltip("オン：全員が投票して抽選で決める（オンライン用）。オフ：1P だけがえらび、左に動かせるプレビューが出る（ローカル）")]
     [SerializeField] bool stageVote = false;
+    [Tooltip("キャラクターセレクトの枠で、Y でパッシブ・ハンマー性能・必殺技の説明に切り替えられるようにする（今は出さない）")]
+    [SerializeField] bool showCharacterInfo = false;
 
     [Header("ルール")]
     [SerializeField, Range(1, 8)] int maxPlayers = 4;
@@ -316,7 +318,7 @@ public class MatchSelect : MonoBehaviour
             : phase == Phase.Rule
             ? "↑↓ / A：項目をえらぶ　←→：切り替え　Start：キャラクターセレクトへ　B：モードセレクトへ"
             : phase == Phase.Character
-            ? "A：参加・えらぶ・CPUのコインをつかむ　B：取り消し・抜ける　Y：せつめい切り替え　Start：次へ"
+            ? "A：参加・えらぶ・CPUのコインをつかむ　B：取り消し・抜ける　" + (showCharacterInfo ? "Y：せつめい切り替え　" : "") + "Start：次へ"
             : phase == Phase.Stage && !stageVote ? "A：決定　B：キャラクターセレクトへ　右スティック（IJKL）：ステージを見回す　えらべるのは " + (Chooser() != null ? Chooser().Label : "1P") + " だけ"
             : phase == Phase.Stage ? "A：投票　B：取り消し（投票していなければキャラクターセレクトへ）　全員が投票したら抽選！"
             : "";
@@ -538,7 +540,7 @@ public class MatchSelect : MonoBehaviour
             MoveCursor(p, s, dt);
 
             // Y / RB（キーボードは C・Tab）で次、LB（Q）で前の表示へ（自分の枠だけ）
-            if (s.next || s.prev) TurnPage(panels[p.index], s.next ? 1 : -1);
+            if (showCharacterInfo && (s.next || s.prev)) TurnPage(panels[p.index], s.next ? 1 : -1);
 
             if (s.start && ready && p.holding == null) { MenuSounds.Decide(); GoToStageSelect(); return; }
             if (s.a) PressA(p);
@@ -580,7 +582,7 @@ public class MatchSelect : MonoBehaviour
             var ui = panels[i];
             if (Hit(ui.typeButton.rectTransform, p.cursor)) { ToggleSlot(p, i); return; }
             // 枠の下の丸：カーソルで押しても表示が切り替わる（CPU の枠もこれで見られる）
-            if (slots[i] != null && Hit(ui.dotsRow, p.cursor)) { TurnPage(ui, 1); return; }
+            if (showCharacterInfo && slots[i] != null && Hit(ui.dotsRow, p.cursor)) { TurnPage(ui, 1); return; }
             var cpu = slots[i];
             if (cpu != null && cpu.IsCpu && ui.levelRow.gameObject.activeSelf)
             {
@@ -1208,7 +1210,7 @@ public class MatchSelect : MonoBehaviour
             ui.typeText.text = !used ? "なし" : cpu ? "CPU" : "プレイヤー";
             ui.typeButton.color = !used ? new Color(0.75f, 0.73f, 0.72f) : cpu ? CpuColor : PlayerColors[i % PlayerColors.Length];
             // キャラ（0）以外の表示のときは、顔・名前の代わりに説明を出す
-            int page = used ? ui.page : 0;
+            int page = used && showCharacterInfo ? ui.page : 0;
             bool chara = page == 0;
             bool okNow = used && p.HasCharacter && p.heldBy == null;
             ui.join.gameObject.SetActive(!used);
@@ -1218,7 +1220,7 @@ public class MatchSelect : MonoBehaviour
             ui.portrait.gameObject.SetActive(used && chara);
             ui.ok.gameObject.SetActive(okNow);
             ui.okSmall.gameObject.SetActive(okNow && !chara);
-            ui.dotsRow.gameObject.SetActive(used);
+            ui.dotsRow.gameObject.SetActive(used && showCharacterInfo);
             ui.info.gameObject.SetActive(used && !chara);
             for (int d = 0; d < ui.dots.Length; d++)
             {
@@ -1482,6 +1484,7 @@ public class MatchSelect : MonoBehaviour
         foreach (var b in floaters) b.Rotate(new Vector3(0.3f, 0.7f, 0.2f), 12f * Time.unscaledDeltaTime);
         cam.transform.position = new Vector3(Mathf.Sin(t * 0.13f) * 0.3f, 3f + Mathf.Sin(t * 0.17f) * 0.1f, -10f);
         cam.transform.LookAt(new Vector3(0f, 3f, 5f));
+        cam.fieldOfView = ToyKit.FitFov(45f, cam.aspect);   // どの縦横比でも左右の範囲は同じ
     }
 
     // ローカルのステージセレクトの左半分：動かせるプレビュー・ステージ名・説明

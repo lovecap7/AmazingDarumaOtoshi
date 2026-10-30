@@ -351,7 +351,7 @@ public partial class ClubOpeningMovie : MonoBehaviour
             movieCam.transform.LookAt(camLook(lt) + shake * 0.5f);
             // 当たった瞬間にグッと寄る（ズームパンチ）
             fovPunch = Mathf.MoveTowards(fovPunch, 0f, Time.unscaledDeltaTime * 45f);
-            movieCam.fieldOfView = shotFov - fovPunch;
+            movieCam.fieldOfView = ToyKit.FitFov(shotFov - fovPunch, movieCam.aspect);
         }
         UpdateRushFx();
     }
@@ -374,7 +374,7 @@ public partial class ClubOpeningMovie : MonoBehaviour
         camPos = pos;
         camLook = look;
         shotStart = mt;
-        movieCam.fieldOfView = fov;
+        movieCam.fieldOfView = ToyKit.FitFov(fov, movieCam.aspect);
         shotFov = fov;
     }
 

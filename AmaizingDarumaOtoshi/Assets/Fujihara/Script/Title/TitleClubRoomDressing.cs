@@ -66,6 +66,10 @@ public class TitleClubRoomDressing : MonoBehaviour
         root.position = roomOffset;
         BuildTable();
         BuildMembers();
+
+        // 部屋（窓枠・天井・横断幕・ロッカーなど）の影が作業台の上のロゴ・ボタン・看板に重なって見づらいので、部屋は影を落とさない
+        // （作業台の上の物どうしの影はそのまま）
+        foreach (var r in root.GetComponentsInChildren<Renderer>(true)) r.shadowCastingMode = ShadowCastingMode.Off;
     }
 
     // ================= 光 =================

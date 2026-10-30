@@ -70,6 +70,26 @@ public class MainMenu : MonoBehaviour
              "得点板とノートは、映す項目が変わるたびにページがめくれる")]
     [SerializeField] BoardLook boardLook = BoardLook.ScoreBoard;
 
+    [Header("ハンマーの位置のずらし（項目ごと。再生中に変えてもすぐ反映される。x：右　y：上　z：奥）")]
+    [SerializeField] Vector3 hammerOffsetBattle = Vector3.zero;
+    [SerializeField] Vector3 hammerOffsetSound = Vector3.zero;
+    [SerializeField] Vector3 hammerOffsetVideo = Vector3.zero;
+    [SerializeField] Vector3 hammerOffsetCredits = Vector3.zero;
+    [SerializeField] Vector3 hammerOffsetQuit = Vector3.zero;
+
+    [Header("カメラ（再生中に変えてもすぐ反映される）")]
+    [Tooltip("ふだん：左の山と右の看板")]
+    [SerializeField] Shot browseShot = new Shot { look = new Vector3(-0.55f, 2.8f, 0.5f), distance = 11f, width = 13.6f };
+    [Tooltip("サウンド・ビデオを操作しているとき：看板と、上に乗った積み木")]
+    [SerializeField] Shot panelShot = new Shot { look = new Vector3(2.9f, 2.9f, 1f), distance = 10f, width = 12.5f };
+    [Tooltip("たたかうで、ローカル／オンラインを選んでいるとき：2つの積み木（下まで）と看板")]
+    [SerializeField] Shot choiceShot = new Shot { look = new Vector3(2.5f, 2.1f, 0.3f), distance = 10f, width = 13.5f };
+    [Tooltip("見下ろす具合（距離 1 あたりのカメラの高さ。0 で見る点と同じ高さから水平に見る）")]
+    [SerializeField, Range(-0.3f, 0.5f)] float camRise = 0.03f;
+
+    [Tooltip("部屋を斜めから見る角度。カメラを右へ回り込ませて左を向かせ、積み木・看板・ハンマーも一緒に回してカメラの正面に向ける")]
+    [SerializeField, Range(-45f, 45f)] float viewYaw = 18f;
+
     const int Battle = 0, Sound = 1, Video = 2, Credits = 3, Quit = 4;
     static readonly Vector3 BlockSize = new Vector3(2.6f, 0.72f, 1.1f);
     const float BoardDepth = 0.3f;
@@ -96,6 +116,9 @@ public class MainMenu : MonoBehaviour
     ToyKit.Fx fx;
     ToyKit.Face face;
     Transform hammer, board;
+    // メニューの物（積み木・顔・ハンマー・看板）とカメラを入れる空間。原点を中心に viewYaw だけ回してある
+    // 中の位置はすべてこの空間での位置（前と同じ数字のまま）。部屋（TitleClubRoomDressing）は回さない
+    Transform space;
     Light boardLight;
     Transform[] blocks;
     Material[] blockMats;
@@ -131,10 +154,20 @@ public class MainMenu : MonoBehaviour
 
     // ---- カメラ ----
     Vector3 camPos, camLook;
-    float camFov = 40f, shake;
-    static readonly Vector3 BrowsePos = new Vector3(-0.3f, 2.5f, -10.5f), BrowseLook = new Vector3(-0.3f, 2.2f, 0.5f);
-    static readonly Vector3 PanelPos = new Vector3(1.9f, 3.0f, -8.2f), PanelLook = new Vector3(2.4f, 2.9f, 1f);
-    static readonly Vector3 ChoicePos = new Vector3(2.1f, 2.05f, -7.6f), ChoiceLook = new Vector3(2.1f, 1.7f, 1f);   // ローカル／オンラインの積み木と看板を正面から
+    float camDist, camWidth, shake;
+
+    // 構図（メニューの空間で）：見る点・距離・横に映す幅（見る点の奥行きで）
+    // 横の幅で決めるので、画面の縦横比が変わっても左右の収まりは変わらない（画角は縦横比から求める）
+    [Serializable]
+    public struct Shot
+    {
+        [Tooltip("カメラが見る点（画面の真ん中に来る）。x：右　y：上　z：奥")]
+        public Vector3 look;
+        [Tooltip("見る点からカメラまでの距離。近いほど遠近感が強く、遠いほど正面から見たように平たくなる")]
+        public float distance;
+        [Tooltip("見る点の奥行きで、画面の左右に映す幅。小さいほど寄る")]
+        public float width;
+    }
 
     // ---- UI ----
     RectTransform overlay;
@@ -173,8 +206,9 @@ public class MainMenu : MonoBehaviour
     void Start()
     {
         BuildStage();
-        camPos = BrowsePos; camLook = BrowseLook;
-        hammerPos = ToyKit.HammerPivot(Contact(cursor), hammerScale);
+        camLook = browseShot.look; camDist = browseShot.distance; camWidth = browseShot.width;
+        camPos = CamPosition();
+        hammerPos = HammerSpot(cursor);
 
         int n = blocks.Length;
         dropAt = new float[n];
@@ -197,7 +231,14 @@ public class MainMenu : MonoBehaviour
     }
 
     // 始まりの間、ハンマーは画面の左の外で待つ
-    Vector3 OffscreenHammer() => ToyKit.HammerPivot(Contact(cursor), hammerScale) + new Vector3(-8f, 0f, 0f);
+    Vector3 OffscreenHammer() => HammerSpot(cursor) + new Vector3(-8f, 0f, 0f);
+
+    // 項目 i の横で構えるハンマーの位置（Inspector の「ハンマーの位置のずらし」を足す）
+    Vector3 HammerSpot(int i)
+    {
+        var offsets = new[] { hammerOffsetBattle, hammerOffsetSound, hammerOffsetVideo, hammerOffsetCredits, hammerOffsetQuit };
+        return ToyKit.HammerPivot(Contact(i), hammerScale) + (i >= 0 && i < offsets.Length ? offsets[i] : Vector3.zero);
+    }
 
     // 降ってくる高さ（0 で着地）
     float DropOffset(float at)
@@ -217,14 +258,14 @@ public class MainMenu : MonoBehaviour
         {
             if (dropLanded[i] || sim < dropAt[i] + DropFall) continue;
             dropLanded[i] = true;
-            ToyKit.Emit(fx.puff, Slot(i) - Vector3.up * BH * 0.5f, Quaternion.Euler(-90f, 0f, 0f), 6);
+            Emit(fx.puff, Slot(i) - Vector3.up * BH * 0.5f, Quaternion.Euler(-90f, 0f, 0f), 6);
             shake = Mathf.Max(shake, 0.2f);
             MenuSounds.Play(MatchSounds.Instance.BlockHitBlock, 0.7f);
         }
         if (!headDropLanded && sim >= headDropAt + DropFall)
         {
             headDropLanded = true;
-            ToyKit.Emit(fx.sparkle, new Vector3(stackX, labels.Length * BH + ToyKit.HeadR, 0f), Quaternion.Euler(-90f, 0f, 0f), 14);
+            Emit(fx.sparkle, new Vector3(stackX, labels.Length * BH + ToyKit.HeadR, 0f), Quaternion.Euler(-90f, 0f, 0f), 14);
             shake = Mathf.Max(shake, 0.3f);
             MenuSounds.Play(MatchSounds.Instance.BlockHitBlock, 0.9f);
         }
@@ -248,6 +289,8 @@ public class MainMenu : MonoBehaviour
         var blockMesh = ToyKit.RoundedBox(new Vector3(ToyKit.BlockW, ToyKit.BlockH, ToyKit.BlockD), 0.14f, 10);
         menuMesh = ToyKit.RoundedBox(BlockSize, 0.16f, 10);
         letterMat = ToyKit.LetterMaterial(font);
+        space = new GameObject("MenuSpace").transform;
+        space.rotation = Quaternion.Euler(0f, -viewYaw, 0f);
 
         cam = ToyKit.CreateCamera();
         ToyKit.CreateLights();
@@ -267,6 +310,7 @@ public class MainMenu : MonoBehaviour
         {
             blockColors[i] = colors[i % colors.Length];
             blocks[i] = ToyKit.CreateBlock(labels[i], blockColors[i], menuMesh, new Vector2(2.3f, 0.6f), BlockSize.z, font, letterMat, out blockMats[i]);
+            blocks[i].SetParent(space, false);
             blocks[i].gameObject.AddComponent<BoxCollider>().size = BlockSize;
             scaleNow[i] = 1f;
         }
@@ -282,13 +326,16 @@ public class MainMenu : MonoBehaviour
         for (int i = 0; i < 2; i++)
         {
             choiceBlocks[i] = ToyKit.CreateBlock(ChoiceLabels[i], choiceColors[i], menuMesh, new Vector2(2.3f, 0.6f), BlockSize.z, font, letterMat, out choiceMats[i]);
+            choiceBlocks[i].SetParent(space, false);
             choiceBlocks[i].gameObject.AddComponent<BoxCollider>().size = BlockSize;
             choiceBlocks[i].gameObject.SetActive(false);
             choiceScale[i] = 1f;
         }
 
         face = ToyKit.CreateHead();
+        face.root.SetParent(space, false);
         hammer = ToyKit.CreateHammer();
+        hammer.SetParent(space, false);
         hammer.localScale = Vector3.one * hammerScale;
 
         BuildBoard();
@@ -299,7 +346,8 @@ public class MainMenu : MonoBehaviour
     void BuildBoard()
     {
         board = new GameObject("Board").transform;
-        board.position = boardCenter;
+        board.SetParent(space, false);
+        board.localPosition = boardCenter;
         if (boardLook == BoardLook.ScoreBoard) BuildScoreBoard();
         else if (boardLook == BoardLook.Notebook) BuildNotebook();
         else BuildWhiteboard();
@@ -312,8 +360,9 @@ public class MainMenu : MonoBehaviour
         boardLight.innerSpotAngle = 35f;
         boardLight.range = 20f;
         boardLight.intensity = 0f;
-        boardLight.transform.position = boardCenter + new Vector3(-1f, 4.5f, -5f);
-        boardLight.transform.LookAt(boardCenter);
+        boardLight.transform.SetParent(space, false);
+        boardLight.transform.localPosition = boardCenter + new Vector3(-1f, 4.5f, -5f);
+        boardLight.transform.localRotation = Quaternion.LookRotation(new Vector3(1f, -4.5f, 5f));
 
         // 表面の UI
         var canvasGo = new GameObject("BoardUI", typeof(RectTransform));
@@ -428,7 +477,7 @@ public class MainMenu : MonoBehaviour
     void BuildNotebook()
     {
         float w = boardSize.x, h = boardSize.y, front = -BoardDepth * 0.5f;
-        board.rotation = Quaternion.Euler(8f, 0f, 0f);
+        board.localRotation = Quaternion.Euler(8f, 0f, 0f);
         var wood = ToyKit.Lit(new Color(0.8f, 0.6f, 0.4f), 0.4f);
         var cover = ToyKit.Lit(new Color(0.24f, 0.42f, 0.72f), 0.35f);
         var paper = ToyKit.Lit(new Color(1f, 0.99f, 0.96f), 0.15f);
@@ -452,7 +501,7 @@ public class MainMenu : MonoBehaviour
         var stand = new GameObject("Stand").transform;
         stand.SetParent(board, false);
         stand.localPosition = new Vector3(0f, -h * 0.5f - 0.1f, front + 0.05f);
-        stand.rotation = Quaternion.identity;
+        stand.rotation = space.rotation;
         Part(ToyKit.RoundedBox(new Vector3(w + 0.4f, 0.16f, 0.55f), 0.05f, 4), "Ledge", wood, new Vector3(0f, 0f, -0.1f), stand);
         Part(ToyKit.RoundedBox(new Vector3(w + 0.4f, 0.1f, 0.18f), 0.04f, 4), "Lip", wood, new Vector3(0f, 0.11f, -0.32f), stand);
         float legH = stand.position.y;   // 棚から机まで
@@ -460,7 +509,8 @@ public class MainMenu : MonoBehaviour
             Part(ToyKit.RoundedBox(new Vector3(0.16f, legH, 0.16f), 0.04f, 4), "Leg", wood, new Vector3(x, -legH * 0.5f, 0f), stand);
         // 支えの板：ノートの裏の真ん中あたりから、後ろの机まで
         Vector3 a = board.TransformPoint(new Vector3(0f, 0f, front + 0.22f));
-        Vector3 b = new Vector3(a.x, 0f, a.z + 1.3f);
+        Vector3 b = a + space.forward * 1.3f;
+        b.y = 0f;
         var prop = Part(ToyKit.RoundedBox(new Vector3(w * 0.4f, 0.08f, (a - b).magnitude), 0.03f, 3), "Prop", wood, Vector3.zero, stand);
         prop.SetPositionAndRotation((a + b) * 0.5f, Quaternion.LookRotation(a - b));
 
@@ -606,8 +656,8 @@ public class MainMenu : MonoBehaviour
         yield return Swing(0.22f, -82f);
         MenuSounds.Play(MatchSounds.Instance.KO);   // 叩き飛ばした瞬間に撃墜の音
         var contact = ChoiceContact(index);
-        ToyKit.Emit(fx.confetti, contact, Quaternion.Euler(-30f, 90f, 0f), 45);
-        ToyKit.Emit(fx.sparkle, contact, Quaternion.Euler(0f, 90f, 0f), 20);
+        Emit(fx.confetti, contact, Quaternion.Euler(-30f, 90f, 0f), 45);
+        Emit(fx.sparkle, contact, Quaternion.Euler(0f, 90f, 0f), 20);
         shake = Mathf.Max(shake, 0.6f);
         post.chroma.intensity.value = 0.5f;
         SlowMo(0.15f, 0.08f);
@@ -658,7 +708,7 @@ public class MainMenu : MonoBehaviour
             {
                 // ドスン
                 choiceLanded[i] = true;
-                ToyKit.Emit(fx.puff, slot - Vector3.up * BH * 0.5f, Quaternion.Euler(-90f, 0f, 0f), 8);
+                Emit(fx.puff, slot - Vector3.up * BH * 0.5f, Quaternion.Euler(-90f, 0f, 0f), 8);
                 shake = Mathf.Max(shake, 0.3f);
                 MenuSounds.Play(MatchSounds.Instance.BlockHitBlock, 0.7f);
             }
@@ -690,8 +740,8 @@ public class MainMenu : MonoBehaviour
                 rot = Quaternion.Euler(0f, 0f, -540f * f);
             }
 
-            b.position = pos;
-            b.rotation = rot;
+            b.localPosition = pos;
+            b.localRotation = rot;
             b.localScale = s;
             float glow = isCursor ? 0.08f + 0.05f * Mathf.Sin(Time.unscaledTime * 5f) : 0f;
             choiceMats[i].SetColor("_EmissionColor", Color.white * glow);
@@ -721,8 +771,8 @@ public class MainMenu : MonoBehaviour
         MenuSounds.Play(MatchSounds.Instance.KO);
         boardPunch = sim;
         shake = Mathf.Max(shake, 0.5f);
-        ToyKit.Emit(fx.confetti, boardCenter + new Vector3(0f, 0.5f, -0.5f), Quaternion.Euler(-60f, 0f, 0f), 50);
-        ToyKit.Emit(fx.sparkle, boardCenter + new Vector3(0f, 0f, -0.5f), Quaternion.Euler(0f, 180f, 0f), 20);
+        Emit(fx.confetti, boardCenter + new Vector3(0f, 0.5f, -0.5f), Quaternion.Euler(-60f, 0f, 0f), 50);
+        Emit(fx.sparkle, boardCenter + new Vector3(0f, 0f, -0.5f), Quaternion.Euler(0f, 180f, 0f), 20);
         yield return new WaitForSecondsRealtime(0.45f);
         Fader.Load(scene);
     }
@@ -997,8 +1047,8 @@ public class MainMenu : MonoBehaviour
         yield return Swing(0.22f, -82f);
 
         var contact = Contact(index);
-        ToyKit.Emit(fx.confetti, contact, Quaternion.Euler(-30f, 90f, 0f), 35);
-        ToyKit.Emit(fx.sparkle, contact, Quaternion.Euler(0f, 90f, 0f), 18);
+        Emit(fx.confetti, contact, Quaternion.Euler(-30f, 90f, 0f), 35);
+        Emit(fx.sparkle, contact, Quaternion.Euler(0f, 90f, 0f), 18);
         shake = Mathf.Max(shake, 0.5f);
         post.chroma.intensity.value = 0.4f;
         SlowMo(0.15f, 0.07f);
@@ -1106,7 +1156,8 @@ public class MainMenu : MonoBehaviour
         bool panel = phase == Phase.Panel;
         bool choosing = phase == Phase.Choose || phase == Phase.ChoiceLeaving;
         dim = Mathf.MoveTowards(dim, panel || phase == Phase.Credits ? 1f : choosing ? 0.6f : 0f, dt * 3f);
-        panelLit = Mathf.MoveTowards(panelLit, panel ? 1f : 0f, dt * 3f);
+        // 看板を照らす：サウンド・ビデオの操作中と、たたかうでローカル／オンラインを選んでいる間（看板に選んでいる方の説明が出る）
+        panelLit = Mathf.MoveTowards(panelLit, panel || choosing ? 1f : 0f, dt * 3f);
 
         UpdateBlocks();
         UpdateChoices();
@@ -1213,8 +1264,8 @@ public class MainMenu : MonoBehaviour
                 }
             }
 
-            b.position = pos;
-            b.rotation = rot;
+            b.localPosition = pos;
+            b.localRotation = rot;
             b.localScale = s;
 
             // 看板を操作している間、左の山は暗くなる（看板に乗った積み木は明るいまま）
@@ -1231,8 +1282,8 @@ public class MainMenu : MonoBehaviour
         phase = Phase.Panel;
         dockTime = sim;
         boardPunch = sim;
-        ToyKit.Emit(fx.puff, Dock() - Vector3.up * BH * 0.5f, Quaternion.Euler(-90f, 0f, 0f), 8);
-        ToyKit.Emit(fx.sparkle, Dock(), Quaternion.Euler(-90f, 0f, 0f), 14);
+        Emit(fx.puff, Dock() - Vector3.up * BH * 0.5f, Quaternion.Euler(-90f, 0f, 0f), 8);
+        Emit(fx.sparkle, Dock(), Quaternion.Euler(-90f, 0f, 0f), 14);
         shake = Mathf.Max(shake, 0.25f);
 
         var first = outIdx == Battle ? battleFirst : outIdx == Sound ? soundFirst : videoFirst;
@@ -1263,8 +1314,8 @@ public class MainMenu : MonoBehaviour
         // 始まり：顔は最後に降ってきて、ぽよんとつぶれる
         y += DropOffset(headDropAt);
         s = Vector3.Scale(s, ToyKit.SquashVec(ToyKit.Squash((sim - headDropAt - DropFall) / 0.45f, 0.3f)));
-        f.root.position = new Vector3(stackX, y, 0f);
-        f.root.rotation = headRot;
+        f.root.localPosition = new Vector3(stackX, y, 0f);
+        f.root.localRotation = headRot;
         f.root.localScale = s;
         Color c = new Color(0.99f, 0.85f, 0.18f);
         f.body.SetColor("_BaseColor", Color.Lerp(c, c * 0.5f, dim));
@@ -1282,9 +1333,13 @@ public class MainMenu : MonoBehaviour
         bool choosing = phase == Phase.Choose || phase == Phase.ChoiceLeaving;
         if (phase == Phase.Intro) hammerPos = OffscreenHammer();
         else if (!swinging && phase != Phase.Leaving && !(phase == Phase.ChoiceLeaving && choiceOut >= 0))
-            hammerPos = Vector3.Lerp(hammerPos, ToyKit.HammerPivot(choosing ? ChoiceContact(choiceCursor) : Contact(cursor), hammerScale), 1f - Mathf.Exp(-12f * Time.deltaTime));
-        hammer.position = hammerPos;
-        hammer.rotation = Quaternion.Euler(0f, hammerYaw, 0f);
+            hammerPos = Vector3.Lerp(hammerPos, choosing ? ToyKit.HammerPivot(ChoiceContact(choiceCursor), hammerScale) : HammerSpot(cursor), 1f - Mathf.Exp(-12f * Time.deltaTime));
+        hammer.localPosition = hammerPos;
+        // どの段（ローカル／オンラインも）にいても、一番下（やめる）にいるときと同じ角度で見えるように、
+        // カメラから見た方向の違いの分だけ傾ける（上の段ほど、少し上から見下ろした向きに起こす）
+        Vector3 refPos = HammerSpot(labels.Length - 1);
+        var tilt = Quaternion.FromToRotation(refPos - camPos, hammerPos - camPos);
+        hammer.localRotation = tilt * Quaternion.Euler(0f, hammerYaw, 0f);
     }
 
     void UpdateBoard(float dt)
@@ -1339,6 +1394,11 @@ public class MainMenu : MonoBehaviour
         }
     }
 
+    // 粒を出す（位置と向きはメニューの空間で）
+    void Emit(ParticleSystem ps, Vector3 pos, Quaternion rot, int count) => ToyKit.Emit(ps, space.TransformPoint(pos), space.rotation * rot, count);
+
+    Vector3 CamPosition() => camLook + new Vector3(0f, camDist * camRise, -camDist);
+
     static void Fade(CanvasGroup g, bool on, float dt) => g.alpha = Mathf.MoveTowards(g.alpha, on ? 1f : 0f, dt * 6f);
 
     void UpdateCamera(float dt)
@@ -1346,20 +1406,24 @@ public class MainMenu : MonoBehaviour
         bool focusBoard = phase == Phase.Panel || phase == Phase.Flying;
         // ローカル／オンラインを選んでいる間は、2つの積み木と看板に寄る
         bool focusChoice = phase == Phase.Choose || phase == Phase.ChoiceLeaving;
-        Vector3 pos = focusChoice ? ChoicePos : focusBoard ? PanelPos : BrowsePos;
-        Vector3 look = focusChoice ? ChoiceLook : focusBoard ? PanelLook : BrowseLook;
+        Shot shot = focusChoice ? choiceShot : focusBoard ? panelShot : browseShot;
         float k = 1f - Mathf.Exp(-3.5f * dt);
-        camPos = Vector3.Lerp(camPos, pos, k);
-        camLook = Vector3.Lerp(camLook, look, k);
-        camFov = Mathf.Lerp(camFov, focusChoice || focusBoard ? 38f : 40f, k);
+        camLook = Vector3.Lerp(camLook, shot.look, k);
+        camDist = Mathf.Lerp(camDist, shot.distance, k);
+        camWidth = Mathf.Lerp(camWidth, shot.width, k);
+        camPos = CamPosition();
 
+        // 揺れは距離に合わせて大きくし、画面の上ではいつも同じくらいに見せる
         float tt = Time.unscaledTime;
+        float far = camDist / 11f;
         Vector3 drift = new Vector3(Mathf.PerlinNoise(tt * 0.21f, 1.3f) - 0.5f, Mathf.PerlinNoise(2.7f, tt * 0.17f) - 0.5f, 0f) * 0.1f;
         shake = Mathf.Max(0f, shake - dt * 2.2f);
         Vector3 jolt = UnityEngine.Random.insideUnitSphere * 0.08f * shake * shake;
-        cam.transform.position = camPos + drift + jolt;
-        cam.transform.LookAt(camLook + drift * 0.5f);
-        cam.fieldOfView = camFov;
+        // カメラもメニューの空間に置く（部屋から見ると、右に回り込んで左を向いている）
+        cam.transform.position = space.TransformPoint(camPos + (drift + jolt) * far);
+        cam.transform.LookAt(space.TransformPoint(camLook + drift * 0.5f));
+        float halfW = camWidth * 0.5f / camDist;
+        cam.fieldOfView = 2f * Mathf.Atan(halfW / Mathf.Max(0.1f, cam.aspect)) * Mathf.Rad2Deg;
 
         // クレジット中は全体を大きくボカす
         bool blurAll = phase == Phase.Credits || credits.IsBusy;
@@ -1385,7 +1449,7 @@ public class MainMenu : MonoBehaviour
     Vector3 Dock()
     {
         var top = new Vector3(-boardSize.x * 0.5f + BlockSize.x * 0.65f, boardSize.y * 0.5f + boardTop, 0f);
-        Vector3 p = board != null ? board.position + board.rotation * top : boardCenter + top;
+        Vector3 p = board != null ? board.localPosition + board.localRotation * top : boardCenter + top;
         return p + Vector3.up * BH * 0.5f;
     }
 
