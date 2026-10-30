@@ -44,7 +44,8 @@ public class MatchDebugView : MonoBehaviour
 
     void MakeTags()
     {
-        foreach (var p in m_director.Players) m_tags.Add(MakeTag(p));
+        // ネット対戦用(suehara): やり直しで Started が何度も来ても、同じ人の名札は1つだけ
+        foreach (var p in m_director.Players) if (!m_tags.Exists(t => t.player == p)) m_tags.Add(MakeTag(p));
     }
 
     void Update()

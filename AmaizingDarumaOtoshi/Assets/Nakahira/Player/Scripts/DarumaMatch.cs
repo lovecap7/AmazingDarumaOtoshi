@@ -138,6 +138,12 @@ namespace Nakahira
         // カウントダウンの残り(秒)と、全体の秒数
         public float CountdownLeft => Mathf.Max(0f, m_countdownLeft);
         public float CountdownLength => m_countdownLength;
+        // ネット対戦用(suehara): ネット対戦の試合か(同じ GameObject に INetMatchDriver がある)
+        public bool IsNetworked => m_net != null;
+        // ネット対戦のクライアントか(試合を進めず、ホストから届いた内容を見せるだけ)
+        public bool IsNetClient => m_net != null && !m_net.IsServer;
+        // ネット対戦で、ホストが試合を始める前か。この間は時間が進まず、やられても少ししてから復活し、試合は終わらない
+        public bool IsNetWaiting => m_net != null && !m_netStarted;
 
         // ---- お知らせ ----
         public event Action Started;
@@ -179,6 +185,9 @@ namespace Nakahira
         float m_finishTime = -1f;
         bool m_leaving;
         float m_countdownLeft, m_countdownLength;
+        // ネット対戦用(suehara)
+        INetMatchDriver m_net;
+        bool m_netStarted;
 
         private void Awake()
         {
@@ -190,11 +199,14 @@ namespace Nakahira
             m_settings = MatchSettings.Instance;
             if (m_settings == null) m_settings = ScriptableObject.CreateInstance<MatchSettings>();
 
+            // ネット対戦用(suehara): 接続した人が出るので、セレクトの内容もボタンを押した人の途中参加も使わない
+            m_net = GetComponent<INetMatchDriver>();
+
             // セレクト画面で決めた内容があれば、その内容で試合をする(ボタンを押した人の途中参加は止める)
-            IsConfigured = MatchSetup.Players.Count > 0;
+            IsConfigured = m_net == null && MatchSetup.Players.Count > 0;
             m_rules = IsConfigured ? MatchSetup.Rules : DirectRules();
             m_timeLimit = Rules.TimeLimit;
-            if (IsConfigured && m_inputManager != null)
+            if ((IsConfigured || m_net != null) && m_inputManager != null)
             {
                 m_inputManager.DisableJoining();
                 m_inputManager.enabled = false;
@@ -225,17 +237,22 @@ namespace Nakahira
 
         private void Start()
         {
+            // ネット対戦用(suehara): 出る人は接続してから AddNetPlayer で足す
+            if (m_net != null) return;
             if (IsConfigured) StartConfigured();
             else StartDirect();
         }
 
         private void Update()
         {
+            // ネット対戦用(suehara): クライアントは試合を進めない(時間・結果はホストから届く)
+            if (IsNetClient) return;
             UpdateMatch();
         }
 
         private void LateUpdate()
         {
+            if (IsNetClient) return;
             LateUpdateMatch();
         }
 
@@ -467,6 +484,8 @@ namespace Nakahira
         void SpawnMatchCharacter(MatchPlayer p, Vector3 pos, bool invincible)
         {
             var c = Instantiate(CharacterPrefab(p), pos, FacingCenter(pos));
+            // ネット対戦用(suehara): 全員に配る
+            m_net?.OnBodySpawned(c.gameObject);
             if (invincible) c.SetInvincible(IsConfigured ? m_settings.respawnInvincibleTime : m_reviveInvincibleTime);
 
             m_owners[c] = p;
@@ -510,7 +529,8 @@ namespace Nakahira
             // カウントダウン中は時間を進めない
             if (UpdateCountdown()) return;
 
-            Elapsed += Time.deltaTime;
+            // ネット対戦用(suehara): 開始待ちの間は時間を進めない
+            if (!IsNetWaiting) Elapsed += Time.deltaTime;
 
             // 復活待ち
             foreach (var p in m_players)
@@ -658,6 +678,12 @@ namespace Nakahira
             if (!m_owners.TryGetValue(c, out var p)) return;
             m_owners.Remove(c);
             if (Result != null) return;
+            // ネット対戦用(suehara): 開始待ちの間は、モードにかかわらず少ししてから復活するだけ
+            if (IsNetWaiting)
+            {
+                p.SetRespawning(m_settings.respawnDelay);
+                return;
+            }
 
             p.CountFall();
             m_hits.Add(new Hit { victim = p, head = true });
@@ -691,6 +717,8 @@ namespace Nakahira
             if (GhostPrefab == null) { p.SetOut(p.OutOrder); return; }
             if (m_stageArea != null) pos = m_stageArea.Clamp(pos, 0.5f);
             var ghost = Instantiate(GhostPrefab, pos, Quaternion.identity);
+            // ネット対戦用(suehara): 全員に配る
+            m_net?.OnBodySpawned(ghost.gameObject);
             ghost.Init(m_stageArea);
             ghost.ReviveRequested += g =>
             {
@@ -730,7 +758,8 @@ namespace Nakahira
 
         void Finish(FinishReason reason)
         {
-            if (Result != null) return;
+            // ネット対戦用(suehara): 開始待ちの間は終わらない
+            if (Result != null || IsNetWaiting) return;
             ProcessHits();   // このフレームの点数を先に入れる
             m_timeUpFinish = reason == FinishReason.TimeUp;
 
@@ -780,7 +809,8 @@ namespace Nakahira
             float t = Time.unscaledTime - m_finishTime;
             if (t > m_settings.resultTime || (t > 1f && PressedStart()))
             {
-                if (IsConfigured) BackToSelect();
+                if (m_net != null) BeginNetMatch();   // ネット対戦用(suehara): シーンを読み直さずにもう一度
+                else if (IsConfigured) BackToSelect();
                 else Restart();
             }
         }
@@ -788,6 +818,12 @@ namespace Nakahira
         // 同じシーンを読み直して、試合をやり直す(直接再生。参加していた人はボタンを押して参加し直す)
         public void Restart()
         {
+            // ネット対戦用(suehara): シーンは全員で共有しているので読み直さず、その場でやり直す
+            if (m_net != null)
+            {
+                BeginNetMatch();
+                return;
+            }
             if (m_leaving) return;
             m_leaving = true;
             BeforeRestart?.Invoke();
@@ -813,6 +849,129 @@ namespace Nakahira
             m_leaving = true;
             Time.timeScale = 1f;
             Fader.Load(SelectSceneName);
+        }
+
+        //========================================
+        // ネット対戦用(suehara)。ローカルの試合では使わない
+        //  ・ホスト      : 試合はここでいつもどおり進める。出る人は接続した人(AddNetPlayer)。
+        //                  始め方・やり直しは BeginNetMatch(シーンは読み直さない)。それまでは開始待ち(IsNetWaiting)
+        //  ・クライアント: 試合を進めない。ホストから届いた人・時間・結果を NetClient〜 で入れ、お知らせを出す
+        //                  (HUD・カメラ・カウントダウンの表示は、いつもどおりここを読めばよい)
+        //========================================
+
+        // ネット対戦のクライアントに届けるお知らせの種類
+        internal enum NetEvent : byte { Knocked, KO, RespawnAppearing, Respawned, Out, Scored }
+
+        // 試合のルールを決める(ホストは試合を始める前に、クライアントはホストから届いたら)
+        public void SetNetRules(MatchSetup.MatchRules rules)
+        {
+            m_rules = rules;
+            m_timeLimit = rules.TimeLimit;
+        }
+
+        // ホスト: 接続した人を参加させ、キャラクターを出す
+        public void AddNetPlayer(MatchPlayer p, MatchSetup.Entry entry, IDarumaCommandSource source)
+        {
+            if (m_net == null || m_players.Contains(p)) return;
+            p.Setup(entry, ColorFor(entry), source, Mode == MatchSetup.MatchMode.Stock ? Mathf.Max(1, Rules.stocks) : -1);
+            m_players.Add(p);
+            m_players.Sort((a, b) => a.Index.CompareTo(b.Index));
+            SpawnMatchCharacter(p, FarthestSpawnPoint(p), false);
+            Debug.Log($"[DarumaMatch] {p.Label} が接続して参加 ({m_players.Count}人)");
+            PlayerJoined?.Invoke(p);
+        }
+
+        // ホスト: 切断した人を試合から外し、体を消す
+        public void RemoveNetPlayer(MatchPlayer p)
+        {
+            if (!m_players.Remove(p)) return;
+            if (p.Character != null)
+            {
+                m_owners.Remove(p.Character);
+                Destroy(p.Character.gameObject);
+            }
+            if (p.Ghost != null) Destroy(p.Ghost.gameObject);
+            m_appearing.RemoveAll(a => a.player == p);
+            m_hits.RemoveAll(h => h.victim == p || h.attacker == p);
+            Debug.Log($"[DarumaMatch] {p.Label} が切断 ({m_players.Count}人)");
+            CheckLastOne();
+        }
+
+        // ホスト: 試合を始める(やり直す)。全員を最初の状態に戻して出現ポイントに出し直し、カウントダウンから始める
+        public void BeginNetMatch()
+        {
+            if (m_net == null || !m_net.IsServer) return;
+            Time.timeScale = 1f;
+            ClearBodies();
+            foreach (var block in FindObjectsByType<TumikiBlock>()) Destroy(block.gameObject);
+
+            Result = null;
+            Elapsed = 0f;
+            m_outCount = 0;
+            m_lastOutFrame = -1;
+            m_lastOnePending = false;
+            m_timeUpFinish = false;
+            m_leaving = false;
+            m_timeLimit = Rules.TimeLimit;
+            int stocks = Mode == MatchSetup.MatchMode.Stock ? Mathf.Max(1, Rules.stocks) : -1;
+            foreach (var p in m_players) p.ResetForMatch(stocks);
+
+            m_netStarted = true;
+            SpawnAllAtStart();
+            BeginCountdown();
+            Debug.Log($"[DarumaMatch] ネット対戦の試合開始 ({m_players.Count}人 / {Rules.ModeName})");
+            Started?.Invoke();
+        }
+
+        // クライアント: 人が増えた・減った
+        internal void NetClientAddPlayer(MatchPlayer p)
+        {
+            if (m_players.Contains(p)) return;
+            m_players.Add(p);
+            m_players.Sort((a, b) => a.Index.CompareTo(b.Index));
+            PlayerJoined?.Invoke(p);
+        }
+
+        internal void NetClientRemovePlayer(MatchPlayer p) => m_players.Remove(p);
+
+        // クライアント: 時間とカウントダウン
+        internal void NetClientSetClock(bool started, float elapsed, float countdownLeft, float countdownLength)
+        {
+            bool wasCounting = IsCountingDown;
+            m_netStarted = started;
+            Elapsed = elapsed;
+            m_countdownLeft = countdownLeft;
+            m_countdownLength = countdownLength;
+            if (wasCounting && !IsCountingDown) CountdownFinished?.Invoke();
+        }
+
+        // クライアント: 試合が始まった(やり直しを含む)
+        internal void NetClientStarted()
+        {
+            Result = null;
+            Started?.Invoke();
+        }
+
+        // クライアント: 試合が終わった(順位は result に入れて届く)
+        internal void NetClientFinish(MatchResult result)
+        {
+            Result = result;
+            m_finishTime = Time.unscaledTime;
+            Finished?.Invoke(result);
+        }
+
+        // クライアント: ホストで出たお知らせを、同じように出す
+        internal void NetClientRaise(NetEvent e, MatchPlayer a, MatchPlayer b, Vector3 pos, float seconds, int points, ScoreReason reason)
+        {
+            switch (e)
+            {
+                case NetEvent.Knocked: PlayerKnocked?.Invoke(a, b); break;
+                case NetEvent.KO: PlayerKO?.Invoke(a, b); break;
+                case NetEvent.RespawnAppearing: PlayerRespawnAppearing?.Invoke(a, pos, seconds); break;
+                case NetEvent.Respawned: PlayerRespawned?.Invoke(a); break;
+                case NetEvent.Out: PlayerOut?.Invoke(a); break;
+                case NetEvent.Scored: Scored?.Invoke(a, points, reason); break;
+            }
         }
 
         //========================================
