@@ -58411,7 +58411,7 @@ GameObject:
   - component: {fileID: 530128323}
   - component: {fileID: 530128324}
   m_Layer: 0
-  m_Name: NetTestUI
+  m_Name: NetLobbyUI
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -58441,9 +58441,11 @@ MonoBehaviour:
   m_GameObject: {fileID: 530128322}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 46b4682c9ad389e4aa087d6a84424033, type: 3}
+  m_Script: {fileID: 11500000, guid: c4c663c6f8382bd4c90c06439f0fb62c, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::NetTestUI
+  m_EditorClassIdentifier: Assembly-CSharp::NetLobbyUI
+  m_port: 7777
+  m_connectAttempts: 10
 --- !u!1 &531156796
 GameObject:
   m_ObjectHideFlags: 0
@@ -59698,7 +59700,7 @@ MonoBehaviour:
   m_HeartbeatTimeoutMS: 500
   m_ConnectTimeoutMS: 1000
   m_MaxConnectAttempts: 60
-  m_DisconnectTimeoutMS: 30000
+  m_DisconnectTimeoutMS: 10000
   ConnectionData:
     Address: 127.0.0.1
     Port: 7777

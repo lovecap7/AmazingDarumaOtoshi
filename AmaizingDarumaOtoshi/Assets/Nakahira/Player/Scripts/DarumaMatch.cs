@@ -894,7 +894,9 @@ namespace Nakahira
             m_appearing.RemoveAll(a => a.player == p);
             m_hits.RemoveAll(h => h.victim == p || h.attacker == p);
             Debug.Log($"[DarumaMatch] {p.Label} が切断 ({m_players.Count}人)");
-            CheckLastOne();
+            // 試合中に相手がいなくなったら、残った人の勝ちで終わる(タイムは時間まで続ける)
+            if (!IsNetWaiting && Mode != MatchSetup.MatchMode.Time && m_players.Count == 1) m_lastOnePending = true;
+            else CheckLastOne();
         }
 
         // ホスト: 試合を始める(やり直す)。全員を最初の状態に戻して出現ポイントに出し直し、カウントダウンから始める
