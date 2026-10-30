@@ -99,6 +99,11 @@ public class MatchSelect : MonoBehaviour
 
     enum Phase { Mode, Rule, Character, Stage, Lottery, Leaving }
 
+    // 次にセレクト画面を開いたときに最初に出す画面（試合のポーズから「ルール選択に戻る」など）。開いたら Auto に戻る
+    //   Auto：試合から戻ってきたらキャラクターセレクト、それ以外はモードセレクト
+    public enum StartScreen { Auto, Mode, Rule, Character }
+    public static StartScreen NextStartScreen = StartScreen.Auto;
+
     struct PadState
     {
         public Vector2 move;
@@ -258,7 +263,11 @@ public class MatchSelect : MonoBehaviour
 
         BuildBackground();
         BuildUI();
-        if (fromMatch) GoToCharacterSelect();
+        var start = NextStartScreen;
+        NextStartScreen = StartScreen.Auto;
+        if (start == StartScreen.Auto) start = fromMatch ? StartScreen.Character : StartScreen.Mode;
+        if (start == StartScreen.Character) GoToCharacterSelect();
+        else if (start == StartScreen.Rule) GoToRuleSelect();
         else GoToModeSelect();
         SnapScreens();
         InputSystem.onDeviceChange += OnDeviceChange;

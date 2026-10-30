@@ -42,6 +42,7 @@ namespace Nakahira
         }
 
         public override string Name => "逃げる";
+        public override CpuPathFollower Route => m_route;
 
         // 1段 → 0段になった瞬間だけ true(決める側が立てる)
         public bool ZeroStackCheck { get; set; }

@@ -18,12 +18,16 @@ namespace Nakahira
 
         public override string Name => "攻めに行く";
         public MatchPlayer Target => m_target;
+        public override CpuPathFollower Route => m_route;
 
         public override float Evaluate(CpuContext c)
         {
             if (!ShouldApproach(c)) return 0.0f;
-            if (m_target != null && IsValidTarget(c, c.Perception.Find(m_target))) return c.Params.ApproachScore;
-            return ChooseTarget(c) != null ? c.Params.ApproachScore : 0.0f;
+            // 満タン近く(遊ぶ)でも点数は同じ(遊ぶ側では積むの点数が下がるので、積むには勝つ)。
+            // 今の状態に足す StateStickiness 込みでも、殴る・撃つより低くなるようにしておく(近づいたら必ず引き継ぐ)
+            float score = c.Params.ApproachScore;
+            if (m_target != null && IsValidTarget(c, c.Perception.Find(m_target))) return score;
+            return ChooseTarget(c) != null ? score : 0.0f;
         }
 
         public override void Enter(CpuContext c)
@@ -67,8 +71,8 @@ namespace Nakahira
             return true;
         }
 
-        // 攻めに行く場面か:盤面に拾える積み木がない、または積み終わった(積むが選ばれない)
-        private static bool ShouldApproach(CpuContext c) => CpuBlockSearch.NothingToCollect(c);
+        // 攻めに行く場面か:盤面に拾える積み木がない、または積み終わった(積むが選ばれない)、または満タン近く(遊ぶ)
+        private static bool ShouldApproach(CpuContext c) => c.IsPlayful || CpuBlockSearch.NothingToCollect(c);
 
         // 狙える相手のうち、攻めの点数が一番高い相手(歩いて行けて、道が危険な相手のそばを通らない)
         private CpuOpponent ChooseTarget(CpuContext c)
@@ -94,10 +98,14 @@ namespace Nakahira
 
         // 狙ってよい相手か(生存者・無敵でない・自分が有利な相手)
         // 有利でない相手には攻めに行かない(積み木の供給を待つ。首だけどうしで突っ込み合わないように)
+        // ただし満タン近く(遊ぶ)なら、同じ段数の相手にも攻めに行く(満タンどうしで止まらないように)
+        // 殴る距離(MeleeEnterDistance)まで近づいた相手は、攻めに行くの相手ではない
+        // (攻めに行くを終えて殴る・撃つに引き継ぐ。近づいたまま押し合わないように)
         private static bool IsValidTarget(CpuContext c, CpuOpponent o)
         {
             if (o == null || o.IsGhost || o.IsInvincible || o.Character == null) return false;
-            return o.StackDiff >= c.Params.AdvantageMargin;
+            if (o.PathDistance <= c.Params.MeleeEnterDistance) return false;
+            return o.StackDiff >= (c.IsPlayful ? 0 : c.Params.AdvantageMargin);
         }
 
         public override void DrawGizmos(CpuContext c)

@@ -1,6 +1,6 @@
 # DeepSeek 引き継ぎメモ（Yurube / アメイジングだるま落とし）
 
-最終更新: 2026-10-29
+最終更新: 2026-10-30
 このファイルは、別のPC・別ワークスペースの DeepSeek に作業内容を引き継ぐためのメモです。
 作業を始めるときは、このファイルを読ませる（または貼り付ける）ところから始めてください。
 
@@ -32,13 +32,13 @@
 
 ---
 
-## 2. 実装済みキャラクター（2026-10-29 時点・すべてコミット済み）
+## 2. 実装済みキャラクター（2026-10-30 時点・すべてコミット済み）
 
 | キャラ | パッシブ | 主なスクリプト |
 |---|---|---|
 | あかだる | 赤い積み木の数だけ弾速UP（+1.0 m/s / 個、上限60） | `AkadaruPassive.cs` |
 | あかだる（演出） | 弾速に応じた残光トレイル＋マズルフラッシュ／衝撃波 | `AkadaruShotTrail.cs` / `AkadaruShotFlash.cs` |
-| あかだる（必殺技） | トロン: 通常射撃のトレイルに沿って分割判定。壁反射も追従。触れた積み木は壊れ、キャラクターは0.4秒間隔で積み木を1個ずつ失う（0個なら即死）。発動直後0.6秒は自分無敵。F3／ラボで判定表示。**通った地面は一定時間焼け焦げる**（自作シェーダー、約6秒で消える） | `AkadaruSpecial.cs` / `TronProjectile.cs` / `TronTrailHit.cs` / `TronHitboxView.cs` / `TronScorchTrail.cs` / `Shaders/TronScorch.shader` |
+| あかだる（必殺技） | 終焉の軌跡（旧トロン）: 通常射撃のトレイルに沿って分割判定。壁反射も追従。触れた積み木は壊れ、キャラクターは0.4秒間隔で積み木を1個ずつ失う（0個なら即死）。発動直後0.6秒は自分無敵。F3／ラボで判定表示。**通った地面は一定時間焼け焦げる**（自作シェーダー、約6秒で消える）。発動時はゲームを止める短い3Dカットイン（発動瞬間に実際の頭へ大胆にアップ／赤黒い集中線／衝撃波3回／画面揺れ／フラッシュ／画面下中央に大型「終焉の軌跡」、約1.3秒、旧・積み木／ハンマー／レーザー／破片演出は削除、終了時に複製を明示破棄） | `AkadaruSpecial.cs` / `TronProjectile.cs` / `TronTrailHit.cs` / `TronHitboxView.cs` / `TronScorchTrail.cs` / `Shaders/TronScorch.shader` / `SpecialCutIn.cs` |
 | あおだる | 青い積み木の数だけ移動速度UP（+1.0 m/s / 個、上限12） | `AodaruPassive.cs` |
 | あおだる（演出） | 青い風＋青い残像 | `AodaruSpeedEffect.cs` / `AodaruGhost.cs` |
 | あおだる（必殺技） | 六腕: ハンマーのモデルを6本出し（阿修羅風）、発動時の向きを基準にした3方向から近づく積み木を、操作に関係なくはじき返す（4秒間） | `AodaruSpecial.cs` / `AodaruSixArms.cs` |
@@ -46,23 +46,29 @@
 | みだる（必殺技） | ファンネル: ボタンを押すとその場で自分の積み木を撃ち、「積んでいる数」に分裂して近くの敵へ手分けしてホーミング | `MidaruSpecial.cs` / `TumikiHoming.cs` |
 | いわだる | 飛ばした積み木は積み木を壊し、壁で壊れる（岩の破片表示つき） | `IwaPassive.cs` / `IwaBlock.cs`（`IwaImpact` 含む） |
 | きだる | 黄色い積み木を積むと、同じ黄色がもう1個増える（上限10段） | `KidaruPassive.cs` |
+| きだる（必殺技） | 黄金化: 無敵＋移動速度UP。発動時の積み木の数だけ延長（基本3秒＋1秒/個、速度1.5倍）。点滅せず虹色にモデルが光る。頭を一番下にして積み木を上に乗せ、頭が車輪のように回転。終了で元に戻る | `KidaruSpecial.cs` / `KidaruWheelVisual.cs` |
 | へびだる | 股抜きショットで飛ばした自分の積み木が左右に蛇行（ハンマーで飛ばした積み木は対象外） | `HebiPassive.cs` / `TumikiZigzag.cs` |
 | だるきんぐ | 積み木は2個まで。3個目を積むと一番上（古い段）が落ちる | `DaruKingPassive.cs` |
+
+> トロンの当たり判定と焦げは `AkadaruShotTrail.m_trail`（通常射撃トレイル）基準。
+> 見た目の `TronLaserOverlay`（太いグロー＋白い芯、2秒）は別トレイルで、判定より太く長い。
 
 ### 2-1. 共通システム
 
 - 必殺技ゲージ: `Assets/Yurube/Script/SpecialGauge.cs`
-  - 全キャラ共通。積み木5個で満タン。必殺技を持つキャラのプレハブに付ける。
+  - 全キャラ共通。積み木5個で満タン。
+  - あかだるはプレハブに付与済み。あおだる・みだる・きだるは各パッシブが実行時に追加する。
 - 検証用キャラクターラボ: `Assets/Yurube/Debug/`
   - `CharacterLab.cs` / `CharacterLabBlocks.cs` / `CharacterLabDummy.cs` / `CharacterLabUI.cs`
   - ラボの項目から各キャラのパッシブ・必殺技を再現して確認できる
-    （例: 「きだる: 黄色1個」「へびだる: 積んでショット」「あかだる: 必殺技」など）
+    （例: 「きだる: 黄色1個」「きだる: 必殺技」「へびだる: 積んでショット」「あかだる: 必殺技」「あおだる: 必殺技」「みだる: 必殺技」など）
 
 ### 2-2. アセットの場所
 
 - キャラクターデータ: `Assets/Fujihara/Data/Characters/{akadaru,aodaru,midaru,iwadaru,kidaru,hebidaru,daruking}.asset`
 - プレハブ: `Assets/Yurube/Prefabs/{Akadaru,Aodaru,Midaru,Iwa,Kidaru,Hebi,DaruKing}.prefab`
 - 頭マテリアル: `Assets/Yurube/Materials/{AodaruHead,MidaruHead,IwaHead,KidaruHead,HebiHead,DaruKingHead}.mat`
+- トロンの焦げ: `Assets/Yurube/Resources/TronScorch.mat` / `Assets/Yurube/Shaders/TronScorch.shader`
 
 ---
 
@@ -157,8 +163,9 @@ public class XxxPassive : MonoBehaviour
 - あかだるの弾の演出中は、その積み木の既存の煙・炎（`Tumiki.prefab` の SmokeTrail / FireAura）を
   インスタンス単位で止めている（共有プレハブは変更していない）。
 - 各キャラのプレハブは **NetworkObject を持っていない**ため、通信対戦では使えない（現状はオフライン想定）。
-- あかだる・あおだるの演出は「実行時にコンポーネントを追加」する方式。プレハブにコンポーネントを
-  足していないので、追加のマテリアル参照だけをプレハブに1行入れている。
+- パッシブ演出（あかだるの弾トレイル、あおだるの速度エフェクトなど）は実行時にコンポーネントを追加する方式。
+- 必殺技は、あかだるがプレハブに `SpecialGauge` / `AkadaruSpecial` を追加済み。あおだる・みだる・きだるは
+  各パッシブが実行時に `SpecialGauge` と必殺技コンポーネントを追加する。
 
 ---
 

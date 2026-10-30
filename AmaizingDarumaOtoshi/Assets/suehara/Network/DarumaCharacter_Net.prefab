@@ -67,10 +67,10 @@ PrefabInstance:
       addedObject: {fileID: 4529229351224948630}
     - targetCorrespondingSourceObject: {fileID: 9069936943766670842, guid: 98dfe1d631da6fc429ba3618bb53aa46, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 6727903594629285650}
+      addedObject: {fileID: 449980439392195589}
     - targetCorrespondingSourceObject: {fileID: 9069936943766670842, guid: 98dfe1d631da6fc429ba3618bb53aa46, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 449980439392195589}
+      addedObject: {fileID: 3532703442492020543}
   m_SourcePrefab: {fileID: 100100000, guid: 98dfe1d631da6fc429ba3618bb53aa46, type: 3}
 --- !u!1 &175581071880964521 stripped
 GameObject:
@@ -167,19 +167,6 @@ MonoBehaviour:
   UseRigidBodyForMotion: 0
   AutoUpdateKinematicState: 1
   AutoSetKinematicOnDespawn: 1
---- !u!114 &6727903594629285650
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 175581071880964521}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0854b285e97ab7447a4861d5e8552cca, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::NetworkCommandSource
-  ShowTopMostFoldoutHeaderGroup: 1
 --- !u!114 &449980439392195589
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -192,4 +179,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 984a416efd5880f4491e93a53eb05a2b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NetworkDarumaCharacter
+  ShowTopMostFoldoutHeaderGroup: 1
+--- !u!114 &3532703442492020543
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 175581071880964521}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: eb63fc44de095c947a137585acdaedf5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NetworkHammerView
   ShowTopMostFoldoutHeaderGroup: 1

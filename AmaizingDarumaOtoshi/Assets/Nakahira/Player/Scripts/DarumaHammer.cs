@@ -133,8 +133,7 @@ namespace Nakahira
             m_hitThisSwing.Clear();
         }
 
-        
-public bool TrySweep()
+        public bool TrySweep()
         {
             if (IsBusy) return false;
             m_action = Action.Sweep;

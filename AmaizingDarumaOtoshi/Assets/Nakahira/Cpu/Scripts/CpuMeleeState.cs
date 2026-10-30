@@ -68,6 +68,7 @@ namespace Nakahira
         Vector2 m_dodgeMove;
 
         public override string Name => "殴る";
+        public override CpuPathFollower Route => m_route;
         public MatchPlayer Target => m_target;
 
         public override float Evaluate(CpuContext c)

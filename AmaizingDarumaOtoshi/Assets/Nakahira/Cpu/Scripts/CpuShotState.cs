@@ -35,8 +35,22 @@ namespace Nakahira
         // ついでに弾く:弾いたあと、次に弾くまでの間(秒。振り終わってから)
         const float kFlickInterval = 0.2f;
 
+        // 撃ったあと横へ動くとき、相手との距離をこの範囲(m)に保つ(殴る間合いの少し外 〜 射程の少し内)
+        const float kStrafeNearMargin = 1.0f;
+        const float kStrafeFarMargin = 1.0f;
+        // 横へ動くとき、距離のずれを前後に直す強さ
+        const float kStrafeRadialGain = 1.0f;
+        // 横へ動く先に床があるか確かめる距離(m)
+        const float kStrafeLookAhead = 0.8f;
+        // 踏み込みながら撃つのは、相手が殴る間合いよりこの距離(m)以上遠いときだけ
+        const float kStepInMinGap = 1.5f;
+
         Motive m_motive;
         MatchPlayer m_target;
+        // 撃ったあと横へ動く向き(+1 = 相手を左に見て右へ、-1 = 反対、0 = 止まって撃つ)
+        int m_strafeSide;
+        // 今の1発を、相手の方へ踏み込みながら狙うか
+        bool m_stepIn;
         Vector3 m_scatterPoint;
         float m_scatterUntil = -1.0f;
         float m_nextScatterRoll;
@@ -66,6 +80,14 @@ namespace Nakahira
             // 熱中するか(疲れて焦っているほど熱中しやすい)
             m_overheated = Random.value < c.Params.OverheatChance * c.Panic;
             m_aiming = false;
+            RollStrafe(c);
+            m_stepIn = false;
+        }
+
+        // 次に撃つまでの間に横へ動くか・どちらへ動くか決める(外れたらその場で止まって撃つ)
+        private void RollStrafe(CpuContext c)
+        {
+            m_strafeSide = Random.value < c.Params.ShotStrafeChance ? (Random.value < 0.5f ? 1 : -1) : 0;
         }
 
         public override void Exit(CpuContext c)
@@ -86,15 +108,22 @@ namespace Nakahira
             {
                 if (hammer.IsAimingShot)
                 {
-                    if (TryGetAim(c, out Vector3 dir)) cmd.Move = new Vector2(dir.x, dir.z) * kAimInput;
+                    // 狙う間はスティックの向きが狙う向きになる。踏み込む番なら、その向きへ歩きながら狙う
+                    if (TryGetAim(c, out Vector3 dir))
+                    {
+                        bool step = m_stepIn && CpuSensor.HasGround(c.Position + dir * kStrafeLookAhead, c.Params.GroundProbeDepth);
+                        cmd.Move = new Vector2(dir.x, dir.z) * (step ? 1.0f : kAimInput);
+                    }
                     return true;
                 }
                 // 弾が出た(または撃てなかった)
                 m_aiming = false;
                 if (!hammer.IsShooting) return true;
                 c.AddLoad(c.Params.AttentionOnShot);
-                float interval = m_overheated ? c.Params.OverheatShotInterval : Random.Range(c.Params.ShotIntervalMin, c.Params.ShotIntervalMax);
-                m_nextShotTime = Time.time + interval;
+                m_nextShotTime = Time.time + NextShotInterval(c);
+                // 撃ったあとは横へ動く(たまにその場で止まって撃つ)。弾が出たあとは向きが固定されるので、横へ走っても狙いはずれない
+                RollStrafe(c);
+                if (m_strafeSide != 0) Strafe(c, ref cmd);
                 return true;
             }
 
@@ -115,18 +144,79 @@ namespace Nakahira
 
             if (Time.time < m_nextShotTime || hammer.IsBusy || !c.Self.CanStartShot)
             {
-                // 待つ間も狙う向きを向いておく
-                cmd.Move = new Vector2(aim.x, aim.z) * kAimInput;
+                // 待つ間は横へ動く(撃つ瞬間にスティックの向きへ向き直るので、走っていても狙える)。止まる番なら狙う向きを向いておく
+                if (m_strafeSide == 0 || !Strafe(c, ref cmd)) cmd.Move = new Vector2(aim.x, aim.z) * kAimInput;
                 return true;
             }
 
             // 撃つ(押した瞬間にスティックの向きを向く)
-            m_aimError = Random.Range(-c.Params.ShotAimError, c.Params.ShotAimError);
+            // 狙いのぶれ:集中度の割合が高いほど大きい(落ち着いていれば精密、焦ると連打で雑)
+            float error = Mathf.Lerp(c.Params.ShotAimError, c.Params.ShotAimErrorMax, c.LoadRatio);
+            m_aimError = Random.Range(-error, error);
             TryGetAim(c, out aim);
             cmd.Move = new Vector2(aim.x, aim.z) * kAimInput;
             cmd.Shot = true;
             m_aiming = true;
+            // 踏み込みながら狙うか(相手が殴る間合いより十分遠いときだけ)
+            m_stepIn = m_motive != Motive.Scatter && TargetDistance(c) > c.Params.MeleeEnterDistance + kStepInMinGap
+                && Random.value < c.Params.ShotStepInChance;
             return true;
+        }
+
+        // 次に撃つまでの間(秒)。熱中していれば短い。そうでなければ、集中度の割合が高いほど連打に近づく
+        private float NextShotInterval(CpuContext c)
+        {
+            CpuParams p = c.Params;
+            float calm = Random.Range(p.ShotIntervalMin, p.ShotIntervalMax);
+            float mash = Random.Range(0.0f, p.ShotMashInterval);
+            float interval = Mathf.Lerp(calm, mash, c.LoadRatio);
+            return m_overheated ? Mathf.Min(interval, p.OverheatShotInterval) : interval;
+        }
+
+        // 狙う相手(乱反射遊びなら固まり)までの水平の距離
+        private float TargetDistance(CpuContext c)
+        {
+            if (m_motive == Motive.Scatter) return CpuContext.FlatDistance(c.Position, m_scatterPoint);
+            CpuOpponent o = m_target != null ? c.Perception.Find(m_target) : null;
+            return o != null ? o.FlatDistance : 0.0f;
+        }
+
+        // 相手(乱反射遊びなら固まり)を横に見ながら、距離を保って横へ走る。横に床がなければ反対へ。どちらも無理なら false
+        private bool Strafe(CpuContext c, ref DarumaCommand cmd)
+        {
+            CpuParams p = c.Params;
+            Vector3 targetPos;
+            if (m_motive == Motive.Scatter) targetPos = m_scatterPoint;
+            else
+            {
+                CpuOpponent o = m_target != null ? c.Perception.Find(m_target) : null;
+                if (o == null) return false;
+                targetPos = o.Position;
+            }
+            Vector3 to = targetPos - c.Position;
+            to.y = 0.0f;
+            float dist = to.magnitude;
+            if (dist < 0.01f) return false;
+            to /= dist;
+
+            // 近すぎれば下がり、遠すぎれば寄る(殴る間合いの少し外 〜 射程の少し内)
+            float near = p.MeleeEnterDistance + kStrafeNearMargin;
+            float far = Mathf.Max(near, p.ShotRange - kStrafeFarMargin);
+            float radial = dist < near ? (dist - near) : (dist > far ? dist - far : 0.0f);
+            Vector3 radialDir = to * Mathf.Clamp(radial * kStrafeRadialGain, -1.0f, 1.0f);
+            for (int attempt = 0; attempt < 2; attempt++)
+            {
+                Vector3 tangent = Vector3.Cross(Vector3.up, to) * m_strafeSide;
+                Vector3 dir = (tangent + radialDir).normalized;
+                Vector3 ahead = c.Position + dir * kStrafeLookAhead;
+                if (CpuSensor.HasGround(ahead, p.GroundProbeDepth) && !CpuNavMesh.IsNearHazard(ahead, DarumaCharacter.kBodyRadius))
+                {
+                    cmd.Move = new Vector2(dir.x, dir.z);
+                    return true;
+                }
+                m_strafeSide = -m_strafeSide;   // こちらは床がない(奈落ぎわ・バンパー):反対へ
+            }
+            return false;
         }
 
         //========================================
@@ -159,8 +249,9 @@ namespace Nakahira
 
             // 狙い撃ち:身の回りに拾える積み木がないとき、遠くの倒せそうな相手を撃つ
             // (身の回りを確かめるのは撃ち始めるときだけ。撃ち合いの最中に近くに落ちてきた積み木は、ついでに弾く材料にする)
+            // 満タン近く(遊ぶ)なら、近くに積み木があっても撃つ
             bool engaged = m_motive == Motive.Hunt;
-            if (engaged || !HasNearbyCollectable(c))
+            if (engaged || c.IsPlayful || !HasNearbyCollectable(c))
             {
                 CpuOpponent best = null;
                 float bestScore = float.MinValue;
@@ -222,15 +313,19 @@ namespace Nakahira
             CpuParams p = c.Params;
             if (Time.time < m_nextScatterRoll) return false;
             m_nextScatterRoll = Time.time + p.ThinkInterval;
-            if (Random.value >= p.ScatterChancePerSecond * p.ThinkInterval) return false;
+            // 満タン近く(遊ぶ)なら、よく撃ち込みたくなり、歩いて拾える近くの固まりにも撃つ
+            bool playful = c.IsPlayful;
+            float chance = playful ? p.PlayfulScatterChancePerSecond : p.ScatterChancePerSecond;
+            if (Random.value >= chance * p.ThinkInterval) return false;
 
             Vector3 pos = c.Position;
+            float minDist = playful ? p.MeleeEnterDistance : p.ShotNearbyRadius;
             foreach (var block in TumikiBlock.All)
             {
                 if (!CpuBlockSearch.IsCollectable(block)) continue;
                 Vector3 bp = block.transform.position;
                 float dist = CpuContext.FlatDistance(pos, bp);
-                if (dist <= p.ShotNearbyRadius || dist > p.ScatterRange) continue;
+                if (dist <= minDist || dist > p.ScatterRange) continue;
                 int count = 0;
                 foreach (var other in TumikiBlock.All)
                 {
@@ -239,7 +334,7 @@ namespace Nakahira
                 if (count < p.ScatterClusterCount) continue;
                 // 近い道で拾いに行ける固まりは撃たない(拾いに行く)。道がない・遠回りの道しかない固まりだけ
                 if (m_path == null) m_path = new NavMeshPath();
-                if (CpuNavMesh.TryFindPath(pos, bp, CpuPickupMotor.GoalTolerance, m_path, out float length)
+                if (!playful && CpuNavMesh.TryFindPath(pos, bp, CpuPickupMotor.GoalTolerance, m_path, out float length)
                     && length < p.ScatterMinPathLength) continue;
                 if (HasWall(pos, bp)) continue;
                 point = bp;

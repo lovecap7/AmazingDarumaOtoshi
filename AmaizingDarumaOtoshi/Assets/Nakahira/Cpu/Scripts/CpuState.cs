@@ -19,6 +19,9 @@ namespace Nakahira
         // 操作を cmd に書く。状態が終わったら false(すぐに選び直す)
         public abstract bool Tick(CpuContext c, ref DarumaCommand cmd);
 
+        // 今たどっている道(なければ null)。移動床に乗って行く道なら、乗り降りを CpuRide が行う
+        public virtual CpuPathFollower Route => null;
+
         public virtual void DrawGizmos(CpuContext c) { }
     }
 }

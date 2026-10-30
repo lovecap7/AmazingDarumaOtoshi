@@ -166,7 +166,8 @@ namespace Nakagawa
 
         private void Update()
         {
-            float dt = Time.deltaTime;
+            // 止めている間は回らず、ためも発射もしない
+            float dt = GimmickClock.IsHeld ? 0.0f : Time.deltaTime;
             m_time += dt;
             UpdateRotation(dt);
             UpdateFiring(dt);

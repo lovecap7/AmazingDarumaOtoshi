@@ -68,8 +68,7 @@ namespace Nakagawa
         // 片付けやキャラクターの出し直しをせず、表示するステージだけを切り替える(ネット対戦のクライアント用)
         public void ShowStage(int index) => ApplyStage(index);
 
-        
-public int CurrentIndex => m_index;
+        public int CurrentIndex => m_index;
         public StageEntry Current => m_index >= 0 ? m_stages[m_index] : null;
         public StageCameraPresets CameraPresets => m_cameraPresets;
         bool DebugEnabled => m_debugInConfiguredMatch || m_match == null || !m_match.IsConfigured;
@@ -142,7 +141,12 @@ public int CurrentIndex => m_index;
             ApplyStage(index);
 
             // 全員を新しいステージの出現ポイントに出し直す
-            if (m_match != null) m_match.SpawnAllAtStart();
+            // (待っている1フレームの間に復活待ちの人の出現演出が始まっていると、出し直したあとにもう1体出てしまうので、出し直す前にもう一度片付ける)
+            if (m_match != null)
+            {
+                m_match.ClearBodies();
+                m_match.SpawnAllAtStart();
+            }
             m_switching = false;
         }
 

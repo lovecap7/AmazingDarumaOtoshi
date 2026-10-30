@@ -115,6 +115,7 @@ namespace Nakagawa
 
         private void FixedUpdate()
         {
+            if (GimmickClock.IsHeld) return;
             Vector3 half = new Vector3(m_size.x * 0.5f, m_rideHeight * 0.5f, m_size.y * 0.5f);
             GimmickUtil.OverlapBox(transform.position + Vector3.up * (m_rideHeight * 0.5f), half, transform.rotation, m_found);
             Vector3 forward = Forward;
@@ -176,7 +177,7 @@ namespace Nakagawa
 
         private void Update()
         {
-            float dt = Time.deltaTime;
+            float dt = GimmickClock.IsHeld ? 0.0f : Time.deltaTime;
             m_time += dt;
             m_rollerAngle = Mathf.Repeat(m_rollerAngle + m_rollerSpeed * dt, 360.0f);
             if (m_rollers != null)
