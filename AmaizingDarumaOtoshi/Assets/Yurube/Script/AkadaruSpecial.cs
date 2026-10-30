@@ -27,6 +27,10 @@ namespace Yurube
         [Tooltip("発動・命中をConsoleに出す(テスト用)")]
         [SerializeField] bool m_logSpecial = true;
 
+        [Header("カットイン")]
+        [SerializeField] string m_cutInSpecialName = "終焉の軌跡";
+        [SerializeField] Color m_cutInColor = new Color(0.91f, 0.29f, 0.25f);
+
         DarumaCharacter m_character;
         SpecialGauge m_gauge;
         Material m_effectMaterial;
@@ -74,6 +78,7 @@ namespace Yurube
             if (!m_character.CanBeAffected) return false;
             if (m_character.Hammer != null && m_character.Hammer.IsBusy) return false;
 
+            int cutInBlocks = m_character.Stack.Count;
             var block = m_character.Stack.RemoveAt(0);
             if (block == null) return false;
             m_gauge.Consume();
@@ -99,7 +104,11 @@ namespace Yurube
             var scorchObject = new GameObject("TronScorch");
             scorchObject.AddComponent<TronScorchTrail>().Begin(shotTrail);
 
-            if (m_logSpecial) Debug.Log("[あかだる] 必殺技トロン発動", this);
+            // 発動カットイン(ゲームを一時停止、実モデルの3D演出)
+            SpecialCutIn.Show(m_cutInSpecialName, m_cutInColor, m_effectMaterial,
+                m_character, block, cutInBlocks);
+
+            if (m_logSpecial) Debug.Log("[あかだる] 必殺技『終焉の軌跡』発動", this);
             return true;
         }
 
