@@ -16,7 +16,7 @@ MonoBehaviour:
   StateStickiness: 0.1
   MinStateTime: 0.5
   UrgentScore: 0.75
-  AttentionCapacity: 1
+  AttentionCapacity: 0.01
   AttentionDecay: 0.25
   AttentionOnKnockToZero: 0.95
   AttentionOnDodge: 0.2
@@ -72,7 +72,11 @@ MonoBehaviour:
   ShotRange: 8
   ShotIntervalMin: 0.6
   ShotIntervalMax: 1.2
+  ShotMashInterval: 0.05
   ShotAimError: 3
+  ShotAimErrorMax: 9
+  ShotStrafeChance: 0.8
+  ShotStepInChance: 0.4
   FlickChance: 0.8
   FlickAimWidth: 0.8
   AttentionOnShot: 0.05
