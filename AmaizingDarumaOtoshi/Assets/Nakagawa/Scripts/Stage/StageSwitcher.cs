@@ -68,8 +68,7 @@ namespace Nakagawa
         // 片付けやキャラクターの出し直しをせず、表示するステージだけを切り替える(ネット対戦のクライアント用)
         public void ShowStage(int index) => ApplyStage(index);
 
-        
-public int CurrentIndex => m_index;
+        public int CurrentIndex => m_index;
         public StageEntry Current => m_index >= 0 ? m_stages[m_index] : null;
         public StageCameraPresets CameraPresets => m_cameraPresets;
         bool DebugEnabled => m_debugInConfiguredMatch || m_match == null || !m_match.IsConfigured;
