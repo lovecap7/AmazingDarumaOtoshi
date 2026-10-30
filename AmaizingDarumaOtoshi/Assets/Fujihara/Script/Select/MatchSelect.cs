@@ -22,7 +22,10 @@ using UnityEngine.UI;
 //   - 参加者全員が選ぶと「じゅんびOK！」。Start / Enter でステージセレクトへ
 //   - 各枠は Y / RB（キーボードは C・Tab）で「キャラ → パッシブ → ハンマー性能 → 必殺技」と表示が切り替わる（LB / Q で戻る）
 //     枠の下の丸をカーソルで押しても切り替わる（CPU の枠も見られる）。中身は CharacterData に書く
-// ・ステージセレクト：プレイヤー（CPU 以外）が自分のカーソルでステージ（またはおまかせ）に投票する
+// ・ステージセレクト（ローカル。stageVote がオフ）：画面右にステージが並び、えらべるのは 1P（一番小さい番号のプレイヤー）だけ
+//   1P のカーソルが乗っているステージが画面左にプレビューされる（右スティック / IJKL で見回せる。触らなければゆっくり回る）
+//   プレビューは見た目だけのステージ（SelectRoster.stagePreviews。「Fujihara > ステージ一覧を更新」で作る）
+// ・ステージセレクト（オンライン用。stageVote がオン）：プレイヤー（CPU 以外）が自分のカーソルでステージ（またはおまかせ）に投票する
 //   全員が投票したら、マリオカートのように全員の票の中から1つを抽選する。おまかせ票は当たったときにめくれる
 //   投票した人が1人だけ・全員が同じステージに投票したときは、抽選の演出を飛ばしてそのまま決める
 // ・決まった内容は MatchSetup に入れてゲーム本編へ渡す。キャラクターセレクトに入るたびに選択はまっさらに戻る
@@ -44,6 +47,8 @@ public class MatchSelect : MonoBehaviour
     [SerializeField] SelectRoster roster;
     [Tooltip("ステージセレクトで横に並べるステージの数（最大）。ステージが多いときは増やすと1つずつが小さくなり、少ない行に収まる")]
     [SerializeField, Range(1, 20)] int stageColumns = 7;
+    [Tooltip("オン：全員が投票して抽選で決める（オンライン用）。オフ：1P だけがえらび、左に動かせるプレビューが出る（ローカル）")]
+    [SerializeField] bool stageVote = false;
 
     [Header("ルール")]
     [SerializeField, Range(1, 8)] int maxPlayers = 4;
@@ -95,6 +100,7 @@ public class MatchSelect : MonoBehaviour
     struct PadState
     {
         public Vector2 move;
+        public Vector2 look;        // ステージのプレビューを見回す（右スティック / IJKL）
         public bool a, b, start;
         public bool next, prev;     // 枠の表示（キャラ／パッシブ／ハンマー／必殺技）を切り替える
     }
@@ -210,6 +216,20 @@ public class MatchSelect : MonoBehaviour
     Camera cam;
     readonly List<Transform> floaters = new List<Transform>();
 
+    // ---- ステージのプレビュー（ローカル） ----
+    // 見た目だけのステージを画面の外（ずっと下）に置き、専用のカメラで撮って左の枠に映す
+    static readonly Vector3 PreviewOrigin = new Vector3(0f, -1000f, 0f);
+    Camera previewCam;
+    RenderTexture previewTexture;
+    Transform previewRoot;
+    readonly Dictionary<StageData, GameObject> previewModels = new Dictionary<StageData, GameObject>();
+    Tile previewTile;
+    SelectRoster.StagePreview previewInfo;
+    float previewYaw, previewPitch, previewIdle;
+    RectTransform previewFrame;
+    RawImage previewImage;
+    TextMeshProUGUI previewLetter, previewName;
+
     void Start()
     {
         if (roster == null || roster.characters.Count == 0 || roster.stages.Count == 0)
@@ -242,7 +262,13 @@ public class MatchSelect : MonoBehaviour
         InputSystem.onDeviceChange += OnDeviceChange;
     }
 
-    void OnDestroy() => InputSystem.onDeviceChange -= OnDeviceChange;
+    void OnDestroy()
+    {
+        InputSystem.onDeviceChange -= OnDeviceChange;
+        if (previewTexture != null) previewTexture.Release();
+        UnityEngine.Rendering.RenderPipelineManager.beginCameraRendering -= FogOffForPreview;
+        UnityEngine.Rendering.RenderPipelineManager.endCameraRendering -= FogBackAfterPreview;
+    }
 
     // コントローラーが抜かれたら、そのプレイヤーは抜けたことにする（キャラ・ステージを選んでいる間だけ）
     void OnDeviceChange(InputDevice device, InputDeviceChange change)
@@ -282,6 +308,7 @@ public class MatchSelect : MonoBehaviour
         UpdatePanels();
         UpdateChips();
         UpdateTiles(dt);
+        UpdatePreview(dt);
         UpdateBackground();
 
         hint.text = phase == Phase.Mode
@@ -290,6 +317,7 @@ public class MatchSelect : MonoBehaviour
             ? "↑↓ / A：項目をえらぶ　←→：切り替え　Start：キャラクターセレクトへ　B：モードセレクトへ"
             : phase == Phase.Character
             ? "A：参加・えらぶ・CPUのコインをつかむ　B：取り消し・抜ける　Y：せつめい切り替え　Start：次へ"
+            : phase == Phase.Stage && !stageVote ? "A：決定　B：キャラクターセレクトへ　右スティック（IJKL）：ステージを見回す　えらべるのは " + (Chooser() != null ? Chooser().Label : "1P") + " だけ"
             : phase == Phase.Stage ? "A：投票　B：取り消し（投票していなければキャラクターセレクトへ）　全員が投票したら抽選！"
             : "";
     }
@@ -795,6 +823,108 @@ public class MatchSelect : MonoBehaviour
         phaseFrame = Time.frameCount;
         allVotedTime = -1f;
         foreach (var p in Humans()) p.cursor = new Vector2(PanelPosition(p.index).x, -120f);
+        if (!stageVote && Chooser() != null)
+        {
+            Chooser().cursor = stageTiles[0].rect.anchoredPosition;
+            previewTile = null;
+        }
+    }
+
+    // ローカルでステージをえらぶ人（一番小さい番号のプレイヤー）
+    Player Chooser()
+    {
+        foreach (var p in Humans()) return p;
+        return null;
+    }
+
+    // ---------------- ステージセレクト（ローカル：1P だけがえらぶ） ----------------
+    void UpdateStageChoose(float dt)
+    {
+        var p = Chooser();
+        if (p == null) return;
+        if (phaseFrame != Time.frameCount)
+        {
+            var s = Read(p.device);
+            MoveCursor(p, s, dt);
+            if (s.look != Vector2.zero)
+            {
+                previewIdle = 0f;
+                previewYaw += s.look.x * 100f * dt;
+                previewPitch = Mathf.Clamp(previewPitch - s.look.y * 45f * dt, -30f, 25f);
+            }
+            if (s.a)
+            {
+                var tile = TileAt(stageTiles, p.cursor);
+                if (tile != null) { StartCoroutine(ChooseStage(tile)); return; }
+            }
+            else if (s.b) { MenuSounds.Cancel(); BackToCharacterSelect(); return; }
+        }
+
+        var hovered = TileAt(stageTiles, p.cursor);
+        if (hovered != null) ShowPreview(hovered);
+        stageStatus.text = p.Label + " が えらんでね";
+    }
+
+    IEnumerator ChooseStage(Tile tile)
+    {
+        phase = Phase.Lottery;
+        MenuSounds.Decide();
+        var stage = tile.random ? roster.stages[Random.Range(0, roster.stages.Count)] : tile.stage;
+        if (tile.random)
+        {
+            // おまかせは、決めたステージをプレビューにめくって見せる
+            yield return Wait(0.2f);
+            var shown = stageTiles.Find(t => t.stage == stage);
+            if (shown != null) ShowPreview(shown);
+            yield return Wait(0.6f);
+        }
+        else yield return Wait(0.25f);
+        ConfirmMatch(stage);
+    }
+
+    // カーソルが乗ったステージを左の枠に映す（変わったときだけ）
+    void ShowPreview(Tile tile)
+    {
+        if (tile == previewTile) return;
+        previewTile = tile;
+        foreach (var m in previewModels.Values) m.SetActive(false);
+
+        previewInfo = tile.random ? null : roster.PreviewOf(tile.stage);
+        if (previewInfo != null)
+        {
+            if (!previewModels.TryGetValue(tile.stage, out var model))
+            {
+                model = Instantiate(previewInfo.model, previewRoot, false);
+                previewModels[tile.stage] = model;
+            }
+            model.SetActive(true);
+        }
+        previewYaw = 0f;
+        previewPitch = 0f;
+        previewIdle = 0f;
+        previewFrame.localScale = Vector3.one * 1.04f;
+
+        previewImage.enabled = previewInfo != null;
+        previewFrame.GetComponent<Image>().color = tile.random ? RandomColor : tile.stage.color;
+        previewLetter.text = previewInfo != null ? "" : tile.random ? "？" : Initial(tile.stage.displayName);
+        previewName.text = tile.random ? "おまかせ" : tile.stage.displayName;
+        stageDescription.text = tile.random ? "どのステージになるかは、決めるまで分からない" : tile.stage.description;
+    }
+
+    // プレビューのカメラ：本編のカメラと同じ距離・角度から、見ている点のまわりを回る。触らなければゆっくり回る
+    void UpdatePreview(float dt)
+    {
+        if (previewCam == null) return;
+        bool on = !stageVote && (phase == Phase.Stage || phase == Phase.Lottery || phase == Phase.Leaving) && stageGroup.alpha > 0.01f && previewInfo != null;
+        previewCam.enabled = on;
+        previewFrame.localScale = Vector3.Lerp(previewFrame.localScale, Vector3.one, 1f - Mathf.Exp(-12f * dt));
+        if (!on) return;
+
+        previewIdle += dt;
+        if (previewIdle > 1.5f) previewYaw += 7f * dt;
+        var rot = Quaternion.Euler(Mathf.Clamp(previewInfo.pitch + previewPitch, 15f, 85f), previewYaw, 0f);
+        var target = PreviewOrigin + previewInfo.target;
+        previewCam.transform.SetPositionAndRotation(target - rot * Vector3.forward * previewInfo.distance, rot);
     }
 
     void BackToCharacterSelect()
@@ -806,6 +936,7 @@ public class MatchSelect : MonoBehaviour
 
     void UpdateStageSelect(float dt)
     {
+        if (!stageVote) { UpdateStageChoose(dt); return; }
         foreach (var p in Humans())
         {
             if (phaseFrame == Time.frameCount) break;
@@ -1041,10 +1172,16 @@ public class MatchSelect : MonoBehaviour
     void UpdateCursors()
     {
         float k = 1f - Mathf.Exp(-14f * Time.unscaledDeltaTime);
+        var chooser = Chooser();
         foreach (var p in slots)
         {
             if (p == null) continue;
-            if (p.cursorRect != null) p.cursorRect.anchoredPosition = p.cursor;
+            if (p.cursorRect != null)
+            {
+                p.cursorRect.anchoredPosition = p.cursor;
+                // ローカルのステージセレクトでは、えらぶ人のカーソルだけ出す
+                p.cursorRect.gameObject.SetActive(stageVote || (phase != Phase.Stage && phase != Phase.Lottery) || p == chooser);
+            }
             if (p.heldBy != null) p.charToken.anchoredPosition = p.heldBy.cursor + new Vector2(30f, -30f);   // 掴まれたコインはカーソルについてくる
             foreach (var token in new[] { p.charToken, p.stageToken })
             {
@@ -1198,7 +1335,7 @@ public class MatchSelect : MonoBehaviour
         {
             var chip = chips[i];
             var p = slots[i];
-            chip.rect.gameObject.SetActive(p != null && phase != Phase.Lottery);   // 抽選中は隠す
+            chip.rect.gameObject.SetActive(p != null && phase != Phase.Lottery && stageVote);   // 抽選中とローカル（投票しない）は隠す
             if (p == null) { chip.shown = null; continue; }
             chip.rect.GetComponent<Image>().color = p.Color;
             string chara = p.randomCharacter ? "ランダム" : p.character != null ? p.character.displayName : "-";
@@ -1255,11 +1392,15 @@ public class MatchSelect : MonoBehaviour
     {
         float k = 1f - Mathf.Exp(-14f * dt);
         var active = phase == Phase.Character ? charTiles : phase == Phase.Stage ? stageTiles : null;
+        var chooser = Chooser();
         foreach (var list in new[] { charTiles, stageTiles })
             foreach (var t in list)
             {
                 bool hovered = false;
-                if (list == active) foreach (var p in Humans()) if (TileAt(list, p.cursor) == t) hovered = true;
+                if (list == active)
+                    foreach (var p in Humans())
+                        if ((stageVote || list != stageTiles || p == chooser) && TileAt(list, p.cursor) == t) hovered = true;
+                if (!stageVote && list == stageTiles && phase == Phase.Lottery && t == previewTile) hovered = true;   // 決めたステージ
                 t.rect.localScale = Vector3.Lerp(t.rect.localScale, Vector3.one * (hovered ? 1.08f : 1f), k);
             }
     }
@@ -1288,6 +1429,8 @@ public class MatchSelect : MonoBehaviour
             var dp = g.dpad.ReadValue();
             if (dp.sqrMagnitude > m.sqrMagnitude) m = dp;
             s.move = m.magnitude < 0.2f ? Vector2.zero : m;
+            var look = g.rightStick.ReadValue();
+            s.look = look.magnitude < 0.2f ? Vector2.zero : look;
             s.a = g.buttonSouth.wasPressedThisFrame;
             s.b = g.buttonEast.wasPressedThisFrame;
             s.start = g.startButton.wasPressedThisFrame;
@@ -1299,6 +1442,7 @@ public class MatchSelect : MonoBehaviour
             float x = (k.dKey.isPressed || k.rightArrowKey.isPressed ? 1f : 0f) - (k.aKey.isPressed || k.leftArrowKey.isPressed ? 1f : 0f);
             float y = (k.wKey.isPressed || k.upArrowKey.isPressed ? 1f : 0f) - (k.sKey.isPressed || k.downArrowKey.isPressed ? 1f : 0f);
             s.move = Vector2.ClampMagnitude(new Vector2(x, y), 1f);
+            s.look = new Vector2((k.lKey.isPressed ? 1f : 0f) - (k.jKey.isPressed ? 1f : 0f), (k.iKey.isPressed ? 1f : 0f) - (k.kKey.isPressed ? 1f : 0f));
             s.start = k.enterKey.wasPressedThisFrame || k.numpadEnterKey.wasPressedThisFrame;
             s.a = k.spaceKey.wasPressedThisFrame || k.zKey.wasPressedThisFrame || s.start;
             s.b = k.escapeKey.wasPressedThisFrame || k.xKey.wasPressedThisFrame || k.backspaceKey.wasPressedThisFrame;
@@ -1338,6 +1482,73 @@ public class MatchSelect : MonoBehaviour
         foreach (var b in floaters) b.Rotate(new Vector3(0.3f, 0.7f, 0.2f), 12f * Time.unscaledDeltaTime);
         cam.transform.position = new Vector3(Mathf.Sin(t * 0.13f) * 0.3f, 3f + Mathf.Sin(t * 0.17f) * 0.1f, -10f);
         cam.transform.LookAt(new Vector3(0f, 3f, 5f));
+    }
+
+    // ローカルのステージセレクトの左半分：動かせるプレビュー・ステージ名・説明
+    void BuildStagePreview()
+    {
+        previewRoot = new GameObject("StagePreview").transform;
+        previewRoot.position = PreviewOrigin;   // 背景のカメラ（遠くは 120 まで）には映らない
+        previewTexture = new RenderTexture(1280, 720, 24) { antiAliasing = 4, name = "StagePreview" };
+        previewCam = new GameObject("StagePreviewCamera").AddComponent<Camera>();
+        previewCam.targetTexture = previewTexture;
+        previewCam.clearFlags = CameraClearFlags.SolidColor;
+        previewCam.backgroundColor = new Color(0.85f, 0.9f, 0.96f);
+        previewCam.fieldOfView = 40f;
+        previewCam.nearClipPlane = 0.3f;
+        previewCam.farClipPlane = 2000f;
+        previewCam.enabled = false;
+        UnityEngine.Rendering.RenderPipelineManager.beginCameraRendering += FogOffForPreview;
+        UnityEngine.Rendering.RenderPipelineManager.endCameraRendering += FogBackAfterPreview;
+
+        const float x = -475f;
+        previewFrame = ToyKit.UIImage("PreviewFrame", stageRoot, RandomColor, uiSprite);
+        previewFrame.GetComponent<Image>().pixelsPerUnitMultiplier = 0.4f;
+        ToyKit.Anchor(previewFrame, new Vector2(0.5f, 0.5f), new Vector2(x, 85f), new Vector2(880f, 495f));
+        var ol = previewFrame.gameObject.AddComponent<Outline>(); ol.effectColor = ToyKit.Ink; ol.effectDistance = new Vector2(3f, -3f);
+
+        var img = new GameObject("View", typeof(RectTransform)).AddComponent<RawImage>();
+        img.rectTransform.SetParent(previewFrame, false);
+        ToyKit.Stretch(img.rectTransform);
+        img.rectTransform.offsetMin = new Vector2(10f, 10f);
+        img.rectTransform.offsetMax = new Vector2(-10f, -10f);
+        img.texture = previewTexture;
+        img.enabled = false;
+        previewImage = img;
+
+        previewLetter = ToyKit.UIText("Letter", previewFrame, font, "", 220f, Color.white);
+        previewLetter.fontSharedMaterial = letterMat;
+        ToyKit.Stretch(previewLetter.rectTransform);
+
+        var tip = ToyKit.UIText("Tip", previewFrame, font, "右スティックで見回せる", 26f, Color.white);
+        tip.fontSharedMaterial = letterMat;
+        tip.alignment = TextAlignmentOptions.BottomRight;
+        ToyKit.Stretch(tip.rectTransform);
+        tip.rectTransform.offsetMin = new Vector2(20f, 18f);
+        tip.rectTransform.offsetMax = new Vector2(-24f, -18f);
+
+        previewName = ToyKit.UIText("Name", stageRoot, font, "", 64f, ToyKit.Ink);
+        previewName.fontSharedMaterial = popMat;
+        ToyKit.Anchor(previewName.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(x, -215f), new Vector2(880f, 90f));
+
+        ToyKit.Anchor(stageDescription.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(x, -300f), new Vector2(880f, 90f));
+        stageDescription.fontSize = 30f;
+        ToyKit.Anchor(stageStatus.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(x, -385f), new Vector2(880f, 60f));
+        stageStatus.fontSize = 38f;
+    }
+
+    // 背景のフォグ（16〜50）がプレビューにかかると白くかすむので、プレビューのカメラで撮る間だけ切る
+    bool fogWasOn;
+    void FogOffForPreview(UnityEngine.Rendering.ScriptableRenderContext context, Camera c)
+    {
+        if (c != previewCam) return;
+        fogWasOn = RenderSettings.fog;
+        RenderSettings.fog = false;
+    }
+
+    void FogBackAfterPreview(UnityEngine.Rendering.ScriptableRenderContext context, Camera c)
+    {
+        if (c == previewCam) RenderSettings.fog = fogWasOn;
     }
 
     void BuildUI()
@@ -1414,13 +1625,17 @@ public class MatchSelect : MonoBehaviour
         stageGroup = stageRoot.gameObject.AddComponent<CanvasGroup>();
         Header(stageRoot, "ステージセレクト", ToyKit.Palette[4]);
 
+        // 投票（オンライン用）は画面いっぱいに並べる。ローカルは右半分に並べ、左半分をプレビューにする
         int sc = roster.stages.Count + 1;   // 最後におまかせ
-        var sgrid = GridLayout(sc, stageColumns, new Vector2(1760f, 470f), new Vector2(380f, 240f), 18f, 345f);
+        var sgrid = stageVote
+            ? GridLayout(sc, stageColumns, new Vector2(1760f, 470f), new Vector2(380f, 240f), 18f, 345f)
+            : GridLayout(sc, 4, new Vector2(900f, 790f), new Vector2(280f, 180f), 14f, 350f);
         for (int i = 0; i < sc; i++)
         {
             bool random = i == roster.stages.Count;
             var st = random ? null : roster.stages[i];
-            var tile = MakeTile(stageRoot, sgrid[i].pos, sgrid[i].size, random ? RandomColor : st.color,
+            var pos = sgrid[i].pos + (stageVote ? Vector2.zero : new Vector2(480f, 0f));
+            var tile = MakeTile(stageRoot, pos, sgrid[i].size, random ? RandomColor : st.color,
                                 random ? null : st.preview, random ? "おまかせ" : st.displayName, random ? "？" : Initial(st.displayName));
             tile.stage = st;
             tile.random = random;
@@ -1434,6 +1649,8 @@ public class MatchSelect : MonoBehaviour
         stageDescription = ToyKit.UIText("Description", stageRoot, font, "", 32f, ToyKit.Ink);
         stageDescription.textWrappingMode = TextWrappingModes.Normal;
         ToyKit.Anchor(stageDescription.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, -195f), new Vector2(1700f, 110f));
+
+        if (!stageVote) BuildStagePreview();
 
         chips = new Chip[maxPlayers];
         for (int i = 0; i < maxPlayers; i++)

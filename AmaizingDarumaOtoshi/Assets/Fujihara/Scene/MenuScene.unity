@@ -231,6 +231,7 @@ MonoBehaviour:
   hammerScale: 0.75
   boardCenter: {x: 2.9, y: 2.35, z: 1}
   boardSize: {x: 6.4, y: 3.9}
+  boardLook: 0
 --- !u!4 &2041404170
 Transform:
   m_ObjectHideFlags: 0

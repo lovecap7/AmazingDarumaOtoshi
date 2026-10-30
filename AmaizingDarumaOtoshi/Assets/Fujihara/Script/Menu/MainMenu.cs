@@ -64,6 +64,12 @@ public class MainMenu : MonoBehaviour
     [SerializeField] Vector3 boardCenter = new Vector3(2.9f, 2.35f, 1.0f);
     [SerializeField] Vector2 boardSize = new Vector2(6.4f, 3.9f);
 
+    // 右の看板の見た目（中身の UI・位置・大きさはどれも同じ）
+    public enum BoardLook { ScoreBoard, Notebook, Whiteboard }
+    [Tooltip("ScoreBoard：卓上のめくり式の得点板　Notebook：ブックスタンドに立てた部活ノート　Whiteboard：前のホワイトボード\n" +
+             "得点板とノートは、映す項目が変わるたびにページがめくれる")]
+    [SerializeField] BoardLook boardLook = BoardLook.ScoreBoard;
+
     const int Battle = 0, Sound = 1, Video = 2, Credits = 3, Quit = 4;
     static readonly Vector3 BlockSize = new Vector3(2.6f, 0.72f, 1.1f);
     const float BoardDepth = 0.3f;
@@ -105,6 +111,13 @@ public class MainMenu : MonoBehaviour
     float wobbleTime = -100f;
     float dim, panelLit;
     float boardPunch = -100f;
+
+    // ---- 看板のページめくり（得点板・ノート） ----
+    const float FlipTime = 0.34f;
+    Transform flipPage;                 // めくれていくページ（上の綴じ目が軸）
+    float flipStart = -100f;
+    int shownKey = -1;                  // いま映している中身（変わったらめくる）
+    float boardTop;                     // 看板のいちばん上（板の上端からの高さ。積み木が乗る）
 
     // ---- ハンマー ----
     bool swinging;
@@ -282,25 +295,14 @@ public class MainMenu : MonoBehaviour
         BuildOverlay();
     }
 
-    // 右の看板（世界の中に立つ板。表面に設定画面の UI を貼る）
+    // 右の看板（世界の中に立つ物。表面に設定画面の UI を貼る）。どの見た目でも、表の面は z = -BoardDepth / 2
     void BuildBoard()
     {
         board = new GameObject("Board").transform;
         board.position = boardCenter;
-        var body = new GameObject("Body");
-        body.transform.SetParent(board, false);
-        body.AddComponent<MeshFilter>().sharedMesh = ToyKit.RoundedBox(new Vector3(boardSize.x, boardSize.y, BoardDepth), 0.18f, 10);
-        body.AddComponent<MeshRenderer>().sharedMaterial = ToyKit.Lit(new Color(1f, 0.97f, 0.92f), 0.4f);
-
-        float feetH = boardCenter.y - boardSize.y * 0.5f;
-        var wood = ToyKit.Lit(new Color(0.96f, 0.86f, 0.66f), 0.45f);
-        foreach (float x in new[] { -boardSize.x * 0.35f, boardSize.x * 0.35f })
-        {
-            var leg = ToyKit.Primitive(PrimitiveType.Cylinder, "Leg", board);
-            leg.localScale = new Vector3(0.18f, feetH * 0.5f, 0.18f);
-            leg.localPosition = new Vector3(x, -boardSize.y * 0.5f - feetH * 0.5f, 0f);
-            leg.GetComponent<Renderer>().sharedMaterial = wood;
-        }
+        if (boardLook == BoardLook.ScoreBoard) BuildScoreBoard();
+        else if (boardLook == BoardLook.Notebook) BuildNotebook();
+        else BuildWhiteboard();
 
         // 決定したときに看板を照らすスポットライト
         boardLight = new GameObject("BoardLight").AddComponent<Light>();
@@ -324,9 +326,11 @@ public class MainMenu : MonoBehaviour
         root.sizeDelta = new Vector2(boardSize.x - 0.2f, boardSize.y - 0.2f) / CanvasScale;
         root.localScale = Vector3.one * CanvasScale;
         root.localPosition = new Vector3(0f, 0f, -BoardDepth * 0.5f - 0.01f);
+        DecorateSurface(root);
 
         boardTitle = ToyKit.UIText("Title", root, font, "", 64f, ToyKit.Ink);
         ToyKit.Anchor(boardTitle.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -70f), new Vector2(1000f, 100f));
+        if (boardLook == BoardLook.ScoreBoard) boardTitle.color = Color.white;   // 赤い色帯の上
 
         battleGroup = BuildBattlePanel(root);
         soundGroup = BuildSoundPanel(root);
@@ -343,6 +347,175 @@ public class MainMenu : MonoBehaviour
         // プレビュー中に暗くする幕（最前面）
         boardDim = ToyKit.UIImage("Dim", root, new Color(0.2f, 0.15f, 0.15f, 0.5f), uiSprite).GetComponent<Image>();
         ToyKit.Stretch(boardDim.rectTransform);
+    }
+
+    // ---- 看板の見た目 ----
+    Transform Part(Mesh mesh, string name, Material mat, Vector3 pos, Transform parent = null)
+    {
+        var t = new GameObject(name).transform;
+        t.SetParent(parent != null ? parent : board, false);
+        t.localPosition = pos;
+        t.gameObject.AddComponent<MeshFilter>().sharedMesh = mesh;
+        t.gameObject.AddComponent<MeshRenderer>().sharedMaterial = mat;
+        return t;
+    }
+
+    Transform Prim(PrimitiveType type, string name, Material mat, Vector3 pos, Vector3 scale, Vector3 euler = default)
+    {
+        var t = ToyKit.Primitive(type, name, board);
+        t.localPosition = pos;
+        t.localScale = scale;
+        t.localRotation = Quaternion.Euler(euler);
+        t.GetComponent<Renderer>().sharedMaterial = mat;
+        return t;
+    }
+
+    // 机の上面（y = 0）の、看板から見た高さ
+    float TableY => -boardCenter.y;
+
+    // 前のホワイトボード（白い板に脚2本）
+    void BuildWhiteboard()
+    {
+        Part(ToyKit.RoundedBox(new Vector3(boardSize.x, boardSize.y, BoardDepth), 0.18f, 10), "Body", ToyKit.Lit(new Color(1f, 0.97f, 0.92f), 0.4f), Vector3.zero);
+        float feetH = boardCenter.y - boardSize.y * 0.5f;
+        var wood = ToyKit.Lit(new Color(0.96f, 0.86f, 0.66f), 0.45f);
+        foreach (float x in new[] { -boardSize.x * 0.35f, boardSize.x * 0.35f })
+            Prim(PrimitiveType.Cylinder, "Leg", wood, new Vector3(x, -boardSize.y * 0.5f - feetH * 0.5f, 0f), new Vector3(0.18f, feetH * 0.5f, 0.18f));
+        boardTop = 0f;
+    }
+
+    // 卓上のめくり式の得点板：緑の台と2本の柱、上の横棒にリングでカードを吊るす。後ろにめくったカードが重なっている
+    void BuildScoreBoard()
+    {
+        float w = boardSize.x, h = boardSize.y, front = -BoardDepth * 0.5f;
+        float barY = h * 0.5f + 0.2f;
+        var frame = ToyKit.Lit(new Color(0.16f, 0.4f, 0.31f), 0.35f);
+        var metal = ToyKit.Lit(new Color(0.78f, 0.8f, 0.84f), 0.8f);
+        var card = ToyKit.Lit(new Color(1f, 0.98f, 0.93f), 0.25f);
+
+        // 台と柱と横棒
+        Part(ToyKit.RoundedBox(new Vector3(w + 1.2f, 0.22f, 1.7f), 0.08f, 6), "Base", frame, new Vector3(0f, TableY + 0.11f, 0.25f));
+        float postH = barY + 0.25f - TableY;
+        foreach (float x in new[] { -w * 0.5f - 0.35f, w * 0.5f + 0.35f })
+            Part(ToyKit.RoundedBox(new Vector3(0.26f, postH, 0.26f), 0.06f, 4), "Post", frame, new Vector3(x, TableY + postH * 0.5f, 0f));
+        Prim(PrimitiveType.Cylinder, "Bar", metal, new Vector3(0f, barY, 0f), new Vector3(0.12f, w * 0.5f + 0.4f, 0.12f), new Vector3(0f, 0f, 90f));
+
+        // カード（表）と、後ろにめくったカード
+        var cardMesh = ToyKit.RoundedBox(new Vector3(w, h, 0.06f), 0.08f, 6);
+        Part(cardMesh, "Card", card, new Vector3(0f, 0f, front + 0.03f));
+        var back = ToyKit.Lit(new Color(0.93f, 0.9f, 0.84f), 0.25f);
+        for (int i = 0; i < 2; i++)
+        {
+            var hinge = new GameObject("BackHinge").transform;
+            hinge.SetParent(board, false);
+            hinge.localPosition = new Vector3(0f, barY, 0.1f + i * 0.08f);
+            hinge.localRotation = Quaternion.Euler(-6f - i * 5f, 0f, 0f);
+            Part(cardMesh, "BackCard", back, new Vector3(0f, -barY, 0f), hinge);
+        }
+
+        // 横棒に通したリング
+        for (int i = 0; i < 6; i++)
+        {
+            float x = (i - 2.5f) * (w / 6.5f);
+            Prim(PrimitiveType.Cylinder, "Ring", metal, new Vector3(x, barY, 0f), new Vector3(0.3f, 0.025f, 0.3f), new Vector3(0f, 0f, 90f));
+        }
+
+        flipPage = MakeFlipPage(cardMesh, card, barY, front - 0.04f);
+        boardTop = barY + 0.12f - h * 0.5f;
+    }
+
+    // ブックスタンドに立てた部活ノート（上がリング綴じ）。少し後ろにもたれている
+    void BuildNotebook()
+    {
+        float w = boardSize.x, h = boardSize.y, front = -BoardDepth * 0.5f;
+        board.rotation = Quaternion.Euler(8f, 0f, 0f);
+        var wood = ToyKit.Lit(new Color(0.8f, 0.6f, 0.4f), 0.4f);
+        var cover = ToyKit.Lit(new Color(0.24f, 0.42f, 0.72f), 0.35f);
+        var paper = ToyKit.Lit(new Color(1f, 0.99f, 0.96f), 0.15f);
+        var metal = ToyKit.Lit(new Color(0.35f, 0.36f, 0.4f), 0.7f);
+
+        // 表紙（後ろ）と紙の束
+        Part(ToyKit.RoundedBox(new Vector3(w + 0.16f, h + 0.12f, 0.06f), 0.06f, 4), "Cover", cover, new Vector3(0f, -0.04f, front + 0.16f));
+        var pageMesh = ToyKit.RoundedBox(new Vector3(w, h, 0.12f), 0.03f, 4);
+        Part(pageMesh, "Pages", paper, new Vector3(0f, 0f, front + 0.06f));
+
+        // 上のリング（紙を貫く輪）
+        float ringY = h * 0.5f;
+        for (int i = 0; i < 17; i++)
+        {
+            float x = (i - 8f) * (w / 17.5f);
+            Prim(PrimitiveType.Cylinder, "Ring", metal, new Vector3(x, ringY, front + 0.08f), new Vector3(0.24f, 0.012f, 0.24f), new Vector3(0f, 0f, 90f));
+        }
+
+        // ブックスタンド：ノートの下を受ける棚と、机までの脚。後ろに支えの板
+        // （板ごと傾けているので、机の上の物は傾きを戻して置く）
+        var stand = new GameObject("Stand").transform;
+        stand.SetParent(board, false);
+        stand.localPosition = new Vector3(0f, -h * 0.5f - 0.1f, front + 0.05f);
+        stand.rotation = Quaternion.identity;
+        Part(ToyKit.RoundedBox(new Vector3(w + 0.4f, 0.16f, 0.55f), 0.05f, 4), "Ledge", wood, new Vector3(0f, 0f, -0.1f), stand);
+        Part(ToyKit.RoundedBox(new Vector3(w + 0.4f, 0.1f, 0.18f), 0.04f, 4), "Lip", wood, new Vector3(0f, 0.11f, -0.32f), stand);
+        float legH = stand.position.y;   // 棚から机まで
+        foreach (float x in new[] { -w * 0.4f, w * 0.4f })
+            Part(ToyKit.RoundedBox(new Vector3(0.16f, legH, 0.16f), 0.04f, 4), "Leg", wood, new Vector3(x, -legH * 0.5f, 0f), stand);
+        // 支えの板：ノートの裏の真ん中あたりから、後ろの机まで
+        Vector3 a = board.TransformPoint(new Vector3(0f, 0f, front + 0.22f));
+        Vector3 b = new Vector3(a.x, 0f, a.z + 1.3f);
+        var prop = Part(ToyKit.RoundedBox(new Vector3(w * 0.4f, 0.08f, (a - b).magnitude), 0.03f, 3), "Prop", wood, Vector3.zero, stand);
+        prop.SetPositionAndRotation((a + b) * 0.5f, Quaternion.LookRotation(a - b));
+
+        flipPage = MakeFlipPage(ToyKit.RoundedBox(new Vector3(w, h, 0.02f), 0.02f, 3), paper, ringY, front - 0.03f);
+        boardTop = 0.14f;
+    }
+
+    // めくれていくページ：綴じ目（y = hingeY）を軸に、手前から上を越えて後ろへ回る。ふだんは隠しておく
+    Transform MakeFlipPage(Mesh mesh, Material mat, float hingeY, float z)
+    {
+        var hinge = new GameObject("FlipHinge").transform;
+        hinge.SetParent(board, false);
+        hinge.localPosition = new Vector3(0f, hingeY, z);
+        Part(mesh, "FlipPage", mat, new Vector3(0f, -hingeY, 0f), hinge);
+        hinge.gameObject.SetActive(false);
+        return hinge;
+    }
+
+    // 表面の飾り（中身の UI より後ろ）：得点板は上の色帯、ノートは罫線と赤い余白線
+    void DecorateSurface(RectTransform root)
+    {
+        if (boardLook == BoardLook.ScoreBoard)
+        {
+            var band = ToyKit.UIImage("Band", root, new Color(0.93f, 0.33f, 0.27f));
+            band.anchorMin = new Vector2(0f, 1f); band.anchorMax = new Vector2(1f, 1f); band.pivot = new Vector2(0.5f, 1f);
+            band.sizeDelta = new Vector2(-40f, 130f);
+            band.anchoredPosition = new Vector2(0f, -10f);
+            // 色帯の両はしの、めくり式の番号
+            foreach (float side in new[] { -1f, 1f })
+            {
+                var num = ToyKit.UIRounded("Num", band, new Color(1f, 0.98f, 0.93f), 14f);
+                ToyKit.Anchor(num, new Vector2(side < 0f ? 0f : 1f, 0.5f), new Vector2(side * -70f, 0f), new Vector2(80f, 100f));
+                var t = ToyKit.UIText("Text", num, font, side < 0f ? "0" : "1", 70f, ToyKit.Ink);
+                t.fontStyle = FontStyles.Bold;
+                ToyKit.Stretch(t.rectTransform);
+            }
+        }
+        else if (boardLook == BoardLook.Notebook)
+        {
+            var line = new Color(0.55f, 0.7f, 0.9f, 0.55f);
+            for (float y = -150f; y > -root.sizeDelta.y; y -= 90f)
+            {
+                var l = ToyKit.UIImage("Rule", root, line);
+                l.anchorMin = new Vector2(0f, 1f); l.anchorMax = new Vector2(1f, 1f);
+                l.sizeDelta = new Vector2(0f, 3f);
+                l.anchoredPosition = new Vector2(0f, y);
+            }
+            var margin = ToyKit.UIImage("Margin", root, new Color(0.9f, 0.4f, 0.4f, 0.6f));
+            margin.anchorMin = new Vector2(0f, 0f); margin.anchorMax = new Vector2(0f, 1f);
+            margin.sizeDelta = new Vector2(3f, 0f);
+            margin.anchoredPosition = new Vector2(70f, 0f);
+            var memo = ToyKit.UIText("Memo", root, font, "だるま部　れんしゅうノート", 30f, new Color(0.45f, 0.45f, 0.5f));
+            memo.alignment = TextAlignmentOptions.Right;
+            ToyKit.Anchor(memo.rectTransform, new Vector2(1f, 1f), new Vector2(-230f, -40f), new Vector2(420f, 50f));
+        }
     }
 
     // たたかう：ローカル／オンラインの大きなボタン2つ
@@ -1149,6 +1322,21 @@ public class MainMenu : MonoBehaviour
 
         float p = (sim - boardPunch) / 0.35f;
         board.localScale = Vector3.one * (1f + ToyKit.Punch(p, 0.05f));
+
+        // 映す中身が変わったら、前のページが手前から上を越えて後ろへめくれる（得点板・ノート）
+        int key = (int)content * 100 + item * 10 + (choosing ? choiceCursor + 1 : 0);
+        if (key != shownKey)
+        {
+            if (shownKey >= 0) flipStart = sim;
+            shownKey = key;
+        }
+        if (flipPage != null)
+        {
+            float u = (sim - flipStart) / FlipTime;
+            bool flipping = u >= 0f && u < 1f;
+            flipPage.gameObject.SetActive(flipping);
+            if (flipping) flipPage.localRotation = Quaternion.Euler(Mathf.Lerp(8f, 290f, Mathf.SmoothStep(0f, 1f, u)), 0f, 0f);
+        }
     }
 
     static void Fade(CanvasGroup g, bool on, float dt) => g.alpha = Mathf.MoveTowards(g.alpha, on ? 1f : 0f, dt * 6f);
@@ -1193,8 +1381,13 @@ public class MainMenu : MonoBehaviour
     // ================= 位置 =================
     Vector3 Slot(int i) => new Vector3(stackX, (labels.Length - 1 - i) * BH + BH * 0.5f, 0f);
 
-    // 看板の上（左寄り）に乗る位置
-    Vector3 Dock() => new Vector3(boardCenter.x - boardSize.x * 0.5f + BlockSize.x * 0.65f, boardCenter.y + boardSize.y * 0.5f + BH * 0.5f, boardCenter.z);
+    // 看板の上（左寄り）に乗る位置（得点板は横棒の上、ノートはリングの上。ノートは傾いているので傾きに沿わせる）
+    Vector3 Dock()
+    {
+        var top = new Vector3(-boardSize.x * 0.5f + BlockSize.x * 0.65f, boardSize.y * 0.5f + boardTop, 0f);
+        Vector3 p = board != null ? board.position + board.rotation * top : boardCenter + top;
+        return p + Vector3.up * BH * 0.5f;
+    }
 
     // 積み木の左面（ハンマーが当たる位置）
     Vector3 Contact(int i)

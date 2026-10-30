@@ -41,34 +41,94 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e08ae488b303122499b6eb002597b6ed, type: 2}
   - {fileID: 11400000, guid: 9cbb41ceddcdc484ab5b657f5932ecda, type: 2}
   - {fileID: 11400000, guid: 19b0c9bfe8ef4e942a7893f1a4f6da62, type: 2}
-  - {fileID: 11400000, guid: 9ed471c697bd6bd4b8c1fa0bb23e6e00, type: 2}
-  - {fileID: 11400000, guid: b0a5520bcf413be40aa63d0821de67e5, type: 2}
-  - {fileID: 11400000, guid: 114f0bd6e6adf5d45a9eb93c28679dd5, type: 2}
-  - {fileID: 11400000, guid: f52b6e1dfa65ceb408b53e38d1a4d363, type: 2}
-  - {fileID: 11400000, guid: 1b239f48560eb8d4a9f7ce60c71e1323, type: 2}
-  - {fileID: 11400000, guid: 82184f9d3609dbe47b2cd52df99a1f37, type: 2}
-  - {fileID: 11400000, guid: 01c22d673892a93488b73b3a1bdf1548, type: 2}
-  - {fileID: 11400000, guid: 23b88a5e098ee414cb2a8cb7603cf931, type: 2}
-  - {fileID: 11400000, guid: d3157a646cfe556429cb88166f3e446c, type: 2}
-  - {fileID: 11400000, guid: f4677ff0f5b964e43a449c96f5ac6f31, type: 2}
-  - {fileID: 11400000, guid: f6b6d1db8574eeb46bb53bb7c843b44c, type: 2}
-  - {fileID: 11400000, guid: 84b438ef198f58f4b8a2892fc833954a, type: 2}
-  - {fileID: 11400000, guid: b71f73c6d726a04429773d4976b555ba, type: 2}
-  - {fileID: 11400000, guid: a44c804bf8ed549448550ebbbe7d02df, type: 2}
-  - {fileID: 11400000, guid: 4fb0553321e01e74783596470e70e941, type: 2}
-  - {fileID: 11400000, guid: 84985068989d82c4f9443326315e2e3e, type: 2}
-  - {fileID: 11400000, guid: aef529470c9dc51409ced2a2dcfaf240, type: 2}
-  - {fileID: 11400000, guid: f9699031db0a88446b3a8777587f9c2f, type: 2}
-  - {fileID: 11400000, guid: 93866759a3e9bce4e9b8f4932e37f85c, type: 2}
-  - {fileID: 11400000, guid: 5fdd3ab69c14226458190cc14ddecd0e, type: 2}
-  - {fileID: 11400000, guid: 5518ab56dcf9d7d44bea87e01a3bca8d, type: 2}
-  - {fileID: 11400000, guid: 0974e3b8ed8f2c74eab2195c30192b86, type: 2}
-  - {fileID: 11400000, guid: 95088e36fd0b1d7498c83e065e4def25, type: 2}
-  - {fileID: 11400000, guid: e63e858047db3194b849359d9fd9f96c, type: 2}
-  - {fileID: 11400000, guid: 808e68d4afc52b847974ce3c3e9118be, type: 2}
-  - {fileID: 11400000, guid: 405449515b907b64ca2689d6c5c53ccb, type: 2}
-  - {fileID: 11400000, guid: 6b7cd9c5c2c25644c894cb368cedce90, type: 2}
-  - {fileID: 11400000, guid: 2cb0409ffcf6e504fb420b0cdcde7c20, type: 2}
-  - {fileID: 11400000, guid: 65cdedfc30c1c0a47b9f82b5dcf1fcb3, type: 2}
-  - {fileID: 11400000, guid: 751ed1f80e2dc6442a44151ba9b88026, type: 2}
-  - {fileID: 11400000, guid: a9c93dd9291a7bb47bb60ef004272942, type: 2}
+  stagePreviews:
+  - id: Stage01
+    model: {fileID: 2250992415309450338, guid: f697d05120d5a6e49b38432c9e1b177e, type: 3}
+    target: {x: 0, y: 0, z: -0.0000038146973}
+    distance: 29.999996
+    pitch: 55.000008
+  - id: Stage02
+    model: {fileID: 6721807970473989863, guid: db8147462d9692b4ba669628451d6b4e, type: 3}
+    target: {x: 0, y: 0, z: -0.0000019073486}
+    distance: 32.999996
+    pitch: 55.000008
+  - id: Stage03
+    model: {fileID: 2841358596347438483, guid: bb012b115e11cd848af4f5ffcfcee10c, type: 3}
+    target: {x: 0, y: 0, z: -0.0000038146973}
+    distance: 46.499992
+    pitch: 55.000008
+  - id: Stage04
+    model: {fileID: 373278823122575141, guid: 5b8a0baf985fc55458348736855d071c, type: 3}
+    target: {x: 0, y: 0.0000019073486, z: -0.0000038146973}
+    distance: 35.499992
+    pitch: 55.000008
+  - id: Stage05
+    model: {fileID: 271889513783257371, guid: c81065fdc2ae52e4a90b463b2ad4d6e4, type: 3}
+    target: {x: 0, y: 0, z: 0.4999981}
+    distance: 34.499996
+    pitch: 55.000008
+  - id: Stage06
+    model: {fileID: 4682958994377388894, guid: cfab61df06e213e4d8a8653eace7ceef, type: 3}
+    target: {x: 0, y: 0, z: -0.000002861023}
+    distance: 27.499996
+    pitch: 55.000008
+  - id: Stage07
+    model: {fileID: 2638616800185925812, guid: c06ce7a781fba3d42bc173dc7724d087, type: 3}
+    target: {x: 0, y: 0, z: -0.0000019073486}
+    distance: 32.999996
+    pitch: 55.000008
+  - id: Stage08
+    model: {fileID: 7778400331066250390, guid: 99692a3be5508d24da5f1302c182c179, type: 3}
+    target: {x: -0.5, y: 0, z: -0.0000038146973}
+    distance: 29.999996
+    pitch: 55.000008
+  - id: Stage09
+    model: {fileID: 4126858788398202282, guid: 5a67098a0aa71b7449dd8e6e836123d3, type: 3}
+    target: {x: 0, y: 0, z: -0.0000019073486}
+    distance: 31.499994
+    pitch: 55.000008
+  - id: Stage10
+    model: {fileID: 2593430481360594084, guid: 8fc1fe3c9e5d900439561d9613ab7b12, type: 3}
+    target: {x: 0, y: 0, z: -0.0000019073486}
+    distance: 31.499994
+    pitch: 55.000008
+  - id: Stage11
+    model: {fileID: 7475607712876471435, guid: 2e9ab1bb47bd8854986aa7d3ad09ae77, type: 3}
+    target: {x: 0, y: 0, z: -0.0000019073486}
+    distance: 32.999996
+    pitch: 55.000008
+  - id: Stage12
+    model: {fileID: 7809330082274891358, guid: 0ec1723c1d4d2004d8503dc911a4433a, type: 3}
+    target: {x: 0, y: 0, z: 0.4999981}
+    distance: 31.999996
+    pitch: 55.000008
+  - id: Stage13
+    model: {fileID: 6625919109743178094, guid: fdcd193169a00134fbd42aac9ec03ae7, type: 3}
+    target: {x: 0, y: 0, z: -0.0000019073486}
+    distance: 32.999996
+    pitch: 55.000008
+  - id: Stage14
+    model: {fileID: 2251670830224564136, guid: 15391fa18ad19dd449daf550a31c2230, type: 3}
+    target: {x: 0, y: 0.0000019073486, z: -0.0000038146973}
+    distance: 38.499992
+    pitch: 55.000008
+  - id: Stage15
+    model: {fileID: 2283216051699503109, guid: 559953c6e2eb89b448ed921220f991ff, type: 3}
+    target: {x: 0, y: 0, z: 0.4999981}
+    distance: 31.499994
+    pitch: 55.000008
+  - id: Stage16
+    model: {fileID: 2662835364644943063, guid: 87273c3e52c6f404190fb4ee01397d5e, type: 3}
+    target: {x: 0, y: 0, z: -0.000002861023}
+    distance: 27.499996
+    pitch: 55.000008
+  - id: Stage17
+    model: {fileID: 4242072370728386848, guid: b54f82fc0f1456243889ba22ad797188, type: 3}
+    target: {x: 0, y: 0, z: -0.0000019073486}
+    distance: 32.999996
+    pitch: 55.000008
+  - id: Stage18
+    model: {fileID: 8647752789050421418, guid: 4c0f31d5257cfd944a42ad1c4bdbd8cf, type: 3}
+    target: {x: -0.5, y: 0, z: 1.9799404}
+    distance: 25.047155
+    pitch: 40

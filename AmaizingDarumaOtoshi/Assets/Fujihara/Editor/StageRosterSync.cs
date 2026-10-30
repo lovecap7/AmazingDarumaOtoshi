@@ -14,6 +14,8 @@ using UnityEngine.SceneManagement;
 //    （既にある StageData は id で探して使う。新しく作るものは NewDataFolder に置く）
 //  ・遊ぶシーンは全ステージをまとめた AllStages（StageData.sceneName）。ステージセレクトで決まったら AllStages へ移動し、
 //    StageSwitcher が id のステージに切り替える
+//  ・ステージセレクト（ローカル）の動かせるプレビュー用に、見た目だけのステージを Fujihara/Data/StagePreviews に書き出し、
+//    SelectRoster.stagePreviews に入れる（プレビューだけ作り直すときは「Fujihara > ステージのプレビューを作り直す」）
 //  ・Nakagawa が撮ったステージの写真（Assets/Nakagawa/StagePreviews/<id>.png）があれば、プレビュー画像にする
 //    （手で別の画像を設定していればそのまま残す）。色はそのまま残す
 public static class StageRosterSync
@@ -32,6 +34,9 @@ public static class StageRosterSync
         new Color(0.95f, 0.75f, 0.60f), new Color(0.60f, 0.80f, 0.95f), new Color(0.70f, 0.90f, 0.65f),
         new Color(0.85f, 0.70f, 0.95f), new Color(0.98f, 0.88f, 0.55f), new Color(0.95f, 0.65f, 0.70f),
     };
+
+    // ステージセレクト（ローカル）で動かせるプレビューに使う、見た目だけのステージの置き場所
+    const string PreviewModelFolder = "Assets/Fujihara/Data/StagePreviews";
 
     struct StageSource
     {
@@ -61,6 +66,36 @@ public static class StageRosterSync
         EditorUtility.SetDirty(roster);
         AssetDatabase.SaveAssets();
         Debug.Log($"[StageRosterSync] ステージセレクトの一覧を {stages.Count} ステージで更新しました");
+        if (File.Exists(CombinedScenePath)) BakePreviews();
+    }
+
+    // AllStages の各ステージから見た目だけのプレビューを作り、SelectRoster.stagePreviews に入れる（Nakagawa のフォルダは変えない）
+    [MenuItem("Fujihara/ステージのプレビューを作り直す")]
+    public static void BakePreviews()
+    {
+        if (EditorApplication.isPlaying) { Debug.LogWarning("再生中は作れません"); return; }
+        var roster = AssetDatabase.LoadAssetAtPath<SelectRoster>(RosterPath);
+        if (roster == null) { Debug.LogError("SelectRoster が見つかりません：" + RosterPath); return; }
+
+        Scene scene = SceneManager.GetSceneByPath(CombinedScenePath);
+        bool wasLoaded = scene.IsValid() && scene.isLoaded;
+        if (!wasLoaded) scene = EditorSceneManager.OpenScene(CombinedScenePath, OpenSceneMode.Additive);
+
+        var previews = new List<SelectRoster.StagePreview>();
+        foreach (var root in scene.GetRootGameObjects())
+        {
+            var entry = root.GetComponent<StageEntry>();
+            if (entry == null) continue;
+            string id = entry.Info != null && !string.IsNullOrEmpty(entry.Info.Id) ? entry.Info.Id : entry.name;
+            if (!roster.stages.Exists(s => s != null && s.id == id)) continue;   // 一覧に並んでいるステージだけ
+            previews.Add(BakePreview(entry, id));
+        }
+        if (!wasLoaded) EditorSceneManager.CloseScene(scene, true);
+
+        roster.stagePreviews = previews;
+        EditorUtility.SetDirty(roster);
+        AssetDatabase.SaveAssets();
+        Debug.Log($"[StageRosterSync] ステージのプレビューを {previews.Count} 個作りました（{PreviewModelFolder}）");
     }
 
     // まとめたシーン（AllStages）の StageSwitcher に登録された順に読む
@@ -129,6 +164,45 @@ public static class StageRosterSync
             Title = info != null && !string.IsNullOrEmpty(info.Title) ? info.Title : fallbackName,
             Concept = info != null ? info.Concept : "",
         };
+    }
+
+    // ステージを写して、見た目（MeshFilter / MeshRenderer）だけを残したプレハブを作る。積み木の生成エリアの印は外す
+    // カメラは本編のカメラ（CameraPoint）と同じ距離・角度から、床の高さで見ている点を中心に回す
+    static SelectRoster.StagePreview BakePreview(StageEntry entry, string id)
+    {
+        EnsureFolder(PreviewModelFolder);
+        var copy = Object.Instantiate(entry.gameObject);
+        copy.name = id + "_Preview";
+        copy.SetActive(true);
+        copy.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+        foreach (Transform child in copy.transform)
+            if (child.GetComponent("TumikiSpawner") != null) Object.DestroyImmediate(child.gameObject);
+
+        // ほかの部品に必要とされている部品は先に消せないので、スクリプト → 関節 → そのほか → Rigidbody の順に消す
+        for (int order = 0; order < 4; order++)
+        {
+            foreach (var c in copy.GetComponentsInChildren<Component>(true))
+            {
+                if (c == null || c is Transform || c is MeshFilter || c is MeshRenderer) continue;
+                int o = c is MonoBehaviour ? 0 : c is Joint ? 1 : c is Rigidbody ? 3 : 2;
+                if (o == order) Object.DestroyImmediate(c);
+            }
+        }
+
+        var preview = new SelectRoster.StagePreview { id = id };
+        preview.model = PrefabUtility.SaveAsPrefabAsset(copy, $"{PreviewModelFolder}/{id}.prefab");
+        Object.DestroyImmediate(copy);
+
+        var cam = entry.CameraPoint;
+        if (cam != null && cam.forward.y < -0.05f)
+        {
+            float ground = entry.transform.position.y;
+            float t = (ground - cam.position.y) / cam.forward.y;
+            preview.target = entry.transform.InverseTransformPoint(cam.position + cam.forward * t);
+            preview.distance = t;
+            preview.pitch = cam.eulerAngles.x;
+        }
+        return preview;
     }
 
     // プロジェクトにある StageData（id → データ）。id が空ならファイル名で探す

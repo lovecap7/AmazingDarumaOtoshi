@@ -103,21 +103,10 @@ public class TitleClubRoomDressing : MonoBehaviour
             clouds.Add(TitleDressingKit.Quad(root, "Cloud", pos, new Vector3(s, s * 0.5f, 1f), cloudMat));
             cloudBase.Add(pos);
         }
-        // 校庭：土のグラウンドと、その向こうの木
+        // 校庭：土のグラウンド（向こうの木は木に見えなかったので一旦なし）
         // 窓枠の下の壁に隠れないよう、校庭は部屋の床より高くしてある（外の部員の全身が見えるように）
         var ground = TitleDressingKit.Quad(root, "Schoolyard", new Vector3(6f, YardY, BackZ + 15f), new Vector3(120f, 30f, 1f), TitleDressingKit.Unlit(new Color(0.78f, 0.66f, 0.5f)));
         ground.rotation = Quaternion.Euler(90f, 0f, 0f);
-        var leaf = TitleDressingKit.Unlit(new Color(0.35f, 0.6f, 0.32f));
-        var leaf2 = TitleDressingKit.Unlit(new Color(0.42f, 0.7f, 0.36f));
-        for (int i = 0; i < 10; i++)
-        {
-            var t = ToyKit.Primitive(PrimitiveType.Sphere, "Tree", root);
-            float s = 5f + (float)rng.NextDouble() * 4f;
-            t.localScale = new Vector3(s, s * 0.85f, 2f);
-            t.position = new Vector3(-16f + i * 4.6f, YardY + 3.5f + (float)rng.NextDouble() * 2.5f, BackZ + 28f);
-            t.GetComponent<Renderer>().sharedMaterial = i % 2 == 0 ? leaf : leaf2;
-            t.GetComponent<Renderer>().shadowCastingMode = ShadowCastingMode.Off;
-        }
     }
 
     // ================= 部屋（汚れた床・壁） =================
