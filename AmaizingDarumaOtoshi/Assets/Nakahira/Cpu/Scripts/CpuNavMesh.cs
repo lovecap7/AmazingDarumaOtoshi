@@ -10,6 +10,8 @@ namespace Nakahira
     // バンパーの周りは余裕を持って歩けないエリアにする(触れるとはじかれて落ちるため)
     // 道を求めるだけで NavMeshAgent は使わない(動きは DarumaCharacter の物理のまま)
     // ステージの床の配置が変わったら MarkDirty を呼ぶと、次に道を聞かれたときに作り直す
+    // 動くギミックは焼き込まない:せり上がり塀・扇風機は当たり判定がある間だけ切り抜き(CpuGimmickObstacle)、
+    // 移動床は乗り場から乗って行く道として使う(CpuMovingFloors / CpuRide)
     public static class CpuNavMesh
     {
         // ナビメッシュを作る範囲(ワールドの原点を中心とした立方体の一辺 m)
@@ -57,12 +59,39 @@ namespace Nakahira
             s_dirty = true;
         }
 
-        // from から to まで歩いて行ける道を求める。to の近く(水平に goalTolerance m 以内)まで行けなければ false
+        // from から to まで行ける道を求める。to の近く(水平に goalTolerance m 以内)まで行けなければ false
         // 道(曲がり角)は path に入る。length は道の長さ(水平)
+        // 歩いて行けなければ、移動床に乗って行く道を探す(そのときの path は乗り場までの道。length は乗る手間も含む)
         public static bool TryFindPath(Vector3 from, Vector3 to, float goalTolerance, NavMeshPath path, out float length)
         {
-            length = 0.0f;
+            return TryFindPath(from, to, goalTolerance, path, out length, out _);
+        }
+
+        // ride:移動床に乗って行くなら、その乗り方(歩いて行けるなら無効)
+        public static bool TryFindPath(Vector3 from, Vector3 to, float goalTolerance, NavMeshPath path, out float length, out CpuRidePlan ride)
+        {
+            ride = default;
             EnsureBuilt();
+            // 移動床の上にいるなら、今止まっている(動いていれば次に止まる)地点の乗り場から道を求める
+            // (床はナビメッシュに無いので。床が動いている間は降りない:CpuRide)
+            float extra = 0.0f;
+            if (CpuMovingFloors.TryGetFloorUnder(from, out var floor) && CpuMovingFloors.TryGetCurrentDock(floor, out Vector3 dock))
+            {
+                extra = FlatDistance(from, dock);
+                from = dock;
+            }
+            if (TryFindDirect(from, to, goalTolerance, path, out length) || CpuMovingFloors.TryFindRide(from, to, goalTolerance, path, out length, out ride))
+            {
+                length += extra;
+                return true;
+            }
+            return false;
+        }
+
+        // from から to まで歩いて行ける道を求める(移動床は使わない)
+        internal static bool TryFindDirect(Vector3 from, Vector3 to, float goalTolerance, NavMeshPath path, out float length)
+        {
+            length = 0.0f;
             if (!NavMesh.SamplePosition(from, out NavMeshHit start, kStartSampleRadius, NavMesh.AllAreas)) return false;
             if (!NavMesh.SamplePosition(to, out NavMeshHit goal, goalTolerance, NavMesh.AllAreas)) return false;
             if (FlatDistance(goal.position, to) > goalTolerance) return false;
@@ -98,14 +127,16 @@ namespace Nakahira
 
             var bounds = new Bounds(Vector3.zero, Vector3.one * kBuildSize);
             NavMeshBuilder.CollectSources(bounds, ~0, NavMeshCollectGeometry.PhysicsColliders, 0, s_markups, s_sources);
-            // 動くもの(積み木・キャラクター)と、通り抜けられるトリガーは足場・壁にしない
+            // 動くもの(積み木・キャラクター・動くギミック)と、通り抜けられるトリガーは足場・壁にしない
+            // (せり上がり塀・扇風機は CpuGimmickObstacle で切り抜き、移動床は CpuMovingFloors で乗り場から使う)
             s_sources.RemoveAll(source =>
             {
                 var col = source.component as Collider;
                 if (col == null) return false;
                 return col.isTrigger
                     || col.GetComponentInParent<TumikiBlock>() != null
-                    || col.GetComponentInParent<DarumaCharacter>() != null;
+                    || col.GetComponentInParent<DarumaCharacter>() != null
+                    || IsDynamicGimmick(col);
             });
             AddHazards();
 
@@ -119,6 +150,32 @@ namespace Nakahira
             NavMeshData data = NavMeshBuilder.BuildNavMeshData(settings, s_sources, bounds, Vector3.zero, Quaternion.identity);
             if (data != null) s_instance = NavMesh.AddNavMeshData(data);
             s_sources.Clear();
+
+            AttachObstacles();
+            CpuMovingFloors.Build();
+        }
+
+        private static bool IsDynamicGimmick(Collider col)
+        {
+            return col.GetComponentInParent<Nakagawa.RisingWallGimmick>() != null
+                || col.GetComponentInParent<Nakagawa.FanGimmick>() != null
+                || col.GetComponentInParent<Nakagawa.MovingFloorGimmick>() != null;
+        }
+
+        // せり上がり塀・扇風機の本体を、当たり判定がある間だけナビメッシュから切り抜く
+        // (せり上がり塀は床に戻っている間は当たり判定が無効なので、無効なものも含めて付けておく)
+        private static void AttachObstacles()
+        {
+            foreach (var wall in Object.FindObjectsByType<Nakagawa.RisingWallGimmick>()) AttachObstacles(wall);
+            foreach (var fan in Object.FindObjectsByType<Nakagawa.FanGimmick>()) AttachObstacles(fan);
+        }
+
+        private static void AttachObstacles(Component gimmick)
+        {
+            foreach (var box in gimmick.GetComponentsInChildren<BoxCollider>(true))
+            {
+                if (!box.isTrigger) CpuGimmickObstacle.Attach(box);
+            }
         }
 
         // 触れると危ないギミック(バンパー:触れるとはじかれて奈落に落ちることがある)を覚え、

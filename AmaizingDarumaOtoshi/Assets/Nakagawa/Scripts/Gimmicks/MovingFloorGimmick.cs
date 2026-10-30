@@ -58,6 +58,20 @@ namespace Nakagawa
         float m_waitTimer;
         bool m_stopped;
 
+        // CPU が乗り降りを判断するための読み取り用
+        // 地点の位置(開始時の位置)・回り方・速さ・大きさ・今の上面の中心
+        public IReadOnlyList<Vector3> Points => m_points;
+        public LoopMode Mode => m_loopMode;
+        public float Speed => m_speed;
+        public Vector2 Size => m_size;
+        public Vector3 Position => m_rb != null ? m_rb.position : transform.position;
+        // 地点で止まっているならその地点の番号、動いているなら -1
+        public int StoppedAt => m_points.Count == 0 ? -1 : (m_stopped || m_waitTimer > 0.0f) ? m_index : -1;
+        // 止まっている残りの時間(動いていれば 0。片道の終点などで止まりきりなら無限)
+        public float WaitRemaining => m_stopped ? float.PositiveInfinity : Mathf.Max(0.0f, m_waitTimer);
+        // 次に止まる地点(止まっていれば、次に向かう地点)
+        public int NextStop => m_points.Count < 2 || m_stopped ? m_index : NextIndex();
+
         private void Awake()
         {
             m_rb = GetComponent<Rigidbody>();

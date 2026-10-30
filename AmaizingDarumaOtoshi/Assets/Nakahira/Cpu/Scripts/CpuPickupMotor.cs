@@ -118,7 +118,8 @@ namespace Nakahira
             }
 
             CpuParams p = c.Params;
-            m_chaseTime += c.DeltaTime;
+            // 移動床を待っている・乗っている間は近づけなくても諦めない
+            if (!m_route.HasRide) m_chaseTime += c.DeltaTime;
             if (m_chaseTime > p.GiveUpTime)
             {
                 c.GiveUp(m_target);

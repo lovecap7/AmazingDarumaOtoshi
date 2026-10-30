@@ -18,6 +18,7 @@ namespace Nakahira
 
         public override string Name => "攻めに行く";
         public MatchPlayer Target => m_target;
+        public override CpuPathFollower Route => m_route;
 
         public override float Evaluate(CpuContext c)
         {

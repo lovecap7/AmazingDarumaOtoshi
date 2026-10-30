@@ -73,6 +73,7 @@ namespace Nakahira
         float m_nextWanderTime;
 
         public override string Name => "待つ";
+        public override CpuPathFollower Route => m_route;
 
         public override float Evaluate(CpuContext c)
         {
