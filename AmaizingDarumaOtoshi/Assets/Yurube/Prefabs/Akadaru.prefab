@@ -608,6 +608,8 @@ GameObject:
   - component: {fileID: 6242312641939630888}
   - component: {fileID: 1611246128041429823}
   - component: {fileID: 5182239471364050811}
+  - component: {fileID: 5182239471364050812}
+  - component: {fileID: 5182239471364050813}
   m_Layer: 0
   m_Name: Akadaru
   m_TagString: Untagged
@@ -734,4 +736,38 @@ MonoBehaviour:
   m_shotSpeedPerRedBlock: 1
   m_maxShotSpeed: 60
   m_logShotSpeed: 1
+  m_enableShotVisuals: 1
+  m_searchRadius: 3
   m_effectMaterial: {fileID: 2100000, guid: dd619cf70c425c048af5157405cb98d5, type: 2}
+--- !u!114 &5182239471364050812
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9069936943766670842}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0a13560a26218d46964d9c9f251e1ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Yurube.SpecialGauge
+  m_blocksToFill: 5
+--- !u!114 &5182239471364050813
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9069936943766670842}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 083fc32391edb6596dd652435eefa3f1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Yurube.AkadaruSpecial
+  m_speed: 40
+  m_trailDuration: 10
+  m_effectMinSpeed: 130
+  m_effectMaxSpeed: 260
+  m_ownerGrace: 0.6
+  m_hitInterval: 0.4
+  m_logSpecial: 1

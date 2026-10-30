@@ -19,10 +19,10 @@ public class BlockController : MonoBehaviour
     public event Action OnFlightEnded;
 
     // テスト用：インスペクターで挙動を選べるようにする
-    public enum BehaviorType { Normal, Iwa,HebiLeft, HebiRight, UnBreak,Homing,Ziguzagu,Grow,Bomb, Magnet,Fade, Boomerang, Gravity }
+    public enum BehaviorType { Normal, Iwa,HebiLeft, HebiRight, UnBreak,Homing,Ziguzagu,Grow,Bomb, Magnet,Fade, Boomerang, Gravity, Accelerat, Funnel }
     [SerializeField] BehaviorType behaviorType = BehaviorType.Normal;
     [SerializeField] float hebiTurnSpeed = 60.0f; // テスト用：へびだるの曲がる強さ(度/秒)。大きいほど急カーブになる
-    [SerializeField] float homingStartTurnSpeed = 270f;  // テスト用：ホーミング発射直後の旋回速度(度/秒)
+    [SerializeField] float homingStartTurnSpeed = 270.0f;  // テスト用：ホーミング発射直後の旋回速度(度/秒)
     [SerializeField] float homingGuidanceDuration = 1.5f; // テスト用：誘導が切れるまでの時間(秒)
     [SerializeField] float ziguzagAngle = 40.0f;      // テスト用：ジグザグの傾き(度)
     [SerializeField] float ziguzagInterval = 0.4f;  // テスト用：向きを切り替える間隔(秒)
@@ -45,6 +45,15 @@ public class BlockController : MonoBehaviour
     [SerializeField] float gravityDuration = 2.5f;    // テスト用：井戸が残る時間(秒)
     [SerializeField] float gravityDeadZone = 0.4f;    // テスト用：中心で止まる距離
     [SerializeField] float gravityEdgeRatio = 0.4f; // テスト用：範囲の端での強さ(中心を1とした割合)
+    [SerializeField] float accelRate = 1.3f;       // テスト用：壁ヒットごとの加速倍率
+    [SerializeField] float accelMaxSpeed = 12.0f;  // テスト用：速度の上限
+    [SerializeField] int accelMaxBlockHits = 2;    // テスト用：積み木に何回当たったら壊れるか
+
+    int funnelCount = 5;               // テスト用：分裂後の総数。本来はプレイヤーが管理している積み木の数を渡す
+    float funnelSpacing = 2.4f;        // テスト用：分身を左右に並べる間隔(積み木の幅に対する倍率)
+    float funnelSearchRadius = 15.0f;  // テスト用：狙う相手を探す範囲
+    float funnelTurnSpeed = 270.0f;    // テスト用：発射直後の旋回速度(度/秒)
+    float funnelDuration = 3.0f;       // テスト用：誘導が切れるまでの時間(秒)
 
     public bool isFlying {  get; private set; } // 現在飛行中かどうか trueの場合は攻撃判定が発生する
 
@@ -108,6 +117,8 @@ public class BlockController : MonoBehaviour
             case BehaviorType.Fade: return new FadeBehavior(this, fadeDelay, fadeDuration, fadeMinAlpha);
             case BehaviorType.Boomerang: return new BoomerangBehavior(this, boomerangReturnTarget, boomerangRadius, boomerangCurveLeft, boomerangArriveDistance);
             case BehaviorType.Gravity: return new GravityWellBehavior(this, gravityRadius, gravityStrength, gravityDuration, gravityDeadZone, gravityEdgeRatio);
+            case BehaviorType.Accelerat: return new AcceleratBehavior(this, accelRate, accelMaxSpeed, accelMaxBlockHits);
+            case BehaviorType.Funnel: return new FunnelBehavior(this, funnelCount, funnelSpacing, funnelSearchRadius, funnelTurnSpeed, funnelDuration);
             case BehaviorType.Normal:
             default: return new NormalBehavior();
         }
@@ -166,6 +177,18 @@ public class BlockController : MonoBehaviour
         Vector3 v = direction * currentSpeed;
         v.y = rb.linearVelocity.y;
         rb.linearVelocity = v;
+    }
+
+    // 挙動のインスタンスを直接差し替える(FunnelBehaviorが分身に渡すためなど)
+    public void SetBehaviorInstance(IBlockBehavior newBehavior)
+    {
+        behavior = newBehavior;
+    }
+
+    // 飛行が終わって止まったら、この積み木を消す(分身が場に残り続けないようにする)
+    public void DestroyWhenFlightEnds()
+    {
+        OnFlightEnded += () => Destroy(gameObject);
     }
 
     void StopFlying()
@@ -330,5 +353,11 @@ public class BlockController : MonoBehaviour
             return block;
         }
         return null;
+    }
+
+    // 速度を倍率で上げる(上限つき)。壁で加速する挙動などから呼ぶ
+    public void BoostSpeed(float ratio, float maxSpeed)
+    {
+        currentSpeed = Mathf.Min(currentSpeed * ratio, maxSpeed);
     }
 }

@@ -23,6 +23,79 @@ namespace Nakagawa.EditorTools
         const int kPreviewHeight = 480;
         // まとめたシーンの壁の高さ(Yスケール)
         const float kWallHeight = 5.0f;
+        // ステージごとのカメラの設定(再生中に StageCameraTuner で保存する)
+        public const string kCameraPresetsPath = kStageDir + "/StageCameraPresets.asset";
+
+        // ステージごとのカメラの設定。なければ作る
+        public static StageCameraPresets LoadOrCreateCameraPresets()
+        {
+            var presets = AssetDatabase.LoadAssetAtPath<StageCameraPresets>(kCameraPresetsPath);
+            if (presets != null) return presets;
+            presets = ScriptableObject.CreateInstance<StageCameraPresets>();
+            AssetDatabase.CreateAsset(presets, kCameraPresetsPath);
+            AssetDatabase.SaveAssets();
+            return presets;
+        }
+
+        // 保存したカメラの設定を、開いているまとめたシーンの各ステージの CameraPoint に写し、写したステージの写真を撮り直す
+        // (StageSwitcher は再生中に設定を直接使うので、写さなくても再生中の見た目は変わらない。エディタ上の見た目と写真のため)
+        [MenuItem("Nakagawa/Stages/Apply Camera Presets To AllStages")]
+        public static void ApplyCameraPresets()
+        {
+            if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
+            Scene combined = SceneManager.GetSceneByPath(kCombinedPath);
+            if (!combined.IsValid() || !combined.isLoaded) combined = EditorSceneManager.OpenScene(kCombinedPath, OpenSceneMode.Single);
+            var switcher = FindInScene<StageSwitcher>(combined);
+            if (switcher == null)
+            {
+                Debug.LogError($"[StageCombiner] {kCombinedPath} に StageSwitcher がありません");
+                return;
+            }
+            var so = new SerializedObject(switcher);
+            var stagesProp = so.FindProperty("m_stages");
+            var stages = new List<StageEntry>();
+            var changed = new List<StageEntry>();
+            for (int i = 0; i < stagesProp.arraySize; i++)
+            {
+                if (!(stagesProp.GetArrayElementAtIndex(i).objectReferenceValue is StageEntry e)) continue;
+                stages.Add(e);
+                if (ApplyCameraPreset(e)) changed.Add(e);
+            }
+            var sharedPointsProp = so.FindProperty("m_spawnPoints");
+            var sharedPoints = new Transform[sharedPointsProp.arraySize];
+            for (int i = 0; i < sharedPoints.Length; i++) sharedPoints[i] = sharedPointsProp.GetArrayElementAtIndex(i).objectReferenceValue as Transform;
+            var sharedArea = so.FindProperty("m_stageArea").objectReferenceValue as StageArea;
+            var camera = so.FindProperty("m_camera").objectReferenceValue as Camera;
+            if (changed.Count > 0 && camera != null && sharedArea != null)
+            {
+                foreach (var s in stages) s.gameObject.SetActive(false);
+                CapturePreviews(changed, sharedPoints, sharedArea, camera);
+                for (int i = 0; i < stages.Count; i++) stages[i].gameObject.SetActive(i == 0);
+                ApplySharedToStage(stages[0], sharedPoints, sharedArea, camera);
+            }
+            EditorSceneManager.SaveScene(combined);
+            Debug.Log($"[StageCombiner] 保存したカメラの設定を {changed.Count} ステージの CameraPoint に写しました\n" + string.Join("\n", changed.Select(e => e.name)));
+        }
+
+        // 保存したカメラの設定があれば、ステージの CameraPoint に写す。写したら true
+        static bool ApplyCameraPreset(StageEntry stage)
+        {
+            var presets = AssetDatabase.LoadAssetAtPath<StageCameraPresets>(kCameraPresetsPath);
+            string id = stage.Info != null && !string.IsNullOrEmpty(stage.Info.Id) ? stage.Info.Id : stage.name;
+            var preset = presets != null ? presets.Find(id) : null;
+            if (preset == null || stage.CameraPoint == null) return false;
+            stage.CameraPoint.SetPositionAndRotation(preset.Position, preset.Rotation);
+            return true;
+        }
+
+        // 保存したカメラの視野角(なければ fallback)
+        static float PresetFov(StageEntry stage, float fallback)
+        {
+            var presets = AssetDatabase.LoadAssetAtPath<StageCameraPresets>(kCameraPresetsPath);
+            string id = stage.Info != null && !string.IsNullOrEmpty(stage.Info.Id) ? stage.Info.Id : stage.name;
+            var preset = presets != null ? presets.Find(id) : null;
+            return preset != null && preset.Fov > 0.0f ? preset.Fov : fallback;
+        }
 
         [MenuItem("Nakagawa/Stages/Build Combined Scene (AllStages)")]
         public static void Build()
@@ -410,6 +483,8 @@ namespace Nakagawa.EditorTools
             }
             pointCount = points.Count;
             entry.Set(info, points.ToArray(), area, cameraPoint);
+            // 再生中に保存したカメラの設定があれば、作り直しても引き継ぐ
+            ApplyCameraPreset(entry);
             if (backdrop != null) entry.SetBackdrop(PrefabUtility.GetCorrespondingObjectFromSource(backdrop));
             report = $"{entry.DisplayName}: 出現位置{points.Count} / 生成エリア{root.GetComponentsInChildren<TumikiSpawnArea>(true).Length} / TumikiSpawner{spawners.Count}" +
                      (backdrop != null ? $" / 背景 {backdrop.Id}" : "");
@@ -489,6 +564,7 @@ namespace Nakagawa.EditorTools
             var tex = new Texture2D(kPreviewWidth, kPreviewHeight, TextureFormat.RGB24, false);
             var prevTarget = camera.targetTexture;
             var prevActive = RenderTexture.active;
+            float prevFov = camera.fieldOfView;
             var paths = new List<string>();
             try
             {
@@ -496,6 +572,7 @@ namespace Nakagawa.EditorTools
                 {
                     for (int j = 0; j < stages.Count; j++) stages[j].gameObject.SetActive(j == i);
                     ApplySharedToStage(stages[i], sharedPoints, sharedArea, camera);
+                    camera.fieldOfView = PresetFov(stages[i], prevFov);
 
                     camera.targetTexture = rt;
                     camera.Render();
@@ -512,6 +589,7 @@ namespace Nakagawa.EditorTools
             finally
             {
                 camera.targetTexture = prevTarget;
+                camera.fieldOfView = prevFov;
                 RenderTexture.active = prevActive;
                 Object.DestroyImmediate(rt);
                 Object.DestroyImmediate(tex);

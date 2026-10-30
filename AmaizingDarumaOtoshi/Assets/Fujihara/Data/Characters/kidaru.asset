@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c8a751e747833b74c9fdf9b27cff5e69, type: 3}
+  m_Name: kidaru
+  m_EditorClassIdentifier: Assembly-CSharp::CharacterData
+  id: kidaru
+  displayName: "\u304d\u3060\u308b"
+  color: {r: 0.95, g: 0.85, b: 0.2, a: 1}
+  portrait: {fileID: 0}
+  prefab: {fileID: 9069936943766670842, guid: eee8c0cfb1cf6e24cc8ec6956b6554bf, type: 3}
+  passiveColor: 3
+  passiveCount: 1
+  passiveName: "\u9ec4\u306e\u5897\u6b96"
+  passiveText: "\u9ec4\u8272\u3044\u7a4d\u307f\u6728\u3092\u7a4d\u3080\u3068\u3001\u3082\u30461\u500b\u5897\u3048\u308b"
+  hammerPower: 3
+  hammerSpeed: 3
+  hammerReach: 3
+  specialName: ""
+  specialText: ""

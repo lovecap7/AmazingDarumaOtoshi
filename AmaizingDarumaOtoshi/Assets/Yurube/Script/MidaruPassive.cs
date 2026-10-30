@@ -25,6 +25,10 @@ namespace Yurube
         private void Awake()
         {
             m_character = GetComponent<DarumaCharacter>();
+
+            // 必殺技「ファンネル」用のゲージと発動コンポーネント(プレハブに無ければ付ける)
+            if (GetComponent<SpecialGauge>() == null) gameObject.AddComponent<SpecialGauge>();
+            if (GetComponent<MidaruSpecial>() == null) gameObject.AddComponent<MidaruSpecial>();
         }
 
         private void FixedUpdate()

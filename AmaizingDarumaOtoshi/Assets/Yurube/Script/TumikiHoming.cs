@@ -21,7 +21,9 @@ namespace Yurube
         TumikiBlock m_block;
         DarumaCharacter m_shooter;
         DarumaCharacter m_target;
+        DarumaCharacter m_preferredTarget;
         float m_elapsed;
+        float m_startDelay;
         // 何も設定されていないときは動かさない(Begin で false になる)
         bool m_finished = true;
         bool m_loggedStart;
@@ -48,17 +50,32 @@ namespace Yurube
         // みだるのパッシブから、飛び始めた緑の積み木に対して呼ばれる
         public void Begin(DarumaCharacter shooter, float turnSpeed, float guidanceDuration, bool log)
         {
+            Begin(shooter, turnSpeed, guidanceDuration, log, 0.0f);
+        }
+
+        // startDelay: 発射してから追いかけ始めるまでの時間(必殺技の分裂弾用)
+        public void Begin(DarumaCharacter shooter, float turnSpeed, float guidanceDuration, bool log, float startDelay)
+        {
             m_shooter = shooter;
             m_turnSpeed = turnSpeed;
             m_guidanceDuration = guidanceDuration;
             m_logHoming = log;
+            m_startDelay = Mathf.Max(0.0f, startDelay);
 
             m_target = null;
+            m_preferredTarget = null;
             m_elapsed = 0.0f;
             m_finished = false;
             m_loggedStart = false;
             ConsumedLaunch = true;
             enabled = true;
+        }
+
+        // 必殺技から「この敵を狙え」と指定する(未指定なら一番近い敵)
+        public void SetPreferredTarget(DarumaCharacter target)
+        {
+            m_preferredTarget = target;
+            m_target = target;
         }
 
         private void FixedUpdate()
@@ -78,13 +95,21 @@ namespace Yurube
             }
 
             m_elapsed += Time.fixedDeltaTime;
-            if (m_elapsed >= m_guidanceDuration)
+
+            // 発射直後はまっすぐ飛ばす(ファンネルのように出てから曲がる)
+            if (m_elapsed < m_startDelay) return;
+
+            if (m_elapsed >= m_startDelay + m_guidanceDuration)
             {
                 Finish();
                 return;
             }
 
-            if (m_target == null) m_target = FindTarget();
+            // 指定された敵がいればそこへ、いなければ一番近い敵へ
+            if (m_target == null)
+            {
+                m_target = m_preferredTarget != null ? m_preferredTarget : FindTarget();
+            }
             if (m_target == null) return;
 
             if (!m_loggedStart)
@@ -92,7 +117,7 @@ namespace Yurube
                 m_loggedStart = true;
                 if (m_logHoming)
                 {
-                    Debug.Log($"[みだる] 緑の積み木がホーミング開始 → {m_target.name}", this);
+                    Debug.Log($"[みだる] 積み木がホーミング開始 → {m_target.name}", this);
                 }
             }
 

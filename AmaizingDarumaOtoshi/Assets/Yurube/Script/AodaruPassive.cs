@@ -22,6 +22,9 @@ namespace Yurube
         [Tooltip("風の粒・残像に使うマテリアル(FireParticle など。未設定なら自動生成)")]
         [SerializeField] Material m_effectMaterial;
 
+        // 必殺技のエネルギーハンマーでも同じマテリアルを使う
+        public Material EffectMaterial => m_effectMaterial;
+
         DarumaCharacter m_character;
         int m_lastBlue = -1;
         float m_lastLoggedSpeed = -1.0f;
@@ -29,6 +32,10 @@ namespace Yurube
         private void Awake()
         {
             m_character = GetComponent<DarumaCharacter>();
+
+            // 必殺技「六腕」用のゲージと発動コンポーネント(プレハブに無ければ付ける)
+            if (GetComponent<SpecialGauge>() == null) gameObject.AddComponent<SpecialGauge>();
+            if (GetComponent<AodaruSpecial>() == null) gameObject.AddComponent<AodaruSpecial>();
 
             // 移動速度UPを見た目で出す(青い風・残像)
             var effect = GetComponent<AodaruSpeedEffect>();
@@ -76,5 +83,11 @@ namespace Yurube
         {
             return Mathf.Min(m_character.MoveSpeed + blue * m_speedPerBlueBlock, m_maxMoveSpeed);
         }
+
+        // ---- デバッグ表示用(キャラクターラボから読む) ----
+        public int BlueCount => CountBlue();
+        public float EffectiveSpeed => TargetSpeed(CountBlue());
+        public float SpeedPerBlueBlock => m_speedPerBlueBlock;
+        public float MaxMoveSpeed => m_maxMoveSpeed;
     }
 }

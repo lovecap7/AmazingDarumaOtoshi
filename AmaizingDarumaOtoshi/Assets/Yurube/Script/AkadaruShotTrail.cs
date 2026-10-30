@@ -24,10 +24,30 @@ namespace Yurube
         [SerializeField] float m_minLight = 11.5f;
         [SerializeField] float m_maxLight = 26.0f;
 
+        [Header("必殺技(トロン)用の強調")]
+        [Tooltip("レーザーの外側グロー(帯)の太さ")]
+        [SerializeField] float m_specialGlowWidth = 4.0f;
+        [Tooltip("レーザーの中心(白い芯)の太さ")]
+        [SerializeField] float m_specialCoreWidth = 1.0f;
+        [Tooltip("必殺技レーザーの残光の長さ(秒)")]
+        [SerializeField] float m_specialTime = 2.0f;
+        [Tooltip("必殺技中の火の粉の量(個/秒)")]
+        [SerializeField] float m_specialCometRate = 600.0f;
+        [Tooltip("必殺技中の火の粉の大きさ")]
+        [SerializeField] float m_specialCometSize = 1.4f;
+        [Tooltip("必殺技中の光の強さ")]
+        [SerializeField] float m_specialLight = 48.0f;
+        [Tooltip("必殺技中の光の届く距離")]
+        [SerializeField] float m_specialLightRange = 12.0f;
+
         TumikiBlock m_block;
         TrailRenderer m_trail;
         ParticleSystem m_comet;
         Light m_light;
+        // 必殺技(トロン)のときだけ足す、太くて白いレーザーの帯
+        TrailRenderer m_specialGlow;
+        TrailRenderer m_specialCore;
+        bool m_special;
         // 積み木が元々持っている煙・炎のエフェクト(あかだるの弾の間だけ消す)
         ParticleSystem[] m_blockEffects;
         float m_minSpeed = 10.0f;
@@ -48,6 +68,17 @@ namespace Yurube
             m_minSpeed = Mathf.Max(0.01f, minSpeed);
             m_maxSpeed = Mathf.Max(m_minSpeed + 0.01f, maxSpeed);
             ConsumedLaunch = true;
+            m_special = false;
+
+            // 前回の残像が消えかけている場合は片付ける(再発射で新しい演出を出す)
+            if (m_trail != null && !m_trail.emitting)
+            {
+                Destroy(m_trail.gameObject);
+                m_trail = null;
+                m_comet = null;
+                m_light = null;
+                ClearSpecialOverlay();
+            }
 
             CreateEffect(material);
             HideBlockEffects();
@@ -62,6 +93,75 @@ namespace Yurube
             }
         }
 
+        // 必殺技「トロン」用。通常の射撃より太く・白く・長く残るレーザーにする。
+        // (当たり判定に使う m_trail は通常どおりの太さのまま。見た目だけを足す)
+        public void BeginSpecial(Material material, float minSpeed, float maxSpeed, Vector3 muzzlePosition)
+        {
+            Begin(material, minSpeed, maxSpeed, muzzlePosition);
+
+            m_special = true;
+            CreateSpecialOverlay(material);
+            UpdateEffect();
+        }
+
+        // トロン用の「外側グロー」と「白い芯」の2本のトレイル
+        private void CreateSpecialOverlay(Material material)
+        {
+            if (m_specialGlow != null) return;
+
+            // TrailRenderer は1つの GameObject に複数付けない(子に分ける)
+            var root = new GameObject("TronLaserOverlay");
+            root.transform.position = transform.position;
+
+            m_specialGlow = CreateTrailPart(root, material, m_specialGlowWidth,
+                new Color(1.0f, 0.30f, 0.05f, 0.9f));
+
+            var coreObject = new GameObject("Core");
+            coreObject.transform.SetParent(root.transform, false);
+            m_specialCore = CreateTrailPart(coreObject, material, m_specialCoreWidth,
+                new Color(1.0f, 0.98f, 0.90f, 1.0f));
+        }
+
+        private TrailRenderer CreateTrailPart(GameObject go, Material material, float width, Color color)
+        {
+            var trail = go.AddComponent<TrailRenderer>();
+            if (material != null) trail.sharedMaterial = material;
+            trail.time = m_specialTime;
+            trail.minVertexDistance = 0.05f;
+            trail.autodestruct = false;
+            trail.emitting = true;
+            trail.alignment = LineAlignment.View;
+            trail.textureMode = LineTextureMode.Stretch;
+            trail.numCapVertices = 2;
+            trail.numCornerVertices = 2;
+            trail.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            trail.receiveShadows = false;
+            trail.startWidth = width;
+            trail.endWidth = 0.0f;
+            trail.startColor = color;
+            trail.endColor = new Color(color.r, color.g, color.b, 0.0f);
+            return trail;
+        }
+
+        private void ClearSpecialOverlay(bool fade = false)
+        {
+            if (m_specialGlow == null) return;
+
+            if (fade)
+            {
+                m_specialGlow.emitting = false;
+                if (m_specialCore != null) m_specialCore.emitting = false;
+                Destroy(m_specialGlow.gameObject, m_specialTime + 0.3f);
+            }
+            else
+            {
+                Destroy(m_specialGlow.gameObject);
+            }
+
+            m_specialGlow = null;
+            m_specialCore = null;
+        }
+
         private void Update()
         {
             if (m_block == null || m_trail == null) return;
@@ -73,6 +173,7 @@ namespace Yurube
             }
 
             m_trail.transform.position = transform.position;
+            if (m_specialGlow != null) m_specialGlow.transform.position = transform.position;
             UpdateEffect();
         }
 
@@ -219,14 +320,77 @@ namespace Yurube
                 m_light.intensity = Mathf.Lerp(m_minLight, m_maxLight, t);
                 m_light.range = Mathf.Lerp(3.5f, 7.0f, t);
             }
+
+            // 必殺技(トロン)はさらに太く・白く・激しく
+            if (m_special)
+            {
+                if (m_specialGlow != null)
+                {
+                    m_specialGlow.time = m_specialTime;
+                    m_specialGlow.startWidth = m_specialGlowWidth;
+                }
+                if (m_specialCore != null)
+                {
+                    m_specialCore.time = m_specialTime;
+                    m_specialCore.startWidth = m_specialCoreWidth;
+                }
+                if (m_comet != null)
+                {
+                    var main = m_comet.main;
+                    main.startSize = m_specialCometSize;
+                    main.startColor = new Color(1.0f, 0.92f, 0.75f, 1.0f);
+                    var emission = m_comet.emission;
+                    emission.rateOverTime = m_specialCometRate;
+                }
+                if (m_light != null)
+                {
+                    m_light.intensity = m_specialLight;
+                    m_light.range = m_specialLightRange;
+                }
+            }
+        }
+
+        // いま表示されているトレイルの全点をコピーする(屈折しても判定を追従させるため)
+        public int CopyTrailPositions(Vector3[] buffer)
+        {
+            if (m_trail == null || buffer == null || buffer.Length == 0) return 0;
+            int count = m_trail.positionCount;
+            if (count < 2 || count > buffer.Length) return 0;
+            m_trail.GetPositions(buffer);
+            return count;
+        }
+
+        public float TrailWidth
+        {
+            get
+            {
+                if (m_trail == null) return 0.0f;
+                return Mathf.Max(0.05f, Mathf.Max(m_trail.startWidth, m_trail.endWidth));
+            }
+        }
+
+        // 実際に表示されているトレイルの両端と幅を返す(必殺技の当たり判定を演出に合わせる)
+        public bool TryGetTrailSegment(out Vector3 oldest, out Vector3 newest, out float width)
+        {
+            oldest = newest = Vector3.zero;
+            width = 0.0f;
+            if (m_trail == null || m_trail.positionCount < 2) return false;
+
+            oldest = m_trail.GetPosition(0);
+            newest = m_trail.GetPosition(m_trail.positionCount - 1);
+            width = Mathf.Max(0.05f, Mathf.Max(m_trail.startWidth, m_trail.endWidth));
+            return true;
         }
 
         private void StopEffect(bool restoreBlockEffects)
         {
             ConsumedLaunch = false;
             enabled = false;
+            m_special = false;
 
             if (restoreBlockEffects) RestoreBlockEffects();
+
+            ClearSpecialOverlay(true);
 
             if (m_trail == null) return;
 
@@ -239,7 +403,6 @@ namespace Yurube
             if (m_light != null) m_light.enabled = false;
 
             Destroy(m_trail.gameObject, Mathf.Max(m_trail.time, 0.4f) + 0.3f);
-            m_trail = null;
             m_comet = null;
             m_light = null;
         }

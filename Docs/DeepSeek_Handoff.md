@@ -2,7 +2,7 @@
 
 最終更新: 2026-10-29
 このファイルは、別のPC・別ワークスペースの DeepSeek に作業内容を引き継ぐためのメモです。
-学校で作業を始めるときは、このファイルを読ませる（または貼り付ける）ところから始めてください。
+作業を始めるときは、このファイルを読ませる（または貼り付ける）ところから始めてください。
 
 ---
 
@@ -32,20 +32,37 @@
 
 ---
 
-## 2. 実装済みキャラクター（2026-10-29 時点）
+## 2. 実装済みキャラクター（2026-10-29 時点・すべてコミット済み）
 
-| キャラ | パッシブ | 主なスクリプト | 状態 |
-|---|---|---|---|
-| あかだる | 赤い積み木の数だけ弾速UP（+1.0 m/s / 個、上限60） | `AkadaruPassive.cs` | コミット済み |
-| あかだる（演出） | 弾速に応じた残光トレイル＋マズルフラッシュ／衝撃波 | `AkadaruShotTrail.cs` / `AkadaruShotFlash.cs` | **未コミット** |
-| あおだる | 青い積み木の数だけ移動速度UP（+1.0 m/s / 個、上限12） | `AodaruPassive.cs` | コミット済み |
-| あおだる（演出） | 青い風＋青い残像 | `AodaruSpeedEffect.cs` / `AodaruGhost.cs` | **未コミット** |
-| みだる | 自分が飛ばした緑の積み木が相手をホーミング | `MidaruPassive.cs` / `TumikiHoming.cs` | コミット済み |
-| いわだる | 飛ばした積み木は積み木を壊し、壁で壊れる（岩の破片表示つき） | `IwaPassive.cs` / `IwaBlock.cs`（`IwaImpact` 含む） | コミット済み |
+| キャラ | パッシブ | 主なスクリプト |
+|---|---|---|
+| あかだる | 赤い積み木の数だけ弾速UP（+1.0 m/s / 個、上限60） | `AkadaruPassive.cs` |
+| あかだる（演出） | 弾速に応じた残光トレイル＋マズルフラッシュ／衝撃波 | `AkadaruShotTrail.cs` / `AkadaruShotFlash.cs` |
+| あかだる（必殺技） | トロン: 通常射撃のトレイルに沿って分割判定。壁反射も追従。触れた積み木は壊れ、キャラクターは0.4秒間隔で積み木を1個ずつ失う（0個なら即死）。発動直後0.6秒は自分無敵。F3／ラボで判定表示。**通った地面は一定時間焼け焦げる**（自作シェーダー、約6秒で消える） | `AkadaruSpecial.cs` / `TronProjectile.cs` / `TronTrailHit.cs` / `TronHitboxView.cs` / `TronScorchTrail.cs` / `Shaders/TronScorch.shader` |
+| あおだる | 青い積み木の数だけ移動速度UP（+1.0 m/s / 個、上限12） | `AodaruPassive.cs` |
+| あおだる（演出） | 青い風＋青い残像 | `AodaruSpeedEffect.cs` / `AodaruGhost.cs` |
+| あおだる（必殺技） | 六腕: ハンマーのモデルを6本出し（阿修羅風）、発動時の向きを基準にした3方向から近づく積み木を、操作に関係なくはじき返す（4秒間） | `AodaruSpecial.cs` / `AodaruSixArms.cs` |
+| みだる | 自分が飛ばした緑の積み木が相手をホーミング | `MidaruPassive.cs` / `TumikiHoming.cs` |
+| みだる（必殺技） | ファンネル: ボタンを押すとその場で自分の積み木を撃ち、「積んでいる数」に分裂して近くの敵へ手分けしてホーミング | `MidaruSpecial.cs` / `TumikiHoming.cs` |
+| いわだる | 飛ばした積み木は積み木を壊し、壁で壊れる（岩の破片表示つき） | `IwaPassive.cs` / `IwaBlock.cs`（`IwaImpact` 含む） |
+| きだる | 黄色い積み木を積むと、同じ黄色がもう1個増える（上限10段） | `KidaruPassive.cs` |
+| へびだる | 股抜きショットで飛ばした自分の積み木が左右に蛇行（ハンマーで飛ばした積み木は対象外） | `HebiPassive.cs` / `TumikiZigzag.cs` |
+| だるきんぐ | 積み木は2個まで。3個目を積むと一番上（古い段）が落ちる | `DaruKingPassive.cs` |
 
-キャラクターデータ: `Assets/Fujihara/Data/Characters/{akadaru,aodaru,midaru,iwadaru}.asset`
-プレハブ: `Assets/Yurube/Prefabs/{Akadaru,Aodaru,Midaru,Iwa}.prefab`
-頭マテリアル: `Assets/Yurube/Materials/{AodaruHead,MidaruHead,IwaHead}.mat`
+### 2-1. 共通システム
+
+- 必殺技ゲージ: `Assets/Yurube/Script/SpecialGauge.cs`
+  - 全キャラ共通。積み木5個で満タン。必殺技を持つキャラのプレハブに付ける。
+- 検証用キャラクターラボ: `Assets/Yurube/Debug/`
+  - `CharacterLab.cs` / `CharacterLabBlocks.cs` / `CharacterLabDummy.cs` / `CharacterLabUI.cs`
+  - ラボの項目から各キャラのパッシブ・必殺技を再現して確認できる
+    （例: 「きだる: 黄色1個」「へびだる: 積んでショット」「あかだる: 必殺技」など）
+
+### 2-2. アセットの場所
+
+- キャラクターデータ: `Assets/Fujihara/Data/Characters/{akadaru,aodaru,midaru,iwadaru,kidaru,hebidaru,daruking}.asset`
+- プレハブ: `Assets/Yurube/Prefabs/{Akadaru,Aodaru,Midaru,Iwa,Kidaru,Hebi,DaruKing}.prefab`
+- 頭マテリアル: `Assets/Yurube/Materials/{AodaruHead,MidaruHead,IwaHead,KidaruHead,HebiHead,DaruKingHead}.mat`
 
 ---
 
@@ -57,6 +74,7 @@
 [RequireComponent(typeof(DarumaCharacter))]
 public class XxxPassive : MonoBehaviour
 ```
+
 - 速度系は `DarumaCharacter.RequestSpeedScale()` を使う。
   - `[DefaultExecutionOrder(-100)]` を付け、`FixedUpdate` で **1固定ステップに1回だけ**掛ける
     （毎フレーム掛けると倍率が累積して速度が爆発する）
@@ -78,7 +96,7 @@ public class XxxPassive : MonoBehaviour
 ### 3-3. 積み木の挙動を変える
 
 - 当たったときの挙動: `TumikiBlock.ImpactBehavior` に `ITumikiImpactBehavior` 実装を差し替え（いわだる）
-- 飛んでいる向き: `TumikiBlock.SetFlyingVelocity(dir * speed)`（みだるのホーミング）
+- 飛んでいる向き: `TumikiBlock.SetFlyingVelocity(dir * speed)`（みだるのホーミング／へびだるの蛇行）
 - 見た目: `ParticleSystem` は `Assets/Nakahira/Player/Effects/FireParticle.mat` を流用
   （URP Particles/Unlit・加算合成。青などは `startColor` / `_BaseColor` で着色）
 
@@ -138,8 +156,7 @@ public class XxxPassive : MonoBehaviour
   赤の枚数は「撃ち始めた瞬間」で固定。打ち返し（sweep）は対象外。
 - あかだるの弾の演出中は、その積み木の既存の煙・炎（`Tumiki.prefab` の SmokeTrail / FireAura）を
   インスタンス単位で止めている（共有プレハブは変更していない）。
-- みだる・いわだる・あおだる・あかだるのプレハブは **NetworkObject を持っていない**ため、
-  通信対戦では使えない（現状はオフライン想定）。
+- 各キャラのプレハブは **NetworkObject を持っていない**ため、通信対戦では使えない（現状はオフライン想定）。
 - あかだる・あおだるの演出は「実行時にコンポーネントを追加」する方式。プレハブにコンポーネントを
   足していないので、追加のマテリアル参照だけをプレハブに1行入れている。
 
@@ -161,10 +178,10 @@ Unity の Roslyn と、前回ビルド済みの `Assembly-CSharp.dll` を使っ�
 
 ## 9. 未対応・今後の候補
 
-- あかだる・あおだるの演出（残光トレイル、マズルフラッシュ、青い風、残像）の**コミット**
 - あかだるの「赤い積み木のときだけ弾速UP」への変更検討（現状は全色）
 - 通信対戦対応（NetworkObject 付与）※共有プレハブに関わるため要相談
-- へびだる・chara3〜6 の実装（`prefab: {fileID: 0}` のまま）
+- chara3〜6 の実装（`prefab: {fileID: 0}` のまま）
+- 各キャラの数値・演出のブラッシュアップ（必要に応じて）
 
 ---
 

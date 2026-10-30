@@ -130,6 +130,14 @@ namespace Nakagawa.EditorTools
         const string kDeskBackdrop = "Desk";
         const string kEngawaBackdrop = "Engawa";
         const string kBathBackdrop = "Bath";
+        const string kClubroomBackdrop = "Clubroom";
+        const string kGroundBackdrop = "Ground";
+        const string kDojoBackdrop = "Dojo";
+        const string kStadiumBackdrop = "Stadium";
+        const string kSlopeBackdrop = "Slope";
+        const string kCruiseBackdrop = "Cruise";
+        const string kRuinsBackdrop = "Ruins";
+        const string kSpaceBackdrop = "Space";
 
         class StageDef
         {
@@ -576,6 +584,7 @@ namespace Nakagawa.EditorTools
             //----------------------------------------
             // デバッグステージ(DebugStage21〜30)。追加ギミック(せり上がり塀・加速床/減速床・移動床・ワープゲート・
             // シューターレーン・回転砲台)と、元からあるギミックを組み合わせたステージ
+            // 21〜28 には背景(部室・運動場・道場・スタジアム・ゲレンデ・客船のデッキ・遺跡・宇宙ステーション)を付ける
             //----------------------------------------
 
             Add("波打つ防波堤", 26,
@@ -597,7 +606,7 @@ namespace Nakagawa.EditorTools
                     c.AreaRect(-12, -10.5f, 4, 3);
                     c.AreaRect(12, -10.5f, 4, 3);
                     c.Spawns(new Vector2(-11, 4), new Vector2(11, -4), new Vector2(-4, -9), new Vector2(4, 9));
-                });
+                }).Backdrop = kClubroomBackdrop;
 
             Add("加速サーキット", 26,
                 "中央の回転台を囲む周回路。各辺の中央に加速床、四隅に減速床が置かれている。",
@@ -623,7 +632,7 @@ namespace Nakagawa.EditorTools
                     c.AreaRect(-13, 0, 3, 6);
                     c.AreaCircle(7, 0, 1.5f);
                     c.Spawns(new Vector2(-6, 6), new Vector2(6, 6), new Vector2(-6, -6), new Vector2(6, -6));
-                });
+                }).Backdrop = kGroundBackdrop;
 
             Add("渡し舟の大河", 24,
                 "南北に流れる大河(奈落)で東西の岸が分かれ、二艘の木のパレットが岸の間を往復する。河の中央に小島。両岸の扇風機が河へ向けて風を送る。",
@@ -646,7 +655,7 @@ namespace Nakagawa.EditorTools
                     c.AreaCircle(-11, 0, 1.5f);
                     c.AreaCircle(11, 0, 1.5f);
                     c.Spawns(new Vector2(-13, 4), new Vector2(-13, -4), new Vector2(13, 4), new Vector2(13, -4));
-                });
+                }).Backdrop = kDojoBackdrop;
 
             Add("ワープ群島", 24,
                 "奈落に浮かぶ四つの島。橋はなく、島の間はワープゲートでしか行き来できない。各島の中央にバンパー。",
@@ -675,7 +684,7 @@ namespace Nakagawa.EditorTools
                     c.AreaCircle(6, 11, 1.5f);
                     c.AreaCircle(-6, -11, 1.5f);
                     c.Spawns(new Vector2(5, 9), new Vector2(-9, 5), new Vector2(9, -5), new Vector2(-5, -9));
-                });
+                }).Backdrop = kStadiumBackdrop;
 
             Add("砲台の砦", 26,
                 "東西に向かい合う二基の回転砲台が首を振りながら積み木を撃ち出す。中央の南北の線には、波のように立ち上がるせり上がり塀。",
@@ -694,7 +703,7 @@ namespace Nakagawa.EditorTools
                     c.AreaRect(-13, 0, 3, 6);
                     c.AreaRect(13, 0, 3, 6);
                     c.Spawns(new Vector2(-4, 5), new Vector2(4, -5), new Vector2(-4, -5), new Vector2(4, 5));
-                });
+                }).Backdrop = kSlopeBackdrop;
 
             Add("シューター回廊", 26,
                 "四隅のシューターレーンが、中央の回転台へ向けて斜めに積み木を撃ち出す。",
@@ -715,7 +724,7 @@ namespace Nakagawa.EditorTools
                     c.AreaRect(-14.5f, 0, 3, 6);
                     c.AreaCircle(7, 0, 1.5f);
                     c.Spawns(new Vector2(-7, 4), new Vector2(7, -4), new Vector2(-7, -4), new Vector2(7, 4));
-                });
+                }).Backdrop = kCruiseBackdrop;
 
             Add("氷と泥の庭", 26,
                 "加速床と減速床が市松模様に並ぶ庭。中央に大きなバンパー、四隅に小さなバンパー。",
@@ -745,7 +754,7 @@ namespace Nakagawa.EditorTools
                     c.AreaRect(0, 12.5f, 6, 2);
                     c.AreaRect(0, -12.5f, 6, 2);
                     c.Spawns(new Vector2(-11, 4), new Vector2(11, -4), new Vector2(4, 11), new Vector2(-4, -11));
-                });
+                }).Backdrop = kRuinsBackdrop;
 
             Add("流れる足場の工場", 26,
                 "中央に四角い大穴が空いた工場。穴の中を二枚のパレットが同じ向きに周回し、外周の四隅のシューターレーンが壁沿いに時計回りに積み木を送る。",
@@ -777,7 +786,7 @@ namespace Nakagawa.EditorTools
                     c.AreaCircle(14, 8, 1.5f);
                     c.AreaCircle(-14, -8, 1.5f);
                     c.Spawns(new Vector2(-9, 9), new Vector2(9, 9), new Vector2(-9, -9), new Vector2(9, -9));
-                });
+                }).Backdrop = kSpaceBackdrop;
 
             Add("嵐のワープ", 24,
                 "東西に長い闘技場。両端の扇風機が南北に往復しながら中央へ風を送る。四隅寄りにどちらも送るワープゲート、南北の中央に積み木だけを送り向きを反転させるゲート。",
@@ -1901,6 +1910,19 @@ namespace Nakagawa.EditorTools
             SetupImpactModes(toggle);
             // 出現位置のデバッグ表示
             if (toggle.GetComponent<SpawnPointDebugView>() == null) toggle.gameObject.AddComponent<SpawnPointDebugView>();
+            // ステージをまとめたシーンでは、再生中にステージごとのカメラを調整・保存できるようにする
+            var switcher = FindInScene<StageSwitcher>(scene);
+            if (switcher != null)
+            {
+                if (toggle.GetComponent<StageCameraTuner>() == null) toggle.gameObject.AddComponent<StageCameraTuner>();
+                var switcherSo = new SerializedObject(switcher);
+                var presetsProp = switcherSo.FindProperty("m_cameraPresets");
+                if (presetsProp.objectReferenceValue == null)
+                {
+                    presetsProp.objectReferenceValue = StageCombiner.LoadOrCreateCameraPresets();
+                    switcherSo.ApplyModifiedPropertiesWithoutUndo();
+                }
+            }
 
             // 画面下の表示(ストック・点数・撃墜数)は試合と同じ GameObject に付ける
             var match = FindInScene<DarumaMatch>(scene);
