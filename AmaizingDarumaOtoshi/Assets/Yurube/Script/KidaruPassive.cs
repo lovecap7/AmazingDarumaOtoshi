@@ -22,6 +22,10 @@ namespace Yurube
         private void Awake()
         {
             m_character = GetComponent<DarumaCharacter>();
+
+            // 必殺技用のゲージとコンポーネントを追加
+            if (GetComponent<SpecialGauge>() == null) gameObject.AddComponent<SpecialGauge>();
+            if (GetComponent<KidaruSpecial>() == null) gameObject.AddComponent<KidaruSpecial>();
         }
 
         private void OnEnable()

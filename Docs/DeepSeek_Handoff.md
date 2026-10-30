@@ -1,6 +1,6 @@
 # DeepSeek 引き継ぎメモ（Yurube / アメイジングだるま落とし）
 
-最終更新: 2026-10-29
+最終更新: 2026-10-30
 このファイルは、別のPC・別ワークスペースの DeepSeek に作業内容を引き継ぐためのメモです。
 作業を始めるときは、このファイルを読ませる（または貼り付ける）ところから始めてください。
 
@@ -32,7 +32,7 @@
 
 ---
 
-## 2. 実装済みキャラクター（2026-10-29 時点・すべてコミット済み）
+## 2. 実装済みキャラクター（2026-10-30 時点・すべてコミット済み）
 
 | キャラ | パッシブ | 主なスクリプト |
 |---|---|---|
@@ -46,23 +46,29 @@
 | みだる（必殺技） | ファンネル: ボタンを押すとその場で自分の積み木を撃ち、「積んでいる数」に分裂して近くの敵へ手分けしてホーミング | `MidaruSpecial.cs` / `TumikiHoming.cs` |
 | いわだる | 飛ばした積み木は積み木を壊し、壁で壊れる（岩の破片表示つき） | `IwaPassive.cs` / `IwaBlock.cs`（`IwaImpact` 含む） |
 | きだる | 黄色い積み木を積むと、同じ黄色がもう1個増える（上限10段） | `KidaruPassive.cs` |
+| きだる（必殺技） | 黄金化: 無敵＋移動速度UP。発動時の積み木の数だけ延長（基本3秒＋1秒/個、速度1.5倍）。点滅せず虹色にモデルが光る。頭を一番下にして積み木を上に乗せ、頭が車輪のように回転。終了で元に戻る | `KidaruSpecial.cs` / `KidaruWheelVisual.cs` |
 | へびだる | 股抜きショットで飛ばした自分の積み木が左右に蛇行（ハンマーで飛ばした積み木は対象外） | `HebiPassive.cs` / `TumikiZigzag.cs` |
 | だるきんぐ | 積み木は2個まで。3個目を積むと一番上（古い段）が落ちる | `DaruKingPassive.cs` |
+
+> トロンの当たり判定と焦げは `AkadaruShotTrail.m_trail`（通常射撃トレイル）基準。
+> 見た目の `TronLaserOverlay`（太いグロー＋白い芯、2秒）は別トレイルで、判定より太く長い。
 
 ### 2-1. 共通システム
 
 - 必殺技ゲージ: `Assets/Yurube/Script/SpecialGauge.cs`
-  - 全キャラ共通。積み木5個で満タン。必殺技を持つキャラのプレハブに付ける。
+  - 全キャラ共通。積み木5個で満タン。
+  - あかだるはプレハブに付与済み。あおだる・みだる・きだるは各パッシブが実行時に追加する。
 - 検証用キャラクターラボ: `Assets/Yurube/Debug/`
   - `CharacterLab.cs` / `CharacterLabBlocks.cs` / `CharacterLabDummy.cs` / `CharacterLabUI.cs`
   - ラボの項目から各キャラのパッシブ・必殺技を再現して確認できる
-    （例: 「きだる: 黄色1個」「へびだる: 積んでショット」「あかだる: 必殺技」など）
+    （例: 「きだる: 黄色1個」「きだる: 必殺技」「へびだる: 積んでショット」「あかだる: 必殺技」「あおだる: 必殺技」「みだる: 必殺技」など）
 
 ### 2-2. アセットの場所
 
 - キャラクターデータ: `Assets/Fujihara/Data/Characters/{akadaru,aodaru,midaru,iwadaru,kidaru,hebidaru,daruking}.asset`
 - プレハブ: `Assets/Yurube/Prefabs/{Akadaru,Aodaru,Midaru,Iwa,Kidaru,Hebi,DaruKing}.prefab`
 - 頭マテリアル: `Assets/Yurube/Materials/{AodaruHead,MidaruHead,IwaHead,KidaruHead,HebiHead,DaruKingHead}.mat`
+- トロンの焦げ: `Assets/Yurube/Resources/TronScorch.mat` / `Assets/Yurube/Shaders/TronScorch.shader`
 
 ---
 
@@ -157,8 +163,9 @@ public class XxxPassive : MonoBehaviour
 - あかだるの弾の演出中は、その積み木の既存の煙・炎（`Tumiki.prefab` の SmokeTrail / FireAura）を
   インスタンス単位で止めている（共有プレハブは変更していない）。
 - 各キャラのプレハブは **NetworkObject を持っていない**ため、通信対戦では使えない（現状はオフライン想定）。
-- あかだる・あおだるの演出は「実行時にコンポーネントを追加」する方式。プレハブにコンポーネントを
-  足していないので、追加のマテリアル参照だけをプレハブに1行入れている。
+- パッシブ演出（あかだるの弾トレイル、あおだるの速度エフェクトなど）は実行時にコンポーネントを追加する方式。
+- 必殺技は、あかだるがプレハブに `SpecialGauge` / `AkadaruSpecial` を追加済み。あおだる・みだる・きだるは
+  各パッシブが実行時に `SpecialGauge` と必殺技コンポーネントを追加する。
 
 ---
 
