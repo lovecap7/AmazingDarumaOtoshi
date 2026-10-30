@@ -37,11 +37,15 @@ namespace Nakagawa
         Rigidbody m_rb;
         Quaternion m_baseRotation;
         float m_angle;
+        // 回り始めてからの時間(ネット対戦ではホストとそろえる。GimmickClock)
+        float m_time;
         readonly List<IGimmickAffectable> m_targets = new List<IGimmickAffectable>();
 
         public float Radius => m_radius;
         // 上から見て時計回りが正(UnityのY軸回転と同じ)
         float SignedSpeed => m_direction == Direction.Clockwise ? m_speed : -m_speed;
+        // 1回転の時間(止まっていれば 0)
+        float Period => m_speed > 0.0f ? 360.0f / m_speed : 0.0f;
 
         private void Awake()
         {
@@ -63,8 +67,12 @@ namespace Nakagawa
         {
             float dt = Time.fixedDeltaTime;
             float delta = SignedSpeed * dt;
-            m_angle = Mathf.Repeat(m_angle + delta, 360.0f);
+            // 角度は時間から決める(ネット対戦でホストとずれていたら、時計を合わせたときに一度に回る)
+            m_time = GimmickClock.Step(m_time, dt, 0.0f, Period);
+            if (Period > 0.0f) m_time = Mathf.Repeat(m_time, Period);
+            m_angle = Mathf.Repeat(SignedSpeed * m_time, 360.0f);
             m_rb.MoveRotation(m_baseRotation * Quaternion.Euler(0.0f, m_angle, 0.0f));
+            // 乗っているものは、時計を合わせて一度に回った分ではなく、ふだんの1ステップ分だけ運ぶ
             Carry(delta, dt);
         }
 

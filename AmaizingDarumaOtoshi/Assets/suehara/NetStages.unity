@@ -46051,6 +46051,7 @@ GameObject:
   - component: {fileID: 426153190}
   - component: {fileID: 426153189}
   - component: {fileID: 426153191}
+  - component: {fileID: 426153192}
   m_Layer: 0
   m_Name: NetMatch
   m_TagString: Untagged
@@ -46116,6 +46117,20 @@ MonoBehaviour:
   m_match: {fileID: 1218044441}
   m_playerPrefab: {fileID: 438764015540999687, guid: ce6fd1c622c4ee94f9b3a7549a48abd3, type: 3}
   m_maxPlayers: 4
+--- !u!114 &426153192
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 426153188}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4f5f56ca1a4a4b047a0177c7549a68e8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NetEffects
+  ShowTopMostFoldoutHeaderGroup: 1
+  m_tumikiPrefab: {fileID: 6571711747332362164, guid: a9551f155e1d0fa40a6b8969eac3d7aa, type: 3}
 --- !u!1 &426650551
 GameObject:
   m_ObjectHideFlags: 0

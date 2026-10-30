@@ -16,6 +16,17 @@ namespace Nakagawa
         // 1ステップで、ずれのうち寄せる割合
         const float kCorrectionPerStep = 0.05f;
 
+        // ネット対戦用(suehara): ネット対戦のクライアントか。ギミックの当たり・押し出しはホストだけが行う
+        // (クライアントの積み木・キャラクターはホストから位置を受け取って見せるだけなので、ギミックで動かさない)
+        public static bool IsNetClient
+        {
+            get
+            {
+                var nm = NetworkManager.Singleton;
+                return nm != null && nm.IsListening && nm.IsClient && !nm.IsServer;
+            }
+        }
+
         // 通信中なら、ホストと共有する時刻(秒)
         public static bool TryGetSharedTime(out double time)
         {
