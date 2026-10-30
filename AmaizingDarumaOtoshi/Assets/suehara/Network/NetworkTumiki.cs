@@ -6,12 +6,16 @@ using UnityEngine;
 // ネット対戦用の積み木。ホストだけが物理とルールを動かし、クライアントは位置の見た目だけを受け取る。
 // 積まれている積み木も NetworkTransform がワールド座標で同期するので、タワーはそのまま見える。
 // クライアントでは TumikiBlock を止めているので、煙・炎のエフェクトはここで切り替える。
+// 生成されたときのポンと出る演出(TumikiSpawnPop)はクライアントでも出し、割れて消えたら NetEffects で破片を出す。
 // (積み木のプレハブ Tumiki_Net にだけ付ける。ローカル用の Tumiki.prefab には付けない)
 [RequireComponent(typeof(TumikiBlock))]
 public class NetworkTumiki : NetworkBehaviour
 {
     const byte kHarmful = 1;   // 攻撃判定がある(炎)
     const byte kStacked = 2;   // 積まれている
+    const byte kPopping = 4;   // ポンと出る演出の途中(生成された直後)
+
+    const BindingFlags kPrivate = BindingFlags.NonPublic | BindingFlags.Instance;
 
     readonly NetworkVariable<byte> m_color = new NetworkVariable<byte>();
     readonly NetworkVariable<byte> m_flags = new NetworkVariable<byte>();
@@ -51,15 +55,30 @@ public class NetworkTumiki : NetworkBehaviour
         m_block.enabled = false;
         ApplyColor(m_color.Value);
         m_color.OnValueChanged += (_, c) => ApplyColor(c);
+        if ((m_flags.Value & kPopping) != 0 && GetComponent<Nakagawa.TumikiSpawnPop>() == null) gameObject.AddComponent<Nakagawa.TumikiSpawnPop>();
 
-        const BindingFlags f = BindingFlags.NonPublic | BindingFlags.Instance;
         var t = typeof(TumikiBlock);
-        m_smokeTrail = t.GetField("m_smokeTrail", f)?.GetValue(m_block) as ParticleSystem;
-        m_fireAura = t.GetField("m_fireAura", f)?.GetValue(m_block) as ParticleSystem;
-        var min = t.GetField("m_smokeMinSpeed", f);
+        m_smokeTrail = t.GetField("m_smokeTrail", kPrivate)?.GetValue(m_block) as ParticleSystem;
+        m_fireAura = t.GetField("m_fireAura", kPrivate)?.GetValue(m_block) as ParticleSystem;
+        var min = t.GetField("m_smokeMinSpeed", kPrivate);
         if (min != null) m_smokeMinSpeed = (float)min.GetValue(m_block);
         m_prevPos = transform.position;
         UpdateClientEffects();
+    }
+
+    // ホスト: 割れて消えた(TumikiBlock.Break のあと)なら、クライアントに破片を出してもらう
+    public override void OnNetworkDespawn()
+    {
+        // 破棄の途中で TumikiBlock が先に消えていることがあるので、Unity の null 判定ではなく参照の有無で見る(値は読める)
+        if (!IsServer || ReferenceEquals(m_block, null) || !Read<bool>("m_isBreaking")) return;
+        NetEffects.SendShatter(transform.position, transform.rotation, Read<Vector3>("m_breakVelocity"), m_block.Color,
+            Read<float>("m_shatterDuration"), Read<int>("m_shatterPieces"), Read<float>("m_shatterSpread"));
+    }
+
+    T Read<T>(string field)
+    {
+        var f = typeof(TumikiBlock).GetField(field, kPrivate);
+        return f != null ? (T)f.GetValue(m_block) : default;
     }
 
     byte ReadFlags()
@@ -67,6 +86,7 @@ public class NetworkTumiki : NetworkBehaviour
         byte b = 0;
         if (m_block.IsHarmful) b |= kHarmful;
         if (m_block.CurrentState == TumikiBlock.State.Stacked) b |= kStacked;
+        if (GetComponent<Nakagawa.TumikiSpawnPop>() != null) b |= kPopping;
         return b;
     }
 

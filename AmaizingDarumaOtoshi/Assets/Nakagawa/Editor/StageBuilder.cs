@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -41,6 +41,11 @@ namespace Nakagawa.EditorTools
         const string kWallMaterial = kNakahira + "/Materials/Wall.mat";
 
         const float kWallHeight = 1.5f;
+        // せり上がり塀の高さ。ジャンプの高さ(Jump_Common の Height 1.8m)より十分高くして、跳んでも登れないようにする
+        public const float kRisingWallHeight = 2.5f;
+        // 見下ろすカメラの角度(既定 / DebugStage31〜70。DebugStage21〜28 のカメラの設定に合わせた)
+        const float kCameraPitch = 55.0f;
+        const float kLowCameraPitch = 40.0f;
         // 1ステージの積み木の生成エリアの最低数と、エリアのうち積み木を置ける場所の割合の下限(検証用)
         const int kMinSpawnAreas = 6;
         const float kMinSpawnCapacity = 0.2f;
@@ -74,6 +79,13 @@ namespace Nakagawa.EditorTools
         public static void BuildDebugStages21To30()
         {
             BuildIntoCombined(def => InNumberRange(def.Id, kDebugPrefix, 21, 30));
+        }
+
+        // 背景のテーマごとに5つずつ作ったデバッグステージ(DebugStage31〜70)だけを作り直す。他のステージはそのまま
+        [MenuItem("Nakagawa/Stages/Build Debug Stages 31-70 Into AllStages")]
+        public static void BuildDebugStages31To70()
+        {
+            BuildIntoCombined(def => InNumberRange(def.Id, kDebugPrefix, 31, 70));
         }
 
         // id が「接頭辞 + 通し番号」で、番号が from〜to か
@@ -147,6 +159,8 @@ namespace Nakagawa.EditorTools
             public string Layout; // 生成後に埋める
             // 背景の id(BackdropBuilder の定義)。なければ背景なし
             public string Backdrop;
+            // 見下ろすカメラの角度
+            public float CameraPitch = kCameraPitch;
         }
 
         static List<StageDef> Definitions()
@@ -593,7 +607,7 @@ namespace Nakagawa.EditorTools
                 c =>
                 {
                     c.Arena(0, 0, 28, 24, true, true, true, true);
-                    for (int i = 0; i < 13; i++) c.RisingWall(-12 + i * 2, 0, new Vector2(2, 1.2f), 1.5f, i * 0.25f);
+                    for (int i = 0; i < 13; i++) c.RisingWall(-12 + i * 2, 0, new Vector2(2, 1.2f), i * 0.25f);
                     c.Bumper(-8, 6, 1.2f);
                     c.Bumper(8, 6, 1.2f);
                     c.Bumper(-8, -6, 1.2f);
@@ -694,7 +708,7 @@ namespace Nakagawa.EditorTools
                     c.Arena(0, 0, 30, 26, true, true, true, true);
                     c.Cannon(-8, 0, 90, TumikiCannon.RotationMode.Swing, 1, 3);
                     c.Cannon(8, 0, 270, TumikiCannon.RotationMode.Swing, 1, 3);
-                    for (int i = 0; i < 10; i++) c.RisingWall(0, -9 + i * 2, new Vector2(1.2f, 2), 1.5f, i * 0.3f);
+                    for (int i = 0; i < 10; i++) c.RisingWall(0, -9 + i * 2, new Vector2(1.2f, 2), i * 0.3f);
                     c.AreaCircle(-8, 8, 2);
                     c.AreaCircle(8, 8, 2);
                     c.AreaCircle(-8, -8, 2);
@@ -821,14 +835,14 @@ namespace Nakagawa.EditorTools
                     c.Arena(0, 0, 30, 30, true, true, true, true);
                     c.Cannon(0, 0, 0, TumikiCannon.RotationMode.Spin, 1, 4);
                     // 砲台を囲む塀(北・南は横長、東・西は縦長)。隣どうしで開始をずらして交互に立ち上がる
-                    c.RisingWall(-2, 5, new Vector2(2, 1), 1.5f, 0.0f);
-                    c.RisingWall(2, 5, new Vector2(2, 1), 1.5f, 2.0f);
-                    c.RisingWall(5, 2, new Vector2(1, 2), 1.5f, 4.0f);
-                    c.RisingWall(5, -2, new Vector2(1, 2), 1.5f, 6.0f);
-                    c.RisingWall(2, -5, new Vector2(2, 1), 1.5f, 0.0f);
-                    c.RisingWall(-2, -5, new Vector2(2, 1), 1.5f, 2.0f);
-                    c.RisingWall(-5, -2, new Vector2(1, 2), 1.5f, 4.0f);
-                    c.RisingWall(-5, 2, new Vector2(1, 2), 1.5f, 6.0f);
+                    c.RisingWall(-2, 5, new Vector2(2, 1), 0.0f);
+                    c.RisingWall(2, 5, new Vector2(2, 1), 2.0f);
+                    c.RisingWall(5, 2, new Vector2(1, 2), 4.0f);
+                    c.RisingWall(5, -2, new Vector2(1, 2), 6.0f);
+                    c.RisingWall(2, -5, new Vector2(2, 1), 0.0f);
+                    c.RisingWall(-2, -5, new Vector2(2, 1), 2.0f);
+                    c.RisingWall(-5, -2, new Vector2(1, 2), 4.0f);
+                    c.RisingWall(-5, 2, new Vector2(1, 2), 6.0f);
                     c.SpeedFloor(10, 10, new Vector2(3, 3), true);
                     c.SpeedFloor(-10, 10, new Vector2(3, 3), true);
                     c.SpeedFloor(10, -10, new Vector2(3, 3), true);
@@ -842,6 +856,977 @@ namespace Nakagawa.EditorTools
                     c.AreaCircle(0, -8, 1.5f);
                     c.Spawns(new Vector2(-8, 3), new Vector2(8, -3), new Vector2(3, 8), new Vector2(-3, -8));
                 });
+
+            //----------------------------------------
+            // デバッグステージ(DebugStage31〜70)。背景のテーマごとに5つずつ
+            // 31〜35 部室 / 36〜40 運動場 / 41〜45 道場 / 46〜50 スタジアム / 51〜55 ゲレンデ /
+            // 56〜60 豪華客船のデッキ / 61〜65 遺跡 / 66〜70 宇宙ステーション
+            // 形はテーマの再現より遊びやすさを優先する
+            //  ・遊べる範囲は 26〜30×18〜24m ほどに収め、すぐに撃ち合いになるようにする
+            //  ・どのステージにも、落ちる場所(穴・壁のない縁)か押し出す仕掛けを入れる
+            //  ・足場は地続きにする。穴を渡る移動床は、穴の幅いっぱいの「動く橋」にする(遠く離れた足場は作らない)
+            //  ・積み木が多く湧く場所ほど危ない所に置き、取りに行くかどうかの駆け引きを作る
+            //----------------------------------------
+
+            // 部室(DebugStage31〜35)。背景: Clubroom
+
+            Add("長机の会議", 24,
+                "部室の長机が二本、東西に並ぶ。机の間は、両端の仕切り(せり上がり塀)が閉じると会議室になる。東西の端にボールのようなバンパー。",
+                "両端の仕切りは時間をずらして閉じるので、会議室はいつもどちらか一方からだけ入れる。中の補給所は守りやすいが、開いている側から撃ち込まれる。仕切りが上がる瞬間に中にいれば閉じこもれ、乗っていれば机より高い所から撃ち下ろせる。東西のバンパーは、外を回る相手を会議室の入口へはじき返す。",
+                c =>
+                {
+                    c.Arena(0, 0, 26, 20, true, true, true, true);
+                    c.Wall(0, 3.5f, 10, 1);
+                    c.Wall(0, -3.5f, 10, 1);
+                    c.RisingWall(-5.5f, 0, new Vector2(1, 6), 0.0f);
+                    c.RisingWall(5.5f, 0, new Vector2(1, 6), 4.0f);
+                    c.Bumper(-10, 0, 1.2f);
+                    c.Bumper(10, 0, 1.2f);
+                    c.AreaCircle(0, 0, 2.2f);
+                    // 南北の壁にかぶせる / 四隅
+                    c.AreaRect(0, 8.5f, 8, 3);
+                    c.AreaRect(0, -8.5f, 8, 3);
+                    c.AreaCircle(-10.5f, 6, 1.2f);
+                    c.AreaCircle(10.5f, -6, 1.2f);
+                    c.AreaCircle(-10.5f, -6, 1.2f);
+                    c.AreaCircle(10.5f, 6, 1.2f);
+                    c.Spawns(new Vector2(-7, 7), new Vector2(7, -7), new Vector2(-7, -7), new Vector2(7, 7));
+                }).Backdrop = kClubroomBackdrop;
+
+            Add("ロッカーの迷路", 24,
+                "風車の羽のように四枚のロッカー(壁)が中央を囲む部室。北の通路には北西の扇風機が東へ、南の通路には南東の扇風機が西へ風を送る。",
+                "ロッカーの切れ目は風車のようにずれているので、真ん中へはどの方向からも斜めに入ることになり、跳弾で死角から狙える。南北の通路は風に乗ると速く走れて弾も伸びるが、補給所で立ち止まると流される。東西のバンパーは通路の出口で待つ相手をはじき出す。",
+                c =>
+                {
+                    c.Arena(0, 0, 28, 20, true, true, true, true);
+                    c.Wall(-3, 4, 6, 1);
+                    c.Wall(4, 3, 1, 6);
+                    c.Wall(3, -4, 6, 1);
+                    c.Wall(-4, -3, 1, 6);
+                    c.Fan(new Vector2(-13, 7.5f), new Vector2(-13, 7.5f), Vector3.right, 20, 3, 9, 0);
+                    c.Fan(new Vector2(13, -7.5f), new Vector2(13, -7.5f), Vector3.left, 20, 3, 9, 0);
+                    c.Bumper(-9, -2, 1.2f);
+                    c.Bumper(9, 2, 1.2f);
+                    c.AreaCircle(0, 0, 1.8f);
+                    // 風の通路(南北の壁にかぶせる) / 東西の壁にかぶせる
+                    c.AreaRect(0, 8.5f, 6, 2.5f);
+                    c.AreaRect(0, -8.5f, 6, 2.5f);
+                    c.AreaRect(-12.5f, 2, 2, 4);
+                    c.AreaRect(12.5f, -2, 2, 4);
+                    c.AreaCircle(-7, 5, 1.0f);
+                    c.AreaCircle(7, -5, 1.0f);
+                    c.Spawns(new Vector2(-11, 6), new Vector2(11, -6), new Vector2(-11, -6), new Vector2(11, 6));
+                }).Backdrop = kClubroomBackdrop;
+
+            Add("回る事務椅子", 24,
+                "東西に壁のない部室。北西と南東に事務椅子のような逆回りの回転台、残りの二か所にバンパー。",
+                "回転台は東西の崖のほうへ向けて回るので、上に乗った体も積み木も縁へ運ばれていく。回転台の上の補給所で拾っている間に撃たれると、回転の勢いのまま崖から落ちる。バンパーにはじかれた体が回転台に乗ると、さらに外へ振り出される。",
+                c =>
+                {
+                    c.Arena(0, 0, 24, 22, true, true, false, false);
+                    c.Turntable(-5, 4, 3.5f, true, 50);
+                    c.Turntable(5, -4, 3.5f, false, 50);
+                    c.Bumper(5, 5, 1.3f);
+                    c.Bumper(-5, -5, 1.3f);
+                    c.AreaCircle(-5, 4, 1.8f);
+                    c.AreaCircle(5, -4, 1.8f);
+                    c.AreaCircle(0, 0, 1.5f);
+                    // 南北の壁にかぶせる / 東西の崖の外へはみ出す
+                    c.AreaRect(0, 10, 6, 2);
+                    c.AreaRect(0, -10, 6, 2);
+                    c.AreaRect(11, 0, 3, 5);
+                    c.AreaRect(-11, 0, 3, 5);
+                    c.Spawns(new Vector2(-9, -8), new Vector2(9, 8), new Vector2(9, -8), new Vector2(-9, 8));
+                }).Backdrop = kClubroomBackdrop;
+
+            Add("窓からの風", 22,
+                "南の壁の中央だけが開いた窓になっている部室。北の壁際の扇風機が東西へ往復しながら、窓へ向けて風を送る。窓の前にバンパーが二つ。",
+                "風は窓へ向けて吹くので、窓の前で撃ち合うと押し出されて落ちる。窓の両脇は壁が残っていて、風を受けても落ちない安全地帯。窓の前の補給所は積み木が多いが、バンパーにはじかれて風に乗ると窓の外へ一直線。扇風機の往復を見て、風が来ない間に拾う。",
+                c =>
+                {
+                    c.Arena(0, 0, 26, 18, true, false, true, true);
+                    c.Wall(-9.5f, -8.5f, 7, 1);
+                    c.Wall(9.5f, -8.5f, 7, 1);
+                    c.Fan(new Vector2(-8, 8), new Vector2(8, 8), Vector3.back, 16, 4, 9, 2);
+                    c.Bumper(-4, -3, 1.2f);
+                    c.Bumper(4, -3, 1.2f);
+                    // 窓の前(窓の外へはみ出す)
+                    c.AreaRect(0, -7.5f, 8, 3);
+                    c.AreaCircle(0, 0, 1.8f);
+                    c.AreaCircle(-10.5f, -6, 1.2f);
+                    c.AreaCircle(10.5f, -6, 1.2f);
+                    // 東西の壁にかぶせる
+                    c.AreaRect(-11.5f, 4, 2, 4);
+                    c.AreaRect(11.5f, 4, 2, 4);
+                    c.Spawns(new Vector2(-8, 5), new Vector2(8, 5), new Vector2(-8, -3), new Vector2(8, -3));
+                }).Backdrop = kClubroomBackdrop;
+
+            Add("抜けた床板", 24,
+                "床板が抜けて中央に穴が空いた部室。穴の幅いっぱいの板(移動床)が東西に往復し、東西の端のワープゲートが互いにつながる。",
+                "穴の南北の縁は補給所で、拾っているところを撃たれると穴へ落ちる。板は穴の東西の端まで届くので近道に使えるが、乗っている間は南北の縁から狙い撃ちされる。ワープゲートで反対側へ回り込めるものの、出口で待ち伏せされやすい。",
+                c =>
+                {
+                    // 遊べる範囲 28×22m。中央 10×6m の穴を残して床を並べ、四方に壁
+                    c.Floor(0, 7.5f, 30, 9);
+                    c.Floor(0, -7.5f, 30, 9);
+                    c.Floor(-10, 0, 10, 6);
+                    c.Floor(10, 0, 10, 6);
+                    c.Wall(0, 11.5f, 30, 1);
+                    c.Wall(0, -11.5f, 30, 1);
+                    c.Wall(14.5f, 0, 1, 24);
+                    c.Wall(-14.5f, 0, 1, 24);
+                    c.MovingFloor(new Vector2(2.9f, 2.9f), MovingFloorGimmick.LoopMode.PingPong, 2.0f, 1.2f, new Vector2(-3.55f, 0), new Vector2(3.55f, 0));
+                    c.WarpGate(-11, 0, 0, 0, WarpGateGimmick.TargetType.Both, WarpGateGimmick.Selection.Sequential, WarpGateGimmick.Orientation.Keep);
+                    c.WarpGate(11, 0, 0, 0, WarpGateGimmick.TargetType.Both, WarpGateGimmick.Selection.Sequential, WarpGateGimmick.Orientation.Keep);
+                    // 穴の南北の縁
+                    c.AreaRect(0, 4.5f, 8, 2.5f);
+                    c.AreaRect(0, -4.5f, 8, 2.5f);
+                    c.AreaCircle(-11, 8, 1.5f);
+                    c.AreaCircle(11, -8, 1.5f);
+                    c.AreaCircle(-7, 0, 1.0f);
+                    c.AreaCircle(7, 0, 1.0f);
+                    c.Spawns(new Vector2(-11, 4), new Vector2(11, -4), new Vector2(-6, -8), new Vector2(6, 8));
+                }).Backdrop = kClubroomBackdrop;
+
+            // 運動場(DebugStage36〜40)。背景: Ground
+
+            Add("トラックの周回", 24,
+                "内側のフィールドが奈落になった、東西に長いトラック。南北の直線に加速床、東西のカーブにバンパー。",
+                "トラックの内側は奈落なので、直線で撃たれると内側へ落ちる。加速床で勢いのついた体はカーブのバンパーにはじかれ、内側の穴へ飛び込みかねない。内側の縁の補給所は積み木が多いが、取りに行くのは命がけ。外周の壁際を回って安全に集めるか、内側で勝負するか。",
+                c =>
+                {
+                    // 遊べる範囲 32×20m。中央 16×6m の穴を残して床を並べ、四方に壁
+                    c.Floor(0, 7, 34, 8);
+                    c.Floor(0, -7, 34, 8);
+                    c.Floor(-12.5f, 0, 9, 6);
+                    c.Floor(12.5f, 0, 9, 6);
+                    c.Wall(0, 10.5f, 34, 1);
+                    c.Wall(0, -10.5f, 34, 1);
+                    c.Wall(16.5f, 0, 1, 22);
+                    c.Wall(-16.5f, 0, 1, 22);
+                    c.SpeedFloor(0, 6.5f, new Vector2(10, 3), true);
+                    c.SpeedFloor(0, -6.5f, new Vector2(10, 3), true);
+                    c.Bumper(-12, 0, 1.4f);
+                    c.Bumper(12, 0, 1.4f);
+                    // 内側の穴の縁
+                    c.AreaRect(0, 4, 8, 2);
+                    c.AreaRect(0, -4, 8, 2);
+                    // 東西の壁にかぶせる
+                    c.AreaRect(-15, 0, 2, 4);
+                    c.AreaRect(15, 0, 2, 4);
+                    c.AreaCircle(-7, 8, 1.2f);
+                    c.AreaCircle(7, -8, 1.2f);
+                    c.Spawns(new Vector2(-11, 7), new Vector2(11, -7), new Vector2(-11, -7), new Vector2(11, 7));
+                }).Backdrop = kGroundBackdrop;
+
+            Add("玉入れのかご", 24,
+                "東西に壁のない運動場。中央の回転砲台が玉入れのかごのように回りながら積み木を四方へばらまき、砲台を斜めに四つのバンパーが囲む。",
+                "砲台からばらまかれた積み木の半分は東西の崖のほうへ転がっていく。崖際の補給所は積み木が多いが、バンパーにはじかれた体や流れ弾で落とされやすい。南北の壁際は安全だが積み木が少ない。砲台のそばで流れ弾を拾うか、崖際で稼ぐか。",
+                c =>
+                {
+                    c.Arena(0, 0, 24, 24, true, true, false, false);
+                    c.Cannon(0, 0, 0, TumikiCannon.RotationMode.Spin, 1, 3);
+                    c.Bumper(-6, 6, 1.2f);
+                    c.Bumper(6, 6, 1.2f);
+                    c.Bumper(-6, -6, 1.2f);
+                    c.Bumper(6, -6, 1.2f);
+                    // 南北の壁にかぶせる / 東西の崖の外へはみ出す
+                    c.AreaRect(0, 11, 6, 2);
+                    c.AreaRect(0, -11, 6, 2);
+                    c.AreaRect(11, 0, 3, 6);
+                    c.AreaRect(-11, 0, 3, 6);
+                    c.AreaCircle(0, 4.5f, 1.2f);
+                    c.AreaCircle(0, -4.5f, 1.2f);
+                    c.Spawns(new Vector2(-7.5f, 2), new Vector2(7.5f, -2), new Vector2(2, 7.5f), new Vector2(-2, -7.5f));
+                }).Backdrop = kGroundBackdrop;
+
+            Add("障害物走", 24,
+                "東西に長いコース。中央の帯に5本のハードル(せり上がり塀)が並び、西から順に立ち上がる。南北の通路のあちこちにぬかるみ(減速床)。",
+                "ハードルは跳んでも越えられない高さなので、立っている間は中央の帯が小部屋に区切られる。ハードルの間の補給所は、両隣が下がっている間だけ出入りできる。南北の通路は回り道だが、ぬかるみに足を取られると狙い撃ちされる。ハードルが上がる瞬間に乗っていれば、高台から撃ち下ろせる。",
+                c =>
+                {
+                    c.Arena(0, 0, 32, 18, true, true, true, true);
+                    for (int i = 0; i < 5; i++) c.RisingWall(-10 + i * 5, 0, new Vector2(1, 8), i * 0.6f);
+                    c.SpeedFloor(-7.5f, 6, new Vector2(3, 3), false);
+                    c.SpeedFloor(2.5f, 6, new Vector2(3, 3), false);
+                    c.SpeedFloor(7.5f, -6, new Vector2(3, 3), false);
+                    c.SpeedFloor(-2.5f, -6, new Vector2(3, 3), false);
+                    // ハードルの間
+                    c.AreaCircle(-7.5f, 0, 1.3f);
+                    c.AreaCircle(-2.5f, 0, 1.3f);
+                    c.AreaCircle(2.5f, 0, 1.3f);
+                    c.AreaCircle(7.5f, 0, 1.3f);
+                    // 東西の壁にかぶせる
+                    c.AreaRect(-14.5f, 0, 3, 4);
+                    c.AreaRect(14.5f, 0, 3, 4);
+                    c.Spawns(new Vector2(-13, -6), new Vector2(13, 6), new Vector2(-13, 6), new Vector2(13, -6));
+                }).Backdrop = kGroundBackdrop;
+
+            Add("グラウンドの砂嵐", 24,
+                "東西が崖のグラウンド。北の扇風機は東西に往復しながら南へ、南の扇風機は逆向きに往復しながら北へ砂嵐を吹きつける。中央に大きなバンパー。",
+                "南北の風は往復の向きが逆なので、風の当たる場所が刻々と入れ替わる。風に押されながら中央のバンパーにはじかれると、東西の崖まで転がることも。崖際の補給所は積み木が多い代わりに落ちやすい。風の切れ目を読んで、崖際の相手を撃ち落とす。",
+                c =>
+                {
+                    c.Arena(0, 0, 28, 22, true, true, false, false);
+                    c.Fan(new Vector2(-10, 10), new Vector2(10, 10), Vector3.back, 10, 4, 9, 1.5f);
+                    c.Fan(new Vector2(10, -10), new Vector2(-10, -10), Vector3.forward, 10, 4, 9, 1.5f);
+                    c.Bumper(0, 0, 1.6f);
+                    // 東西の崖の外へはみ出す
+                    c.AreaRect(13, 0, 3, 6);
+                    c.AreaRect(-13, 0, 3, 6);
+                    c.AreaCircle(0, 4, 1.2f);
+                    c.AreaCircle(0, -4, 1.2f);
+                    c.AreaCircle(-11, 7, 1.2f);
+                    c.AreaCircle(11, -7, 1.2f);
+                    c.Spawns(new Vector2(-7, 3), new Vector2(7, -3), new Vector2(-7, -5), new Vector2(7, 5));
+                }).Backdrop = kGroundBackdrop;
+
+            Add("リレーのバトンゾーン", 24,
+                "中央の仕切りで南北のレーンに分かれたコース。仕切りは真ん中と両端が切れている。四隅のシューターレーンが積み木を隅から隅へリレーし、仕切りの切れ目の南北にバンパー。",
+                "レーンに乗った積み木はバトンのように隅から隅へ受け渡され、レーンの上を一直線に走る。仕切りの真ん中の切れ目は南北を行き来する近道だが、両側のバンパーにはじかれやすい。自分で殴った積み木をリレーに乗せれば、遠くの相手を狙える。",
+                c =>
+                {
+                    c.Arena(0, 0, 30, 18, true, true, true, true);
+                    c.Wall(-6.5f, 0, 9, 1);
+                    c.Wall(6.5f, 0, 9, 1);
+                    c.ShooterLane(-13, 4.5f, 90, new Vector2(2.5f, 3));
+                    c.ShooterLane(13, 4.5f, 180, new Vector2(2.5f, 3));
+                    c.ShooterLane(13, -4.5f, 270, new Vector2(2.5f, 3));
+                    c.ShooterLane(-13, -4.5f, 0, new Vector2(2.5f, 3));
+                    c.Bumper(0, 4.5f, 1.0f);
+                    c.Bumper(0, -4.5f, 1.0f);
+                    c.AreaCircle(-6, 4.5f, 1.5f);
+                    c.AreaCircle(6, -4.5f, 1.5f);
+                    // 南北の壁にかぶせる / 仕切りの東西の切れ目
+                    c.AreaRect(0, 8, 6, 2);
+                    c.AreaRect(0, -8, 6, 2);
+                    c.AreaRect(-13.5f, 0, 2, 2.5f);
+                    c.AreaRect(13.5f, 0, 2, 2.5f);
+                    c.Spawns(new Vector2(-8, -5), new Vector2(8, 5), new Vector2(4, -6), new Vector2(-4, 6));
+                }).Backdrop = kGroundBackdrop;
+
+            // 道場(DebugStage41〜45)。背景: Dojo
+
+            Add("畳の土俵", 22,
+                "壁のない小さな畳の上。中央に回転台の土俵、そのまわりの斜め四方にバンパー。",
+                "どの縁も崖なので、はじかれる・押し出されるがそのまま脱落につながる。狭いので最初から撃ち合いになり、土俵の回転が弾を曲げ、乗っている相手を外へ運ぶ。縁の補給所は落下と隣り合わせで、押し出し合いが勝負を決める。",
+                c =>
+                {
+                    c.Arena(0, 0, 20, 20, false, false, false, false);
+                    c.Turntable(0, 0, 3, true, 40);
+                    c.Bumper(-4.5f, 4.5f, 1.0f);
+                    c.Bumper(4.5f, 4.5f, 1.0f);
+                    c.Bumper(-4.5f, -4.5f, 1.0f);
+                    c.Bumper(4.5f, -4.5f, 1.0f);
+                    c.AreaCircle(0, 0, 2);
+                    // 崖の外へはみ出す
+                    c.AreaRect(0, 9, 8, 3);
+                    c.AreaRect(0, -9, 8, 3);
+                    c.AreaRect(9, 0, 3, 8);
+                    c.AreaRect(-9, 0, 3, 8);
+                    c.AreaCircle(5.5f, 0, 1.0f);
+                    c.AreaCircle(-5.5f, 0, 1.0f);
+                    c.Spawns(new Vector2(-7, -7), new Vector2(7, 7), new Vector2(-7, 7), new Vector2(7, -7));
+                }).Backdrop = kDojoBackdrop;
+
+            Add("襖の間", 24,
+                "南北二列の襖(せり上がり塀)が、隣どうし時間をずらして開け閉めされる道場。列の両端はいつも開いている。中央に大きなバンパー。",
+                "襖は跳んでも越えられないので、閉じている所は壁、開いている所だけが南北の通り道。北の列と南の列は開くタイミングがずれていて、中央の部屋に入ると両側の襖が閉じて閉じ込められることも。中央のバンパーのまわりの補給所を、襖の開閉に合わせて奪い合う。",
+                c =>
+                {
+                    c.Arena(0, 0, 28, 20, true, true, true, true);
+                    for (int i = 0; i < 6; i++)
+                    {
+                        c.RisingWall(-10 + i * 4, 4, new Vector2(4, 1), i * 0.4f);
+                        c.RisingWall(-10 + i * 4, -4, new Vector2(4, 1), 1.5f + i * 0.4f);
+                    }
+                    c.Bumper(0, 0, 1.4f);
+                    c.AreaCircle(-7, 0, 1.5f);
+                    c.AreaCircle(7, 0, 1.5f);
+                    // 南北・東西の壁にかぶせる
+                    c.AreaRect(0, 8.5f, 8, 3);
+                    c.AreaRect(0, -8.5f, 8, 3);
+                    c.AreaRect(-12.5f, 7, 3, 4);
+                    c.AreaRect(12.5f, -7, 3, 4);
+                    c.Spawns(new Vector2(-8, 7.5f), new Vector2(8, 7.5f), new Vector2(-8, -7.5f), new Vector2(8, -7.5f));
+                }).Backdrop = kDojoBackdrop;
+
+            Add("雑巾がけの廊下", 24,
+                "東西の端が開いた長い廊下。雑巾がけでつるつるになった床(加速床)が東西に伸び、端の手前にワックスの乾いていない減速床。",
+                "加速床に乗ると体も弾も一気に滑り、そのまま廊下の端から飛び出しかねない。端の手前の減速床が最後のブレーキ。加速床の上の積み木は走り出すので、拾いに行くより流れてくるのを待つのも手。廊下の端の補給所は、滑ってきた相手に押し出される危険地帯。",
+                c =>
+                {
+                    c.Arena(0, 0, 30, 16, true, true, false, false);
+                    c.SpeedFloor(-6, 4, new Vector2(12, 2.5f), true);
+                    c.SpeedFloor(6, -4, new Vector2(12, 2.5f), true);
+                    c.SpeedFloor(-13.5f, 4, new Vector2(3, 2.5f), false);
+                    c.SpeedFloor(13.5f, -4, new Vector2(3, 2.5f), false);
+                    c.AreaCircle(0, 0, 2);
+                    c.AreaCircle(-6, -4, 1.5f);
+                    c.AreaCircle(6, 4, 1.5f);
+                    // 東西の端の外へはみ出す / 北の壁にかぶせる
+                    c.AreaRect(-14, 0, 3, 4);
+                    c.AreaRect(14, 0, 3, 4);
+                    c.AreaRect(0, 7, 6, 2);
+                    c.Spawns(new Vector2(-10, -1), new Vector2(10, 1), new Vector2(-4, 6), new Vector2(4, -6));
+                }).Backdrop = kDojoBackdrop;
+
+            Add("太鼓の響き", 24,
+                "中央に大太鼓のような大きなバンパー。北東と南西に回転台、その外側に小太鼓のバンパー。",
+                "大太鼓に当たった弾は大きくはじかれ、回転台の上を通ると曲がってさらに読めなくなる。回転台の補給所は流されながら拾うことになり、大太鼓の陰から狙われる。大太鼓を盾にして回り込む立ち回りが鍵。",
+                c =>
+                {
+                    c.Arena(0, 0, 24, 22, true, true, true, true);
+                    c.Bumper(0, 0, 2.0f);
+                    c.Bumper(-8.5f, 7, 1.2f);
+                    c.Bumper(8.5f, -7, 1.2f);
+                    c.Turntable(-6, -5, 3, false, 45);
+                    c.Turntable(6, 5, 3, true, 45);
+                    c.AreaCircle(-6, -5, 1.8f);
+                    c.AreaCircle(6, 5, 1.8f);
+                    c.AreaCircle(0, 4, 1.0f);
+                    c.AreaCircle(0, -4, 1.0f);
+                    // 南・東西の壁にかぶせる
+                    c.AreaRect(0, -10, 8, 2);
+                    c.AreaRect(11, -6, 2, 4);
+                    c.AreaRect(-11, 6, 2, 4);
+                    c.Spawns(new Vector2(-8, 1), new Vector2(8, -1), new Vector2(-5, 9), new Vector2(5, -9));
+                }).Backdrop = kDojoBackdrop;
+
+            Add("中庭の稽古場", 24,
+                "東西二つの中庭(奈落)を囲む稽古場。中庭の間を南北に渡り廊下が通り、中庭の中では板(移動床)が東西に往復して、渡り廊下と外側の縁側をつなぐ。中庭の角にバンパー。",
+                "どこも地続きで、北と南の稽古場は渡り廊下か外側の縁側を通って行き来する。中庭の板は渡り廊下と縁側の両方に届く近道だが、板の南北は穴なので、乗っている所を撃たれると落ちる。中庭の角のバンパーは、縁を歩く相手を中庭へはじき落とす。渡り廊下の補給所は四方から狙われる激戦区。",
+                c =>
+                {
+                    // 遊べる範囲 28×22m。東西に 7×6m の中庭(穴)を残して床を並べ、四方に壁
+                    c.Floor(0, 7.5f, 30, 9);
+                    c.Floor(0, -7.5f, 30, 9);
+                    c.Floor(0, 0, 7, 6);
+                    c.Floor(-12.75f, 0, 4.5f, 6);
+                    c.Floor(12.75f, 0, 4.5f, 6);
+                    c.Wall(0, 11.5f, 30, 1);
+                    c.Wall(0, -11.5f, 30, 1);
+                    c.Wall(14.5f, 0, 1, 24);
+                    c.Wall(-14.5f, 0, 1, 24);
+                    c.MovingFloor(new Vector2(2.9f, 2.9f), MovingFloorGimmick.LoopMode.PingPong, 1.6f, 1.0f, new Vector2(-9.05f, 0), new Vector2(-4.95f, 0));
+                    c.MovingFloor(new Vector2(2.9f, 2.9f), MovingFloorGimmick.LoopMode.PingPong, 1.6f, 1.0f, new Vector2(4.95f, 0), new Vector2(9.05f, 0));
+                    c.Bumper(7, 5, 1.2f);
+                    c.Bumper(-7, -5, 1.2f);
+                    // 渡り廊下 / 縁側 / 中庭の縁
+                    c.AreaCircle(0, 0, 2);
+                    c.AreaCircle(-12.75f, 0, 1.2f);
+                    c.AreaCircle(12.75f, 0, 1.2f);
+                    c.AreaCircle(-7, 5, 1.2f);
+                    c.AreaCircle(7, -5, 1.2f);
+                    // 南北の壁にかぶせる
+                    c.AreaRect(0, 9.5f, 8, 2.5f);
+                    c.AreaRect(0, -9.5f, 8, 2.5f);
+                    c.Spawns(new Vector2(-11, 7.5f), new Vector2(11, -7.5f), new Vector2(-11, -7.5f), new Vector2(11, 7.5f));
+                }).Backdrop = kDojoBackdrop;
+
+            // スタジアム(DebugStage46〜50)。背景: Stadium
+
+            Add("センターサークル", 24,
+                "東西に長いピッチ。東西の壁の真ん中がゴールの口になっていて、そこだけ外へ落ちる。中央にセンターサークルの回転台、ゴール前にキーパーのバンパー。",
+                "相手をゴールの口へ撃ち込めば、そのまま場外へ落とせる。ゴール前のキーパー(バンパー)が弾も体もはじくので、正面からは決まりにくく、回転台で曲げた弾や跳弾で角度をつけて狙う。ゴール脇の補給所は積み木が多いが、キーパーにはじかれてゴールへ転がる危険がある。",
+                c =>
+                {
+                    // 遊べる範囲 30×20m。東西の壁は南北に 6m 空けてゴールの口にする
+                    c.Floor(0, 0, 32, 22);
+                    c.Wall(0, 10.5f, 32, 1);
+                    c.Wall(0, -10.5f, 32, 1);
+                    c.Wall(15.5f, 6.5f, 1, 7);
+                    c.Wall(15.5f, -6.5f, 1, 7);
+                    c.Wall(-15.5f, 6.5f, 1, 7);
+                    c.Wall(-15.5f, -6.5f, 1, 7);
+                    c.Turntable(0, 0, 4, true, 40);
+                    c.Bumper(-11.5f, 0, 1.0f);
+                    c.Bumper(11.5f, 0, 1.0f);
+                    c.AreaCircle(0, 0, 2.5f);
+                    c.AreaCircle(-7, 0, 1.0f);
+                    c.AreaCircle(7, 0, 1.0f);
+                    // ゴール脇 / 南北の壁にかぶせる
+                    c.AreaCircle(-13.5f, 6.5f, 1.2f);
+                    c.AreaCircle(13.5f, -6.5f, 1.2f);
+                    c.AreaRect(0, 9, 8, 2);
+                    c.AreaRect(0, -9, 8, 2);
+                    c.Spawns(new Vector2(-7, -6), new Vector2(7, 6), new Vector2(-7, 6), new Vector2(7, -6));
+                }).Backdrop = kStadiumBackdrop;
+
+            Add("観客席のウェーブ", 24,
+                "南北の観客席の前に並んだせり上がり塀が、ウェーブのように順番に立ち上がる。東の扇風機が南北に往復しながら西へ風を送る。",
+                "北と南のウェーブは逆向きに流れるので、塀の切れ目の位置が南北で違う。塀は跳んでも越えられず、観客席側の補給所へは切れ目を通って入るしかない。中央の帯は東からの風で西へ流され、風上の東から撃つ弾は速く飛ぶ。",
+                c =>
+                {
+                    c.Arena(0, 0, 30, 22, true, true, true, true);
+                    for (int i = 0; i < 8; i++)
+                    {
+                        c.RisingWall(-10.5f + i * 3, 5.5f, new Vector2(3, 1), i * 0.3f);
+                        c.RisingWall(10.5f - i * 3, -5.5f, new Vector2(3, 1), i * 0.3f);
+                    }
+                    c.Fan(new Vector2(14, -2.5f), new Vector2(14, 2.5f), Vector3.left, 26, 4, 9, 1.5f);
+                    c.AreaCircle(0, 0, 2);
+                    c.AreaCircle(-8, 0, 1.5f);
+                    c.AreaCircle(8, 0, 1.5f);
+                    // 南北の壁にかぶせる / 風下の西の壁際
+                    c.AreaRect(0, 9.5f, 10, 2.5f);
+                    c.AreaRect(0, -9.5f, 10, 2.5f);
+                    c.AreaCircle(-12.5f, 0, 1.2f);
+                    c.Spawns(new Vector2(-12, 9), new Vector2(12, 9), new Vector2(-12, -9), new Vector2(12, -9));
+                }).Backdrop = kStadiumBackdrop;
+
+            Add("PK戦のゴール", 24,
+                "東西のゴール前に、どちらへも送るワープゲート。南北の中央には積み木だけを送り向きを反転させるゲート。中央寄りにバンパー。",
+                "ゴールのゲートに飛び込むと、どちらのゴールから出るか分からない。南北の積み木専用ゲートに撃ち込んだ弾は、反対側のゲートから逆向きに飛び出すので、ゴール前で待つ相手への奇襲になる。狭いピッチなので、ゲートから出た直後にすぐ撃ち合いになる。",
+                c =>
+                {
+                    c.Arena(0, 0, 30, 18, true, true, true, true);
+                    c.WarpGate(-13, 0, 90, 0, WarpGateGimmick.TargetType.Both, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.Keep);
+                    c.WarpGate(13, 0, 270, 0, WarpGateGimmick.TargetType.Both, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.Keep);
+                    c.WarpGate(0, 6.5f, 0, 1, WarpGateGimmick.TargetType.Blocks, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.RelativeToGate);
+                    c.WarpGate(0, -6.5f, 180, 1, WarpGateGimmick.TargetType.Blocks, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.RelativeToGate);
+                    c.Bumper(-7, 0, 1.2f);
+                    c.Bumper(7, 0, 1.2f);
+                    c.AreaCircle(0, 0, 2.2f);
+                    c.AreaCircle(-4, 4.5f, 1.0f);
+                    c.AreaCircle(4, -4.5f, 1.0f);
+                    // 四隅(壁にかぶせる)
+                    c.AreaRect(-11, 7.5f, 4, 2);
+                    c.AreaRect(11, -7.5f, 4, 2);
+                    c.AreaRect(11, 7.5f, 4, 2);
+                    c.AreaRect(-11, -7.5f, 4, 2);
+                    c.Spawns(new Vector2(-7, -4.5f), new Vector2(7, 4.5f), new Vector2(7, -4.5f), new Vector2(-7, 4.5f));
+                }).Backdrop = kStadiumBackdrop;
+
+            Add("スプリンクラーの芝", 24,
+                "南北の回転砲台が、スプリンクラーのように首を振って積み木をまく。東西の芝は水を含んだ減速床。",
+                "砲台から扇状にまかれた積み木が、中央から東西へ散らばる。濡れた芝(減速床)に入ると動きも弾も遅くなり、砲台の流れ弾をかわしにくい。四隅の補給所で集めるか、砲台のそばの流れ弾を拾うかの選択。",
+                c =>
+                {
+                    c.Arena(0, 0, 28, 24, true, true, true, true);
+                    c.Cannon(0, 5.5f, 180, TumikiCannon.RotationMode.Swing, 1, 3);
+                    c.Cannon(0, -5.5f, 0, TumikiCannon.RotationMode.Swing, 1, 3);
+                    c.SpeedFloor(-8, 0, new Vector2(4, 5), false);
+                    c.SpeedFloor(8, 0, new Vector2(4, 5), false);
+                    c.AreaCircle(-8, 8, 2);
+                    c.AreaCircle(8, -8, 2);
+                    c.AreaCircle(8, 8, 2);
+                    c.AreaCircle(-8, -8, 2);
+                    // 東西の壁にかぶせる
+                    c.AreaRect(-12.5f, 0, 3, 6);
+                    c.AreaRect(12.5f, 0, 3, 6);
+                    c.Spawns(new Vector2(-11, 4.5f), new Vector2(11, -4.5f), new Vector2(-11, -4.5f), new Vector2(11, 4.5f));
+                }).Backdrop = kStadiumBackdrop;
+
+            Add("跳ねるボール", 24,
+                "中央を菱形に囲む四つのバンパー。四隅には加速床。",
+                "四隅の加速床で勢いのついた弾や体が、中央のバンパーに飛び込んで大きくはじかれる。中央の補給所はバンパーに囲まれていて、入るのも出るのも一苦労。跳ね返りを計算して、バンパー越しに中央の相手を狙う。",
+                c =>
+                {
+                    c.Arena(0, 0, 26, 22, true, true, true, true);
+                    c.Bumper(-5.5f, 0, 1.3f);
+                    c.Bumper(5.5f, 0, 1.3f);
+                    c.Bumper(0, 4.5f, 1.3f);
+                    c.Bumper(0, -4.5f, 1.3f);
+                    c.SpeedFloor(-9.5f, 7, new Vector2(3, 3), true);
+                    c.SpeedFloor(9.5f, -7, new Vector2(3, 3), true);
+                    c.SpeedFloor(9.5f, 7, new Vector2(3, 3), true);
+                    c.SpeedFloor(-9.5f, -7, new Vector2(3, 3), true);
+                    c.AreaCircle(0, 0, 1.8f);
+                    c.AreaCircle(5, 5, 1.0f);
+                    c.AreaCircle(-5, -5, 1.0f);
+                    // 南北・東西の壁にかぶせる
+                    c.AreaRect(0, 9.5f, 6, 2.5f);
+                    c.AreaRect(0, -9.5f, 6, 2.5f);
+                    c.AreaRect(11.5f, 0, 2.5f, 5);
+                    c.AreaRect(-11.5f, 0, 2.5f, 5);
+                    c.Spawns(new Vector2(-5, 8), new Vector2(5, -8), new Vector2(-9, 2.5f), new Vector2(9, -2.5f));
+                }).Backdrop = kStadiumBackdrop;
+
+            // ゲレンデ(DebugStage51〜55)。背景: Slope
+
+            Add("リフトの谷", 24,
+                "東西に細長い谷(奈落)が走る雪原。谷の中をリフト(移動床)が谷の幅いっぱいで東西に往復し、谷の東西の端は雪の橋でつながる。北と南の扇風機が、逆向きに往復しながら谷へ向けて吹雪を吹きつける。",
+                "南北の雪原はどこからでも谷をはさんで撃ち合える距離。リフトは動く橋で、来た所でいつでも対岸へ渡れるが、待っている間に吹雪で谷へ押し出されることも。谷の縁の補給所は積み木が多いが、撃たれると谷へ落ちる。東西の雪の橋は安全な回り道だが、橋の上で待ち伏せされやすい。",
+                c =>
+                {
+                    // 遊べる範囲 28×22m。中央に 18×3m の谷(穴)を残して床を並べ、四方に壁
+                    c.Floor(0, 6.75f, 30, 10.5f);
+                    c.Floor(0, -6.75f, 30, 10.5f);
+                    c.Floor(-12, 0, 6, 3);
+                    c.Floor(12, 0, 6, 3);
+                    c.Wall(0, 11.5f, 30, 1);
+                    c.Wall(0, -11.5f, 30, 1);
+                    c.Wall(14.5f, 0, 1, 24);
+                    c.Wall(-14.5f, 0, 1, 24);
+                    c.MovingFloor(new Vector2(2.9f, 2.9f), MovingFloorGimmick.LoopMode.PingPong, 2.0f, 1.0f, new Vector2(-7.55f, 0), new Vector2(7.55f, 0));
+                    c.Fan(new Vector2(-9, 10.5f), new Vector2(9, 10.5f), Vector3.back, 9, 4, 8, 1.5f);
+                    c.Fan(new Vector2(9, -10.5f), new Vector2(-9, -10.5f), Vector3.forward, 9, 4, 8, 1.5f);
+                    // 谷の縁 / 雪の橋 / 隅
+                    c.AreaRect(0, 3, 8, 2);
+                    c.AreaRect(0, -3, 8, 2);
+                    c.AreaCircle(-12, 0, 1.2f);
+                    c.AreaCircle(12, 0, 1.2f);
+                    c.AreaCircle(-12, 7, 1.5f);
+                    c.AreaCircle(12, -7, 1.5f);
+                    c.Spawns(new Vector2(-6, 7), new Vector2(6, -7), new Vector2(6, 7), new Vector2(-6, -7));
+                }).Backdrop = kSlopeBackdrop;
+
+            Add("こぶ斜面", 24,
+                "南側が崖になった斜面。こぶのようなバンパーが点在し、ところどころに加速床。",
+                "加速床で勢いがつくと、こぶ(バンパー)にはじかれて思わぬ方向へ飛ばされる。南の崖際の補給所は積み木が湧いても取りに行くのが怖い。こぶを盾にしながら、加速床を使って一気に間合いを詰める。",
+                c =>
+                {
+                    c.Arena(0, 0, 28, 22, true, false, true, true);
+                    c.SpeedFloor(-6, 3, new Vector2(3, 6), true);
+                    c.SpeedFloor(6, -3, new Vector2(3, 6), true);
+                    c.Bumper(0, 6, 1.2f);
+                    c.Bumper(-5, -6, 1.2f);
+                    c.Bumper(8, 4, 1.2f);
+                    c.Bumper(-9.5f, 1, 1.2f);
+                    c.AreaCircle(0, 0, 2);
+                    // 南の崖の外へはみ出す / 北・東西の壁にかぶせる
+                    c.AreaRect(0, -10, 8, 3);
+                    c.AreaRect(0, 9.5f, 8, 2.5f);
+                    c.AreaRect(-12.5f, 7, 2.5f, 4);
+                    c.AreaRect(12.5f, -6, 2.5f, 4);
+                    c.AreaCircle(-11, -8, 1.2f);
+                    c.Spawns(new Vector2(-9, -4), new Vector2(9, 0), new Vector2(-6, 9), new Vector2(6, -9));
+                }).Backdrop = kSlopeBackdrop;
+
+            Add("雪だるまの林", 24,
+                "東西が崖の雪原に、雪だるまのようなバンパーが斜めに並ぶ。北東と南西に回転台。",
+                "斜めに並んだ雪だるまのせいで、まっすぐ撃てる場所が限られる。回転台の上で弾が曲がり、雪だるまに当たってさらに向きが変わる。東西の崖際の補給所は、はじかれて落ちる危険と隣り合わせ。",
+                c =>
+                {
+                    c.Arena(0, 0, 28, 22, true, true, false, false);
+                    c.Bumper(-9, 6, 1.2f);
+                    c.Bumper(-3, 2, 1.2f);
+                    c.Bumper(3, -2, 1.2f);
+                    c.Bumper(9, -6, 1.2f);
+                    c.Bumper(-3, -7, 1.2f);
+                    c.Bumper(3, 7, 1.2f);
+                    c.Turntable(-9, -4.5f, 3, false, 40);
+                    c.Turntable(9, 4.5f, 3, true, 40);
+                    c.AreaCircle(-9, -4.5f, 1.8f);
+                    c.AreaCircle(9, 4.5f, 1.8f);
+                    c.AreaCircle(0, 0, 1.5f);
+                    // 東西の崖の外へはみ出す / 北の壁にかぶせる
+                    c.AreaRect(13, 0, 3, 6);
+                    c.AreaRect(-13, 0, 3, 6);
+                    c.AreaRect(0, 10, 6, 2);
+                    c.Spawns(new Vector2(-10, 1), new Vector2(10, -1), new Vector2(-7, -9.5f), new Vector2(7, 9.5f));
+                }).Backdrop = kSlopeBackdrop;
+
+            Add("雪崩の斜面", 24,
+                "南側が崖の斜面。北の扇風機が東西に往復しながら雪崩のような風を南へ吹き下ろす。中ほどには雪よけの柵(せり上がり塀)。",
+                "風は北から南の崖へ吹くので、南へ行くほど危ない。柵が立ち上がっている間はその陰が風よけと盾になり、下がると風が吹き抜ける。柵は跳んでも越えられないので、陰に入るには柵の切れ目を回り込む。柵の陰で待つか、崖際の補給所へ取りに行くかの判断が分かれ目。",
+                c =>
+                {
+                    c.Arena(0, 0, 28, 22, true, false, true, true);
+                    c.Fan(new Vector2(-8, 10), new Vector2(8, 10), Vector3.back, 20, 4, 9, 2);
+                    c.RisingWall(-8, -2, new Vector2(4, 1), 0.0f);
+                    c.RisingWall(0, -2, new Vector2(4, 1), 1.5f);
+                    c.RisingWall(8, -2, new Vector2(4, 1), 3.0f);
+                    c.AreaCircle(0, 3, 2);
+                    // 東西の壁にかぶせる / 南の崖の外へはみ出す
+                    c.AreaRect(-12, 5, 3, 4);
+                    c.AreaRect(12, 5, 3, 4);
+                    c.AreaRect(0, -10, 10, 3);
+                    c.AreaCircle(-10.5f, -7, 1.5f);
+                    c.AreaCircle(10.5f, -7, 1.5f);
+                    c.Spawns(new Vector2(-6, 6), new Vector2(6, 6), new Vector2(-5, -6), new Vector2(5, -6));
+                }).Backdrop = kSlopeBackdrop;
+
+            Add("ゴンドラの乗り継ぎ", 24,
+                "北の雪原から南へ三本の尾根が伸び、尾根の間の細い谷をゴンドラ(移動床)が谷の幅いっぱいで南北に往復する。東西の尾根の南の端どうしをワープゲートがつなぐ。",
+                "尾根どうしは北の雪原を回ればつながっているが、ゴンドラが来た所なら谷を一歩で渡れる近道になる。ゴンドラを待つ間に撃たれると谷へ落ちる。東西の尾根の南の端のゲートで一気に反対側へ行けるが、出口で待ち伏せされやすい。中央の尾根は両側の谷から狙われる激戦区。",
+                c =>
+                {
+                    // 遊べる範囲 28×22m。北の雪原(z 6〜11)から三本の尾根を伸ばし、間に 3m の谷を二本残す
+                    c.Floor(0, 9, 30, 6);
+                    c.Floor(-11.25f, -3, 7.5f, 18);
+                    c.Floor(0, -3, 9, 18);
+                    c.Floor(11.25f, -3, 7.5f, 18);
+                    c.Wall(0, 11.5f, 30, 1);
+                    c.Wall(-14.5f, 0, 1, 24);
+                    c.Wall(14.5f, 0, 1, 24);
+                    c.Wall(-11.25f, -11.5f, 7.5f, 1);
+                    c.Wall(0, -11.5f, 9, 1);
+                    c.Wall(11.25f, -11.5f, 7.5f, 1);
+                    c.MovingFloor(new Vector2(2.9f, 2.9f), MovingFloorGimmick.LoopMode.PingPong, 2.0f, 1.0f, new Vector2(-6, 4.5f), new Vector2(-6, -9.5f));
+                    c.MovingFloor(new Vector2(2.9f, 2.9f), MovingFloorGimmick.LoopMode.PingPong, 2.0f, 1.0f, new Vector2(6, -9.5f), new Vector2(6, 4.5f));
+                    c.WarpGate(-11, -9, 0, 0, WarpGateGimmick.TargetType.Players, WarpGateGimmick.Selection.Sequential, WarpGateGimmick.Orientation.Keep);
+                    c.WarpGate(11, -9, 0, 0, WarpGateGimmick.TargetType.Players, WarpGateGimmick.Selection.Sequential, WarpGateGimmick.Orientation.Keep);
+                    c.AreaCircle(0, -3, 2);
+                    c.AreaRect(0, -10, 6, 2);
+                    c.AreaCircle(-11, -3, 1.5f);
+                    c.AreaCircle(11, -3, 1.5f);
+                    // 北の雪原(北の壁にかぶせる)
+                    c.AreaRect(0, 9, 8, 3);
+                    c.AreaCircle(-11, 8.5f, 1.2f);
+                    c.AreaCircle(11, 8.5f, 1.2f);
+                    c.Spawns(new Vector2(-11, 2), new Vector2(11, 2), new Vector2(-11, -6.5f), new Vector2(11, -6.5f));
+                }).Backdrop = kSlopeBackdrop;
+
+            // 豪華客船のデッキ(DebugStage56〜60)。背景: Cruise
+
+            Add("プールサイド", 24,
+                "中央にプール(奈落)のあるデッキ。プールの中を浮き輪のボート(移動床)が縁に沿って周回し、プールの角に浮き輪のバンパー。",
+                "ボートはプールの縁すれすれを回るので、近づいた所で飛び乗れば近道になる。乗り遅れるとプールへ落ちる。プールの縁の補給所は、ボートの上からも縁からも狙われ、角のバンパーにはじかれるとプールへ転がり込む。デッキを大回りするか、ボートで近道するかの選択。",
+                c =>
+                {
+                    // 遊べる範囲 26×22m。中央 12×8m のプールを残して床を並べ、四方に手すり(壁)
+                    c.Floor(0, 8, 28, 8);
+                    c.Floor(0, -8, 28, 8);
+                    c.Floor(-10, 0, 8, 8);
+                    c.Floor(10, 0, 8, 8);
+                    c.Wall(0, 11.5f, 28, 1);
+                    c.Wall(0, -11.5f, 28, 1);
+                    c.Wall(13.5f, 0, 1, 24);
+                    c.Wall(-13.5f, 0, 1, 24);
+                    c.MovingFloor(new Vector2(2.9f, 2.9f), MovingFloorGimmick.LoopMode.Loop, 2.0f, 0.8f,
+                        new Vector2(-4.5f, -2.5f), new Vector2(4.5f, -2.5f), new Vector2(4.5f, 2.5f), new Vector2(-4.5f, 2.5f));
+                    c.Bumper(-8, 6.5f, 1.2f);
+                    c.Bumper(8, -6.5f, 1.2f);
+                    // プールの縁
+                    c.AreaRect(0, 6, 8, 3);
+                    c.AreaRect(0, -6, 8, 3);
+                    c.AreaCircle(-10, 0, 1.5f);
+                    c.AreaCircle(10, 0, 1.5f);
+                    c.AreaCircle(-5, -9.5f, 1.5f);
+                    c.AreaCircle(5, 9.5f, 1.5f);
+                    c.Spawns(new Vector2(-11, 8.5f), new Vector2(11, -8.5f), new Vector2(11, 8.5f), new Vector2(-11, -8.5f));
+                }).Backdrop = kCruiseBackdrop;
+
+            Add("船首の突風", 24,
+                "東へ向かって細くなっていく船首のデッキ。手すりは西と南北にしかなく、船首は海(崖)。西の扇風機が南北に往復しながら船首へ向けて突風を送る。甲板にはキャプスタンのようなバンパー。",
+                "風は西から船首へ吹き、船首へ行くほど足場が細くなる。船首の先端の補給所は積み木が多いが、風とバンパーに押されると海へ落ちる。風上の西から撃つ弾は伸び、風下から撃ち返す弾は押し戻される。船首の段の角に追い詰めれば、風が勝手に落としてくれる。",
+                c =>
+                {
+                    // 遊べる範囲: 甲板 21×20m(西と南北に手すり)+ 船首の段(5×15m, 4×8m)
+                    c.Floor(-5, 0, 22, 22);
+                    c.Floor(8.5f, 0, 5, 15);
+                    c.Floor(13, 0, 4, 8);
+                    c.Wall(-15.5f, 0, 1, 22);
+                    c.Wall(-5, 10.5f, 22, 1);
+                    c.Wall(-5, -10.5f, 22, 1);
+                    c.Fan(new Vector2(-14, -6), new Vector2(-14, 6), Vector3.right, 24, 4, 9, 1.5f);
+                    c.Bumper(-3, 5, 1.3f);
+                    c.Bumper(-3, -5, 1.3f);
+                    c.Bumper(5, 0, 1.3f);
+                    c.AreaCircle(-8, 0, 2);
+                    // 船首の先端(海へはみ出す) / 船首の段 / 南北の手すりにかぶせる
+                    c.AreaRect(13.5f, 0, 3, 6);
+                    c.AreaCircle(8.5f, 5, 1.2f);
+                    c.AreaCircle(8.5f, -5, 1.2f);
+                    c.AreaRect(-5, 9, 8, 2);
+                    c.AreaRect(-5, -9, 8, 2);
+                    c.Spawns(new Vector2(-11, 7), new Vector2(-11, -7), new Vector2(2, 8), new Vector2(2, -8));
+                }).Backdrop = kCruiseBackdrop;
+
+            Add("カジノのルーレット", 24,
+                "船内カジノの床の大半を、大きなルーレット(回転台)が占める。四隅にバンパー。",
+                "ルーレットの上を通る弾は大きく曲がり、どこへ抜けるかは回転次第。ルーレットの上の補給所は回りながら外へ運ばれるので、縁で待ち構えて拾うのも手。四隅のバンパーは壁際へ逃げた相手を中へはじき返す。",
+                c =>
+                {
+                    c.Arena(0, 0, 26, 26, true, true, true, true);
+                    c.Turntable(0, 0, 6, true, 60);
+                    c.Bumper(-9, 9, 1.2f);
+                    c.Bumper(9, 9, 1.2f);
+                    c.Bumper(-9, -9, 1.2f);
+                    c.Bumper(9, -9, 1.2f);
+                    c.AreaCircle(0, 0, 2.5f);
+                    c.AreaCircle(4, -4, 1.5f);
+                    // 各辺の壁にかぶせる
+                    c.AreaRect(0, 11.5f, 6, 3);
+                    c.AreaRect(0, -11.5f, 6, 3);
+                    c.AreaRect(11.5f, 0, 3, 6);
+                    c.AreaRect(-11.5f, 0, 3, 6);
+                    c.Spawns(new Vector2(-9, 4), new Vector2(9, -4), new Vector2(4, 9), new Vector2(-4, -9));
+                }).Backdrop = kCruiseBackdrop;
+
+            Add("船室のワープ扉", 24,
+                "中央に壁で囲まれた船室。船室の中と甲板の隅に、どこへ飛ぶか分からないワープゲート。甲板の隅にバンパー。",
+                "船室の入口は四隅の狭い隙間だけで、中の補給所は守りやすく攻めにくい。ワープゲートに飛び込めば一気に船室へ入れることもあるが、行き先はランダム。船室の壁越しの跳弾と、ゲートからの奇襲が見どころ。",
+                c =>
+                {
+                    c.Arena(0, 0, 32, 22, true, true, true, true);
+                    c.Wall(-7, 0, 1, 10);
+                    c.Wall(7, 0, 1, 10);
+                    c.Wall(0, 5.5f, 10, 1);
+                    c.Wall(0, -5.5f, 10, 1);
+                    c.WarpGate(-3, 0, 0, 0, WarpGateGimmick.TargetType.Both, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.Keep);
+                    c.WarpGate(3, 0, 0, 0, WarpGateGimmick.TargetType.Both, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.Keep);
+                    c.WarpGate(-12, 7.5f, 0, 0, WarpGateGimmick.TargetType.Both, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.Keep);
+                    c.WarpGate(12, -7.5f, 0, 0, WarpGateGimmick.TargetType.Both, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.Keep);
+                    c.Bumper(-12, -6, 1.2f);
+                    c.Bumper(12, 6, 1.2f);
+                    c.AreaCircle(0, 2.5f, 1.5f);
+                    c.AreaCircle(0, -2.5f, 1.5f);
+                    // 東西・南北の壁にかぶせる
+                    c.AreaRect(-15, 0, 2, 4);
+                    c.AreaRect(15, 0, 2, 4);
+                    c.AreaRect(0, 9, 8, 2.5f);
+                    c.AreaRect(0, -9, 8, 2.5f);
+                    c.Spawns(new Vector2(-11, 2.5f), new Vector2(11, -2.5f), new Vector2(-10, -8), new Vector2(10, 8));
+                }).Backdrop = kCruiseBackdrop;
+
+            Add("濡れた甲板の荷揚げ", 24,
+                "南北のクレーン(回転砲台)が首を振りながら荷物(積み木)を甲板へ降ろす。甲板の中央は濡れて滑る加速床。",
+                "クレーンから扇状にばらまかれた積み木が中央へ集まり、濡れた甲板の上で勝手に滑っていく。中央に立つと両方のクレーンの流れ弾を浴びる。四隅の補給所で集めつつ、滑ってくる積み木を横取りする。",
+                c =>
+                {
+                    c.Arena(0, 0, 28, 22, true, true, true, true);
+                    c.Cannon(0, 7.5f, 180, TumikiCannon.RotationMode.Swing, 1, 3);
+                    c.Cannon(0, -7.5f, 0, TumikiCannon.RotationMode.Swing, 1, 3);
+                    c.SpeedFloor(-5, 0, new Vector2(3, 6), true);
+                    c.SpeedFloor(5, 0, new Vector2(3, 6), true);
+                    c.AreaCircle(-9, 6, 2);
+                    c.AreaCircle(9, -6, 2);
+                    c.AreaCircle(9, 6, 2);
+                    c.AreaCircle(-9, -6, 2);
+                    // 東西の壁にかぶせる
+                    c.AreaRect(-12.5f, 0, 3, 6);
+                    c.AreaRect(12.5f, 0, 3, 6);
+                    c.Spawns(new Vector2(-10, 1), new Vector2(10, -1), new Vector2(0, 3), new Vector2(0, -3));
+                }).Backdrop = kCruiseBackdrop;
+
+            // 遺跡(DebugStage61〜65)。背景: Ruins
+
+            Add("仕掛けの回廊", 24,
+                "互い違いに並んだ石柱(せり上がり塀)が、順番にせり上がっては沈む回廊。中央に石の円盤(回転台)。",
+                "柱は跳んでも越えられず、上がっている間は盾になり、沈むと見通しが開ける。柱の陰から陰へ移りながら撃ち合い、中央の円盤の補給所を狙う。円盤を通る弾は曲がるので、柱の隙間から曲げて当てることもできる。",
+                c =>
+                {
+                    c.Arena(0, 0, 28, 22, true, true, true, true);
+                    int n = 0;
+                    foreach (float z in new[] { 4.5f, -4.5f })
+                    {
+                        foreach (float x in new[] { -8.0f, 0.0f, 8.0f }) c.RisingWall(x, z, new Vector2(1.5f, 1.5f), n++ * 0.7f);
+                    }
+                    c.RisingWall(-9, 0, new Vector2(1.5f, 1.5f), n++ * 0.7f);
+                    c.RisingWall(9, 0, new Vector2(1.5f, 1.5f), n++ * 0.7f);
+                    c.Turntable(0, 0, 2.5f, true, 50);
+                    c.AreaCircle(0, 0, 1.8f);
+                    c.AreaCircle(4.5f, 0, 1.2f);
+                    c.AreaCircle(-4.5f, 0, 1.2f);
+                    // 南北・東西の壁にかぶせる
+                    c.AreaRect(0, 9.5f, 8, 3);
+                    c.AreaRect(0, -9.5f, 8, 3);
+                    c.AreaRect(-12.5f, 0, 3, 6);
+                    c.AreaRect(12.5f, 0, 3, 6);
+                    c.Spawns(new Vector2(-11, 8), new Vector2(11, -8), new Vector2(-11, -8), new Vector2(11, 8));
+                }).Backdrop = kRuinsBackdrop;
+
+            Add("石像の守護者", 24,
+                "北西と南東の隅の石像(回転砲台)が、首を振りながら中央へ積み木を撃ち出す。中央の両脇にバンパー。",
+                "石像の弾は対角線に沿って飛んでくるので、北西と南東を結ぶ線上は常に危険。バンパーにはじかれた流れ弾が思わぬ方向から飛んでくる。石像のない北東・南西の隅の補給所は、比較的安全に集められる。",
+                c =>
+                {
+                    c.Arena(0, 0, 26, 26, true, true, true, true);
+                    c.Cannon(-10.5f, 10.5f, 135, TumikiCannon.RotationMode.Swing, 1, 2);
+                    c.Cannon(10.5f, -10.5f, 315, TumikiCannon.RotationMode.Swing, 1, 2);
+                    c.Bumper(-4, -4, 1.4f);
+                    c.Bumper(4, 4, 1.4f);
+                    c.AreaCircle(0, 0, 2);
+                    c.AreaCircle(-8.5f, -8.5f, 2);
+                    c.AreaCircle(8.5f, 8.5f, 2);
+                    // 各辺の壁にかぶせる
+                    c.AreaRect(0, 11.5f, 6, 3);
+                    c.AreaRect(0, -11.5f, 6, 3);
+                    c.AreaRect(11.5f, 0, 3, 6);
+                    c.AreaRect(-11.5f, 0, 3, 6);
+                    c.Spawns(new Vector2(-8, 2), new Vector2(8, -2), new Vector2(2, 8), new Vector2(-2, -8));
+                }).Backdrop = kRuinsBackdrop;
+
+            Add("崩れた神殿", 22,
+                "壁のない神殿の床。床が二か所崩れて穴が空き、穴の中を崩れた石(移動床)が東西に往復する。北西と南東の祭壇はワープゲートでつながる。",
+                "どの縁も崖で、床の中にも穴がある。穴の石は穴の東西の端まで届く近道だが、石の南北には隙間があり、撃たれると穴へ落ちる。穴のそばの補給所は、穴と崖にはさまれた危険地帯。祭壇のゲートで対角へ飛べば挟み撃ちを抜けられるが、出口の祭壇は崖際。",
+                c =>
+                {
+                    // 遊べる範囲 24×22m(壁なし)。北西寄りと南東寄りに 5×4m の穴を残して床を並べる
+                    c.Floor(0, 8.5f, 24, 5);
+                    c.Floor(0, -8.5f, 24, 5);
+                    c.Floor(-10.25f, 0, 3.5f, 12);
+                    c.Floor(0, 0, 7, 12);
+                    c.Floor(10.25f, 0, 3.5f, 12);
+                    c.Floor(-6, -2, 5, 8);
+                    c.Floor(6, 2, 5, 8);
+                    c.MovingFloor(new Vector2(2.9f, 2.9f), MovingFloorGimmick.LoopMode.PingPong, 1.5f, 1.0f, new Vector2(-7.05f, 4), new Vector2(-4.95f, 4));
+                    c.MovingFloor(new Vector2(2.9f, 2.9f), MovingFloorGimmick.LoopMode.PingPong, 1.5f, 1.0f, new Vector2(7.05f, -4), new Vector2(4.95f, -4));
+                    c.WarpGate(-10, 9, 0, 0, WarpGateGimmick.TargetType.Both, WarpGateGimmick.Selection.Sequential, WarpGateGimmick.Orientation.Keep);
+                    c.WarpGate(10, -9, 0, 0, WarpGateGimmick.TargetType.Both, WarpGateGimmick.Selection.Sequential, WarpGateGimmick.Orientation.Keep);
+                    c.AreaCircle(0, 0, 2);
+                    // 穴のそば
+                    c.AreaCircle(-6, -3, 1.2f);
+                    c.AreaCircle(6, 3, 1.2f);
+                    // 崖の外へはみ出す
+                    c.AreaRect(0, 10.5f, 8, 2);
+                    c.AreaRect(0, -10.5f, 8, 2);
+                    c.AreaRect(11.5f, 0, 2, 6);
+                    c.AreaRect(-11.5f, 0, 2, 6);
+                    c.Spawns(new Vector2(-9, -4), new Vector2(9, 4), new Vector2(-4, 8.5f), new Vector2(4, -8.5f));
+                }).Backdrop = kRuinsBackdrop;
+
+            Add("流砂と仕掛け壁", 24,
+                "あちこちに流砂(減速床)が広がる遺跡。中央の石柱と、北西・南東の仕掛け壁が時間差でせり上がる。",
+                "流砂に足を取られると動きが鈍り、仕掛け壁の陰に逃げ込むのが遅れる。中央の石柱が上がると南北の補給所の間の射線がさえぎられる。流砂を避けて回り込むか、遅くなるのを承知で突っ切るか。",
+                c =>
+                {
+                    c.Arena(0, 0, 28, 24, true, true, true, true);
+                    c.SpeedFloor(-7, 0, new Vector2(4, 4), false);
+                    c.SpeedFloor(7, 0, new Vector2(4, 4), false);
+                    c.SpeedFloor(0, 7, new Vector2(4, 3), false);
+                    c.SpeedFloor(0, -7, new Vector2(4, 3), false);
+                    c.RisingWall(0, 0, new Vector2(2, 2), 0.0f);
+                    c.RisingWall(-7, 6, new Vector2(3, 1), 1.5f);
+                    c.RisingWall(7, -6, new Vector2(3, 1), 3.0f);
+                    c.AreaCircle(0, 3.5f, 1.2f);
+                    c.AreaCircle(0, -3.5f, 1.2f);
+                    c.AreaCircle(-7, -7, 1.5f);
+                    c.AreaCircle(7, 7, 1.5f);
+                    // 東西の壁にかぶせる
+                    c.AreaRect(-12.5f, 7, 3, 4);
+                    c.AreaRect(12.5f, -7, 3, 4);
+                    c.Spawns(new Vector2(-10, -3), new Vector2(10, 3), new Vector2(-4, 10), new Vector2(4, -10));
+                }).Backdrop = kRuinsBackdrop;
+
+            Add("風の神殿", 24,
+                "中央に石の円盤(回転台)がある神殿。東西の扇風機が南北に往復しながら円盤へ風を吹きつける。",
+                "東西からの風が円盤の上でぶつかり、回転と合わさって弾も体も渦を巻くように流される。風の届かない南北の壁際の補給所は安全だが、円盤まわりの補給所は流されながらの取り合いになる。",
+                c =>
+                {
+                    c.Arena(0, 0, 26, 26, true, true, true, true);
+                    c.Fan(new Vector2(-12, -6), new Vector2(-12, 6), Vector3.right, 11, 4, 10, 1.5f);
+                    c.Fan(new Vector2(12, 6), new Vector2(12, -6), Vector3.left, 11, 4, 10, 1.5f);
+                    c.Turntable(0, 0, 4, false, 45);
+                    c.AreaCircle(0, 0, 2.5f);
+                    c.AreaCircle(-6, 0, 1.2f);
+                    c.AreaCircle(6, 0, 1.2f);
+                    c.AreaCircle(0, 8, 1.2f);
+                    // 南北の壁にかぶせる
+                    c.AreaRect(0, 11.5f, 8, 3);
+                    c.AreaRect(0, -11.5f, 8, 3);
+                    c.Spawns(new Vector2(-8.5f, 8.5f), new Vector2(8.5f, -8.5f), new Vector2(-8.5f, -8.5f), new Vector2(8.5f, 8.5f));
+                }).Backdrop = kRuinsBackdrop;
+
+            // 宇宙ステーション(DebugStage66〜70)。背景: Space
+
+            Add("ドッキングポート", 22,
+                "東西に長い本体の南北に、ドッキングベイが直接つながった十字形の宇宙ステーション。手すりは本体の東西の端とベイの先にしかなく、長い縁はどこも宇宙(奈落)。本体の両端とベイの奥に、どこへ飛ぶか分からないワープゲート。中央にバンパー。",
+                "本体とベイの角が十字の交差点になっていて、どこから来た相手とも撃ち合える。長い縁はどこも奈落なので、撃ち合いはいつも落下と隣り合わせ。中央のバンパーにはじかれると縁まで転がる。ゲートに飛び込めば端から端へ一気に回り込めるが、行き先はランダムで、出た先で待ち伏せされることも。",
+                c =>
+                {
+                    // 本体 28×8m(東西の端に手すり)+ 南北のベイ 10×6m(先に手すり)
+                    c.Floor(0, 0, 30, 8);
+                    c.Floor(0, 7.5f, 10, 7);
+                    c.Floor(0, -7.5f, 10, 7);
+                    c.Wall(14.5f, 0, 1, 8);
+                    c.Wall(-14.5f, 0, 1, 8);
+                    c.Wall(0, 10.5f, 10, 1);
+                    c.Wall(0, -10.5f, 10, 1);
+                    c.WarpGate(12, 0, 0, 0, WarpGateGimmick.TargetType.Both, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.Keep);
+                    c.WarpGate(-12, 0, 0, 0, WarpGateGimmick.TargetType.Both, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.Keep);
+                    c.WarpGate(0, 8, 0, 0, WarpGateGimmick.TargetType.Both, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.Keep);
+                    c.WarpGate(0, -8, 0, 0, WarpGateGimmick.TargetType.Both, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.Keep);
+                    c.Bumper(0, 0, 1.6f);
+                    c.AreaCircle(-7, 0, 1.5f);
+                    c.AreaCircle(7, 0, 1.5f);
+                    c.AreaCircle(-3, 7, 1.2f);
+                    c.AreaCircle(3, -7, 1.2f);
+                    // 本体の長い縁(宇宙へはみ出す)
+                    c.AreaRect(-9, -3.5f, 6, 2);
+                    c.AreaRect(9, 3.5f, 6, 2);
+                    c.Spawns(new Vector2(-10, 1.5f), new Vector2(10, -1.5f), new Vector2(3, 8.5f), new Vector2(-3, -8.5f));
+                }).Backdrop = kSpaceBackdrop;
+
+            Add("人工重力リング", 24,
+                "床の大半を占める人工重力のリング(回転台)がゆっくり回る。四隅には推進装置の加速床。",
+                "リングの上では弾がゆっくり曲がり続け、遠くの相手ほど当てにくい。四隅の加速床で勢いをつけて飛び出すと、リングの上を一気に横切れる。リング中央の補給所は回りながら外へ運ばれていく。",
+                c =>
+                {
+                    c.Arena(0, 0, 26, 26, true, true, true, true);
+                    c.Turntable(0, 0, 7, true, 30);
+                    c.SpeedFloor(-9, 9, new Vector2(3, 3), true);
+                    c.SpeedFloor(9, 9, new Vector2(3, 3), true);
+                    c.SpeedFloor(-9, -9, new Vector2(3, 3), true);
+                    c.SpeedFloor(9, -9, new Vector2(3, 3), true);
+                    c.AreaCircle(0, 0, 2);
+                    c.AreaCircle(4, 4, 1.2f);
+                    c.AreaCircle(-4, -4, 1.2f);
+                    // 南北・東の壁にかぶせる
+                    c.AreaRect(0, 11.5f, 6, 3);
+                    c.AreaRect(0, -11.5f, 6, 3);
+                    c.AreaRect(11.5f, 0, 3, 6);
+                    c.Spawns(new Vector2(-10, 4), new Vector2(9, -5), new Vector2(4, -10), new Vector2(-4, 10));
+                }).Backdrop = kSpaceBackdrop;
+
+            Add("エアロック", 24,
+                "東西のエアロックの扉(せり上がり塀)が、時間差で開け閉めされる。東西の端の扇風機が、中央へ向けて減圧の風を吹き込む。",
+                "扉は跳んでも越えられず、閉じている所では中央の区画と東西の区画が分かれる。扉の開け閉めに合わせて中央へ攻め込むか、端で風に押されながら待つか。扉が上がる瞬間に乗っていれば、高台から撃ち下ろせる。",
+                c =>
+                {
+                    c.Arena(0, 0, 30, 20, true, true, true, true);
+                    for (int i = 0; i < 5; i++)
+                    {
+                        c.RisingWall(-6, -8 + i * 4, new Vector2(1, 4), i * 0.6f);
+                        c.RisingWall(6, -8 + i * 4, new Vector2(1, 4), 1.5f + i * 0.6f);
+                    }
+                    c.Fan(new Vector2(-14, 0), new Vector2(-14, 0), Vector3.right, 13, 4, 10, 0);
+                    c.Fan(new Vector2(14, 0), new Vector2(14, 0), Vector3.left, 13, 4, 10, 0);
+                    c.AreaCircle(0, 4, 1.5f);
+                    c.AreaCircle(0, -4, 1.5f);
+                    c.AreaCircle(-10.5f, -5, 1.5f);
+                    c.AreaCircle(10.5f, 5, 1.5f);
+                    // 南北の壁にかぶせる
+                    c.AreaRect(-10.5f, 8, 4, 2);
+                    c.AreaRect(10.5f, -8, 4, 2);
+                    c.Spawns(new Vector2(-10.5f, 2.5f), new Vector2(10.5f, -2.5f), new Vector2(-3, 7.5f), new Vector2(3, -7.5f));
+                }).Backdrop = kSpaceBackdrop;
+
+            Add("ソーラーパネルの翼", 22,
+                "中央のハブから東西にソーラーパネルの翼が伸びる。翼の先のシューターレーンがハブへ向けて積み木を撃ち出し、ハブの南北にバンパー。",
+                "翼は細長く、南北の縁はどこも奈落。翼の先のレーンに積み木を運べばハブへ一直線に撃ち込めるが、ハブのバンパーではじかれて翼の外へ飛ぶこともある。翼の上で撃ち合うと、避けた先が奈落になりやすい。",
+                c =>
+                {
+                    c.Floor(0, 0, 10, 10);
+                    c.Floor(-12, 0, 14, 8);
+                    c.Floor(12, 0, 14, 8);
+                    c.ShooterLane(-16, 0, 90, new Vector2(2.5f, 3));
+                    c.ShooterLane(16, 0, 270, new Vector2(2.5f, 3));
+                    c.Bumper(0, 3, 1.2f);
+                    c.Bumper(0, -3, 1.2f);
+                    c.AreaCircle(-11, 0, 1.5f);
+                    c.AreaCircle(11, 0, 1.5f);
+                    c.AreaCircle(-3, 0, 1.2f);
+                    c.AreaCircle(3, 0, 1.2f);
+                    // 翼の縁の外へはみ出す
+                    c.AreaRect(-12, 4, 8, 3);
+                    c.AreaRect(12, -4, 8, 3);
+                    c.Spawns(new Vector2(-14, -3), new Vector2(14, 3), new Vector2(-7, -2.5f), new Vector2(7, 2.5f));
+                }).Backdrop = kSpaceBackdrop;
+
+            Add("宇宙ゴミの回収", 24,
+                "中央の回転砲台が宇宙ゴミ(積み木)をまき散らす。四隅には積み木だけを吸い込んで別の隅から吐き出す回収ゲート(ワープゲート)。",
+                "砲台からまかれた積み木が四隅へ流れると、回収ゲートに吸い込まれて別の隅から飛び出す。ゲートの前に立つと、どこから飛んできたか分からない弾に当たる。自分で殴った積み木をゲートに打ち込めば、離れた隅の相手を狙える。",
+                c =>
+                {
+                    c.Arena(0, 0, 28, 24, true, true, true, true);
+                    c.Cannon(0, 0, 0, TumikiCannon.RotationMode.Spin, 1, 3);
+                    c.WarpGate(-10.5f, 8.5f, 135, 0, WarpGateGimmick.TargetType.Blocks, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.RelativeToGate);
+                    c.WarpGate(10.5f, 8.5f, 225, 0, WarpGateGimmick.TargetType.Blocks, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.RelativeToGate);
+                    c.WarpGate(10.5f, -8.5f, 315, 0, WarpGateGimmick.TargetType.Blocks, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.RelativeToGate);
+                    c.WarpGate(-10.5f, -8.5f, 45, 0, WarpGateGimmick.TargetType.Blocks, WarpGateGimmick.Selection.Random, WarpGateGimmick.Orientation.RelativeToGate);
+                    c.AreaCircle(-6, -6, 1.5f);
+                    c.AreaCircle(6, 6, 1.5f);
+                    // 南北・東西の壁にかぶせる
+                    c.AreaRect(0, 10.5f, 8, 3);
+                    c.AreaRect(0, -10.5f, 8, 3);
+                    c.AreaRect(12.5f, 0, 3, 6);
+                    c.AreaRect(-12.5f, 0, 3, 6);
+                    c.Spawns(new Vector2(-7, 4), new Vector2(7, -4), new Vector2(4, 8), new Vector2(-4, -8));
+                }).Backdrop = kSpaceBackdrop;
 
             //----------------------------------------
             // 本編のステージ(Stage01〜)。家にある物とその周りをテーマにした背景の上で戦う
@@ -1235,7 +2220,7 @@ namespace Nakagawa.EditorTools
                     c.Wall(-18.5f, 0, 1, 34);
 
                     // 案1: せり上がり塀(北西)。開始を0.3秒ずつずらして、西から東へ波のように立ち上がる
-                    for (int i = 0; i < 5; i++) c.RisingWall(-15 + i * 2, 12, new Vector2(2, 1.5f), 1.5f, i * 0.3f);
+                    for (int i = 0; i < 5; i++) c.RisingWall(-15 + i * 2, 12, new Vector2(2, 1.5f), i * 0.3f);
 
                     // 案2: 加速床・減速床(北東)
                     c.SpeedFloor(4, 12, new Vector2(3, 3), true);
@@ -1274,6 +2259,11 @@ namespace Nakagawa.EditorTools
                     c.Spawns(new Vector2(-6, 0), new Vector2(6, -1), new Vector2(-2, 6), new Vector2(-3, -6));
                 });
 
+            // DebugStage31〜70 は、DebugStage21〜28 と同じ浅い角度のカメラで見下ろす
+            foreach (var def in list)
+            {
+                if (InNumberRange(def.Id, kDebugPrefix, 31, 70)) def.CameraPitch = kLowCameraPitch;
+            }
             return list;
         }
 
@@ -1414,13 +2404,14 @@ namespace Nakagawa.EditorTools
             int m_movingFloorIndex;
 
             // せり上がり塀。phaseOffset: 開始のずれ(秒)。並べて少しずつずらすと波のように立ち上がる
-            public void RisingWall(float x, float z, Vector2 size, float height, float phaseOffset)
+            // 高さはジャンプで登れない kRisingWallHeight(せり上がるときに乗っていれば、持ち上げられて上に乗れる)
+            public void RisingWall(float x, float z, Vector2 size, float phaseOffset)
             {
                 var go = Place(AdditionalGimmickBuilder.kRisingWall, new Vector3(x, 0, z));
                 var wall = go.GetComponent<RisingWallGimmick>();
                 var so = new SerializedObject(wall);
                 so.FindProperty("m_size").vector2Value = size;
-                so.FindProperty("m_wallHeight").floatValue = height;
+                so.FindProperty("m_wallHeight").floatValue = kRisingWallHeight;
                 so.FindProperty("m_phaseOffset").floatValue = phaseOffset;
                 so.ApplyModifiedPropertiesWithoutUndo();
                 wall.ApplyShape();
@@ -1771,7 +2762,7 @@ namespace Nakagawa.EditorTools
             DarumaMatch match = BuildMatch(spawns, stageArea);
             SetupSpawner(spawnerGo.AddComponent<TumikiSpawner>(), c.AreaList, def.MaxBlocks, match);
 
-            BuildLightAndCamera(bounds);
+            BuildLightAndCamera(bounds, def.CameraPitch);
             SetupCameraAndDebugTools(scene);
 
             string layout = Layout(c, bounds, def.MaxBlocks);
@@ -1826,7 +2817,7 @@ namespace Nakagawa.EditorTools
         }
 
         // ステージ全体が収まる見下ろしのカメラ
-        static void BuildLightAndCamera(Rect bounds)
+        static void BuildLightAndCamera(Rect bounds, float pitch)
         {
             var light = new GameObject("Directional Light").AddComponent<Light>();
             light.type = LightType.Directional;
@@ -1837,11 +2828,46 @@ namespace Nakagawa.EditorTools
             camera.tag = "MainCamera";
             camera.gameObject.AddComponent<AudioListener>();
             camera.fieldOfView = 45.0f;
-            Quaternion rot = Quaternion.Euler(55.0f, 0.0f, 0.0f);
+            camera.aspect = 16.0f / 9.0f;
+            if (pitch < kCameraPitch) FrameLowCamera(camera, bounds, pitch);
+            else FrameCamera(camera, bounds, pitch);
+            camera.ResetAspect();
+        }
+
+        // 浅い角度のカメラ(DebugStage21〜28 で手で合わせた構図に合わせる)
+        //  ・手前の床の端が画面の下端ぎりぎり(kLowNearEdge)。奥は遠くて小さく映るので、画面の上側に空きができる
+        //  ・手前の床の両端が、左右に余白 kLowSideMargin を残して画面に収まるまで引く
+        static void FrameLowCamera(Camera camera, Rect bounds, float pitch)
+        {
+            const float kLowNearEdge = -0.03f;
+            const float kLowSideMargin = 0.02f;
+            const float kFarEdgeMax = 0.95f;
+            Quaternion rot = Quaternion.Euler(pitch, 0.0f, 0.0f);
+            var nearLeft = new Vector3(bounds.xMin, 0.0f, bounds.yMin);
+            var nearRight = new Vector3(bounds.xMax, 0.0f, bounds.yMin);
+            var farLeft = new Vector3(bounds.xMin, 0.0f, bounds.yMax);
+            for (float distance = 10.0f; distance < 200.0f; distance += 0.25f)
+            {
+                // 手前の端が画面の下端に来るよう、見る位置(床の上)を南北にずらす
+                float lo = bounds.yMin - 20.0f, hi = bounds.yMax + 20.0f;
+                for (int i = 0; i < 40; i++)
+                {
+                    float mid = (lo + hi) * 0.5f;
+                    camera.transform.SetPositionAndRotation(new Vector3(bounds.center.x, 0.0f, mid) - rot * Vector3.forward * distance, rot);
+                    if (camera.WorldToViewportPoint(nearLeft).y < kLowNearEdge) hi = mid;
+                    else lo = mid;
+                }
+                Vector3 l = camera.WorldToViewportPoint(nearLeft), r = camera.WorldToViewportPoint(nearRight), f = camera.WorldToViewportPoint(farLeft);
+                if (l.z > 0 && l.x >= kLowSideMargin && r.x <= 1 - kLowSideMargin && f.y <= kFarEdgeMax) return;
+            }
+        }
+
+        static void FrameCamera(Camera camera, Rect bounds, float pitch)
+        {
+            Quaternion rot = Quaternion.Euler(pitch, 0.0f, 0.0f);
             Vector3 target = new Vector3(bounds.center.x, 0.0f, bounds.center.y);
 
             // 16:9の画面で、ステージの四隅(床と壁の上端)がすべて余白付きで映るまで引く
-            camera.aspect = 16.0f / 9.0f;
             var corners = new List<Vector3>();
             foreach (float y in new[] { 0.0f, kWallHeight })
             {
@@ -1862,7 +2888,6 @@ namespace Nakagawa.EditorTools
                 }
                 if (fits) break;
             }
-            camera.ResetAspect();
         }
 
         // カメラの演出(プレイヤーを追う・揺れる・壁を透過する)、壁の透過用マテリアル、デバッグ用の切り替え(積み木の衝突の振る舞い)を付ける

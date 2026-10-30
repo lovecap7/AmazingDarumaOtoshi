@@ -140,8 +140,16 @@ namespace Nakahira
         [Tooltip("撃ったあと、次に撃つまでの間(秒)の最小・最大")]
         [Min(0.0f)] public float ShotIntervalMin = 0.6f;
         [Min(0.0f)] public float ShotIntervalMax = 1.2f;
-        [Tooltip("狙いのぶれ(度。この範囲でずれる)。強いほど小さい")]
+        [Tooltip("集中度の割合が最大のときの、次に撃つまでの間(秒。0〜この値。ショットの動作が終わればすぐ撃つ連打に近い)。落ち着いているときは ShotIntervalMin〜Max で、集中度の割合が上がるほどこちらに近づく")]
+        [Min(0.0f)] public float ShotMashInterval = 0.05f;
+        [Tooltip("狙いのぶれ(度。この範囲でずれる)。落ち着いているときの値。強いほど小さい")]
         [Min(0.0f)] public float ShotAimError = 3.0f;
+        [Tooltip("集中度の割合が最大のときの狙いのぶれ(度)。集中度の割合が上がるほど ShotAimError からこちらに近づく(焦ると連打で雑になる)")]
+        [Min(0.0f)] public float ShotAimErrorMax = 9.0f;
+        [Tooltip("撃ったあと、次に撃つまでの間に横へ動く確率(外れたらその場で止まって撃つ)")]
+        [Range(0.0f, 1.0f)] public float ShotStrafeChance = 0.8f;
+        [Tooltip("撃つボタンを押してから弾が出るまでの間、相手の方へ踏み込みながら狙う確率")]
+        [Range(0.0f, 1.0f)] public float ShotStepInChance = 0.4f;
         [Tooltip("ついでに弾く:落ちている積み木を弾けば相手に当たるとき、弾く確率(積み木ごとに決める)")]
         [Range(0.0f, 1.0f)] public float FlickChance = 0.8f;
         [Tooltip("ついでに弾く:弾いた積み木が飛ぶ線から、相手(の予想位置)がこの距離(m)以内なら当たるとみなす")]

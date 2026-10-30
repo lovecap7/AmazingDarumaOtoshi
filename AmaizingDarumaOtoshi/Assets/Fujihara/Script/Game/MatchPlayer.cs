@@ -45,7 +45,7 @@ public class MatchPlayer : MonoBehaviour
 
     // ---- 積み木 ----
     public DarumaStack Stack => Character != null ? Character.Stack : null;
-    public int StackCount => Character != null ? Character.Stack.Count : 0;
+    public int StackCount => NetStackCount >= 0 ? NetStackCount : Character != null ? Character.Stack.Count : 0;
     public int StackMax => Character != null ? Character.Stack.MaxCount : 0;
 
     // ---- ストック・点数・記録 ----
@@ -149,4 +149,67 @@ public class MatchPlayer : MonoBehaviour
     internal void CountSelfOut() => SelfOuts++;
 
     void OnStackChanged() => StackChanged?.Invoke();
+
+    // ---- ネット対戦用(suehara)。ローカルの試合では使わない ----
+
+    // クライアントは積み木を持っていない(位置だけ届く)ので、数をホストから受け取る。-1 = 使わない
+    internal int NetStackCount = -1;
+
+    // ホスト: 試合をやり直すとき、最初の状態に戻す(体は DarumaMatch が消して出し直す)
+    internal void ResetForMatch(int stocks)
+    {
+        int oldScore = Score;
+        Character = null;
+        Ghost = null;
+        State = PlayerState.Respawning;
+        RespawnTimeLeft = 0f;
+        Stocks = stocks;
+        Score = 0;
+        Knocks = Knocked = KOs = Falls = SelfOuts = 0;
+        Rank = 0;
+        OutOrder = 0;
+        StateChanged?.Invoke();
+        StocksChanged?.Invoke();
+        if (oldScore != 0) ScoreChanged?.Invoke(-oldScore);
+        StackChanged?.Invoke();
+    }
+
+    // クライアント: ホストから届いた値を入れる。変わったものだけお知らせする
+    internal void NetApply(int stocks, int score, int knocks, int knocked, int kos, int falls, int selfOuts, int rank, int stackCount, float respawnTimeLeft)
+    {
+        bool stackChanged = NetStackCount != stackCount;
+        NetStackCount = stackCount;
+        if (Stocks != stocks)
+        {
+            Stocks = stocks;
+            StocksChanged?.Invoke();
+        }
+        if (Score != score)
+        {
+            int delta = score - Score;
+            Score = score;
+            ScoreChanged?.Invoke(delta);
+        }
+        Knocks = knocks;
+        Knocked = knocked;
+        KOs = kos;
+        Falls = falls;
+        SelfOuts = selfOuts;
+        Rank = rank;
+        RespawnTimeLeft = respawnTimeLeft;
+        if (stackChanged) StackChanged?.Invoke();
+    }
+
+    // クライアント: いまの状態と体を入れる(体はホストが出したものが届く。ここでは消したり操作をつないだりしない)
+    internal void NetSetBody(PlayerState state, DarumaCharacter character, DarumaGhost ghost)
+    {
+        if (State == state && Character == character && Ghost == ghost) return;
+        State = state;
+        Character = character;
+        Ghost = ghost;
+        if (character != null) character.name = Label + "_Character";
+        if (ghost != null) ghost.name = Label + "_Ghost";
+        StateChanged?.Invoke();
+        StackChanged?.Invoke();
+    }
 }

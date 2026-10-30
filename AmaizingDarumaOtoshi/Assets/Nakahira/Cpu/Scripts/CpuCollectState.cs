@@ -25,6 +25,7 @@ namespace Nakahira
 
         public override string Name => "積む";
         public CpuPickupMotor Pickup => m_pickup;
+        public override CpuPathFollower Route => m_pickup.Target != null ? m_pickup.Route : null;
 
         public CpuCollectState()
         {

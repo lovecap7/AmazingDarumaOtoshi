@@ -103,6 +103,86 @@ MonoBehaviour:
   m_shakeAmount: 0.03
   m_shakeFrequency: 30
   m_surfaceOffset: 0.004
+  m_seeThrough: 1
+  m_seeThroughShader: {fileID: 4800000, guid: 33c3fd5a2fb873c4ca9d3d2c8ce93fe6, type: 3}
+  m_seeThroughMinHeight: 0.05
+  m_warningEffectInterval: 0.2
+  m_warningEffect:
+    Enabled: 1
+    Material: {fileID: 0}
+    Additive: 1
+    ColorA: {r: 1, g: 0.9, b: 0.15, a: 1}
+    ColorB: {r: 1, g: 1, b: 0.7, a: 1}
+    Count: 6
+    Speed: {x: 0.4, y: 1.2}
+    Size: {x: 0.05, y: 0.12}
+    Lifetime: {x: 0.3, y: 0.6}
+    Gravity: -0.05
+    Shape: 3
+    ShapeSize: {x: 1, y: 0, z: 1}
+    ConeAngle: 25
+    Stretch: 0
+    Shockwave: 0
+    ShockwaveColor: {r: 1, g: 1, b: 1, a: 1}
+    ShockwaveRadius: 1.5
+    ShockwaveTime: 0.3
+  m_riseEffect:
+    Enabled: 1
+    Material: {fileID: 0}
+    Additive: 0
+    ColorA: {r: 0.85, g: 0.8, b: 0.7, a: 0.9}
+    ColorB: {r: 0.65, g: 0.6, b: 0.52, a: 0.8}
+    Count: 36
+    Speed: {x: 1, y: 2.5}
+    Size: {x: 0.15, y: 0.35}
+    Lifetime: {x: 0.4, y: 0.8}
+    Gravity: -0.05
+    Shape: 3
+    ShapeSize: {x: 1, y: 0, z: 1}
+    ConeAngle: 25
+    Stretch: 0
+    Shockwave: 1
+    ShockwaveColor: {r: 1, g: 0.95, b: 0.8, a: 0.6}
+    ShockwaveRadius: 1.8
+    ShockwaveTime: 0.3
+  m_lowerEffect:
+    Enabled: 1
+    Material: {fileID: 0}
+    Additive: 0
+    ColorA: {r: 0.85, g: 0.8, b: 0.7, a: 0.8}
+    ColorB: {r: 0.65, g: 0.6, b: 0.52, a: 0.7}
+    Count: 20
+    Speed: {x: 0.5, y: 1.5}
+    Size: {x: 0.12, y: 0.28}
+    Lifetime: {x: 0.4, y: 0.7}
+    Gravity: -0.03
+    Shape: 3
+    ShapeSize: {x: 1, y: 0, z: 1}
+    ConeAngle: 25
+    Stretch: 0
+    Shockwave: 0
+    ShockwaveColor: {r: 1, g: 1, b: 1, a: 1}
+    ShockwaveRadius: 1.5
+    ShockwaveTime: 0.3
+  m_landEffect:
+    Enabled: 1
+    Material: {fileID: 0}
+    Additive: 0
+    ColorA: {r: 0.85, g: 0.8, b: 0.7, a: 0.8}
+    ColorB: {r: 0.65, g: 0.6, b: 0.52, a: 0.7}
+    Count: 16
+    Speed: {x: 0.8, y: 1.8}
+    Size: {x: 0.1, y: 0.22}
+    Lifetime: {x: 0.3, y: 0.5}
+    Gravity: 0
+    Shape: 3
+    ShapeSize: {x: 1, y: 0, z: 1}
+    ConeAngle: 25
+    Stretch: 0
+    Shockwave: 1
+    ShockwaveColor: {r: 1, g: 0.95, b: 0.8, a: 0.4}
+    ShockwaveRadius: 1.4
+    ShockwaveTime: 0.25
   m_rumbleClip: {fileID: 0}
   m_rumbleVolume: 0.35
 --- !u!1 &685308950640818065

@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using System.Collections.Generic;
 
 public class BlockController : MonoBehaviour 
 {
@@ -19,7 +20,7 @@ public class BlockController : MonoBehaviour
     public event Action OnFlightEnded;
 
     // テスト用：インスペクターで挙動を選べるようにする
-    public enum BehaviorType { Normal, Iwa,HebiLeft, HebiRight, UnBreak,Homing,Ziguzagu,Grow,Bomb, Magnet,Fade, Boomerang, Gravity, Accelerat, Funnel }
+    public enum BehaviorType { Normal, Iwa,HebiLeft, HebiRight, UnBreak,Homing,Ziguzagu,Grow,Bomb, Magnet,Fade, Boomerang, Gravity, Accelerat, Funnel, Afterimage }
     [SerializeField] BehaviorType behaviorType = BehaviorType.Normal;
     [SerializeField] float hebiTurnSpeed = 60.0f; // テスト用：へびだるの曲がる強さ(度/秒)。大きいほど急カーブになる
     [SerializeField] float homingStartTurnSpeed = 270.0f;  // テスト用：ホーミング発射直後の旋回速度(度/秒)
@@ -45,15 +46,23 @@ public class BlockController : MonoBehaviour
     [SerializeField] float gravityDuration = 2.5f;    // テスト用：井戸が残る時間(秒)
     [SerializeField] float gravityDeadZone = 0.4f;    // テスト用：中心で止まる距離
     [SerializeField] float gravityEdgeRatio = 0.4f; // テスト用：範囲の端での強さ(中心を1とした割合)
+    [SerializeField] float gravityBurstImmunity = 0.5f; // テスト用：射出した積み木同士が、互いを攻撃として扱わない時間(秒)
     [SerializeField] float accelRate = 1.3f;       // テスト用：壁ヒットごとの加速倍率
     [SerializeField] float accelMaxSpeed = 12.0f;  // テスト用：速度の上限
     [SerializeField] int accelMaxBlockHits = 2;    // テスト用：積み木に何回当たったら壊れるか
+    [SerializeField] float afterimageDelay = 0.25f;     // テスト用：本体より何秒遅れるか
+    [SerializeField] float afterimageLifetime = 1.5f;   // テスト用：残像が消えるまでの時間(秒)
+    [SerializeField] float afterimageAlpha = 0.4f;      // テスト用：残像の濃さ
+    [SerializeField] Material afterimageMaterial;       // テスト用：残像用の半透明マテリアル(未設定だと本体のマテリアルを複製する)
 
     int funnelCount = 5;               // テスト用：分裂後の総数。本来はプレイヤーが管理している積み木の数を渡す
     float funnelSpacing = 2.4f;        // テスト用：分身を左右に並べる間隔(積み木の幅に対する倍率)
     float funnelSearchRadius = 15.0f;  // テスト用：狙う相手を探す範囲
     float funnelTurnSpeed = 270.0f;    // テスト用：発射直後の旋回速度(度/秒)
     float funnelDuration = 3.0f;       // テスト用：誘導が切れるまでの時間(秒)
+
+    float bombFuseTime = 2.5f;       // テスト用：打ち出してから爆発するまでの時間(秒)
+    float bombBlinkDuration = 1.5f;  // テスト用：爆発の何秒前から点滅するか
 
     public bool isFlying {  get; private set; } // 現在飛行中かどうか trueの場合は攻撃判定が発生する
 
@@ -82,6 +91,11 @@ public class BlockController : MonoBehaviour
 
     // 現在の飛行方向。IBlockBehavior実装クラス(別スクリプト)から参照するための公開プロパティ
     public Vector3 Direction => direction;
+
+    // 一定時間、指定した積み木(仲間)との接触を、攻撃として扱わない(壊れない・相手を飛ばさない)
+    HashSet<BlockController> hitImmuneTargets;
+    float hitImmuneUntil;
+
 
     private void Awake()
     {
@@ -112,13 +126,14 @@ public class BlockController : MonoBehaviour
             case BehaviorType.Homing: return new HomingBehavior(this, new OtherBlockTargetSelector(), homingStartTurnSpeed, homingGuidanceDuration);
             case BehaviorType.Ziguzagu: return new ZiguzagBehavior(ziguzagAngle, ziguzagInterval);
             case BehaviorType.Grow: return new GrowBehavior(this, growRate, growMaxMultiplier);
-            case BehaviorType.Bomb: return new BombBehavior(explosionRadius);
+            case BehaviorType.Bomb: return new BombBehavior(this, explosionRadius, bombFuseTime, bombBlinkDuration);
             case BehaviorType.Magnet: return new MagnetBehavior(this, magnetRange, magnetStrength, magnetRepelStrength, magnetMinDistance);
             case BehaviorType.Fade: return new FadeBehavior(this, fadeDelay, fadeDuration, fadeMinAlpha);
             case BehaviorType.Boomerang: return new BoomerangBehavior(this, boomerangReturnTarget, boomerangRadius, boomerangCurveLeft, boomerangArriveDistance);
-            case BehaviorType.Gravity: return new GravityWellBehavior(this, gravityRadius, gravityStrength, gravityDuration, gravityDeadZone, gravityEdgeRatio);
+            case BehaviorType.Gravity: return new GravityWellBehavior(this, gravityRadius, gravityStrength, gravityDuration, gravityDeadZone, gravityEdgeRatio, gravityBurstImmunity);
             case BehaviorType.Accelerat: return new AcceleratBehavior(this, accelRate, accelMaxSpeed, accelMaxBlockHits);
             case BehaviorType.Funnel: return new FunnelBehavior(this, funnelCount, funnelSpacing, funnelSearchRadius, funnelTurnSpeed, funnelDuration);
+            case BehaviorType.Afterimage: return new AfterimageBehavior(this, afterimageDelay, afterimageLifetime, afterimageAlpha, afterimageMaterial);
             case BehaviorType.Normal:
             default: return new NormalBehavior();
         }
@@ -261,7 +276,7 @@ public class BlockController : MonoBehaviour
             if (other != null)
             {
                 // 弾かれた直後に同じ相手へ再衝突しても、一定時間は無視する
-                if (other == lastHitTarget && Time.time < ignoreUntil)
+                if (hitImmuneTargets != null && Time.time < hitImmuneUntil && hitImmuneTargets.Contains(other))
                 {
                     return;
                 }
@@ -359,5 +374,11 @@ public class BlockController : MonoBehaviour
     public void BoostSpeed(float ratio, float maxSpeed)
     {
         currentSpeed = Mathf.Min(currentSpeed * ratio, maxSpeed);
+    }
+
+    public void SetHitImmunity(HashSet<BlockController> targets, float seconds)
+    {
+        hitImmuneTargets = targets;
+        hitImmuneUntil = Time.time + seconds;
     }
 }
