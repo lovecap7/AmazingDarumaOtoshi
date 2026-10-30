@@ -52,10 +52,16 @@ namespace Nakagawa
         readonly List<Vector3> m_points = new List<Vector3>();
         readonly List<float> m_waits = new List<float>();
         readonly List<IGimmickAffectable> m_targets = new List<IGimmickAffectable>();
-        int m_index;          // 今いる(または出発した)地点
-        int m_direction = 1;  // 往復の向き
-        float m_segmentTime;  // 区間を進んだ時間
-        float m_waitTimer;
+        // 1周の区間(地点で待ってから次の地点へ動く)。位置は「始めてからの時間」から決める
+        // (ネット対戦ではホストと時間をそろえる。GimmickClock)
+        struct Leg
+        {
+            public int From, To;
+            public float Wait, Move;
+        }
+        readonly List<Leg> m_legs = new List<Leg>();
+        float m_cycle;        // 1周の時間(片道は最後まで行く時間)
+        float m_time;
         bool m_stopped;
 
         // CPU が乗り降りを判断するための読み取り用
@@ -71,6 +77,8 @@ namespace Nakagawa
         public float WaitRemaining => m_stopped ? float.PositiveInfinity : Mathf.Max(0.0f, m_waitTimer);
         // 次に止まる地点(止まっていれば、次に向かう地点)
         public int NextStop => m_points.Count < 2 || m_stopped ? m_index : NextIndex();
+        // 繰り返す動きか(片道は最後の地点で止まるので繰り返さない)
+        float Period => m_loopMode == LoopMode.OneWay ? 0.0f : m_cycle;
 
         private void Awake()
         {
@@ -90,15 +98,14 @@ namespace Nakagawa
         // ステージの切り替えで有効になるたびに最初の地点からやり直す
         private void OnEnable()
         {
-            m_index = 0;
-            m_direction = 1;
-            m_segmentTime = 0.0f;
+            BuildLegs();
             m_stopped = m_points.Count < 2;
+            m_time = m_stopped ? 0.0f : GimmickClock.StartTime(0.0f, Period);
             if (m_points.Count > 0)
             {
-                m_rb.position = m_points[0];
-                transform.position = m_points[0];
-                m_waitTimer = WaitAt(0);
+                Vector3 pos = m_stopped ? m_points[0] : PositionAt(m_time);
+                m_rb.position = pos;
+                transform.position = pos;
             }
         }
 
@@ -112,56 +119,63 @@ namespace Nakagawa
 
         private void FixedUpdate()
         {
-            if (m_stopped) return;
+            if (m_stopped || GimmickClock.IsHeld) return;
             float dt = Time.fixedDeltaTime;
             Vector3 before = m_rb.position;
-            Vector3 after = Step(dt);
+            m_time = GimmickClock.Step(m_time, dt, 0.0f, Period);
+            if (Period > 0.0f) m_time = Mathf.Repeat(m_time, Period);
+            Vector3 after = PositionAt(m_time);
             m_rb.MovePosition(after);
-            Carry(before, after, dt);
+            // ネット対戦で時計を合わせて一度に動いたときは運ばない(乗っているものが飛ばされないように)
+            if ((after - before).magnitude <= m_speed * dt * 3.0f) Carry(before, after, dt);
         }
 
-        // このステップの移動先
-        private Vector3 Step(float dt)
+        // 1周の区間を作る。ループ: A→B→C→A / 往復: A→B→C→B→A / 片道: A→B→C(最後で止まる)。各地点で待ってから動く
+        private void BuildLegs()
         {
-            if (m_waitTimer > 0.0f)
-            {
-                m_waitTimer -= dt;
-                return m_points[m_index];
-            }
-
-            int next = NextIndex();
-            Vector3 from = m_points[m_index], to = m_points[next];
-            float duration = Mathf.Max(0.01f, Vector3.Distance(from, to) / m_speed);
-            m_segmentTime += dt;
-            if (m_segmentTime < duration) return Vector3.Lerp(from, to, Ease(m_segmentTime / duration));
-
-            // 次の地点に着いた
-            Arrive(next);
-            return to;
-        }
-
-        private void Arrive(int next)
-        {
-            if (m_loopMode == LoopMode.PingPong)
-            {
-                bool atEnd = next == m_points.Count - 1 || next == 0;
-                if (atEnd) m_direction = -m_direction;
-            }
-            m_index = next;
-            m_segmentTime = 0.0f;
-            m_waitTimer = WaitAt(next);
-            if (m_loopMode == LoopMode.OneWay && next == m_points.Count - 1) m_stopped = true;
-        }
-
-        private int NextIndex()
-        {
+            m_legs.Clear();
+            m_cycle = 0.0f;
             int n = m_points.Count;
+            if (n < 2) return;
             switch (m_loopMode)
             {
-                case LoopMode.Loop: return (m_index + 1) % n;
-                case LoopMode.PingPong: return Mathf.Clamp(m_index + m_direction, 0, n - 1);
-                default: return Mathf.Min(m_index + 1, n - 1);
+                case LoopMode.Loop:
+                    for (int i = 0; i < n; i++) AddLeg(i, (i + 1) % n);
+                    break;
+                case LoopMode.PingPong:
+                    for (int i = 0; i < n - 1; i++) AddLeg(i, i + 1);
+                    for (int i = n - 1; i > 0; i--) AddLeg(i, i - 1);
+                    break;
+                default:
+                    for (int i = 0; i < n - 1; i++) AddLeg(i, i + 1);
+                    break;
             }
+        }
+
+        private void AddLeg(int from, int to)
+        {
+            var leg = new Leg
+            {
+                From = from,
+                To = to,
+                Wait = WaitAt(from),
+                Move = Mathf.Max(0.01f, Vector3.Distance(m_points[from], m_points[to]) / m_speed),
+            };
+            m_legs.Add(leg);
+            m_cycle += leg.Wait + leg.Move;
+        }
+
+        // 時間 t での位置(片道は最後まで行ったらそこで止まる)
+        private Vector3 PositionAt(float t)
+        {
+            foreach (var leg in m_legs)
+            {
+                if (t < leg.Wait) return m_points[leg.From];
+                t -= leg.Wait;
+                if (t < leg.Move) return Vector3.Lerp(m_points[leg.From], m_points[leg.To], Ease(t / leg.Move));
+                t -= leg.Move;
+            }
+            return m_legs.Count > 0 ? m_points[m_legs[m_legs.Count - 1].To] : m_points[0];
         }
 
         private float WaitAt(int index) => m_waits[index] >= 0.0f ? m_waits[index] : m_waitTime;

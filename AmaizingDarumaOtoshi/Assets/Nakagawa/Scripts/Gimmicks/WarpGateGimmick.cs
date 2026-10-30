@@ -185,6 +185,7 @@ namespace Nakagawa
 
         private void FixedUpdate()
         {
+            if (GimmickClock.IsHeld) return;
             DetectEntrants();
             UpdateIgnore(Time.fixedDeltaTime);
         }

@@ -47,9 +47,8 @@ namespace Nakagawa
 
         Rigidbody m_rb;
         Vector3 m_a, m_b;
-        float m_t;          // 0=A, 1=B
-        float m_moveSign = 1.0f;
-        float m_waitTimer;
+        // 動き始めてからの時間(ネット対戦ではホストとそろえる。GimmickClock)。位置はこの時間から決める
+        float m_time;
         readonly List<IGimmickAffectable> m_targets = new List<IGimmickAffectable>();
 
         public Vector3 WindDirection
@@ -83,6 +82,7 @@ namespace Nakagawa
 
         private void FixedUpdate()
         {
+            if (GimmickClock.IsHeld) return;
             float dt = Time.fixedDeltaTime;
             UpdateMove(dt);
             Blow();
@@ -90,29 +90,30 @@ namespace Nakagawa
 
         private void Update()
         {
-            if (m_blades != null) m_blades.Rotate(0.0f, 0.0f, m_bladeSpeed * Time.deltaTime, Space.Self);
+            if (m_blades != null && !GimmickClock.IsHeld) m_blades.Rotate(0.0f, 0.0f, m_bladeSpeed * Time.deltaTime, Space.Self);
         }
 
-        // 二点間を一定の速さで往復し、端で少し止まる
+        // 二点間を一定の速さで往復し、端で少し止まる(A → B → 止まる → A → 止まる → …)
         private void UpdateMove(float dt)
         {
-            if (m_waitTimer > 0.0f)
-            {
-                m_waitTimer -= dt;
-                return;
-            }
-
             float length = Vector3.Distance(m_a, m_b);
-            if (length < 0.001f) return;
+            if (length < 0.001f || m_moveSpeed <= 0.0f) return;
 
-            m_t += m_moveSign * m_moveSpeed * dt / length;
-            if (m_t >= 1.0f || m_t <= 0.0f)
-            {
-                m_t = Mathf.Clamp01(m_t);
-                m_moveSign = -m_moveSign;
-                m_waitTimer = m_waitTime;
-            }
-            m_rb.MovePosition(Vector3.Lerp(m_a, m_b, m_t));
+            float travel = length / m_moveSpeed;
+            float period = (travel + m_waitTime) * 2.0f;
+            m_time = Mathf.Repeat(GimmickClock.Step(m_time, dt, 0.0f, period), period);
+            m_rb.MovePosition(Vector3.Lerp(m_a, m_b, PositionAt(m_time, travel)));
+        }
+
+        // 時間 t での位置(0=A, 1=B)
+        private float PositionAt(float t, float travel)
+        {
+            if (t < travel) return t / travel;
+            t -= travel;
+            if (t < m_waitTime) return 1.0f;
+            t -= m_waitTime;
+            if (t < travel) return 1.0f - t / travel;
+            return 0.0f;
         }
 
         // 風の範囲にいるものに風下への力を加える

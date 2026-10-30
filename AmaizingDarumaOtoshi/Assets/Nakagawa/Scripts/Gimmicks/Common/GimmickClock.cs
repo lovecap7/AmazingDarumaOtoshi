@@ -16,6 +16,28 @@ namespace Nakagawa
         // 1ステップで、ずれのうち寄せる割合
         const float kCorrectionPerStep = 0.05f;
 
+        // ネット対戦用(suehara): ネット対戦のクライアントか。ギミックの当たり・押し出しはホストだけが行う
+        // (クライアントの積み木・キャラクターはホストから位置を受け取って見せるだけなので、ギミックで動かさない)
+        public static bool IsNetClient
+        {
+            get
+            {
+                var nm = NetworkManager.Singleton;
+                return nm != null && nm.IsListening && nm.IsClient && !nm.IsServer;
+            }
+        }
+
+        // ギミックを止めておくか(セレクトから始めた試合の、開始のカウントダウン中)
+        // 止めている間、ギミックは動かず・押し出さず・発射しない(時間も進めない)。止める条件はここだけで決める
+        public static bool IsHeld
+        {
+            get
+            {
+                var match = Nakahira.DarumaMatch.Current;
+                return match != null && match.IsConfigured && match.IsCountingDown;
+            }
+        }
+
         // 通信中なら、ホストと共有する時刻(秒)
         public static bool TryGetSharedTime(out double time)
         {

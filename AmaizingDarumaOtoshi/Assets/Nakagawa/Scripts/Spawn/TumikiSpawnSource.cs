@@ -20,5 +20,11 @@ namespace Nakagawa
         // 命令を受けたが、まだ盤面に出ていない積み木の数(盤面の積み木の上限の判定に含める)
         // 予告(TumikiSpawnWarning)の分は TumikiSpawner が別に数えるので含めない
         public virtual int PendingCount => 0;
+
+        // 予告・発射なしで、すぐに盤面へ置けるか(試合開始時に最初から積み木を置いておくのに使う)
+        public virtual bool CanPlaceImmediately => false;
+
+        // 予告・発射なしで、colors の色の積み木をすぐに置き、その数を返す(CanPlaceImmediately のものだけ呼ばれる)
+        public virtual int PlaceImmediately(IReadOnlyList<TumikiColor> colors, TumikiBlock prefab, List<Vector3> reserved) => 0;
     }
 }

@@ -40,6 +40,8 @@ namespace Nakagawa
         float m_time;
         Renderer m_fill, m_ring, m_edge;
         Color m_color;
+        // ネット対戦用(suehara): 見た目だけ(CreateView)
+        bool m_viewOnly;
 
         // ドメインの再読み込みをしない設定でも、再生のたびに空にする
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -56,6 +58,18 @@ namespace Nakagawa
             go.transform.position = new Vector3(pos.x, area.FloorY + kFloorOffset, pos.z);
             var w = go.AddComponent<TumikiSpawnWarning>();
             w.Setup(area, prefab, color, pos, rot, duration);
+            return w;
+        }
+
+        // ネット対戦用(suehara): 見た目だけの予告(時間が来ても積み木を生成しない)。クライアントでホストの予告を見せるのに使う
+        // markY: 印の高さ(ホストの予告の transform の高さ)
+        public static TumikiSpawnWarning CreateView(TumikiColor color, Vector3 pos, float markY, float duration)
+        {
+            var go = new GameObject($"TumikiSpawnWarning_{color}");
+            go.transform.position = new Vector3(pos.x, markY, pos.z);
+            var w = go.AddComponent<TumikiSpawnWarning>();
+            w.m_viewOnly = true;
+            w.Setup(null, null, color, pos, Quaternion.identity, duration);
             return w;
         }
 
@@ -81,7 +95,7 @@ namespace Nakagawa
 
         private void Update()
         {
-            if (m_area == null || !m_area.isActiveAndEnabled)
+            if (!m_viewOnly && (m_area == null || !m_area.isActiveAndEnabled))
             {
                 Destroy(gameObject);
                 return;
@@ -98,6 +112,11 @@ namespace Nakagawa
 
         private void Finish()
         {
+            if (m_viewOnly)
+            {
+                Destroy(gameObject);
+                return;
+            }
             if (m_area.CanSpawnAt(Position))
             {
                 var block = m_area.SpawnBlock(m_prefab, Color, Position, m_rotation);

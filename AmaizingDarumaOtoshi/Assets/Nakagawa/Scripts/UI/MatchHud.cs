@@ -13,7 +13,7 @@ namespace Nakagawa
     //  ・タイム  : 点数
     //  ・ゴースト: 撃墜数(相手の顔を飛ばした数)
     // どのモードでも、撃墜数と積んでいる積み木の数を小さく出す。復活待ち・幽霊・脱落も表示する
-    // 開始のカウントダウン(StartCountdownView)を自動で付ける
+    // 開始のカウントダウン(StartCountdownView)とポーズ画面(PauseMenu)を自動で付ける
     // プレイヤーや積み木がパネルの近くに映っているときは、パネルを半透明にして見えるようにする
     // 途中参加(直接再生)した人のパネルもその場で増える
     [RequireComponent(typeof(DarumaMatch))]
@@ -44,6 +44,10 @@ namespace Nakagawa
         [Header("開始のカウントダウン")]
         // 開始のカウントダウンの表示(StartCountdownView)を自動で付ける(数える秒数は DarumaMatch で決める)
         [SerializeField] bool m_addStartCountdown = true;
+
+        [Header("ポーズ")]
+        // ポーズ画面(PauseMenu)を自動で付ける
+        [SerializeField] bool m_addPauseMenu = true;
 
         [Header("ストックのアイコン")]
         [SerializeField] float m_stockIconSize = 30.0f;
@@ -83,6 +87,7 @@ namespace Nakagawa
             m_canvas = ToyKit.CreateOverlayCanvas("MatchHud", m_sortingOrder);
             m_canvas.SetParent(transform, false);
             if (m_addStartCountdown && GetComponent<StartCountdownView>() == null) gameObject.AddComponent<StartCountdownView>();
+            if (m_addPauseMenu && GetComponent<PauseMenu>() == null) gameObject.AddComponent<PauseMenu>();
         }
 
         private void OnDestroy()

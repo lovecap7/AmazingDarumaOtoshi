@@ -124,6 +124,23 @@ namespace Nakagawa
             return spawned;
         }
 
+        public override bool CanPlaceImmediately => true;
+
+        // 予告なしですぐに置く(試合開始時)。プレイヤーがエリアにいても、体と重ならない位置になら置く
+        public override int PlaceImmediately(IReadOnlyList<TumikiColor> colors, TumikiBlock prefab, List<Vector3> reserved)
+        {
+            if (colors.Count == 0 || prefab == null) return 0;
+            int placed = 0;
+            foreach (var color in colors)
+            {
+                if (!TryFindPosition(reserved, out Vector3 pos)) continue;
+                reserved.Add(pos);
+                SpawnBlock(prefab, color, pos, Quaternion.Euler(0.0f, Random.Range(0.0f, 360.0f), 0.0f));
+                placed++;
+            }
+            return placed;
+        }
+
         // 積み木を1個生成する(ポンと出てくる演出つき)。予告(TumikiSpawnWarning)が終わったときにも呼ばれる
         public TumikiBlock SpawnBlock(TumikiBlock prefab, TumikiColor color, Vector3 pos, Quaternion rot)
         {

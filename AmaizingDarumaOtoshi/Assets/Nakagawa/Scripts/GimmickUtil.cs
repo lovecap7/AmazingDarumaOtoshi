@@ -13,6 +13,8 @@ namespace Nakagawa
         // コライダーの持ち主で、ギミックの影響を受けられるもの(なければnull)
         public static IGimmickAffectable Find(Collider col)
         {
+            // ネット対戦用(suehara): クライアントでは何も影響を受けない(ギミックの結果はホストから位置で届く)
+            if (GimmickClock.IsNetClient) return null;
             Rigidbody rb = col.attachedRigidbody;
             if (rb == null) return null;
             var target = rb.GetComponent<IGimmickAffectable>();
