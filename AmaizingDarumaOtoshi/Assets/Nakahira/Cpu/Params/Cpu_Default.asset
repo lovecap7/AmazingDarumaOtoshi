@@ -47,6 +47,9 @@ MonoBehaviour:
   PanicReachSlack: 1.5
   PanicJumpRate: 2.5
   PanicDodgeJitter: 0.2
+  PlayfulStack: 8
+  PlayfulCollectScore: 0.25
+  PlayfulScatterChancePerSecond: 0.5
   ApproachScore: 0.45
   WaitScore: 0.3
   WaitDangerRadius: 10

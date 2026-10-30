@@ -159,8 +159,9 @@ namespace Nakahira
 
             // 狙い撃ち:身の回りに拾える積み木がないとき、遠くの倒せそうな相手を撃つ
             // (身の回りを確かめるのは撃ち始めるときだけ。撃ち合いの最中に近くに落ちてきた積み木は、ついでに弾く材料にする)
+            // 満タン近く(遊ぶ)なら、近くに積み木があっても撃つ
             bool engaged = m_motive == Motive.Hunt;
-            if (engaged || !HasNearbyCollectable(c))
+            if (engaged || c.IsPlayful || !HasNearbyCollectable(c))
             {
                 CpuOpponent best = null;
                 float bestScore = float.MinValue;
@@ -222,15 +223,19 @@ namespace Nakahira
             CpuParams p = c.Params;
             if (Time.time < m_nextScatterRoll) return false;
             m_nextScatterRoll = Time.time + p.ThinkInterval;
-            if (Random.value >= p.ScatterChancePerSecond * p.ThinkInterval) return false;
+            // 満タン近く(遊ぶ)なら、よく撃ち込みたくなり、歩いて拾える近くの固まりにも撃つ
+            bool playful = c.IsPlayful;
+            float chance = playful ? p.PlayfulScatterChancePerSecond : p.ScatterChancePerSecond;
+            if (Random.value >= chance * p.ThinkInterval) return false;
 
             Vector3 pos = c.Position;
+            float minDist = playful ? p.MeleeEnterDistance : p.ShotNearbyRadius;
             foreach (var block in TumikiBlock.All)
             {
                 if (!CpuBlockSearch.IsCollectable(block)) continue;
                 Vector3 bp = block.transform.position;
                 float dist = CpuContext.FlatDistance(pos, bp);
-                if (dist <= p.ShotNearbyRadius || dist > p.ScatterRange) continue;
+                if (dist <= minDist || dist > p.ScatterRange) continue;
                 int count = 0;
                 foreach (var other in TumikiBlock.All)
                 {
@@ -239,7 +244,7 @@ namespace Nakahira
                 if (count < p.ScatterClusterCount) continue;
                 // 近い道で拾いに行ける固まりは撃たない(拾いに行く)。道がない・遠回りの道しかない固まりだけ
                 if (m_path == null) m_path = new NavMeshPath();
-                if (CpuNavMesh.TryFindPath(pos, bp, CpuPickupMotor.GoalTolerance, m_path, out float length)
+                if (!playful && CpuNavMesh.TryFindPath(pos, bp, CpuPickupMotor.GoalTolerance, m_path, out float length)
                     && length < p.ScatterMinPathLength) continue;
                 if (HasWall(pos, bp)) continue;
                 point = bp;

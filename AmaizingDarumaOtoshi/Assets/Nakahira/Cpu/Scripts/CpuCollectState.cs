@@ -35,7 +35,9 @@ namespace Nakahira
         {
             if (c.StackCount >= c.Params.CollectUntil) return 0.0f;
             // 拾える積み木がなくても、ほかにやることがなければ積む(待つ)
-            return CpuBlockSearch.HasAnyCollectable() ? c.Params.CollectScore : c.Params.CollectScore * 0.1f;
+            if (!CpuBlockSearch.HasAnyCollectable()) return c.Params.CollectScore * 0.1f;
+            // 満タン近くなら、攻めに行ける相手がいればそちらを選ぶ(遊ぶ)
+            return c.IsPlayful ? c.Params.PlayfulCollectScore : c.Params.CollectScore;
         }
 
         public override void Enter(CpuContext c)

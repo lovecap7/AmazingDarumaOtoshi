@@ -87,6 +87,14 @@ namespace Nakahira
         [Tooltip("いちばん焦ったとき、かわすジャンプの遅れに足される最大のずれ(秒)")]
         [Min(0.0f)] public float PanicDodgeJitter = 0.2f;
 
+        [Header("遊ぶ(満タン近く)")]
+        [Tooltip("この段数以上なら、撃って遊ぶ側に切り替える(同じ段数の相手にも攻めに行く・積むより攻めを選ぶ・近くの積み木の固まりにも撃ち込む)")]
+        [Min(1)] public int PlayfulStack = 8;
+        [Tooltip("遊ぶ側のときの積むのやりたさ(攻めに行ける相手がいなければ積む)")]
+        [Range(0.0f, 1.0f)] public float PlayfulCollectScore = 0.25f;
+        [Tooltip("遊ぶ側のとき、1秒あたりに積み木の固まりへ撃ち込みたくなる確率(歩いて拾える固まりにも撃つ)")]
+        [Range(0.0f, 1.0f)] public float PlayfulScatterChancePerSecond = 0.5f;
+
         [Header("攻めに行く・待つ(盤面に拾える積み木がない・積み終わったとき)")]
         [Tooltip("攻めに行く(有利な相手へ近づく)のやりたさ。待つより高く、殴る・撃つ・逃げるより低く")]
         [Range(0.0f, 1.0f)] public float ApproachScore = 0.45f;
