@@ -139,12 +139,20 @@ MonoBehaviour:
   m_shape: 0
   m_size: {x: 6, y: 6}
   m_radius: 3
+  m_minAmount: 0
+  m_maxAmount: 10
   m_spacing: 0.1
   m_maxAttempts: 30
   m_obstacleMask:
     serializedVersion: 2
     m_Bits: 51
   m_checkHeight: 1
+  m_requireFloor: 1
+  m_requireFullSupport: 1
+  m_supportSamples: 12
+  m_supportTolerance: 0.03
+  m_warningTime: 1
+  m_recheckOnSpawn: 1
   m_rectMarker: {fileID: 654857182881128670}
   m_circleMarker: {fileID: 5236673060709492034}
 --- !u!1 &6957812370655973632
