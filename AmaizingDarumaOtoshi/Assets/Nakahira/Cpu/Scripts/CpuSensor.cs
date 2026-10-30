@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace Nakahira
 {
-    // CPU が周りを調べるための問い合わせ(足場)。積み木とキャラクターは足場として扱わない
+    // CPU が周りを調べるための問い合わせ(足場)。積み木・キャラクター・移動床は足場として扱わない
     // (奈落・壁を迂回する道は CpuNavMesh で求める。ここは道の途中で落ちないための念のための確認)
     public static class CpuSensor
     {
@@ -23,9 +23,12 @@ namespace Nakahira
             return false;
         }
 
+        // 移動床も足場として扱わない(すぐ動いていなくなるので。乗り降りは CpuRide が床を直接見て行う)
         static bool IsIgnored(Collider col)
         {
-            return col.GetComponentInParent<TumikiBlock>() != null || col.GetComponentInParent<DarumaCharacter>() != null;
+            return col.GetComponentInParent<TumikiBlock>() != null
+                || col.GetComponentInParent<DarumaCharacter>() != null
+                || col.GetComponentInParent<Nakagawa.MovingFloorGimmick>() != null;
         }
     }
 }

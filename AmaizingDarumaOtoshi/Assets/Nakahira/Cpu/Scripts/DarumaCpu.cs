@@ -30,6 +30,7 @@ namespace Nakahira
         readonly CpuApproachState m_approach = new CpuApproachState();
         readonly CpuWaitState m_wait = new CpuWaitState();
         readonly CpuReflex m_reflex = new CpuReflex();
+        readonly CpuRide m_ride = new CpuRide();
         CpuState[] m_states;
         CpuState m_current;
         float m_stateTime;
@@ -48,6 +49,8 @@ namespace Nakahira
         public string StateName => m_current != null ? m_current.Name : "";
         // 今のとっさの反応(デバッグ表示用)
         public CpuReflex.Action ReflexAction => m_reflex.Current;
+        // 今の移動床の乗り降り(デバッグ表示用)
+        public CpuRide.Action RideAction => m_ride.Current;
         // 集中度(認識の疲れ)の割合(デバッグ表示用)
         public float LoadRatio => m_params != null ? m_context.LoadRatio : 0.0f;
 
@@ -110,6 +113,11 @@ namespace Nakahira
                 if (m_current != null) m_current.Tick(m_context, ref cmd);
             }
 
+            // 移動床の乗り降り:乗り場で待つ・乗っている間は移動を置き換える
+            m_ride.Apply(m_context, m_current != null ? m_current.Route : null, ref cmd);
+            // 縁で踏ん張る:風などで縁の外へ流されていたら押し返す(移動床の乗り降り中は除く)
+            if (m_ride.Current == CpuRide.Action.None) CpuEdgeGuard.Apply(m_context, ref cmd);
+
             // とっさの反応:飛んでくる弾に、どの状態の最中でも割り込む
             m_reflex.Apply(m_context, ref cmd);
             return cmd;
@@ -166,6 +174,7 @@ namespace Nakahira
         {
             if (!m_drawGizmos || !Application.isPlaying || m_current == null || m_lastSelf == null) return;
             m_current.DrawGizmos(m_context);
+            CpuMovingFloors.DrawGizmos();
         }
     }
 }

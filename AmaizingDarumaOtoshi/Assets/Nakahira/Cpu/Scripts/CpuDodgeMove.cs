@@ -8,6 +8,8 @@ namespace Nakahira
     {
         // 着地点がバンパーなどの危険な床からこの距離(m)以内なら使わない
         const float kHazardClearance = DarumaCharacter.kBodyRadius + 0.3f;
+        // 着地点の先にも床があることを確かめる距離(m)
+        const float kLandingMargin = DarumaCharacter.kBodyRadius + 0.5f;
 
         // 跳んでから着地するまでの時間(秒。同じ高さに降りるとき)
         public static float AirTime(JumpParams jump)
@@ -30,6 +32,10 @@ namespace Nakahira
             Vector3 land = pos + dir * distance;
             if (!CpuSensor.HasGround(pos + dir * (distance * 0.5f), depth)) return false;
             if (!CpuSensor.HasGround(land, depth)) return false;
+            // 着地してから少し滑る分も床があること(縁ぎりぎりに降りて落ちないように)
+            if (!CpuSensor.HasGround(land + dir.normalized * kLandingMargin, depth)) return false;
+            // 移動床の上には跳ばない(着くころには動いているかもしれない)
+            if (CpuMovingFloors.TryGetFloorUnder(land, out _)) return false;
             return !CpuNavMesh.IsNearHazard(land, kHazardClearance);
         }
 

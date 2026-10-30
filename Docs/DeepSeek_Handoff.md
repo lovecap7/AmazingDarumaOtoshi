@@ -38,7 +38,7 @@
 |---|---|---|
 | あかだる | 赤い積み木の数だけ弾速UP（+1.0 m/s / 個、上限60） | `AkadaruPassive.cs` |
 | あかだる（演出） | 弾速に応じた残光トレイル＋マズルフラッシュ／衝撃波 | `AkadaruShotTrail.cs` / `AkadaruShotFlash.cs` |
-| あかだる（必殺技） | トロン: 通常射撃のトレイルに沿って分割判定。壁反射も追従。触れた積み木は壊れ、キャラクターは0.4秒間隔で積み木を1個ずつ失う（0個なら即死）。発動直後0.6秒は自分無敵。F3／ラボで判定表示。**通った地面は一定時間焼け焦げる**（自作シェーダー、約6秒で消える） | `AkadaruSpecial.cs` / `TronProjectile.cs` / `TronTrailHit.cs` / `TronHitboxView.cs` / `TronScorchTrail.cs` / `Shaders/TronScorch.shader` |
+| あかだる（必殺技） | 終焉の軌跡（旧トロン）: 通常射撃のトレイルに沿って分割判定。壁反射も追従。触れた積み木は壊れ、キャラクターは0.4秒間隔で積み木を1個ずつ失う（0個なら即死）。発動直後0.6秒は自分無敵。F3／ラボで判定表示。**通った地面は一定時間焼け焦げる**（自作シェーダー、約6秒で消える）。発動時はゲームを止める短い3Dカットイン（発動瞬間に実際の頭へ大胆にアップ／赤黒い集中線／衝撃波3回／画面揺れ／フラッシュ／画面下中央に大型「終焉の軌跡」、約1.3秒、旧・積み木／ハンマー／レーザー／破片演出は削除、終了時に複製を明示破棄） | `AkadaruSpecial.cs` / `TronProjectile.cs` / `TronTrailHit.cs` / `TronHitboxView.cs` / `TronScorchTrail.cs` / `Shaders/TronScorch.shader` / `SpecialCutIn.cs` |
 | あおだる | 青い積み木の数だけ移動速度UP（+1.0 m/s / 個、上限12） | `AodaruPassive.cs` |
 | あおだる（演出） | 青い風＋青い残像 | `AodaruSpeedEffect.cs` / `AodaruGhost.cs` |
 | あおだる（必殺技） | 六腕: ハンマーのモデルを6本出し（阿修羅風）、発動時の向きを基準にした3方向から近づく積み木を、操作に関係なくはじき返す（4秒間） | `AodaruSpecial.cs` / `AodaruSixArms.cs` |

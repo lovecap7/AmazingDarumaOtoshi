@@ -16,7 +16,7 @@ MonoBehaviour:
   StateStickiness: 0.1
   MinStateTime: 0.5
   UrgentScore: 0.75
-  AttentionCapacity: 0.01
+  AttentionCapacity: 1
   AttentionDecay: 0.25
   AttentionOnKnockToZero: 0.95
   AttentionOnDodge: 0.2
