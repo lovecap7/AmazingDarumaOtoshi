@@ -14,6 +14,9 @@ namespace Nakahira
         public float DeltaTime { get; private set; }
 
         public int StackCount => Self.Stack.Count;
+        // 満タン近く(PlayfulStack 段以上)で、撃って遊ぶ側に切り替わっているか
+        // (同じ段数の相手にも攻めに行く・積むより攻めを選ぶ・近くの積み木の固まりにも撃ち込む)
+        public bool IsPlayful => StackCount >= Params.PlayfulStack;
         public Vector3 Position => Self.transform.position;
 
         // 集中度(認識の疲れ)。出来事(弾に反応した・攻撃を受けた等)のたびに足され、時間で減る
