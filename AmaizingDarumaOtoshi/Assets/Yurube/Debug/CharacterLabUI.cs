@@ -133,6 +133,7 @@ namespace Yurube.Lab
             if (GUILayout.Button("みだる: 緑1個＋わざと外して発射", m_button)) PresetMidaru();
             if (GUILayout.Button("いわだる: ダミー5個＋発射", m_button)) PresetIwa();
             if (GUILayout.Button("きだる: 黄色1個", m_button)) PresetKidaru();
+            if (GUILayout.Button("きだる: 必殺技", m_button)) PresetKidaruSpecial();
             if (GUILayout.Button("へびだる: 積んでショット", m_button)) PresetHebi();
             if (GUILayout.Button("だるきんぐ: 積み木3個", m_button)) PresetDaruKing();
             if (GUILayout.Button("あかだる: 必殺技", m_button)) PresetAkadaruSpecial();
@@ -174,7 +175,14 @@ namespace Yurube.Lab
             int yellow = stack != null ? stack.CountColor(TumikiColor.Yellow) : 0;
 
             GUILayout.Label($"積み木: {count}段   赤{red} 青{blue} 緑{green} 黄{yellow}", m_label);
-            GUILayout.Label($"弾速: {m_lab.ShotSpeed:0.0} m/s   移動速度: {character.MoveSpeed:0.0} m/s", m_label);
+
+            float displaySpeed = character.MoveSpeed;
+            var kidaru = character.GetComponent<KidaruSpecial>();
+            if (kidaru != null) displaySpeed = kidaru.EffectiveSpeed;
+            string speedSuffix = kidaru != null && kidaru.IsSpeedBoosted
+                ? $" (必殺技 x{kidaru.CurrentSpeedMultiplier:0.0})"
+                : "";
+            GUILayout.Label($"弾速: {m_lab.ShotSpeed:0.0} m/s   移動速度: {displaySpeed:0.0} m/s{speedSuffix}", m_label);
 
             var aodaru = character.GetComponent<AodaruPassive>();
             if (aodaru != null)
@@ -200,12 +208,22 @@ namespace Yurube.Lab
             GUILayout.Label($"ゲージ: {gauge.Blocks}/{gauge.BlocksToFill}" + (gauge.IsFull ? "  READY" : ""), m_label);
             if (GUILayout.Button("ゲージ満タン", m_button)) gauge.Fill();
 
-            bool showHitbox = TronHitboxView.Visible;
-            bool newShowHitbox = GUILayout.Toggle(showHitbox, "当たり判定を表示 (F3)");
-            if (newShowHitbox != showHitbox) TronHitboxView.Visible = newShowHitbox;
+            if (character.GetComponent<AkadaruSpecial>() != null)
+            {
+                bool showHitbox = TronHitboxView.Visible;
+                bool newShowHitbox = GUILayout.Toggle(showHitbox, "当たり判定を表示 (F3)");
+                if (newShowHitbox != showHitbox) TronHitboxView.Visible = newShowHitbox;
+            }
 
             var special = character.GetComponent<ISpecialAbility>();
             if (special != null && GUILayout.Button("必殺技 (L/Y)", m_button)) special.TryActivate();
+
+            var kidaru = character.GetComponent<KidaruSpecial>();
+            if (kidaru != null)
+            {
+                string state = kidaru.IsActive ? $"強化中 残り{kidaru.RemainingSeconds:F1}秒" : "強化待機";
+                GUILayout.Label($"{state}  前回: {kidaru.LastDuration:F1}秒 ({kidaru.LastBlocks}個)", m_label);
+            }
         }
 
         void DrawHelp()
@@ -299,6 +317,19 @@ namespace Yurube.Lab
             // 黄色を1個積むと、パッシブでもう1個増えて2段になる
             m_lab.AddBlocks(character, TumikiColor.Yellow, 1);
             m_lab.SelectedColor = TumikiColor.Yellow;
+        }
+
+        void PresetKidaruSpecial()
+        {
+            m_lab.SelectCharacter("kidaru");
+            var character = m_lab.Character;
+            m_lab.ClearStack(character);
+            // 5個積んでゲージを満タンにし、そのまま発動
+            m_lab.AddBlocks(character, TumikiColor.Yellow, 5);
+            m_lab.SelectedColor = TumikiColor.Yellow;
+
+            var special = character != null ? character.GetComponent<ISpecialAbility>() : null;
+            if (special != null) special.TryActivate();
         }
 
         void PresetHebi()
