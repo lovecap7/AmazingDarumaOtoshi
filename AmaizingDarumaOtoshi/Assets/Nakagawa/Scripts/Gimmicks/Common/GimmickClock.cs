@@ -27,6 +27,17 @@ namespace Nakagawa
             }
         }
 
+        // ギミックを止めておくか(セレクトから始めた試合の、開始のカウントダウン中)
+        // 止めている間、ギミックは動かず・押し出さず・発射しない(時間も進めない)。止める条件はここだけで決める
+        public static bool IsHeld
+        {
+            get
+            {
+                var match = Nakahira.DarumaMatch.Current;
+                return match != null && match.IsConfigured && match.IsCountingDown;
+            }
+        }
+
         // 通信中なら、ホストと共有する時刻(秒)
         public static bool TryGetSharedTime(out double time)
         {

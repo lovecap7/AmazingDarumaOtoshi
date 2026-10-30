@@ -40,6 +40,7 @@ namespace Nakahira
     //     PlayerOut(人)            ：脱落した(ストックが無くなった)
     //     Scored(人, 点, 理由)      ：点が動いた(タイム)
     //     Finished(結果)            ：試合が終わった
+    //     Paused(人) / Resumed     ：ポーズした / 解いた(Pause / Resume で切り替える。IsPaused / PausedBy で読む)
     //   1人分の積み木・ストック・点数の変化は MatchPlayer のイベント(StackChanged など)でも受け取れる。
     [DefaultExecutionOrder(-50)]   // HUD などより先にプレイヤーを出す
     public class DarumaMatch : MonoBehaviour
@@ -144,6 +145,12 @@ namespace Nakahira
         public bool IsNetClient => m_net != null && !m_net.IsServer;
         // ネット対戦で、ホストが試合を始める前か。この間は時間が進まず、やられても少ししてから復活し、試合は終わらない
         public bool IsNetWaiting => m_net != null && !m_netStarted;
+        // ポーズ中か(Pause / Resume で切り替える。ポーズ中は時間・操作・試合の進行が止まる)
+        public bool IsPaused { get; private set; }
+        // ポーズした人(分からなければ null)
+        public MatchPlayer PausedBy { get; private set; }
+        // いまポーズできるか(試合中で、シーンの切り替え中でない。ネット対戦では全員の時間が止まるのでポーズしない)
+        public bool CanPause => !IsPaused && !IsFinished && !m_leaving && !Fader.IsBusy && m_net == null;
 
         // ---- お知らせ ----
         public event Action Started;
@@ -156,6 +163,8 @@ namespace Nakahira
         public event Action<MatchPlayer> PlayerOut;
         public event Action<MatchPlayer, int, ScoreReason> Scored;
         public event Action<MatchResult> Finished;
+        public event Action<MatchPlayer> Paused;    // ポーズした(ポーズした人。分からなければ null)
+        public event Action Resumed;                // ポーズを解いた
 
         // 崩した / 顔を飛ばした、の記録(同じフレームの「やられた」と「当てた」を組にする)
         class Hit
@@ -232,7 +241,8 @@ namespace Nakahira
         {
             if (Current == this) Current = null;
             // 試合の速さ・終わったときの停止を元に戻す
-            if (IsConfigured || Result != null) Time.timeScale = 1f;
+            if (IsConfigured || Result != null || IsPaused) Time.timeScale = 1f;
+            if (IsPaused) AudioListener.pause = false;
         }
 
         private void Start()
@@ -525,6 +535,7 @@ namespace Nakahira
 
         void UpdateMatch()
         {
+            if (IsPaused) return;
             if (Result != null) { UpdateResult(); return; }
             // カウントダウン中は時間を進めない
             if (UpdateCountdown()) return;
@@ -974,6 +985,64 @@ namespace Nakahira
                 case NetEvent.Out: PlayerOut?.Invoke(a); break;
                 case NetEvent.Scored: Scored?.Invoke(a, points, reason); break;
             }
+        }
+
+        //========================================
+        // ポーズ(共通)
+        //========================================
+
+        // 試合を止める(時間・物理・音・全員の操作)。by: ポーズした人(分からなければ null)。止めたら true
+        public bool Pause(MatchPlayer by = null)
+        {
+            if (!CanPause) return false;
+            IsPaused = true;
+            PausedBy = by;
+            Time.timeScale = 0f;
+            AudioListener.pause = true;
+            foreach (var p in m_players) p.StopControl();
+            Paused?.Invoke(by);
+            return true;
+        }
+
+        // ポーズを解く(カウントダウン中なら、操作はカウントダウンが終わってから戻る)
+        public void Resume()
+        {
+            if (!IsPaused || m_leaving) return;
+            IsPaused = false;
+            PausedBy = null;
+            Time.timeScale = PlaySpeed;
+            AudioListener.pause = false;
+            if (!IsCountingDown)
+            {
+                foreach (var p in m_players)
+                {
+                    if (p.Character != null) p.Character.SetCommandSource(p.CommandSource);
+                    if (p.Ghost != null) p.Ghost.SetCommandSource(p.CommandSource);
+                }
+            }
+            Resumed?.Invoke();
+        }
+
+        // 試合をやめて別のシーンへ移る(ポーズメニューの「タイトルに戻る」など)。ポーズ中なら止めたまま移る
+        public void LeaveTo(string sceneName)
+        {
+            if (m_leaving) return;
+            m_leaving = true;
+            foreach (var p in m_players) p.StopControl();
+            Time.timeScale = 1f;
+            AudioListener.pause = false;
+            Fader.Load(sceneName);
+        }
+
+        // その入力機器で操作している人(いなければ null)
+        public MatchPlayer FindPlayer(InputDevice device)
+        {
+            if (device == null) return null;
+            foreach (var p in m_players)
+            {
+                if (p != null && !p.IsCpu && p.Entry.deviceId == device.deviceId) return p;
+            }
+            return null;
         }
 
         //========================================

@@ -106,7 +106,7 @@ namespace Nakagawa
 
         private void FixedUpdate()
         {
-            if (m_stopped) return;
+            if (m_stopped || GimmickClock.IsHeld) return;
             float dt = Time.fixedDeltaTime;
             Vector3 before = m_rb.position;
             m_time = GimmickClock.Step(m_time, dt, 0.0f, Period);

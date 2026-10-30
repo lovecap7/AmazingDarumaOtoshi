@@ -82,6 +82,7 @@ namespace Nakagawa
 
         private void FixedUpdate()
         {
+            if (GimmickClock.IsHeld) return;
             float dt = Time.fixedDeltaTime;
             UpdateMove(dt);
             Blow();
@@ -89,7 +90,7 @@ namespace Nakagawa
 
         private void Update()
         {
-            if (m_blades != null) m_blades.Rotate(0.0f, 0.0f, m_bladeSpeed * Time.deltaTime, Space.Self);
+            if (m_blades != null && !GimmickClock.IsHeld) m_blades.Rotate(0.0f, 0.0f, m_bladeSpeed * Time.deltaTime, Space.Self);
         }
 
         // 二点間を一定の速さで往復し、端で少し止まる(A → B → 止まる → A → 止まる → …)

@@ -65,6 +65,7 @@ namespace Nakagawa
 
         private void FixedUpdate()
         {
+            if (GimmickClock.IsHeld) return;
             float dt = Time.fixedDeltaTime;
             float delta = SignedSpeed * dt;
             // 角度は時間から決める(ネット対戦でホストとずれていたら、時計を合わせたときに一度に回る)

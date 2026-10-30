@@ -63,6 +63,15 @@ namespace Nakagawa
         // 床とのちらつきを防ぐため、見た目だけ浮かせる高さ
         [SerializeField] float m_surfaceOffset = 0.004f;
 
+        [Header("裏が見える透過")]
+        // せり上がっている間は、ステージの壁と同じように裏の積み木・プレイヤーが見えるよう透過する(SeeThroughWall シェーダー)
+        // 床に戻っている間は元の見た目に戻す(床が透けて穴にならないように)
+        [SerializeField] bool m_seeThrough = true;
+        // 未設定なら「Nakagawa/SeeThroughWall」
+        [SerializeField] Shader m_seeThroughShader;
+        // この高さ(m)より上がったら透過する
+        [SerializeField, Min(0.0f)] float m_seeThroughMinHeight = 0.05f;
+
         [Header("エフェクト")]
         // 予兆の間、縁から黄色い粉が少しずつ噴き出す(この間隔ごと)
         [SerializeField, Min(0.02f)] float m_warningEffectInterval = 0.2f;
@@ -111,6 +120,12 @@ namespace Nakagawa
         MaterialPropertyBlock m_mpb;
         float m_warningEffectTimer;
         readonly List<IGimmickAffectable> m_targets = new List<IGimmickAffectable>();
+        // 透過で差し替える見た目(パネルと縁)と、元のマテリアル・透過用のマテリアル
+        Renderer[] m_seeThroughRenderers;
+        Material[] m_normalMaterials, m_seeThroughMaterials;
+        bool m_seeThroughOn;
+        // 元のマテリアルごとの透過用マテリアル(同じ見た目のパネルどうしで共有する)
+        static readonly Dictionary<Material, Material> s_seeThroughCache = new Dictionary<Material, Material>();
 
         public Phase CurrentPhase => m_phase;
         float Period => m_floorTime + m_warningTime + m_riseTime + m_wallTime + m_lowerTime;
@@ -125,6 +140,7 @@ namespace Nakagawa
             m_mpb = new MaterialPropertyBlock();
             m_rumble = GimmickSound.CreateLoop(transform, GimmickSound.Or(m_rumbleClip, GimmickSound.Rumble));
             ApplyShape();
+            SetupSeeThrough();
         }
 
         // ステージの切り替えで有効になるたびに最初(開始のずれ)からやり直す
@@ -143,6 +159,7 @@ namespace Nakagawa
         private void OnDisable()
         {
             GimmickSound.SetLoopVolume(m_rumble, 0.0f);
+            SetSeeThrough(false);
         }
 
         private void OnValidate()
@@ -154,6 +171,7 @@ namespace Nakagawa
 
         private void FixedUpdate()
         {
+            if (GimmickClock.IsHeld) return;
             float dt = Time.fixedDeltaTime;
             m_time = GimmickClock.Step(m_time, dt, m_phaseOffset, Period);
             Phase before = m_phase;
@@ -177,7 +195,8 @@ namespace Nakagawa
 
         private void Update()
         {
-            bool warning = m_phase == Phase.Warning;
+            // 止めている間は予兆(点滅・揺れ・音・粉)も出さない
+            bool warning = m_phase == Phase.Warning && !GimmickClock.IsHeld;
             float progress = WarningProgress();
 
             // 縁: 予兆の間は黄色く点滅(終わりに向けて速く)
@@ -202,6 +221,9 @@ namespace Nakagawa
             }
 
             GimmickSound.SetLoopVolume(m_rumble, warning ? m_rumbleVolume : 0.0f);
+
+            // 上がっている間だけ裏が見えるよう透過する(見た目の高さで切り替える)
+            SetSeeThrough(m_seeThrough && transform.position.y - m_basePosition.y > m_seeThroughMinHeight);
 
             // 予兆の間は一定の間隔で縁から粉を噴き出す
             if (warning)
@@ -296,6 +318,57 @@ namespace Nakagawa
                 float nz = Mathf.Abs(local.z) / Mathf.Max(0.01f, m_size.y * 0.5f);
                 Vector3 dir = nx >= nz ? new Vector3(Mathf.Sign(local.x), 0, 0) : new Vector3(0, 0, Mathf.Sign(local.z));
                 target.AddKnockback(transform.rotation * dir * m_pushPower + Vector3.up * m_pushUpPower);
+            }
+        }
+
+        // パネルと縁の、透過用のマテリアルを用意する(元の色・模様・つやを写す)
+        private void SetupSeeThrough()
+        {
+            var shader = m_seeThroughShader != null ? m_seeThroughShader : Shader.Find("Nakagawa/SeeThroughWall");
+            if (shader == null) return;
+            var renderers = new List<Renderer>();
+            if (m_panel != null && m_panel.TryGetComponent(out Renderer panel)) renderers.Add(panel);
+            if (m_edges != null) foreach (var r in m_edges) if (r != null) renderers.Add(r);
+
+            m_seeThroughRenderers = renderers.ToArray();
+            m_normalMaterials = new Material[renderers.Count];
+            m_seeThroughMaterials = new Material[renderers.Count];
+            for (int i = 0; i < renderers.Count; i++)
+            {
+                var normal = renderers[i].sharedMaterial;
+                m_normalMaterials[i] = normal;
+                m_seeThroughMaterials[i] = SeeThroughMaterial(normal, shader);
+            }
+        }
+
+        private static Material SeeThroughMaterial(Material normal, Shader shader)
+        {
+            if (normal == null) return null;
+            if (normal.shader == shader) return normal;
+            if (s_seeThroughCache.TryGetValue(normal, out var cached) && cached != null) return cached;
+            var mat = new Material(shader) { name = normal.name + " (SeeThrough)" };
+            if (normal.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", normal.GetColor("_BaseColor"));
+            if (normal.HasProperty("_BaseMap"))
+            {
+                mat.SetTexture("_BaseMap", normal.GetTexture("_BaseMap"));
+                mat.SetTextureScale("_BaseMap", normal.GetTextureScale("_BaseMap"));
+                mat.SetTextureOffset("_BaseMap", normal.GetTextureOffset("_BaseMap"));
+            }
+            if (normal.HasProperty("_Smoothness")) mat.SetFloat("_Smoothness", normal.GetFloat("_Smoothness"));
+            if (normal.HasProperty("_Metallic")) mat.SetFloat("_Metallic", normal.GetFloat("_Metallic"));
+            s_seeThroughCache[normal] = mat;
+            return mat;
+        }
+
+        private void SetSeeThrough(bool on)
+        {
+            if (m_seeThroughOn == on || m_seeThroughRenderers == null) return;
+            m_seeThroughOn = on;
+            for (int i = 0; i < m_seeThroughRenderers.Length; i++)
+            {
+                var r = m_seeThroughRenderers[i];
+                var mat = on ? m_seeThroughMaterials[i] : m_normalMaterials[i];
+                if (r != null && mat != null) r.sharedMaterial = mat;
             }
         }
 
