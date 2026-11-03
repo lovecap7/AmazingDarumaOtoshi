@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using Nakahira;
 using Unity.Netcode;
@@ -8,7 +9,9 @@ using UnityEngine;
 //  ・接続したら、シーンの Match(最初は非表示の DarumaMatch)に NetMatchDriver を付けて表示する
 //  ・ホスト      : 接続した人ごとに NetPlayer を出す(1人分は NetMatchPlayer)。ルール・時間・試合の始まりと終わり・お知らせを配る
 //  ・クライアント: 届いたルール・時間・結果・お知らせを DarumaMatch に入れる(HUD・カメラなどはいつもどおり DarumaMatch を読む)
-// 試合を始める・やり直すのはホスト(StartMatch。テスト用 UI の「試合開始」)。それまでは開始待ちで、自由に動ける
+// 試合を始めるのはホスト(StartMatch。テスト用 UI の「試合開始」)。それまでは開始待ちで、自由に動ける
+// 試合が終わったらローカル(MatchResultRelay)と同じく、結果を ResultData に入れて全員でリザルト画面へ移り、
+// ホストの決定でこのシーンに戻る(NetSceneFlow / NetResultFlow)。シーンを読み直すので、次の試合はまた開始待ちから
 public class NetMatch : NetworkBehaviour
 {
     public struct RulesData : INetworkSerializable, IEquatable<RulesData>
@@ -88,6 +91,9 @@ public class NetMatch : NetworkBehaviour
             Debug.LogError("[NetMatch] DarumaMatch が見つかりません");
             return;
         }
+
+        // リザルトのあと・切断したときに戻るシーン
+        NetSceneFlow.ReturnScene = gameObject.scene.name;
 
         // DarumaMatch は Awake でこれを探すので、表示する前に付ける
         var driver = m_match.GetComponent<NetMatchDriver>();
@@ -259,28 +265,73 @@ public class NetMatch : NetworkBehaviour
         int n = result.Ranking.Count;
         var order = new byte[n];
         var ranks = new byte[n];
+        // 積み木の色(リザルトのタワーに使う。クライアントは積み木を持っていないのでホストのものを送る)
+        var counts = new byte[n];
+        var colors = new List<byte>();
         for (int i = 0; i < n; i++)
         {
-            order[i] = (byte)result.Ranking[i].Index;
-            ranks[i] = (byte)result.Ranking[i].Rank;
+            var p = result.Ranking[i];
+            order[i] = (byte)p.Index;
+            ranks[i] = (byte)p.Rank;
+            var stack = p.Stack;
+            int count = stack != null ? Mathf.Min(stack.Count, byte.MaxValue) : 0;
+            counts[i] = (byte)count;
+            for (int b = 0; b < count; b++) colors.Add((byte)stack.Get(b).Color);
         }
-        FinishedRpc((byte)result.Reason, result.Winner != null ? (sbyte)result.Winner.Index : (sbyte)-1, order, ranks);
+        FinishedRpc((byte)result.Reason, result.Winner != null ? (sbyte)result.Winner.Index : (sbyte)-1, order, ranks, counts, colors.ToArray());
+
+        if (UseResultScene)
+        {
+            ResultData.Capture(result, m_match.Mode);
+            StartCoroutine(GoToResult());
+        }
     }
 
     [Rpc(SendTo.NotServer)]
-    void FinishedRpc(byte reason, sbyte winner, byte[] order, byte[] ranks)
+    void FinishedRpc(byte reason, sbyte winner, byte[] order, byte[] ranks, byte[] counts, byte[] colors)
     {
         if (m_match == null) return;
         var result = new DarumaMatch.MatchResult { Reason = (DarumaMatch.FinishReason)reason };
+        var blockColors = new Dictionary<MatchPlayer, List<Color>>();
+        int next = 0;
         for (int i = 0; i < order.Length; i++)
         {
+            var list = new List<Color>();
+            for (int b = 0; b < counts[i] && next < colors.Length; b++) list.Add(TumikiColorUtil.ToUnityColor((TumikiColor)colors[next++]));
             var p = FindPlayer(order[i]);
             if (p == null) continue;
             p.Rank = ranks[i];
             result.Ranking.Add(p);
+            blockColors[p] = list;
             if (order[i] == winner) result.Winner = p;
         }
         m_match.NetClientFinish(result);
+
+        if (!UseResultScene) return;
+        // ResultData.Ranking は result.Ranking と同じ順(null は入らない)
+        ResultData.Capture(result, m_match.Mode);
+        for (int i = 0; i < result.Ranking.Count && i < ResultData.Ranking.Count; i++)
+        {
+            ResultData.Ranking[i].blockColors.Clear();
+            ResultData.Ranking[i].blockColors.AddRange(blockColors[result.Ranking[i]]);
+        }
+        DarumaMatch.AutoReturnToSelect = false;
+    }
+
+    // リザルト画面を使うか(MatchSettings の「リザルト(表彰)」。使わないなら今までどおりその場でやり直す)
+    static bool UseResultScene => MatchSettings.Instance != null && MatchSettings.Instance.useResultScene;
+
+    // ホスト: 「しあい しゅうりょう！」を見せてから、全員でリザルト画面へ(MatchResultRelay と同じ待ち時間)
+    IEnumerator GoToResult()
+    {
+        // DarumaMatch がその場でやり直さないようにする(リザルト画面が元に戻す)
+        DarumaMatch.AutoReturnToSelect = false;
+        var settings = MatchSettings.Instance;
+        yield return new WaitForSecondsRealtime(settings.resultSceneDelay);
+        // 戻ってきたら同じステージから始める(クライアントはホストのステージに合わせる)
+        var switcher = FindAnyObjectByType<Nakagawa.StageSwitcher>();
+        if (switcher != null && switcher.Current != null && switcher.Current.Info != null) Nakagawa.StageSwitcher.RequestStage(switcher.Current.Info.Id);
+        NetSceneFlow.Load(settings.ResultSceneFor(m_match.Mode));
     }
 
     void OnKnocked(MatchPlayer victim, MatchPlayer attacker) => Send(DarumaMatch.NetEvent.Knocked, victim, attacker);

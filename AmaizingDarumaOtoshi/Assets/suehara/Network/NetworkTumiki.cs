@@ -39,6 +39,12 @@ public class NetworkTumiki : NetworkBehaviour
         var no = GetComponent<NetworkObject>();
         if (nm == null || !nm.IsListening) { CreatedOffline = true; return; }
         if (nm.IsServer && !no.IsSpawned) no.Spawn(true);
+        // クライアントで作られた(ホストから届いたのではない)積み木は、ホストにないので触れない。見えないように消す
+        else if (!nm.IsServer && !no.IsSpawned)
+        {
+            Debug.LogWarning($"[NetworkTumiki] クライアントで作られた積み木を消しました: {name} {transform.position}");
+            Destroy(gameObject);
+        }
     }
 
     public override void OnNetworkSpawn()

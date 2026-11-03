@@ -10,7 +10,8 @@ using UnityEngine.SceneManagement;
 
 // ネット対戦(LAN)の接続画面。NetStages に置く(テスト用の NetTestUI の置き換え)。
 //  ・つないでいないとき: 画面の中央に「ホストになる」と「参加する(ホストの IP アドレスを入れる)」
-//  ・ホスト  : 自分の IP アドレス(参加する人に伝える)・人数と、試合のルールを選んで「試合開始」(試合中・試合後は「やり直し」)
+//  ・ホスト  : 自分の IP アドレス(参加する人に伝える)・人数と、開始待ちのときに試合のルールを選んで「試合開始」
+//              (試合が終わったら全員でリザルト画面へ移り、ホストの決定でこのシーンに戻って開始待ちになる)
 //  ・参加する: つながるまでの表示。つながらなかった・切れたときは理由を出す
 //  ・切断したら(自分で切った・ホストがいなくなった・つながらなかった)シーンを読み直して最初の状態に戻す
 // コマンドライン: -nethost でホストとして、-netclient <IPアドレス> で参加して始める(ビルドでの試験用)
@@ -33,11 +34,15 @@ public class NetLobbyUI : MonoBehaviour
     bool m_wasConnected;
     bool m_reload;
 
-    MatchSetup.MatchMode m_mode = MatchSetup.MatchMode.Stock;
-    int m_stocks = 3;
-    int m_timeIndex;
+    // 選んだルール(リザルトから戻ってシーンを読み直しても覚えておく)
+    static MatchSetup.MatchMode s_mode = MatchSetup.MatchMode.Stock;
+    static int s_stocks = 3;
+    static int s_timeIndex;
 
     UnityTransport Transport => m_nm != null ? m_nm.GetComponent<UnityTransport>() : null;
+
+    // 前回の切断の理由を出す(NetSceneFlow がリザルト画面で切れたときに使う)
+    public static void SetMessage(string message) => s_message = message;
 
     void Start()
     {
@@ -45,6 +50,13 @@ public class NetLobbyUI : MonoBehaviour
         m_address = PlayerPrefs.GetString(kAddressKey, "127.0.0.1");
         m_localAddresses = LocalAddresses();
         if (m_nm == null) return;
+        // つないだままリザルトから戻ってきたら、このシーンの NetworkManager は使わないので消す
+        // (動いている NetworkManager が DontDestroyOnLoad に残っている)
+        foreach (var nm in FindObjectsByType<NetworkManager>())
+        {
+            if (nm != m_nm && !nm.IsListening) Destroy(nm.gameObject);
+        }
+        m_wasConnected = m_nm.IsConnectedClient && !m_nm.IsServer;
         m_nm.OnClientConnectedCallback += OnConnected;
         m_nm.OnClientDisconnectCallback += OnDisconnected;
         m_nm.OnClientStopped += OnStopped;
@@ -228,22 +240,23 @@ public class NetLobbyUI : MonoBehaviour
 
         string phase = !net.IsStarted ? "開始待ち" : net.Match.IsFinished ? "試合終了" : "試合中";
         GUILayout.Label($"{phase}  {net.Rules.ModeName}  {net.PlayerCount}人", label);
-        if (!m_nm.IsServer) return;
+        // ルールを選んで始めるのは開始待ちのときだけ(試合が終わったらリザルトを見て、このシーンに戻ってから次の試合)
+        if (!m_nm.IsServer || net.IsStarted) return;
 
-        if (GUILayout.Button("モード: " + ModeName(m_mode), button)) m_mode = (MatchSetup.MatchMode)(((int)m_mode + 1) % 3);
-        if (m_mode == MatchSetup.MatchMode.Stock && GUILayout.Button($"ストック: {m_stocks}", button)) m_stocks = m_stocks % 5 + 1;
-        if (GUILayout.Button("時間: " + TimeLabel(TimeLimit), button)) m_timeIndex = (m_timeIndex + 1) % kTimeLimits.Length;
-        if (GUILayout.Button(net.IsStarted ? "やり直し" : "試合開始", button, GUILayout.Height(56))) net.StartMatch(BuildRules());
+        if (GUILayout.Button("モード: " + ModeName(s_mode), button)) s_mode = (MatchSetup.MatchMode)(((int)s_mode + 1) % 3);
+        if (s_mode == MatchSetup.MatchMode.Stock && GUILayout.Button($"ストック: {s_stocks}", button)) s_stocks = s_stocks % 5 + 1;
+        if (GUILayout.Button("時間: " + TimeLabel(TimeLimit), button)) s_timeIndex = (s_timeIndex + 1) % kTimeLimits.Length;
+        if (GUILayout.Button("試合開始", button, GUILayout.Height(56))) net.StartMatch(BuildRules());
         GUILayout.Space(8);
     }
 
     // タイムは時間制限なしを選べない
-    float TimeLimit => m_mode == MatchSetup.MatchMode.Time && kTimeLimits[m_timeIndex] <= 0.0f ? 120.0f : kTimeLimits[m_timeIndex];
+    float TimeLimit => s_mode == MatchSetup.MatchMode.Time && kTimeLimits[s_timeIndex] <= 0.0f ? 120.0f : kTimeLimits[s_timeIndex];
 
     MatchSetup.MatchRules BuildRules() => new MatchSetup.MatchRules
     {
-        mode = m_mode,
-        stocks = m_stocks,
+        mode = s_mode,
+        stocks = s_stocks,
         stockTimeLimit = TimeLimit,
         timeLength = TimeLimit,
         ghostTimeLimit = TimeLimit,
