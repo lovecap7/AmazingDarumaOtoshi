@@ -280,11 +280,13 @@ public class NetMatch : NetworkBehaviour
         }
         FinishedRpc((byte)result.Reason, result.Winner != null ? (sbyte)result.Winner.Index : (sbyte)-1, order, ranks, counts, colors.ToArray());
 
-        if (UseResultScene)
-        {
-            ResultData.Capture(result, m_match.Mode);
-            StartCoroutine(GoToResult());
-        }
+        // DarumaMatch が自分でシーンを読み直さないようにする(リザルト画面が元に戻す)
+        DarumaMatch.AutoReturnToSelect = false;
+        // ステージの切り替え(左右キー)も、試合が終わったあとはシーンを読み直してしまうので止める
+        var switcher = FindAnyObjectByType<Nakagawa.StageSwitcher>();
+        if (switcher != null) switcher.enabled = false;
+        ResultData.Capture(result, m_match.Mode);
+        StartCoroutine(GoToResult(switcher));
     }
 
     [Rpc(SendTo.NotServer)]
@@ -307,7 +309,6 @@ public class NetMatch : NetworkBehaviour
         }
         m_match.NetClientFinish(result);
 
-        if (!UseResultScene) return;
         // ResultData.Ranking は result.Ranking と同じ順(null は入らない)
         ResultData.Capture(result, m_match.Mode);
         for (int i = 0; i < result.Ranking.Count && i < ResultData.Ranking.Count; i++)
@@ -318,20 +319,15 @@ public class NetMatch : NetworkBehaviour
         DarumaMatch.AutoReturnToSelect = false;
     }
 
-    // リザルト画面を使うか(MatchSettings の「リザルト(表彰)」。使わないなら今までどおりその場でやり直す)
-    static bool UseResultScene => MatchSettings.Instance != null && MatchSettings.Instance.useResultScene;
-
     // ホスト: 「しあい しゅうりょう！」を見せてから、全員でリザルト画面へ(MatchResultRelay と同じ待ち時間)
-    IEnumerator GoToResult()
+    // ネット対戦では MatchSettings の「リザルト(表彰)」を使わない設定でも、リザルト画面を通って戻る(その場でやり直す作りはない)
+    IEnumerator GoToResult(Nakagawa.StageSwitcher switcher)
     {
-        // DarumaMatch がその場でやり直さないようにする(リザルト画面が元に戻す)
-        DarumaMatch.AutoReturnToSelect = false;
         var settings = MatchSettings.Instance;
-        yield return new WaitForSecondsRealtime(settings.resultSceneDelay);
+        yield return new WaitForSecondsRealtime(settings != null ? settings.resultSceneDelay : 2.0f);
         // 戻ってきたら同じステージから始める(クライアントはホストのステージに合わせる)
-        var switcher = FindAnyObjectByType<Nakagawa.StageSwitcher>();
         if (switcher != null && switcher.Current != null && switcher.Current.Info != null) Nakagawa.StageSwitcher.RequestStage(switcher.Current.Info.Id);
-        NetSceneFlow.Load(settings.ResultSceneFor(m_match.Mode));
+        NetSceneFlow.Load(settings != null ? settings.ResultSceneFor(m_match.Mode) : "ResultTowerScene");
     }
 
     void OnKnocked(MatchPlayer victim, MatchPlayer attacker) => Send(DarumaMatch.NetEvent.Knocked, victim, attacker);

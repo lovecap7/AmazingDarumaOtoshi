@@ -42,8 +42,10 @@
     シーンの切り替えは NGO の SceneManager でホストが全員分行う（`NetSceneFlow`）。試合のたびにシーンを読み直すので、試合中のやり直しはなくした。
     結果は全員の `ResultData` に入れる（クライアントは積み木を持っていないので、タワーの積み木の色はホストから送る）。
     戻ったときのステージは `StageSwitcher.RequestStage` で同じものにする。ルールの選択も覚えておく。
-  - DarumaMatch の「その場でやり直す」分岐（UpdateResult / Restart の `BeginNetMatch`）は、`DarumaMatch.AutoReturnToSelect = false` で通らない。
-    MatchSettings の「リザルト（表彰）」を使わない設定のときだけ、今までどおりその場でやり直す。
+  - DarumaMatch に入れていた「その場でやり直す」分岐（UpdateResult / Restart の `BeginNetMatch`）は、要らなくなったので消した（11/03。中平さんに伝える）。
+    試合が終わったら `NetMatch` が `DarumaMatch.AutoReturnToSelect = false` にして、DarumaMatch が自分でシーンを読み直さないようにする。
+    ホストのステージ切り替え（左右キー）も、終わったあとは SwitchTo → Restart でシーンを読み直してしまうので、`NetMatch` が StageSwitcher を止める。
+    MatchSettings の「リザルト（表彰）」を使わない設定でも、ネット対戦ではリザルト画面を通って戻る。
 - **クライアント**: DarumaMatch は試合を進めない（Update/LateUpdate で何もしない）。
   届いた人・時間・結果を `NetClient〜` メソッドで入れ、同じお知らせ（Started, Finished, PlayerKO など）を出す。
   HUD（MatchHud）・カウントダウン（StartCountdownView）・カメラ（MatchCamera）・名札（MatchDebugView）は、いつもどおり DarumaMatch を読むだけで動く。
@@ -85,7 +87,7 @@
 ### 他の人のスクリプトに足したもの（どれも `ネット対戦用(suehara)` の目印付き。ローカルの動きは変わらない）
 | ファイル（作成者） | 追加 |
 |---|---|
-| `Nakahira/Player/Scripts/DarumaMatch.cs`（中平さん） | ネットの試合の分岐（上の「しくみ」）。`IsNetworked` / `IsNetClient` / `IsNetWaiting`、`SetNetRules`、`AddNetPlayer` / `RemoveNetPlayer` / `BeginNetMatch`、`NetClient〜`。試合中に相手が抜けて1人になったら残った人の勝ち（ストック・ゴースト） |
+| `Nakahira/Player/Scripts/DarumaMatch.cs`（中平さん） | ネットの試合の分岐（上の「しくみ」）。`IsNetworked` / `IsNetClient` / `IsNetWaiting`、`SetNetRules`、`AddNetPlayer` / `RemoveNetPlayer` / `BeginNetMatch`、`NetClient〜`。試合中に相手が抜けて1人になったら残った人の勝ち（ストック・ゴースト）。その場でやり直す分岐は 11/03 に消した |
 | `Fujihara/Script/Game/MatchPlayer.cs`（藤原さん） | `NetStackCount`、`ResetForMatch`（再戦）、`NetApply` / `NetSetBody`（クライアントで値を入れる） |
 | `Nakahira/Player/Scripts/DarumaHammer.cs`（中平さん） | `ViewOnly`, `PlayVisual(bool shot)`（前回） |
 | `Nakagawa/Scripts/Stage/StageSwitcher.cs`（中川さん） | `SwitchStarting` / `StageApplied(int)` / `StageCount` / `ShowStage(int)`（前回） |
