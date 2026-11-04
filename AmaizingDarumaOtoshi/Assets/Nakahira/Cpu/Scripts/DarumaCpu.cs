@@ -175,6 +175,7 @@ namespace Nakahira
             if (!m_drawGizmos || !Application.isPlaying || m_current == null || m_lastSelf == null) return;
             m_current.DrawGizmos(m_context);
             CpuMovingFloors.DrawGizmos();
+            CpuWarpGates.DrawGizmos();
         }
     }
 }
