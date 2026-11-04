@@ -14,6 +14,7 @@ using UnityEngine.SceneManagement;
 //              (試合が終わったら全員でリザルト画面へ移り、ホストの決定でこのシーンに戻って開始待ちになる)
 //  ・参加する: つながるまでの表示。つながらなかった・切れたときは理由を出す
 //  ・切断したら(自分で切った・ホストがいなくなった・つながらなかった)シーンを読み直して最初の状態に戻す
+//    (メニューから接続画面 NetConnectScene を通って来たときは、接続画面に戻る。この画面の接続パネルは NetStages を直接開いたときの試験用)
 // コマンドライン: -nethost でホストとして、-netclient <IPアドレス> で参加して始める(ビルドでの試験用)
 public class NetLobbyUI : MonoBehaviour
 {
@@ -55,6 +56,12 @@ public class NetLobbyUI : MonoBehaviour
         foreach (var nm in FindObjectsByType<NetworkManager>())
         {
             if (nm != m_nm && !nm.IsListening) Destroy(nm.gameObject);
+        }
+        // 接続画面から来る途中で切れていたら(シーンを移っている間に止まったなど)、接続画面に戻る
+        if (!m_nm.IsListening && !string.IsNullOrEmpty(NetConnectScreen.SceneName))
+        {
+            m_reload = true;
+            return;
         }
         m_wasConnected = m_nm.IsConnectedClient && !m_nm.IsServer;
         m_nm.OnClientConnectedCallback += OnConnected;
@@ -135,6 +142,14 @@ public class NetLobbyUI : MonoBehaviour
         Time.timeScale = 1.0f;
         // NetworkManager がシーンの外(DontDestroyOnLoad)に移っていたら、読み直したシーンのものと二重にならないように消す
         if (m_nm != null && m_nm.gameObject.scene != gameObject.scene) Destroy(m_nm.gameObject);
+        // 接続画面(NetConnectScene)から来たときは、接続画面に戻って理由を出す
+        if (!string.IsNullOrEmpty(NetConnectScreen.SceneName))
+        {
+            NetConnectScreen.Message = s_message;
+            s_message = null;
+            Fader.Load(NetConnectScreen.SceneName);
+            return;
+        }
         SceneManager.LoadScene(gameObject.scene.name);
     }
 
@@ -221,6 +236,7 @@ public class NetLobbyUI : MonoBehaviour
         if (m_nm.IsServer)
         {
             GUILayout.Label($"ホスト  {m_nm.ConnectedClientsIds.Count}人", label);
+            if (NetRoom.IsAnswering) GUILayout.Label($"へやばんごう: {NetRoom.Current}", label);
             GUILayout.Label(m_localAddresses.Length > 0 ? "IP: " + string.Join(" / ", m_localAddresses) : "IP: (見つかりません)", label);
         }
         else

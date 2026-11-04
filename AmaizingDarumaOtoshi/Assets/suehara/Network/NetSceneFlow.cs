@@ -114,17 +114,23 @@ public class NetSceneFlow : MonoBehaviour
 
     void OnStopped(NetworkManager nm)
     {
-        if (string.IsNullOrEmpty(ReturnScene) || SceneManager.GetActiveScene().name == ReturnScene)
+        // 試合のシーン(NetLobbyUI)と接続画面(NetConnectScreen)は、切れたときの面倒を自分で見る
+        string active = SceneManager.GetActiveScene().name;
+        string connect = NetConnectScreen.SceneName;
+        if (active == connect || string.IsNullOrEmpty(ReturnScene) || active == ReturnScene)
         {
             if (m_busy) FadeIn();
             return;
         }
-        NetLobbyUI.SetMessage("ホストとの接続が切れました");
+        // 接続画面から来たときは接続画面へ、そうでなければ試合のシーンへ戻る
+        const string message = "ホストとの接続が切れました";
+        NetLobbyUI.SetMessage(message);
+        NetConnectScreen.Message = message;
         // 戻り先のシーンにも NetworkManager があるので、二重にならないように今のものを消す
         if (nm != null) Destroy(nm.gameObject);
         m_busy = false;
         Time.timeScale = 1.0f;
-        Fader.Load(ReturnScene);
+        Fader.Load(string.IsNullOrEmpty(connect) ? ReturnScene : connect);
         FadeIn();
     }
 

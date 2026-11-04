@@ -75,6 +75,8 @@
 | `NetworkDarumaGhost.cs` | クライアントで DarumaGhost を止める |
 | `NetworkTumiki.cs` | ホストでは `Start` で自分を Spawn。色と状態（炎 / 積まれている / ポンと出る途中）を配る。クライアントで煙・炎・ポンと出る演出。割れて消えたら NetEffects に知らせる |
 | `NetStageSync.cs` | ステージ番号を配る。クライアントでは StageSwitcher と全 TumikiSpawner を止める |
+| `NetConnectScreen.cs`（`suehara/NetConnectScene.unity`） | **本番の入り口**（2026-11-04）。メニューの「たたかう → オンライン」から来る。見た目はセレクト画面と同じ（同じ GameObject に藤原さんの `TitleClubRoomDressing` を付けて部室の背景）。「ホスト」→ へやばんごう・IP・集まった人（1P〜4P）を出し、A / Start で全員 NetStages へ（`NetSceneFlow.Load`）。「さんか」→ へやばんごう（4けた）か IP アドレスをキーボードで入れてつなぐ。NetworkManager はプレハブ（`Network/NetworkManager.prefab`。NetStages のものと同じ設定）から作る。NetStages で切断したら（NetLobbyUI・NetSceneFlow）ここに戻ってくる |
+| `NetRoom.cs` | へやばんごうで LAN の中のホストを見つける。ホストは UDP 47777（使われていれば 47778〜47780）で問い合わせを待ち、番号が合えばゲームのポートを返す（シーンをまたいで答え続け、ホストをやめたら消える）。さんかはブロードキャストとこの PC に問い合わせる。**LAN の中だけ。インターネット越しにするならここを Unity Relay の参加コードに置き換える** |
 
 消したもの: `NetStageSpawner.cs`（NetMatch に置き換え）、`suehara/NetTestUI.cs`（NetLobbyUI に置き換え）
 
@@ -100,6 +102,8 @@
 | `Nakagawa/Scripts/GimmickUtil.cs`（中川さん） | ネットのクライアントでは影響を受けるものを見つけない（ギミックがクライアントの積み木・キャラを動かさない。ワープがクライアントのキャラの Kinematic を外す不具合の対策） |
 | `RisingWallGimmick` / `TurntableGimmick` / `FanGimmick` / `MovingFloorGimmick`（中川さん） | GimmickClock で時間を進め、高さ・角度・位置を時間から決める。時計を合わせて一度に動いたときは乗っているものを運ばない |
 | `Nakagawa/Scripts/Spawn/TumikiSpawnWarning.cs`（中川さん） | 見た目だけの予告 `CreateView`（時間が来ても生成しない） |
+| `Fujihara/Scene/MenuScene.unity`（藤原さん。了承済み） | MainMenu の `onlineSceneName` に `NetConnectScene` を入れた（この1か所だけ） |
+| `ProjectSettings/EditorBuildSettings.asset` | `suehara/NetConnectScene.unity` を追加 |
 | `Assets/DefaultNetworkPrefabs.asset` | Net Cube, Tumiki_Net, DarumaCharacter_Net, DarumaGhost_Net, NetPlayer の5件 |
 
 ## 4. 動作確認の状況
@@ -124,9 +128,14 @@
 - リザルト画面で、テクスチャが消えて水色になる部分が出たことが1回ある（どちらの画面かは不明。次の確認では出なかった）。また出たら画面と場所を記録する。
 - 2026-11-04: NetStages を作り直したあと、ホストで接続 → 試合開始 → 積み木の生成（ネットワークに乗っている）→ 新しく入ったステージ（DebugStage50）への切り替えまでエラーなし。
   クライアント側は作り直したあと未確認（シーン内の NetworkObject の識別番号は計算し直してある）。
+- 2026-11-04: 接続画面（NetConnectScene）。メニュー → オンライン → ホスト / さんか（へやばんごう・IP アドレス）→ 全員で NetStages へ →
+  ホストをやめる・切断で接続画面に戻る、まで問題なし（ユーザーが確認）。移る途中でホストが止まったときも接続画面に戻る。
 - **PC 2台の LAN テストは未実施**。
 
 ### テストのしかた
+本番の流れ: MenuScene から再生 →「たたかう → オンライン」→ ホストは「ホスト」、参加する人は「さんか」でホストの画面のへやばんごうを入れる → ホストが A / Start で試合のシーンへ（そこからは下の 3. 以降と同じ）。
+
+NetStages を直接開いて試すとき:
 1. NetStages を開いて再生 → 画面中央の「ホストになる」
 2. Multiplayer Play Mode の Player 2 で、IP に `127.0.0.1` を入れて「参加」
    （別の PC からはホストの左上に出る IP を入れる。初回は Windows のファイアウォールの許可が出る）
@@ -138,6 +147,8 @@
 ### 注意
 - Unity のウィンドウが裏にあると、Windows 版ではコンパイルが始まらないことがある（MCP から編集した後はユーザーに Unity をクリックしてもらう）。
 - `DefaultNetworkPrefabs.asset` に NetworkObject のない `DarumaCharacter.prefab` のエントリが紛れ込んだことが2回あった。再生時に「missing a NetworkObject」の警告が出たら外す。
+- エディタで再生すると `TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF - Fallback.asset` が変わることがある。コミットに入れずに元に戻す。
+- MCP の撮影（screenshot）のあと、エディタが一時停止したままになることがあった（エラーではない）。止まっていたら再生を続ける。
 - **MCP からビルドすると、その間 Unity と MCP が止まる**。さらに URP の設定・ProjectSettings・TextMesh Pro のフォント・`Assets/Resources/PerformanceTestRun*.json` が変わるので、コミットに入れずに元に戻す。
 
 ## 5. まだ同期していないもの（既知の穴）
