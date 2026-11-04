@@ -54,6 +54,86 @@ public class MainMenu : MonoBehaviour
         "このゲームを\nつくった人たち",
         "ゲームをおわります",
     };
+    [Tooltip("下の帯に出す、項目の説明（上から たたかう／サウンド／ビデオ／クレジット／やめる）")]
+    [TextArea(1, 3)]
+    [SerializeField] string[] helpTexts =
+    {
+        "だるまを叩き合って、相手の頭を落とせば勝ち！　ローカル（この画面でみんなで）かオンラインで遊べます。",
+        "BGM や効果音の音量を調整します。",
+        "画面モード・解像度・垂直同期を変更します。",
+        "このゲームをつくった人たちを紹介します。",
+        "ゲームを終了します。",
+    };
+    [Tooltip("カメラの構図を、下の帯（説明＋操作ガイド）より上の範囲に収める割合。1：構図まるごと帯の上に収める（少し引いて上へ寄せる）　0：帯を気にせず画面いっぱい")]
+    [SerializeField, Range(0f, 1f)] float fitAboveBand = 1f;
+
+    // 看板の行1つ分：左に出す名前と、選んでいるとき下の帯に出す説明
+    [Serializable]
+    public class RowText
+    {
+        public string label;
+        [TextArea(1, 3)] public string help;
+        public RowText() { }
+        public RowText(string label, string help) { this.label = label; this.help = help; }
+    }
+
+    // 画面に出すそのほかの文字（項目の名前・説明・クレジットは上の欄）
+    [Serializable]
+    public class MenuTexts
+    {
+        [Header("たたかう：ローカル／オンライン（上から ローカル、オンライン）")]
+        [Tooltip("積み木・看板のボタンに書く名前")]
+        public string[] choiceLabels = { "ローカル", "オンライン" };
+        [Tooltip("選んでいるとき看板に出す短い説明（KnockTwice のとき）／看板のボタンの下の小さい字（Board のとき）")]
+        [TextArea(1, 3)] public string[] choiceBoardTexts = { "この画面で\nみんなで あそぶ", "ネットで\nだれかと あそぶ" };
+        [Tooltip("選んでいるとき下の帯に出す説明")]
+        [TextArea(1, 3)] public string[] choiceHelps =
+        {
+            "1台のパソコンにコントローラーをつないで、最大4人で遊びます。CPU も参加できます。",
+            "インターネットで、ほかのプレイヤーと対戦します。",
+        };
+        [Tooltip("たたかうにカーソルがあるとき看板に出す説明")]
+        [TextArea(1, 3)] public string battleBoardText = "ローカル か オンライン で\nたたかう";
+        [Tooltip("オンラインがまだ遊べないときのお知らせ")]
+        public string onlineNotReady = "オンラインは じゅんびちゅう！";
+
+        [Header("サウンド・ビデオの行（上から）")]
+        public RowText[] soundRows =
+        {
+            new RowText("マスター", "ゲーム全体の音量です。"),
+            new RowText("BGM", "音楽の音量です。"),
+            new RowText("効果音", "叩く音や撃墜の音などの音量です。"),
+        };
+        public RowText[] videoRows =
+        {
+            new RowText("画面モード", "フルスクリーンかウィンドウかを切り替えます。"),
+            new RowText("解像度", "画面の解像度を変更します。"),
+            new RowText("垂直同期", "オンにすると、画面のちらつき（ティアリング）を抑えます。"),
+        };
+
+        [Header("右下の操作ガイド（キーの字と説明）")]
+        public string keySelect = "上下";
+        public string guideSelect = "えらぶ";
+        public string keyChange = "左右";
+        public string guideChange = "かえる";
+        public string keyDecide = "A";
+        public string guideDecide = "けってい";
+        public string keyBack = "B";
+        public string guideBack = "もどる";
+
+        [Header("看板の飾り")]
+        [Tooltip("得点板の色帯の両はしの札（左、右）")]
+        public string[] scoreNumbers = { "0", "1" };
+        [Tooltip("ノートの右上のメモ")]
+        public string notebookMemo = "だるま部　れんしゅうノート";
+    }
+    [Tooltip("ローカル／オンライン・看板の行・操作ガイド・看板の飾りの文字（▶ で開く）。看板と積み木の文字は始まったときに作るので、再生中に変えたら再生し直す")]
+    [SerializeField] MenuTexts texts = new MenuTexts();
+
+    // 配列の i 番目（足りなければ空欄）
+    static string At(string[] a, int i) => a != null && i >= 0 && i < a.Length ? a[i] : "";
+    static RowText RowAt(RowText[] a, int i) => a != null && i >= 0 && i < a.Length && a[i] != null ? a[i] : new RowText("", "");
+
     [TextArea(5, 20)]
     [SerializeField] string creditsText =
         "<size=150%>アメイジング だるま落とし</size>\n\n\n<size=110%>プログラム</size>\nFujihara\nInoue\nShitaka\nNakahira\n\n\n<size=110%>フォント</size>\nYuji Syuku (SIL Open Font License)\n\n\n\n<size=120%>Thank you for playing!</size>";
@@ -172,7 +252,14 @@ public class MainMenu : MonoBehaviour
     // ---- UI ----
     RectTransform overlay;
     Image fade;
-    TextMeshProUGUI hintText;
+    // 下の帯：上が説明の帯（暗い板に緑のふち）、下が操作ガイドの段（右下に、ボタンの形でそろえる）
+    const float GuideBarH = 80f, HelpBandH = 170f;   // 1080 の画面での高さ
+    CanvasGroup helpGroup;
+    TextMeshProUGUI helpText;
+    RectTransform guideRow;
+    string guideKey;
+    // 看板の中の行（音量の行・ビデオの行・ローカル／オンラインのボタン）→ 下の帯に出す説明
+    readonly Dictionary<GameObject, string> rowHelps = new Dictionary<GameObject, string>();
     CanvasGroup titleGroup;
     CreditRoll credits;
     CanvasGroup battleGroup, soundGroup, videoGroup, descGroup;
@@ -183,8 +270,6 @@ public class MainMenu : MonoBehaviour
     float noteTime = -100f;         // 「じゅんびちゅう」を出した時刻
 
     // ---- たたかう（KnockTwice）：ローカル／オンラインの積み木 ----
-    static readonly string[] ChoiceLabels = { "ローカル", "オンライン" };
-    static readonly string[] ChoiceDescriptions = { "この画面で\nみんなで あそぶ", "ネットで\nだれかと あそぶ" };
     static readonly Vector3 ChoiceBase = new Vector3(1.6f, 0f, -1.2f);   // 2つの積み木を積む場所（山の右。間にハンマーが入る）
     const float ChoiceFlyIn = 0.5f;
     Transform[] choiceBlocks;
@@ -325,7 +410,7 @@ public class MainMenu : MonoBehaviour
         choiceLanded = new bool[2];
         for (int i = 0; i < 2; i++)
         {
-            choiceBlocks[i] = ToyKit.CreateBlock(ChoiceLabels[i], choiceColors[i], menuMesh, new Vector2(2.3f, 0.6f), BlockSize.z, font, letterMat, out choiceMats[i]);
+            choiceBlocks[i] = ToyKit.CreateBlock(At(texts.choiceLabels, i), choiceColors[i], menuMesh, new Vector2(2.3f, 0.6f), BlockSize.z, font, letterMat, out choiceMats[i]);
             choiceBlocks[i].SetParent(space, false);
             choiceBlocks[i].gameObject.AddComponent<BoxCollider>().size = BlockSize;
             choiceBlocks[i].gameObject.SetActive(false);
@@ -543,7 +628,7 @@ public class MainMenu : MonoBehaviour
             {
                 var num = ToyKit.UIRounded("Num", band, new Color(1f, 0.98f, 0.93f), 14f);
                 ToyKit.Anchor(num, new Vector2(side < 0f ? 0f : 1f, 0.5f), new Vector2(side * -70f, 0f), new Vector2(80f, 100f));
-                var t = ToyKit.UIText("Text", num, font, side < 0f ? "0" : "1", 70f, ToyKit.Ink);
+                var t = ToyKit.UIText("Text", num, font, At(texts.scoreNumbers, side < 0f ? 0 : 1), 70f, ToyKit.Ink);
                 t.fontStyle = FontStyles.Bold;
                 ToyKit.Stretch(t.rectTransform);
             }
@@ -562,7 +647,7 @@ public class MainMenu : MonoBehaviour
             margin.anchorMin = new Vector2(0f, 0f); margin.anchorMax = new Vector2(0f, 1f);
             margin.sizeDelta = new Vector2(3f, 0f);
             margin.anchoredPosition = new Vector2(70f, 0f);
-            var memo = ToyKit.UIText("Memo", root, font, "だるま部　れんしゅうノート", 30f, new Color(0.45f, 0.45f, 0.5f));
+            var memo = ToyKit.UIText("Memo", root, font, texts.notebookMemo, 30f, new Color(0.45f, 0.45f, 0.5f));
             memo.alignment = TextAlignmentOptions.Right;
             ToyKit.Anchor(memo.rectTransform, new Vector2(1f, 1f), new Vector2(-230f, -40f), new Vector2(420f, 50f));
         }
@@ -572,23 +657,23 @@ public class MainMenu : MonoBehaviour
     CanvasGroup BuildBattlePanel(Transform root)
     {
         var group = Group("Battle", root);
-        var names = new[] { "ローカル", "オンライン" };
-        var subs = new[] { "この画面で みんなで あそぶ", "ネットで だれかと あそぶ" };
         var colors = new[] { ToyKit.Palette[0], ToyKit.Palette[4] };
         var buttons = new Button[2];
         for (int i = 0; i < 2; i++)
         {
+            string name = At(texts.choiceLabels, i), subText = At(texts.choiceBoardTexts, i).Replace("\n", " ");
             // 色の付いたカード（いつも見える）＋ 選んだときに光る板（Tint）
-            var card = ToyKit.UIRounded("Card_" + names[i], group.transform, Color.Lerp(colors[i], Color.white, 0.55f), 36f);
+            var card = ToyKit.UIRounded("Card_" + i, group.transform, Color.Lerp(colors[i], Color.white, 0.55f), 36f);
+            rowHelps[card.gameObject] = At(texts.choiceHelps, i);
             ToyKit.Anchor(card, new Vector2(0.5f, 0.5f), new Vector2(0f, 120f - i * 250f), new Vector2(1100f, 210f));
             var hl = ToyKit.UIRounded("Highlight", card, Color.white, 36f);
             ToyKit.Stretch(hl);
             hl.GetComponent<Image>().raycastTarget = true;
 
-            var label = ToyKit.UIText("Label", card, font, names[i], 84f, Color.Lerp(colors[i], ToyKit.Ink, 0.55f));
+            var label = ToyKit.UIText("Label", card, font, name, 84f, Color.Lerp(colors[i], ToyKit.Ink, 0.55f));
             label.fontStyle = FontStyles.Bold;
             ToyKit.Anchor(label.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 26f), new Vector2(1000f, 110f));
-            var sub = ToyKit.UIText("Sub", card, font, subs[i], 40f, ToyKit.Ink);
+            var sub = ToyKit.UIText("Sub", card, font, subText, 40f, ToyKit.Ink);
             ToyKit.Anchor(sub.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, -58f), new Vector2(1000f, 60f));
 
             var b = card.gameObject.AddComponent<Button>();
@@ -601,7 +686,7 @@ public class MainMenu : MonoBehaviour
         battleFirst = buttons[0];
 
         // オンラインがまだ遊べないときのお知らせ
-        battleNote = ToyKit.UIText("Note", group.transform, font, "オンラインは じゅんびちゅう！", 46f, new Color(0.85f, 0.25f, 0.2f));
+        battleNote = ToyKit.UIText("Note", group.transform, font, texts.onlineNotReady, 46f, new Color(0.85f, 0.25f, 0.2f));
         battleNote.fontStyle = FontStyles.Bold;
         ToyKit.Anchor(battleNote.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, 45f), new Vector2(1100f, 70f));
         battleNote.alpha = 0f;
@@ -780,14 +865,15 @@ public class MainMenu : MonoBehaviour
     CanvasGroup BuildSoundPanel(Transform root)
     {
         var group = Group("Sound", root);
-        var names = new[] { "マスター", "BGM", "効果音" };
         var colors = new[] { ToyKit.Palette[1], ToyKit.Palette[4], ToyKit.Palette[3] };
         var sliders = new Slider[3];
         var meters = new RectTransform[3];
         var values = new TMP_Text[3];
         for (int i = 0; i < 3; i++)
         {
-            var row = Row(group.transform, 150f - i * 150f, names[i]);
+            var rt = RowAt(texts.soundRows, i);
+            var row = Row(group.transform, 150f - i * 150f, rt.label);
+            rowHelps[row] = rt.help;
 
             // 目盛りの積み木を並べる場所。スライダーの当たり判定も同じ広さ
             var sg = new GameObject("Slider", typeof(RectTransform));
@@ -826,11 +912,12 @@ public class MainMenu : MonoBehaviour
     CanvasGroup BuildVideoPanel(Transform root)
     {
         var group = Group("Video", root);
-        var names = new[] { "画面モード", "解像度", "垂直同期" };
         var sels = new OptionSelector[3];
         for (int i = 0; i < 3; i++)
         {
-            var row = Row(group.transform, 150f - i * 150f, names[i]);
+            var rt = RowAt(texts.videoRows, i);
+            var row = Row(group.transform, 150f - i * 150f, rt.label);
+            rowHelps[row] = rt.help;
             row.GetComponent<Image>().raycastTarget = true;
             var os = row.AddComponent<OptionSelector>();
             Tint(os, row.GetComponent<Image>());
@@ -936,10 +1023,7 @@ public class MainMenu : MonoBehaviour
         ToyKit.Anchor(title.rectTransform, new Vector2(0f, 1f), new Vector2(330f, -90f), new Vector2(500f, 120f));
         titleGroup = title.gameObject.AddComponent<CanvasGroup>();
 
-        hintText = ToyKit.UIText("Hint", overlay, font, "", 32f, ToyKit.Ink);
-        hintText.alignment = TextAlignmentOptions.Right;
-        ToyKit.Anchor(hintText.rectTransform, new Vector2(1f, 0f), new Vector2(-70f, 40f), new Vector2(900f, 50f));
-        hintText.rectTransform.pivot = new Vector2(1f, 0f);
+        BuildHelpBand();
 
         // クレジット（背景をボカした上に流す）
         var cr = ToyKit.UIImage("Credits", overlay, new Color(ToyKit.Horizon.r, ToyKit.Horizon.g, ToyKit.Horizon.b, 0.55f));
@@ -955,6 +1039,106 @@ public class MainMenu : MonoBehaviour
 
         fade = ToyKit.UIImage("Fade", overlay, Color.white).GetComponent<Image>();
         ToyKit.Stretch(fade.rectTransform);
+    }
+
+    // 画面の下の帯：説明の帯（上）と操作ガイドの段（下。ガイドは右下にそろえる）
+    void BuildHelpBand()
+    {
+        var root = new GameObject("HelpBand", typeof(RectTransform)).GetComponent<RectTransform>();
+        root.SetParent(overlay, false);
+        BottomStrip(root, GuideBarH + HelpBandH, 0f);
+        helpGroup = root.gameObject.AddComponent<CanvasGroup>();
+        helpGroup.alpha = 0f;
+        helpGroup.blocksRaycasts = false;
+        helpGroup.interactable = false;
+
+        var bar = ToyKit.UIImage("GuideBar", root, new Color(0.34f, 0.24f, 0.08f, 0.92f));
+        BottomStrip(bar, GuideBarH, 0f);
+        var band = ToyKit.UIImage("Band", root, new Color(0.11f, 0.11f, 0.11f, 0.9f));
+        BottomStrip(band, HelpBandH, GuideBarH);
+        var ol = band.gameObject.AddComponent<Outline>();
+        ol.effectColor = new Color(0.36f, 0.62f, 0.3f);
+        ol.effectDistance = new Vector2(4f, -4f);
+
+        helpText = ToyKit.UIText("Text", band, font, "", 36f, Color.white);
+        helpText.alignment = TextAlignmentOptions.TopLeft;
+        helpText.textWrappingMode = TextWrappingModes.Normal;
+        ToyKit.Stretch(helpText.rectTransform);
+        helpText.rectTransform.offsetMin = new Vector2(300f, 18f);
+        helpText.rectTransform.offsetMax = new Vector2(-300f, -24f);
+
+        guideRow = new GameObject("Guides", typeof(RectTransform)).GetComponent<RectTransform>();
+        guideRow.SetParent(bar, false);
+        ToyKit.Stretch(guideRow);
+        guideRow.offsetMax = new Vector2(-40f, 0f);
+    }
+
+    // 画面の下の端にそって横いっぱいに広げる（下から bottom の高さに、高さ h）
+    static void BottomStrip(RectTransform r, float h, float bottom)
+    {
+        r.anchorMin = new Vector2(0f, 0f);
+        r.anchorMax = new Vector2(1f, 0f);
+        r.pivot = new Vector2(0.5f, 0f);
+        r.sizeDelta = new Vector2(0f, h);
+        r.anchoredPosition = new Vector2(0f, bottom);
+    }
+
+    // 操作ガイド：「キー, 説明, キー, 説明…」を、右下から左へボタンの形で並べる（変わったときだけ作り直す）
+    void SetGuides(params string[] pairs)
+    {
+        string key = string.Join("|", pairs);
+        if (key == guideKey) return;
+        guideKey = key;
+        foreach (Transform c in guideRow) Destroy(c.gameObject);
+
+        float x = 0f;
+        for (int i = pairs.Length - 2; i >= 0; i -= 2)
+        {
+            string k = pairs[i], label = pairs[i + 1];
+            var chip = ToyKit.UIRounded("Guide_" + label, guideRow, new Color(0.12f, 0.12f, 0.12f, 0.95f), 14f);
+            chip.anchorMin = chip.anchorMax = chip.pivot = new Vector2(1f, 0.5f);
+
+            // キー：A・B は丸、上下・左右は横長
+            float keyW = k.Length == 1 ? 44f : 76f;
+            var keyBg = ToyKit.UIRounded("Key", chip, new Color(0.95f, 0.93f, 0.88f), 22f);
+            keyBg.anchorMin = keyBg.anchorMax = keyBg.pivot = new Vector2(0f, 0.5f);
+            keyBg.anchoredPosition = new Vector2(12f, 0f);
+            keyBg.sizeDelta = new Vector2(keyW, 44f);
+            var kt = ToyKit.UIText("Text", keyBg, font, k, 28f, new Color(0.12f, 0.12f, 0.12f));
+            kt.fontStyle = FontStyles.Bold;
+            ToyKit.Stretch(kt.rectTransform);
+
+            var lt = ToyKit.UIText("Label", chip, font, label, 32f, Color.white);
+            float labelW = lt.GetPreferredValues(label).x;
+            lt.alignment = TextAlignmentOptions.Left;
+            lt.rectTransform.anchorMin = lt.rectTransform.anchorMax = lt.rectTransform.pivot = new Vector2(0f, 0.5f);
+            lt.rectTransform.anchoredPosition = new Vector2(12f + keyW + 12f, 0f);
+            lt.rectTransform.sizeDelta = new Vector2(labelW + 4f, 50f);
+
+            float w = 12f + keyW + 12f + labelW + 22f;
+            chip.sizeDelta = new Vector2(w, 58f);
+            chip.anchoredPosition = new Vector2(-x, 0f);
+            x += w + 16f;
+        }
+    }
+
+    // 下の帯の説明：操作中は選んでいる行、ローカル／オンラインを選んでいるときはその方、ふだんはカーソルの項目
+    string HelpText()
+    {
+        bool choosing = phase == Phase.Choose || phase == Phase.ChoiceLeaving || phase == Phase.ChoiceBack;
+        if (choosing)
+        {
+            string note = sim - noteTime < 2f ? "　<color=#E8735A>" + texts.onlineNotReady + "</color>" : "";
+            return At(texts.choiceHelps, choiceCursor) + note;
+        }
+        if (phase == Phase.Panel && outIdx >= 0 && EventSystem.current != null)
+        {
+            // 選んでいる行（スライダーは行の子）の説明
+            for (var t = EventSystem.current.currentSelectedGameObject != null ? EventSystem.current.currentSelectedGameObject.transform : null; t != null; t = t.parent)
+                if (rowHelps.TryGetValue(t.gameObject, out var h)) return h;
+        }
+        int item = (phase == Phase.Panel || phase == Phase.Flying || phase == Phase.Returning) && outIdx >= 0 ? outIdx : cursor;
+        return item >= 0 && item < helpTexts.Length ? helpTexts[item] : "";
     }
 
     IEnumerator FadeIn()
@@ -1354,12 +1538,12 @@ public class MainMenu : MonoBehaviour
             if (choosing)
             {
                 // ローカル／オンラインを選んでいる間：選んでいる方の説明（遊べないときはお知らせも）
-                string note = sim - noteTime < 2f ? "\n<color=#D94033><size=65%>オンラインは じゅんびちゅう！</size></color>" : "";
-                descText.text = ChoiceDescriptions[choiceCursor] + note;
+                string note = sim - noteTime < 2f ? "\n<color=#D94033><size=65%>" + texts.onlineNotReady + "</size></color>" : "";
+                descText.text = At(texts.choiceBoardTexts, choiceCursor) + note;
             }
-            else descText.text = item == Battle ? "ローカル か オンライン で\nたたかう" : descriptions[Mathf.Clamp(item, 0, descriptions.Length - 1)];
+            else descText.text = item == Battle ? texts.battleBoardText : At(descriptions, item);
         }
-        boardTitle.text = outIdx >= 0 && phase == Phase.Panel ? "" : choosing ? ChoiceLabels[choiceCursor] : labels[item];
+        boardTitle.text = outIdx >= 0 && phase == Phase.Panel ? "" : choosing ? At(texts.choiceLabels, choiceCursor) : At(labels, item);
 
         Fade(battleGroup, content == Content.Battle, dt);
         Fade(soundGroup, content == Content.Sound, dt);
@@ -1421,8 +1605,15 @@ public class MainMenu : MonoBehaviour
         Vector3 jolt = UnityEngine.Random.insideUnitSphere * 0.08f * shake * shake;
         // カメラもメニューの空間に置く（部屋から見ると、右に回り込んで左を向いている）
         cam.transform.position = space.TransformPoint(camPos + (drift + jolt) * far);
-        cam.transform.LookAt(space.TransformPoint(camLook + drift * 0.5f));
-        float halfW = camWidth * 0.5f / camDist;
+        // 下の帯のぶん、構図まるごと帯より上の範囲に収める：少し引いて（幅を広げて）、帯の高さの半分だけ下を向ける
+        // （構図の数字は、帯が無いときに画面いっぱいで見える形のまま調整できる）
+        float aspect = Mathf.Max(0.1f, cam.aspect);
+        var canvasComp = overlay.GetComponentInParent<Canvas>();
+        float bandShare = Mathf.Clamp01((GuideBarH + HelpBandH) * (canvasComp != null ? canvasComp.scaleFactor : 1f) / Mathf.Max(1f, Screen.height)) * fitAboveBand;
+        float width = camWidth / Mathf.Max(0.3f, 1f - bandShare);
+        float lift = 0.5f * bandShare * width / aspect;
+        cam.transform.LookAt(space.TransformPoint(camLook + drift * 0.5f + Vector3.down * lift));
+        float halfW = width * 0.5f / camDist;
         cam.fieldOfView = 2f * Mathf.Atan(halfW / Mathf.Max(0.1f, cam.aspect)) * Mathf.Rad2Deg;
 
         // クレジット中は全体を大きくボカす
@@ -1436,10 +1627,15 @@ public class MainMenu : MonoBehaviour
     void UpdateUI()
     {
         titleGroup.alpha = 1f - dim;
-        hintText.text = phase == Phase.Intro ? ""
-                      : phase == Phase.Panel && outIdx == Battle || phase == Phase.Choose ? "上下：えらぶ　A：けってい　B：もどる"
-                      : phase == Phase.Panel ? "上下：えらぶ　左右：かえる　B：もどる"
-                      : phase == Phase.Credits ? "" : "上下：えらぶ　A：けってい";
+
+        // 下の帯は、始まりの演出とクレジットの間は隠す
+        bool hide = phase == Phase.Intro || phase == Phase.Credits || credits.IsBusy;
+        helpGroup.alpha = Mathf.MoveTowards(helpGroup.alpha, hide ? 0f : 1f, Time.unscaledDeltaTime * 4f);
+        helpText.text = HelpText();
+        var g = texts;
+        if (phase == Phase.Panel && outIdx == Battle || phase == Phase.Choose) SetGuides(g.keySelect, g.guideSelect, g.keyDecide, g.guideDecide, g.keyBack, g.guideBack);
+        else if (phase == Phase.Panel) SetGuides(g.keySelect, g.guideSelect, g.keyChange, g.guideChange, g.keyBack, g.guideBack);
+        else if (!hide) SetGuides(g.keySelect, g.guideSelect, g.keyDecide, g.guideDecide);
     }
 
     // ================= 位置 =================

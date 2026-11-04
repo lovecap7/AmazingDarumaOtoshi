@@ -1539,6 +1539,12 @@ public class MatchSelect : MonoBehaviour
         tip.rectTransform.offsetMin = new Vector2(20f, 18f);
         tip.rectTransform.offsetMax = new Vector2(-24f, -18f);
 
+        // 名前・説明の後ろに敷く薄い板（背景の部室に文字が紛れないように）。一番後ろに置く
+        var plate = ToyKit.UIImage("InfoPlate", stageRoot, new Color(1f, 0.98f, 0.94f, 0.78f), uiSprite);
+        plate.GetComponent<Image>().pixelsPerUnitMultiplier = 0.4f;
+        ToyKit.Anchor(plate, new Vector2(0.5f, 0.5f), new Vector2(x, -300f), new Vector2(900f, 270f));
+        plate.SetAsFirstSibling();
+
         previewName = ToyKit.UIText("Name", stageRoot, font, "", 64f, ToyKit.Ink);
         previewName.fontSharedMaterial = popMat;
         ToyKit.Anchor(previewName.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(x, -215f), new Vector2(880f, 90f));
