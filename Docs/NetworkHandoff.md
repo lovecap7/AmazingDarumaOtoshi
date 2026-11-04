@@ -1,6 +1,6 @@
 # ネット対戦 引き継ぎメモ
 
-最終更新: 2026-11-03（Claude との作業セッション3回目: クライアント側の確認）
+最終更新: 2026-11-04（Claude との作業セッション4回目: NetStages を AllStages から作り直し）
 担当: 末原（suehara）
 
 このメモだけで作業を再開できるように、方針・現状・既知の問題・次のタスクをまとめています。
@@ -79,9 +79,14 @@
 消したもの: `NetStageSpawner.cs`（NetMatch に置き換え）、`suehara/NetTestUI.cs`（NetLobbyUI に置き換え）
 
 ### Assets/suehara/（テスト用）
-- `NetStages.unity`: AllStages の複製。Match（DarumaMatch）は非表示で置いておき、接続したら NetMatch が表示する。
-  Match のキャラ・幽霊・積み木は `*_Net` を設定済み。TumikiSpawner（全50個）の積み木も `Tumiki_Net`。
+- `NetStages.unity`: AllStages の複製（2026-11-04 に作り直し。ステージ89個）。Match（DarumaMatch）は非表示で置いておき、接続したら NetMatch が表示する。
+  Match のキャラ・幽霊・積み木は `*_Net` を設定済み。TumikiSpawner（全90個）の積み木も `Tumiki_Net`。
   UnityTransport の切断判定は 10 秒（DisconnectTimeoutMS）。
+  **AllStages にステージや設定が足されたら、メニューの「Tools → ネット対戦 → NetStages を AllStages から作り直す」で取り込む**
+  （`suehara/Editor/NetStagesBuilder.cs`）。中身を AllStages で置き換えてから、今の NetStages にあるネット用のルート
+  （NetworkManager・NetLobbyUI・NetStageSync・NetMatch。AllStages に無い名前のルート）を写し、Match を非表示にし、
+  積み木・キャラ・幽霊のプレハブへの参照を `*_Net` に差し替える。シーンの GUID・ビルド設定はそのまま。
+  NetStages だけに入れた、ネット用のルート以外の変更は消えるので、そういう変更は AllStages か、ネット用のルートの中に入れる。
 - `net test.unity`, `Net Cube.prefab`, `NetCubeMover.cs`: 最初の接続テストの名残。
 
 ### 他の人のスクリプトに足したもの（どれも `ネット対戦用(suehara)` の目印付き。ローカルの動きは変わらない）
@@ -117,6 +122,8 @@
   - 残りの項目（HUD のストック・積み木数、カメラ、やられて復活、幽霊、ギミック、切断）も問題なし（ユーザーが目で確認）
 - ホストのまま再生を止めると、NGO の終了処理で NullReferenceException が2件出る（パッケージ内。先に Shutdown してから止めると出ない）。
 - リザルト画面で、テクスチャが消えて水色になる部分が出たことが1回ある（どちらの画面かは不明。次の確認では出なかった）。また出たら画面と場所を記録する。
+- 2026-11-04: NetStages を作り直したあと、ホストで接続 → 試合開始 → 積み木の生成（ネットワークに乗っている）→ 新しく入ったステージ（DebugStage50）への切り替えまでエラーなし。
+  クライアント側は作り直したあと未確認（シーン内の NetworkObject の識別番号は計算し直してある）。
 - **PC 2台の LAN テストは未実施**。
 
 ### テストのしかた
