@@ -764,6 +764,7 @@ MonoBehaviour:
   m_maxBlocks: 10
   m_minRadius: 2.5
   m_maxRadius: 8
+  m_attackRadiusScale: 1.5
   m_minHeight: 6
   m_maxHeight: 18
   m_minRiseTime: 0.45
