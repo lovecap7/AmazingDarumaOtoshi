@@ -20,7 +20,7 @@ public class BlockController : MonoBehaviour
     public event Action OnFlightEnded;
 
     // テスト用：インスペクターで挙動を選べるようにする
-    public enum BehaviorType { Normal, Iwa,HebiLeft, HebiRight, UnBreak,Homing,Ziguzagu,Grow,Bomb, Magnet,Fade, Boomerang, Gravity, Accelerat, Funnel, Afterimage }
+    public enum BehaviorType { Normal, Iwa,HebiLeft, HebiRight, UnBreak,Homing,Ziguzagu,Grow,Bomb, Magnet,Fade, Boomerang, Gravity, Accelerat, Funnel, Afterimage, Teleport }
     [SerializeField] BehaviorType behaviorType = BehaviorType.Normal;
     [SerializeField] float hebiTurnSpeed = 60.0f; // テスト用：へびだるの曲がる強さ(度/秒)。大きいほど急カーブになる
     [SerializeField] float homingStartTurnSpeed = 270.0f;  // テスト用：ホーミング発射直後の旋回速度(度/秒)
@@ -63,6 +63,15 @@ public class BlockController : MonoBehaviour
 
     float bombFuseTime = 2.5f;       // テスト用：打ち出してから爆発するまでの時間(秒)
     float bombBlinkDuration = 1.5f;  // テスト用：爆発の何秒前から点滅するか
+
+    float teleportDistance = 8.0f;  // テスト用：テレポートする距離
+    int teleportMaxUses = 2;        // テスト用：1回の飛行で使える回数
+    float teleportWindUp = 0.15f;       // テスト用：予備動作(発光)の長さ(秒)
+    float teleportGhostLifetime = 0.3f; // テスト用：元の位置の残像が消えるまでの時間(秒)
+    float teleportGhostAlpha = 0.5f;    // テスト用：残像の最初の濃さ
+    float teleportGhostExpand = 1.6f; // テスト用：残像が消えるまでに広がる大きさ(積み木の何倍か)
+    float teleportTrailSpacing = 1.2f; // テスト用：軌跡の残像の間隔(積み木の幅に対する倍率)
+    [SerializeField] Material teleportGhostMaterial;     // テスト用：残像用の半透明マテリアル
 
     public bool isFlying {  get; private set; } // 現在飛行中かどうか trueの場合は攻撃判定が発生する
 
@@ -134,6 +143,8 @@ public class BlockController : MonoBehaviour
             case BehaviorType.Accelerat: return new AcceleratBehavior(this, accelRate, accelMaxSpeed, accelMaxBlockHits);
             case BehaviorType.Funnel: return new FunnelBehavior(this, funnelCount, funnelSpacing, funnelSearchRadius, funnelTurnSpeed, funnelDuration);
             case BehaviorType.Afterimage: return new AfterimageBehavior(this, afterimageDelay, afterimageLifetime, afterimageAlpha, afterimageMaterial);
+            case BehaviorType.Teleport:return new TeleportBehavior(this, teleportDistance, teleportMaxUses,0.1f, 1.5f, teleportWindUp, teleportGhostLifetime, 
+                                                                   teleportGhostAlpha, teleportGhostMaterial, teleportGhostExpand, teleportTrailSpacing);
             case BehaviorType.Normal:
             default: return new NormalBehavior();
         }
@@ -380,5 +391,11 @@ public class BlockController : MonoBehaviour
     {
         hitImmuneTargets = targets;
         hitImmuneUntil = Time.time + seconds;
+    }
+
+    // 任意のタイミングで発動する効果(テレポートなど)を、プレイヤー側が挙動の種類を知らずに呼ぶための窓口
+    public void Activate()
+    {
+        (behavior as IActivatableBehavior)?.Activate();
     }
 }

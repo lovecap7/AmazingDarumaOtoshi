@@ -350,6 +350,7 @@ MonoBehaviour:
   afterimageLifetime: 1.5
   afterimageAlpha: 0.4
   afterimageMaterial: {fileID: 0}
+  teleportGhostMaterial: {fileID: 0}
   rehitIgnoreTime: 0.2
 --- !u!54 &264285117
 Rigidbody:
@@ -617,6 +618,7 @@ GameObject:
   - component: {fileID: 557762076}
   - component: {fileID: 557762078}
   - component: {fileID: 557762079}
+  - component: {fileID: 557762080}
   m_Layer: 0
   m_Name: RedBlock
   m_TagString: Block
@@ -690,7 +692,7 @@ Transform:
   m_GameObject: {fileID: 557762068}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0.71171814, z: -0, w: 0.7024652}
-  m_LocalPosition: {x: 9.79, y: 0.24, z: -13.25}
+  m_LocalPosition: {x: -1.6, y: 0.24, z: -13.4}
   m_LocalScale: {x: 1, y: 0.1341, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -752,7 +754,7 @@ MonoBehaviour:
   speed: 20
   deceleration: 0.2
   stopThreshold: 1
-  behaviorType: 8
+  behaviorType: 16
   hebiTurnSpeed: 60
   homingStartTurnSpeed: 270
   homingGuidanceDuration: 1.5
@@ -785,6 +787,7 @@ MonoBehaviour:
   afterimageLifetime: 5
   afterimageAlpha: 0.8
   afterimageMaterial: {fileID: 2100000, guid: e66b435ce7a0b10448d491ed177705cd, type: 2}
+  teleportGhostMaterial: {fileID: 2100000, guid: e66b435ce7a0b10448d491ed177705cd, type: 2}
   rehitIgnoreTime: 0.2
 --- !u!65 &557762078
 BoxCollider:
@@ -819,6 +822,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f2c73a86cb38db247a625a76e41dac73, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DebugBlockLauncher
+--- !u!114 &557762080
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 557762068}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9a0c352397067be419c4fbdd77b97b32, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DebugActivateInput
 --- !u!1 &596670937
 GameObject:
   m_ObjectHideFlags: 0
@@ -1050,6 +1065,7 @@ MonoBehaviour:
   afterimageLifetime: 1.5
   afterimageAlpha: 0.4
   afterimageMaterial: {fileID: 0}
+  teleportGhostMaterial: {fileID: 0}
   rehitIgnoreTime: 0.2
 --- !u!54 &759035617
 Rigidbody:
@@ -1348,6 +1364,7 @@ MonoBehaviour:
   afterimageLifetime: 1.5
   afterimageAlpha: 0.4
   afterimageMaterial: {fileID: 2100000, guid: 694999f496ccb0e4dacf48b247c3a537, type: 2}
+  teleportGhostMaterial: {fileID: 0}
   rehitIgnoreTime: 0.2
 --- !u!65 &792966896
 BoxCollider:
@@ -1473,6 +1490,7 @@ MonoBehaviour:
   afterimageLifetime: 1.5
   afterimageAlpha: 0.4
   afterimageMaterial: {fileID: 0}
+  teleportGhostMaterial: {fileID: 0}
   rehitIgnoreTime: 0.2
 --- !u!54 &803537026
 Rigidbody:
@@ -1678,6 +1696,7 @@ MonoBehaviour:
   afterimageLifetime: 1.5
   afterimageAlpha: 0.4
   afterimageMaterial: {fileID: 0}
+  teleportGhostMaterial: {fileID: 0}
   rehitIgnoreTime: 0.2
 --- !u!54 &1032551247
 Rigidbody:
@@ -1883,6 +1902,7 @@ MonoBehaviour:
   afterimageLifetime: 1.5
   afterimageAlpha: 0.4
   afterimageMaterial: {fileID: 0}
+  teleportGhostMaterial: {fileID: 0}
   rehitIgnoreTime: 0.2
 --- !u!54 &1076914364
 Rigidbody:
@@ -2088,6 +2108,7 @@ MonoBehaviour:
   afterimageLifetime: 1.5
   afterimageAlpha: 0.4
   afterimageMaterial: {fileID: 0}
+  teleportGhostMaterial: {fileID: 0}
   rehitIgnoreTime: 0.2
 --- !u!54 &1098038425
 Rigidbody:
@@ -2385,6 +2406,7 @@ MonoBehaviour:
   afterimageLifetime: 1.5
   afterimageAlpha: 0.4
   afterimageMaterial: {fileID: 0}
+  teleportGhostMaterial: {fileID: 0}
   rehitIgnoreTime: 0.2
 --- !u!65 &1141642620
 BoxCollider:
@@ -2906,6 +2928,7 @@ MonoBehaviour:
   afterimageLifetime: 1.5
   afterimageAlpha: 0.4
   afterimageMaterial: {fileID: 2100000, guid: e66b435ce7a0b10448d491ed177705cd, type: 2}
+  teleportGhostMaterial: {fileID: 2100000, guid: e66b435ce7a0b10448d491ed177705cd, type: 2}
   rehitIgnoreTime: 0.2
 --- !u!54 &1536202398
 Rigidbody:
@@ -3263,6 +3286,7 @@ MonoBehaviour:
   afterimageLifetime: 1.5
   afterimageAlpha: 0.4
   afterimageMaterial: {fileID: 0}
+  teleportGhostMaterial: {fileID: 0}
   rehitIgnoreTime: 0.2
 --- !u!54 &1796746307
 Rigidbody:
@@ -3561,6 +3585,7 @@ MonoBehaviour:
   afterimageLifetime: 1.5
   afterimageAlpha: 0.4
   afterimageMaterial: {fileID: 2100000, guid: ce69d863759820d4ba8bb07f1adadfda, type: 2}
+  teleportGhostMaterial: {fileID: 0}
   rehitIgnoreTime: 0.2
 --- !u!65 &2023414662
 BoxCollider:
