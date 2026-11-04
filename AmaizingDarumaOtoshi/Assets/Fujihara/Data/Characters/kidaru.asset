@@ -13,16 +13,16 @@ MonoBehaviour:
   m_Name: kidaru
   m_EditorClassIdentifier: Assembly-CSharp::CharacterData
   id: kidaru
-  displayName: "\u304d\u3060\u308b"
+  displayName: "\uFF5E\uFF5E\uFF5E"
   color: {r: 0.95, g: 0.85, b: 0.2, a: 1}
   portrait: {fileID: 0}
   prefab: {fileID: 9069936943766670842, guid: eee8c0cfb1cf6e24cc8ec6956b6554bf, type: 3}
   passiveColor: 3
   passiveCount: 1
-  passiveName: "\u9ec4\u306e\u5897\u6b96"
-  passiveText: "\u9ec4\u8272\u3044\u7a4d\u307f\u6728\u3092\u7a4d\u3080\u3068\u3001\u3082\u30461\u500b\u5897\u3048\u308b"
+  passiveName: "\uFF5E\uFF5E\uFF5E"
+  passiveText: "\uFF5E\uFF5E\uFF5E"
   hammerPower: 3
   hammerSpeed: 3
   hammerReach: 3
-  specialName: ""
-  specialText: ""
+  specialName: "\uFF5E\uFF5E\uFF5E"
+  specialText: "\uFF5E\uFF5E\uFF5E"

@@ -2,7 +2,8 @@ using UnityEngine;
 
 // キャラクター1体分のデータ。Project ウィンドウで右クリック → Create → Daruma → Character で作り、
 // SelectRoster の characters に追加するとキャラクターセレクトに並ぶ。
-// パッシブ・ハンマー性能・必殺技はキャラクターセレクトの枠で表示する（Y で切り替え）。今は表示だけで、ゲームの動きには関係しない。
+// パッシブ・必殺技はメニューの「ずかん」（CharacterBook）で表示する（ハンマー性能は今は性能差を作らないので、ずかんには出さない）。
+// 今は表示だけで、ゲームの動きには関係しない。
 [CreateAssetMenu(menuName = "Daruma/Character", fileName = "Character")]
 public class CharacterData : ScriptableObject
 {
@@ -16,7 +17,7 @@ public class CharacterData : ScriptableObject
     [Tooltip("ゲーム本編で生成するプレハブ（未設定でも可）")]
     public GameObject prefab;
 
-    [Header("パッシブ（枠では「[赤][赤][赤] → 効果」の形で出る）")]
+    [Header("パッシブ（ずかんでは「[赤][赤][赤] → 効果」の形で出る）")]
     [Tooltip("条件になる積み木の色")]
     public Nakahira.TumikiColor passiveColor = Nakahira.TumikiColor.Red;
     [Tooltip("条件になる積み木の数（0 なら条件なし＝いつも）")]

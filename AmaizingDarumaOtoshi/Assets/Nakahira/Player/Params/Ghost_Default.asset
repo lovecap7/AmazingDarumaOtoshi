@@ -12,4 +12,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a5b81a8f05a8c6c4e9ab912d54a8819d, type: 3}
   m_Name: Ghost_Default
   m_EditorClassIdentifier: Assembly-CSharp::Nakahira.GhostParams
-  MoveSpeed: 5
+  MoveSpeed: 3

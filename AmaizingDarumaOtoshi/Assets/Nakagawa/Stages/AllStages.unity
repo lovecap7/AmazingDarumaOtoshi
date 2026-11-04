@@ -72123,7 +72123,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 83426f067c7bb8d4eb1857e7e0a114c7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakahira.StageArea
-  m_size: {x: 26, y: 26}
+  m_size: {x: 260, y: 260}
 --- !u!4 &366048141
 Transform:
   m_ObjectHideFlags: 0
@@ -221820,7 +221820,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: -0.5, z: 0}
-  m_LocalScale: {x: 30, y: 1, z: 30}
+  m_LocalScale: {x: 28, y: 1, z: 28}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 2092544223}
@@ -239456,7 +239456,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &1183794022
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -247380,17 +247380,18 @@ MonoBehaviour:
   m_characterPrefab: {fileID: 6242312641939630888, guid: 98dfe1d631da6fc429ba3618bb53aa46, type: 3}
   m_ghostPrefab: {fileID: 8875810368968693823, guid: f0f050629671f114096c296b81b42a53, type: 3}
   m_reviveInvincibleTime: 1.5
-  m_directMode: 1
+  m_directMode: 2
   m_directStocks: 3
   m_directTimeLimit: 3600
-  m_maxPlayers: 5
+  m_maxPlayers: 3
   m_dummyCount: 0
   m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
   m_dummyStartBlocks: 5
-  m_cpuCount: 3
+  m_cpuCount: 4
   m_cpuParams: {fileID: 11400000, guid: 61306de6ed4e45947be2f1eec470e918, type: 2}
   m_addDebugView: 1
   m_respawnAppearTime: 0.8
+  m_reviveTravelTime: 0.7
   m_startCountdown: 3
   m_countdownInDirectPlay: 0
 --- !u!4 &1218044442
@@ -316044,7 +316045,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &1565450238
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -429579,7 +429580,7 @@ MonoBehaviour:
   - {fileID: 1702510222}
   - {fileID: 1874005870}
   - {fileID: 1630005113}
-  m_startIndex: 38
+  m_startIndex: 44
   m_debugInConfiguredMatch: 0
   m_match: {fileID: 1218044441}
   m_spawnPoints:
