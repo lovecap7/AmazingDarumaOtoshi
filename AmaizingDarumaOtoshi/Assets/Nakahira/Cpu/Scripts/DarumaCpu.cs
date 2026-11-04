@@ -31,6 +31,9 @@ namespace Nakahira
         readonly CpuWaitState m_wait = new CpuWaitState();
         readonly CpuReflex m_reflex = new CpuReflex();
         readonly CpuRide m_ride = new CpuRide();
+        readonly CpuGhost m_ghost = new CpuGhost();
+        // 前のフレームで動かしていた幽霊(幽霊になり直したら考え直す)
+        DarumaGhost m_lastGhost;
         CpuState[] m_states;
         CpuState m_current;
         float m_stateTime;
@@ -45,8 +48,10 @@ namespace Nakahira
             set => m_params = value;
         }
 
-        // 今の状態の名前(デバッグ表示用。なければ空)
-        public string StateName => m_current != null ? m_current.Name : "";
+        // 今の状態の名前(デバッグ表示用。なければ空。幽霊のときは幽霊の動き)
+        public string StateName => m_current != null ? m_current.Name : m_lastGhost != null ? "幽霊:" + GhostAction : "";
+        // 幽霊のときの動き(デバッグ表示用)
+        public CpuGhost.Action GhostAction => m_ghost.Current;
         // 今のとっさの反応(デバッグ表示用)
         public CpuReflex.Action ReflexAction => m_reflex.Current;
         // 今の移動床の乗り降り(デバッグ表示用)
@@ -63,13 +68,25 @@ namespace Nakahira
         {
             var cmd = new DarumaCommand();
             DarumaCharacter self = FindCharacter();
-            // 幽霊のときは今は何もしない
             if (self == null || m_params == null)
             {
                 ChangeState(null);
                 m_lastSelf = null;
-                return cmd;
+                // 幽霊のときは幽霊の頭(CpuGhost)で動かす
+                DarumaGhost ghost = m_player != null ? m_player.Ghost : null;
+                if (ghost == null || m_params == null)
+                {
+                    m_lastGhost = null;
+                    return cmd;
+                }
+                if (ghost != m_lastGhost)
+                {
+                    m_ghost.Reset();
+                    m_lastGhost = ghost;
+                }
+                return m_ghost.Tick(ghost, m_player, m_params, Time.deltaTime);
             }
+            m_lastGhost = null;
 
             float dt = Time.deltaTime;
             m_context.Begin(self, m_player, m_params, dt);
@@ -172,9 +189,12 @@ namespace Nakahira
 
         private void OnDrawGizmos()
         {
-            if (!m_drawGizmos || !Application.isPlaying || m_current == null || m_lastSelf == null) return;
+            if (!m_drawGizmos || !Application.isPlaying) return;
+            if (m_lastGhost != null) m_ghost.DrawGizmos(m_lastGhost);
+            if (m_current == null || m_lastSelf == null) return;
             m_current.DrawGizmos(m_context);
             CpuMovingFloors.DrawGizmos();
+            CpuWarpGates.DrawGizmos();
         }
     }
 }

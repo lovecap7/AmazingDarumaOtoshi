@@ -154,6 +154,10 @@ namespace Nakagawa
         public int Group => m_group;
         public float Radius => m_radius;
         public TargetType Target => m_target;
+        // CPU がワープを道として使うための読み取り用(ワープ範囲の半径・プレイヤーを送るか・行き先の選び方)
+        public float WarpRadius => m_warpRadius;
+        public bool AcceptsPlayers => Accepts(false);
+        public Selection SelectionMode => m_selection;
         Color GroupColor => m_groupColors != null && m_groupColors.Length > 0
             ? m_groupColors[((m_group % m_groupColors.Length) + m_groupColors.Length) % m_groupColors.Length] : Color.white;
 

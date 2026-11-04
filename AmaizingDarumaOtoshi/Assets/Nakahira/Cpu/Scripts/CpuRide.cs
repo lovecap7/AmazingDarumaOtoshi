@@ -9,10 +9,11 @@ namespace Nakahira
     //  ・乗っている:床が動いている間は真ん中に立っている(降りない)
     //  ・降りる:床が止まったとき、今の道がこの床に乗って行く道でなければ(=降りて歩いて行ける)、止まっている地点の乗り場へ降りる
     //           (道を持たない状態(撃つなど)も降りる。乗ったまま運ばれないように)
+    // ワープゲートも同じ層で扱う:状態の道がゲートに入って行く道なら、入り口に着いたらゲートの真ん中へ歩いて入る
     // 状態の道(CpuState.Route)を見るだけで、状態の中身は変えない
     public class CpuRide
     {
-        public enum Action { None, WaitAtDock, Board, Riding, Alight }
+        public enum Action { None, WaitAtDock, Board, Riding, Alight, WaitAtGate, EnterGate, LeaveGate }
 
         // 乗り場に着いたとみなす距離(m)
         const float kDockReach = 0.8f;
@@ -29,8 +30,20 @@ namespace Nakahira
         // 床から出たあと、乗り場までこの距離(m)未満なら降りる動きを続ける
         const float kAlightKeepDistance = 1.5f;
 
+        // ゲートの中にいるとみなす、ゲートの半径に足す距離(m)
+        const float kGateInsideMargin = 0.1f;
+        // ゲートの中にいたあと、入り直すまで待つ時間(秒。ゲートの反応しない時間より長く)
+        const float kGateRearmWait = 0.6f;
+        // ゲートに入ってからこの時間(秒)送られなければ、出直す
+        const float kGateGiveUpTime = 1.5f;
+
         // 降りる先の乗り場
         Vector3 m_alightSpot;
+        // 入ると決めたゲートと、中に入った時刻
+        WarpGateGimmick m_enteringGate;
+        float m_enterTime;
+        // 最後にゲート(どれでも)の中にいた時刻
+        float m_lastInsideTime = float.NegativeInfinity;
 
         public Action Current { get; private set; }
 
@@ -40,6 +53,7 @@ namespace Nakahira
             Current = Action.None;
             if (route != null && Time.time - route.LastPathTime > kRouteStaleTime) route = null;
             Vector3 pos = c.Position;
+            if (CpuWarpGates.IsInsideGate(pos, kGateInsideMargin)) m_lastInsideTime = Time.time;
 
             // 移動床の上
             if (CpuMovingFloors.TryGetFloorUnder(pos, out MovingFloorGimmick floor))
@@ -76,6 +90,14 @@ namespace Nakahira
                 return;
             }
 
+            // ワープゲートに入る
+            if (route != null && route.HasWarp)
+            {
+                ApplyWarp(c, route.Warp, ref cmd);
+                return;
+            }
+            m_enteringGate = null;
+
             // 乗り場で床を待つ・乗る
             if (route == null || !route.HasRide) return;
             CpuRidePlan plan = route.Ride;
@@ -98,6 +120,54 @@ namespace Nakahira
             // 乗り場(島の縁から少し内側)に立って待つ
             Current = Action.WaitAtDock;
             cmd.Move = CpuContext.FlatDistance(pos, plan.BoardSpot) > kSpotReach ? ToPoint(pos, plan.BoardSpot) * 0.5f : Vector2.zero;
+            cmd.Jump = false;
+        }
+
+        // 入り口に着いたら、ゲートの真ん中へ歩いて入る(ゲートが送ってくれる)
+        //  ・ゲートの中にいるのに入ると決めていない(ワープで出てきたところ)なら、まず入り口へ出る
+        //  ・ゲートの中にいたばかりなら、入り口で少し待つ(ゲートは出てきたものに、離れてしばらくは反応しないため)
+        //  ・入ったのにしばらく送られなければ(出口がふさがっているなど)、いったん入り口へ出る
+        private void ApplyWarp(CpuContext c, CpuWarpPlan plan, ref DarumaCommand cmd)
+        {
+            WarpGateGimmick gate = plan.Gate;
+            if (gate == null || !gate.isActiveAndEnabled) return;
+            Vector3 pos = c.Position;
+            float toCenter = CpuContext.FlatDistance(pos, gate.transform.position);
+            bool inside = toCenter <= gate.Radius + kGateInsideMargin;
+
+            if (m_enteringGate != gate || !inside) m_enterTime = Time.time;
+            if (m_enteringGate == gate && inside && Time.time - m_enterTime > kGateGiveUpTime)
+            {
+                // 入ったまま送られない:入り口へ出直す
+                m_enteringGate = null;
+            }
+
+            if (inside && m_enteringGate != gate)
+            {
+                Current = Action.LeaveGate;
+                cmd.Move = ToPoint(pos, plan.EntrySpot);
+                cmd.Jump = false;
+                return;
+            }
+
+            if (m_enteringGate != gate)
+            {
+                // 入り口に着くまでは状態の道のまま歩く
+                if (CpuContext.FlatDistance(pos, plan.EntrySpot) > kDockReach) return;
+                if (Time.time - m_lastInsideTime < kGateRearmWait)
+                {
+                    Current = Action.WaitAtGate;
+                    cmd.Move = Vector2.zero;
+                    cmd.Jump = false;
+                    return;
+                }
+                m_enteringGate = gate;
+                m_enterTime = Time.time;
+            }
+
+            Current = Action.EnterGate;
+            // ゲートは床の上にあり、入り口のすぐ隣なので縁の確かめはしない
+            cmd.Move = ToPoint(pos, gate.transform.position);
             cmd.Jump = false;
         }
 

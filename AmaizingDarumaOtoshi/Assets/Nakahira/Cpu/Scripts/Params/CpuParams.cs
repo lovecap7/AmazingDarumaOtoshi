@@ -243,5 +243,35 @@ namespace Nakahira
         [Min(0.0f)] public float EdgeLookAhead = 0.6f;
         [Tooltip("足元からこの深さ(m)までに地面がなければ奈落とみなす")]
         [Min(0.1f)] public float GroundProbeDepth = 2.0f;
+
+        [Header("幽霊:狙う相手")]
+        [Tooltip("相手の逃げる速さの見込み。0=今の動き(こちらから離れる速さ)だけ、1=相手の最高速度(積み木の数で決まる)で逃げるとみなす")]
+        [Range(0.0f, 1.0f)] public float GhostEscapeWeight = 0.5f;
+        [Tooltip("追いつく速さ(幽霊の速さ - 相手の逃げる速さ)の下限(m/秒)。相手の方が速くても、この速さで近づけるとみなす")]
+        [Min(0.1f)] public float GhostMinClosingSpeed = 0.8f;
+        [Tooltip("今の相手を狙い続けるおまけ(秒)。ほかの相手の方がこれ以上早く追いつけるときだけ乗り換える")]
+        [Min(0.0f)] public float GhostTargetStickiness = 1.0f;
+        [Tooltip("無敵中の相手に足す手間(秒)")]
+        [Min(0.0f)] public float GhostInvinciblePenalty = 3.0f;
+        [Tooltip("相手の動きを先読みして回り込む時間の上限(秒)")]
+        [Min(0.0f)] public float GhostMaxLeadTime = 1.5f;
+        [Tooltip("ワープゲートに入って出てくるまでの手間(秒)")]
+        [Min(0.0f)] public float GhostWarpCost = 1.2f;
+
+        [Header("幽霊:攻撃")]
+        [Tooltip("ハンマーが届く距離の何割まで近づいたら振るか(1 に近いほど届くぎりぎりでも振る)")]
+        [Range(0.5f, 1.0f)] public float GhostHitMargin = 0.9f;
+
+        [Header("幽霊:積み木を弾いて当てる")]
+        [Tooltip("弾いた積み木が相手に当たるとみなす、積み木から相手までの距離の上限(m。積み木は約12mで当たらなくなる)")]
+        [Min(0.0f)] public float GhostBatRange = 9.0f;
+        [Tooltip("弾いて当てる見込みの時間に掛ける倍率。大きいほど、近づいて殴る方を選びやすい(外れることもあるので)")]
+        [Min(0.1f)] public float GhostBatPenalty = 1.5f;
+        [Tooltip("積み木を探す、幽霊からの距離(m)")]
+        [Min(0.0f)] public float GhostBatSearch = 10.0f;
+        [Tooltip("弾く向きと、積み木から相手への向きのずれがこの角度(度)以内なら振る")]
+        [Range(1.0f, 30.0f)] public float GhostBatAimTolerance = 8.0f;
+        [Tooltip("弾く位置に着けないまま、この時間(秒)たったらあきらめる")]
+        [Min(0.5f)] public float GhostBatGiveUpTime = 4.0f;
     }
 }
