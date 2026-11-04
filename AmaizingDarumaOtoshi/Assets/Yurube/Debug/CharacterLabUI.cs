@@ -140,6 +140,7 @@ namespace Yurube.Lab
             if (GUILayout.Button("あおだる: 必殺技", m_button)) PresetAodaruSpecial();
             if (GUILayout.Button("みだる: 必殺技", m_button)) PresetMidaruSpecial();
             if (GUILayout.Button("いわだる: 必殺技", m_button)) PresetIwadaruSpecial();
+            if (GUILayout.Button("へびだる: 必殺技", m_button)) PresetHebidaruSpecial();
 
             // ---- 切替 ----
             GUILayout.Space(6.0f);
@@ -400,6 +401,18 @@ namespace Yurube.Lab
             // 5個積むとゲージが満タン。予告円の大きさも5個ぶんになる
             m_lab.AddBlocks(character, TumikiColor.Red, 5);
             m_lab.SelectedColor = TumikiColor.Red;
+            var special = character != null ? character.GetComponent<ISpecialAbility>() : null;
+            if (special != null) special.TryActivate();
+        }
+
+        void PresetHebidaruSpecial()
+        {
+            m_lab.SelectCharacter("hebidaru");
+            var character = m_lab.Character;
+            m_lab.ClearStack(character);
+            // 5個積むとゲージが満タン。カットイン後に足元へ毒沼が出る
+            m_lab.AddBlocks(character, TumikiColor.Green, 5);
+            m_lab.SelectedColor = TumikiColor.Green;
 
             var special = character != null ? character.GetComponent<ISpecialAbility>() : null;
             if (special != null) special.TryActivate();
@@ -407,8 +420,7 @@ namespace Yurube.Lab
 
         void PresetMidaruSpecial()
         {
-            m_lab.SelectCharacter("midaru");
-            var character = m_lab.Character;
+            m_lab.SelectCharacter("midaru");            var character = m_lab.Character;
             m_lab.ClearStack(character);
             // 5個積むとゲージが満タン。押した瞬間に撃って5発に分裂する
             m_lab.AddBlocks(character, TumikiColor.Red, 5);

@@ -137,6 +137,10 @@ namespace Nakahira
         public bool IsGrounded => m_isGrounded;
         // 必殺技中など、移動だけを受け付ける状態
         public bool MovementOnly { get; set; }
+        // 毒などのデバフ: 移動入力の左右前後を反転する(攻撃・カメラ操作は反転しない)
+        public bool MovementInverted { get; set; }
+        // 毒などのデバフ: 水平移動速度の倍率(1で通常)
+        public float MoveSpeedMultiplier { get; set; } = 1.0f;
         // 股抜きショットを始められるか。地上にいて、先に押されたジャンプが実行待ちでないこと
         public bool CanStartShot => m_isGrounded && !m_jumpRequested;
         public bool IsInvincible => m_invincibleTimer > 0.0f;
@@ -221,6 +225,7 @@ namespace Nakahira
         public void ApplyCommand(in DarumaCommand command)
         {
             Vector2 move = Vector2.ClampMagnitude(command.Move, 1.0f);
+            if (MovementInverted) move = -move;
             m_moveDirection = new Vector3(move.x, 0.0f, move.y);
             if (command.Jump && !MovementOnly) m_jumpRequested = true;
             if (command.Sweep && !MovementOnly) m_hammer.TrySweep();
@@ -313,7 +318,7 @@ namespace Nakahira
         private void UpdateMove(ref Vector3 v, float dt)
         {
             Vector3 moveDir = m_moveDirection;
-            Vector3 horizontal = moveDir * MoveSpeed;
+            Vector3 horizontal = moveDir * MoveSpeed * Mathf.Max(0.0f, MoveSpeedMultiplier);
             v.x = horizontal.x;
             v.z = horizontal.z;
 

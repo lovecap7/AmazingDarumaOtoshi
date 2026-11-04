@@ -608,6 +608,8 @@ GameObject:
   - component: {fileID: 6242312641939630888}
   - component: {fileID: 1611246128041429823}
   - component: {fileID: 5182239471364050811}
+  - component: {fileID: 5182239471364050831}
+  - component: {fileID: 5182239471364050832}
   m_Layer: 0
   m_Name: Hebi
   m_TagString: Untagged
@@ -735,3 +737,37 @@ MonoBehaviour:
   m_turnSpeed: 200
   m_searchRadius: 3
   m_logSnake: 1
+--- !u!114 &5182239471364050831
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9069936943766670842}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0a13560a26218d46964d9c9f251e1ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Yurube.SpecialGauge
+  m_blocksToFill: 5
+--- !u!114 &5182239471364050832
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9069936943766670842}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c9e1a3b5d7f24981a3c5e7b9d1f30426, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Yurube.HebidaruSpecial
+  m_specialName: "\u53CD\u8EE2\u6BD2\u6CBC"
+  m_swampRadius: 4.5
+  m_swampDuration: 8
+  m_debuffDuration: 3
+  m_slowMultiplier: 0.55
+  m_tickInterval: 0.15
+  m_followCaster: 0
+  m_swampOffset: {x: 0, y: 0, z: 0}
+  m_logSpecial: 1
