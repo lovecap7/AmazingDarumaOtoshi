@@ -31,6 +31,8 @@ namespace Yurube
         GameObject m_backdrop;
         Material m_backdropMaterial;
         Material m_shockwaveMaterial;
+        GameObject m_subjectSource;
+        float m_subjectScale = 3.2f;
 
         readonly List<GameObject> m_createdObjects = new List<GameObject>();
         readonly List<GameObject> m_shockwaves = new List<GameObject>();
@@ -53,8 +55,22 @@ namespace Yurube
                 s_instance = go.AddComponent<SpecialCutIn>();
             }
 
-            s_instance.Play(specialName, accent, character);
+            s_instance.Play(specialName, accent, character, null, 3.2f);
         }
+
+        // 頭ではなく、指定した被写体(いわだるの隕石など)をアップで見せる
+        public static void ShowSubject(string specialName, Color accent, GameObject subject, float subjectScale = 1.0f)
+        {
+            if (s_instance == null)
+            {
+                var go = new GameObject("SpecialCutIn");
+                s_instance = go.AddComponent<SpecialCutIn>();
+            }
+
+            s_instance.Play(specialName, accent, null, subject, subjectScale);
+        }
+
+        public static bool IsPlaying => s_instance != null && s_instance.m_active;
 
         private void Awake()
         {
@@ -72,7 +88,8 @@ namespace Yurube
             if (s_instance == this) s_instance = null;
         }
 
-        void Play(string specialName, Color accent, DarumaCharacter character)
+        void Play(string specialName, Color accent, DarumaCharacter character,
+                  GameObject subject, float subjectScale)
         {
             if (!m_active)
             {
@@ -86,6 +103,8 @@ namespace Yurube
 
             m_specialName = specialName;
             m_accent = accent;
+            m_subjectSource = subject;
+            m_subjectScale = Mathf.Max(0.01f, subjectScale);
             m_start = Time.unscaledTime;
             m_active = true;
             m_shockA = false;
@@ -149,6 +168,17 @@ namespace Yurube
 
             CreateBackdrop();
             CreateShockwaveMaterial();
+
+            if (m_subjectSource != null)
+            {
+                var subject = CreateClone(m_subjectSource, "CutInSubject");
+                m_head = subject.transform;
+                m_head.localScale = Vector3.one * m_subjectScale;
+                m_head.localPosition = new Vector3(0.0f, 1.6f, 0.0f);
+                m_head.localRotation = Quaternion.identity;
+                m_createdObjects.Add(subject);
+                return;
+            }
 
             if (character == null) return;
 
@@ -429,6 +459,8 @@ namespace Yurube
             m_backdrop = null;
             m_backdropMaterial = null;
             m_shockwaveMaterial = null;
+            m_subjectSource = null;
+            m_subjectScale = 3.2f;
             m_shockwaves.Clear();
             m_shockwaveStarts.Clear();
             m_shockwaveMaxScales.Clear();
