@@ -22,6 +22,8 @@ namespace Yurube
         [SerializeField, Min(0.1f)] float m_minRadius = 2.5f;
         [Tooltip("最大積み木数のときの攻撃半径(m)")]
         [SerializeField, Min(0.1f)] float m_maxRadius = 8.0f;
+        [Tooltip("攻撃半径の全体倍率(予告円・実判定の両方に適用)")]
+        [SerializeField, Min(0.1f)] float m_attackRadiusScale = 1.5f;
         [Tooltip("積み木1個のときの上昇高度(m)")]
         [SerializeField, Min(0.1f)] float m_minHeight = 6.0f;
         [Tooltip("最大積み木数のときの上昇高度(m)")]
@@ -129,11 +131,7 @@ namespace Yurube
             {
                 if (m_gauge == null || !IsLocalHuman()) return;
 
-                var keyboard = Keyboard.current;
-                bool pressed = keyboard != null && keyboard.lKey.wasPressedThisFrame;
-                var gamepad = Gamepad.current;
-                if (gamepad != null && gamepad.buttonNorth.wasPressedThisFrame) pressed = true;
-                if (pressed) TryActivate();
+                if (SpecialInput.WasPressed(m_character)) TryActivate();
                 return;
             }
 
@@ -152,7 +150,7 @@ namespace Yurube
                     break;
 
                 case State.CutIn:
-                    if (!SpecialCutIn.IsPlaying) BeginFall();
+                    if (!IwadaruCutIn.IsPlaying) BeginFall();
                     break;
 
                 case State.Falling:
@@ -206,7 +204,8 @@ namespace Yurube
                 : 1.0f;
 
             m_blockFactor = t;
-            m_attackRadius = Mathf.Lerp(m_minRadius, m_maxRadius, t);
+            m_attackRadius = Mathf.Lerp(m_minRadius, m_maxRadius, t)
+                * Mathf.Max(0.1f, m_attackRadiusScale);
             m_meteorHeight = Mathf.Lerp(m_minHeight, m_maxHeight, t);
             m_riseTime = Mathf.Lerp(m_minRiseTime, m_maxRiseTime, t);
             m_fallTime = Mathf.Lerp(m_minFallTime, m_maxFallTime, t);
@@ -267,7 +266,7 @@ namespace Yurube
                 m_stateTime = 0.0f;
                 if (m_meteor != null)
                 {
-                    SpecialCutIn.ShowSubject(m_cutInName, m_cutInColor, m_meteor, 1.0f);
+                    IwadaruCutIn.Show(m_cutInName, m_meteor);
                 }
                 else
                 {
@@ -785,34 +784,10 @@ namespace Yurube
             }
 
             // 試合中だけゲージを表示(ラボはラボUI側で表示する)
-            if (m_gauge != null && DarumaMatch.Current != null)
-            {
-                MatchPlayer me = null;
-                foreach (var p in DarumaMatch.Current.Players)
-                {
-                    if (p.Character == m_character) { me = p; break; }
-                }
-
-                if (me != null && !me.IsCpu)
-                {
-                    var rect = new Rect(20.0f, Screen.height - 64.0f, 260.0f, 34.0f);
-                    GUI.Box(rect, GUIContent.none);
-                    GUI.Label(new Rect(rect.x + 8.0f, rect.y + 2.0f, 244.0f, 18.0f),
-                        m_state == State.Countdown
-                            ? $"METEOR {Mathf.Max(1, Mathf.CeilToInt(m_countdown - m_stateTime))}"
-                            : (m_gauge.IsFull ? "SPECIAL READY [L / Y]" : $"SPECIAL {m_gauge.Blocks}/{m_gauge.BlocksToFill}"));
-
-                    var bar = new Rect(rect.x + 8.0f, rect.y + 22.0f, 244.0f, 6.0f);
-                    GUI.color = new Color(0.0f, 0.0f, 0.0f, 0.6f);
-                    GUI.DrawTexture(bar, Texture2D.whiteTexture);
-                    GUI.color = m_gauge.IsFull || m_state != State.Idle
-                        ? new Color(1.0f, 0.78f, 0.35f)
-                        : new Color(0.8f, 0.65f, 0.3f);
-                    GUI.DrawTexture(new Rect(bar.x, bar.y, bar.width * m_gauge.Normalized, bar.height),
-                        Texture2D.whiteTexture);
-                    GUI.color = Color.white;
-                }
-            }
+            SpecialGaugeHUD.Draw(m_gauge, m_character,
+                m_state == State.Countdown
+                    ? $"METEOR {Mathf.Max(1, Mathf.CeilToInt(m_countdown - m_stateTime))}"
+                    : null);
 
             if (m_state != State.Countdown) return;
 

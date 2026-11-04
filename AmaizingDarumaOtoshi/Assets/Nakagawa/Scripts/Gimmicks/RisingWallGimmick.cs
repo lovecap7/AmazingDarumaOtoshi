@@ -11,10 +11,16 @@ namespace Nakagawa
     //  ・開始のずれ(位相)を付けて並べると、波のように順番に立ち上がる
     // 床にいる間は当たり判定を消し、下の床に任せる(床どうしの継ぎ目に積み木が引っかからないように)
     // このTransformの位置が、床に戻っているときのパネルの上面の中心(床の高さ)
+    // 飛んでいる積み木は側面でだけ反射する(ITumikiReflectFilter)。隣り合った塀の上を滑っているときに、隣の塀の上面の縁に触れても反射しない
     [DefaultExecutionOrder(-10)]
     [RequireComponent(typeof(Rigidbody))]
-    public class RisingWallGimmick : MonoBehaviour
+    public class RisingWallGimmick : MonoBehaviour, ITumikiReflectFilter
     {
+        public bool ShouldReflect(TumikiBlock block, Collider collider, ContactPoint contact)
+        {
+            return TumikiReflectRules.ShouldReflectAtSide(block, collider, contact);
+        }
+
         public enum Phase { Floor, Warning, Rising, Wall, Lowering }
         public enum RiderMode
         {
@@ -154,10 +160,13 @@ namespace Nakagawa
                 transform.position = m_rb.position;
             }
             SetSolid(m_phase != Phase.Floor && m_phase != Phase.Warning);
+            // 隣り合った塀の上を滑る積み木が、継ぎ目に引っかかって跳ねないように
+            FloorSeamFilter.RegisterMoving(m_collider);
         }
 
         private void OnDisable()
         {
+            FloorSeamFilter.UnregisterMoving(m_collider);
             GimmickSound.SetLoopVolume(m_rumble, 0.0f);
             SetSeeThrough(false);
         }

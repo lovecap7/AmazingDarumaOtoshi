@@ -107,6 +107,19 @@ public class MatchSelect : MonoBehaviour
     public enum StartScreen { Auto, Mode, Rule, Character }
     public static StartScreen NextStartScreen = StartScreen.Auto;
 
+    // ---- お知らせ（ほかの人の演出・記録用。受け取る側は何をしてもよく、セレクト画面の動きは変わらない） ----
+    // セレクト画面を開いた（true：試合から戻ってきた）
+    public static event System.Action<bool> Opened;
+    // プレイヤー・CPU が枠から抜けた（番号 0 = 1P、入力機器（CPU は null））。B で抜けた・CPU に切り替えた・コントローラーが抜かれた など
+    public static event System.Action<int, InputDevice> PlayerLeft;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetEvents()
+    {
+        Opened = null;
+        PlayerLeft = null;
+    }
+
     struct PadState
     {
         public Vector2 move;
@@ -240,6 +253,7 @@ public class MatchSelect : MonoBehaviour
 
         // 試合から戻ってきたときは、ルールはそのままでキャラクターセレクトから始める（スマブラと同じ）
         bool fromMatch = MatchSetup.Players.Count > 0;
+        Opened?.Invoke(fromMatch);
 
         // 毎回まっさらな状態から選び直す（前回の試合の選択は引き継がない。ルールだけは引き継ぐ）
         MatchSetup.Clear();
@@ -696,6 +710,7 @@ public class MatchSelect : MonoBehaviour
         if (p.stageToken != null) Destroy(p.stageToken.gameObject);
         slots[p.index] = null;
         Debug.Log($"{p.Label} 退出");
+        PlayerLeft?.Invoke(p.index, p.device);
     }
 
     void SetCharacter(Player p, Tile tile)

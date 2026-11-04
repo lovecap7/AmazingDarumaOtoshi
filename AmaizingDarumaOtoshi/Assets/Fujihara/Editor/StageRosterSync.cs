@@ -36,7 +36,39 @@ public static class StageRosterSync
     };
 
     // ステージセレクト（ローカル）で動かせるプレビューに使う、見た目だけのステージの置き場所
-    const string PreviewModelFolder = "Assets/Fujihara/Data/StagePreviews";
+    const string DefaultPreviewModelFolder = "Assets/Fujihara/Data/StagePreviews";
+
+    // 並べるステージの指定（Nakagawa の StageSelectList）。プロジェクトにあれば、そこに書いたステージだけを書いた順に並べる
+    // （無ければ今まで通り全ステージ。プレビューの置き場所も StageSelectList で変えられる）
+    static StageSelectList FindSelectList()
+    {
+        foreach (var g in AssetDatabase.FindAssets("t:StageSelectList"))
+        {
+            var list = AssetDatabase.LoadAssetAtPath<StageSelectList>(AssetDatabase.GUIDToAssetPath(g));
+            if (list != null) return list;
+        }
+        return null;
+    }
+
+    static string PreviewModelFolder
+    {
+        get
+        {
+            var list = FindSelectList();
+            return list != null && !string.IsNullOrEmpty(list.previewModelFolder) ? list.previewModelFolder : DefaultPreviewModelFolder;
+        }
+    }
+
+    static List<StageSource> FilterBySelectList(List<StageSource> sources)
+    {
+        var list = FindSelectList();
+        if (list == null || list.stageIds.Count == 0) return sources;
+        var filtered = sources.FindAll(s => list.Contains(s.Id));
+        filtered.Sort((a, b) => list.OrderOf(a.Id).CompareTo(list.OrderOf(b.Id)));
+        foreach (var id in list.stageIds)
+            if (!string.IsNullOrEmpty(id) && !filtered.Exists(s => s.Id == id)) Debug.LogWarning($"[StageRosterSync] StageSelectList のステージ {id} が見つかりません");
+        return filtered;
+    }
 
     struct StageSource
     {
@@ -52,7 +84,7 @@ public static class StageRosterSync
         var roster = AssetDatabase.LoadAssetAtPath<SelectRoster>(RosterPath);
         if (roster == null) { Debug.LogError("SelectRoster が見つかりません：" + RosterPath); return; }
 
-        var sources = File.Exists(CombinedScenePath) ? ReadCombinedScene() : ReadStageScenes();
+        var sources = FilterBySelectList(File.Exists(CombinedScenePath) ? ReadCombinedScene() : ReadStageScenes());
         if (sources.Count == 0) { Debug.LogWarning("[StageRosterSync] ステージが見つからないので、一覧は変えません"); return; }
 
         var existing = FindExistingData();
@@ -170,7 +202,8 @@ public static class StageRosterSync
     // カメラは本編のカメラ（CameraPoint）と同じ距離・角度から、床の高さで見ている点を中心に回す
     static SelectRoster.StagePreview BakePreview(StageEntry entry, string id)
     {
-        EnsureFolder(PreviewModelFolder);
+        string folder = PreviewModelFolder;
+        EnsureFolder(folder);
         var copy = Object.Instantiate(entry.gameObject);
         copy.name = id + "_Preview";
         copy.SetActive(true);
@@ -190,7 +223,7 @@ public static class StageRosterSync
         }
 
         var preview = new SelectRoster.StagePreview { id = id };
-        preview.model = PrefabUtility.SaveAsPrefabAsset(copy, $"{PreviewModelFolder}/{id}.prefab");
+        preview.model = PrefabUtility.SaveAsPrefabAsset(copy, $"{folder}/{id}.prefab");
         Object.DestroyImmediate(copy);
 
         var cam = entry.CameraPoint;

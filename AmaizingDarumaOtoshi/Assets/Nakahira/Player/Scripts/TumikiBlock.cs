@@ -730,7 +730,7 @@ namespace Nakahira
         // (反射後は壁から離れる向きになるので、接触が続いても何度も反射しない)
         private bool TryReflect(Collision collision)
         {
-            if (!IsReflectSurface(collision)) return false;
+            if (!IsReflectSurface(this, collision)) return false;
 
             Vector3 normal = collision.GetContact(0).normal;
             normal.y = 0.0f;
@@ -744,9 +744,12 @@ namespace Nakahira
         // 反射する面か: 壁と同じように反射させる物(ITumikiReflector。壁・扇風機など)、または動かない当たり判定(床など)の横向きの側面
         // 床から落ちた積み木が床の側面に当たったとき、壁と同じように跳ね返して空中で張り付かないようにする
         // (それ以外のRigidbodyを持つギミックは、それぞれの処理に任せる)
-        private static bool IsReflectSurface(Collision collision)
+        // 当たった物が ITumikiReflectFilter を持っていれば、その判定に任せる(移動床・せり上がり塀など)
+        private static bool IsReflectSurface(TumikiBlock block, Collision collision)
         {
             Collider col = collision.collider;
+            var filter = col.GetComponentInParent<ITumikiReflectFilter>();
+            if (filter != null) return collision.contactCount > 0 && filter.ShouldReflect(block, col, collision.GetContact(0));
             if (col.GetComponentInParent<ITumikiReflector>() != null) return true;
             if (col.attachedRigidbody != null) return false;
             if (collision.contactCount == 0) return false;
