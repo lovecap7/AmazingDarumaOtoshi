@@ -18,11 +18,11 @@ MonoBehaviour:
   portrait: {fileID: 0}
   prefab: {fileID: 9069936943766670842, guid: 1b40e3ce94eb73de3295fe933d28580b, type: 3}
   passiveColor: 0
-  passiveCount: 3
-  passiveName: "\u30CF\u30F3\u30DE\u30FC\u5F37\u5316"
-  passiveText: "\u8D64\u3044\u7A4D\u307F\u6728\u30923\u500B\u7A4D\u3080\u3068\u3001\u30CF\u30F3\u30DE\u30FC\u3067\u98DB\u3070\u3059\u529B\u304C\u4E0A\u304C\u308B"
+  passiveCount: 0
+  passiveName: "\uFF5E\uFF5E\uFF5E"
+  passiveText: "\uFF5E\uFF5E\uFF5E"
   hammerPower: 4
   hammerSpeed: 2
   hammerReach: 3
-  specialName: "\u7D42\u7109\u306E\u8ECC\u8DE1"
-  specialText: "\u7A4D\u307F\u6728\u306E\u6B8B\u50CF\u3067\u76F8\u624B\u3092\u8CAB\u304F\u3002\u89E6\u308C\u305F\u7A4D\u307F\u6728\u306F\u58CA\u308C\u3001\u76F8\u624B\u306F\u7A4D\u307F\u6728\u3092\u5931\u3046"
+  specialName: "\uFF5E\uFF5E\uFF5E"
+  specialText: "\uFF5E\uFF5E\uFF5E"
