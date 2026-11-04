@@ -36,6 +36,10 @@ namespace Nakahira
         static void ResetStatics() => s_active.Clear();
 
         public Collider Body => null;
+        // CPU が操作を決めるための読み取り用(ハンマー・移動の速さ・壁との当たり判定の半径)
+        public DarumaHammer Hammer => m_hammer;
+        public float MoveSpeed => m_params != null ? m_params.MoveSpeed : 0.0f;
+        public float Radius => m_radius;
         public float LocalTimeScale => Mathf.Max(0.01f, m_hitStop.TimeScale);
 
         private void Awake()
