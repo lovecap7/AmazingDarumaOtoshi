@@ -17,6 +17,8 @@ public class NetPadKeyboardInput : MonoBehaviour, IDarumaCommandSource
         if (m_camera == null && Camera.main != null) m_camera = Camera.main.transform;
         // 同じPCで複数の画面を動かすと、ゲームパッドの入力は裏の画面にも届くので、選んでいる画面だけ入力を読む
         if (!Application.isFocused) return default;
+        // ネット対戦のメニュー(NetSessionMenu)を開いている間は動かさない
+        if (NetSessionMenu.IsOpen) return default;
 
         Vector2 stick = Vector2.zero;
         bool jump = false, sweep = false, shot = false;

@@ -166,7 +166,8 @@ namespace Nakagawa
                 if (col.GetComponentInParent<TumikiBlock>() != null || col.GetComponentInParent<DarumaCharacter>() != null) continue;
                 if (found && hit.distance >= nearest.distance) continue;
 
-                bool reflector = col.GetComponentInParent<ITumikiReflector>() != null;
+                // 側面で反射させる物(移動床・せり上がり塀。ITumikiReflectFilter)も壁と同じに扱う
+                bool reflector = col.GetComponentInParent<ITumikiReflector>() != null || col.GetComponentInParent<ITumikiReflectFilter>() != null;
                 bool side = Mathf.Abs(hit.normal.y) < 0.5f;
                 if (!reflector && col.attachedRigidbody == null && !side) continue; // 床の上面などは道筋を遮らない
                 nearest = hit;

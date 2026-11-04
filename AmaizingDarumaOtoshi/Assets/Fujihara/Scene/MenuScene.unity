@@ -211,7 +211,7 @@ MonoBehaviour:
   uiSprite: {fileID: 10905, guid: 0000000000000000f000000000000000, type: 0}
   knobSprite: {fileID: 10913, guid: 0000000000000000f000000000000000, type: 0}
   battleSceneName: SelectScene
-  onlineSceneName: 
+  onlineSceneName: NetConnectScene
   dropIn: 1
   battleStyle: 0
   labels:

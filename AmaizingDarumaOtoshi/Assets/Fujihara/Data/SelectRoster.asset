@@ -25,112 +25,58 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e43cc62756685ffd67cfbe3f5daee82e, type: 2}
   - {fileID: 11400000, guid: 1f06724f149cbe7e579c84eb0b14933a, type: 2}
   stages:
-  - {fileID: 11400000, guid: 5da867ce21154e240908e6963da6231f, type: 2}
-  - {fileID: 11400000, guid: c81c40a91b76e6b4c86417403ed825a7, type: 2}
-  - {fileID: 11400000, guid: a12d8761608d79842b4afd27a5b36d26, type: 2}
-  - {fileID: 11400000, guid: 5e44250f4375d304daf575523e572a3c, type: 2}
-  - {fileID: 11400000, guid: 48c4e0dce4106e949b025b704007d6bf, type: 2}
-  - {fileID: 11400000, guid: db782a45c1a0ecf4e9aae0e915d4c42e, type: 2}
-  - {fileID: 11400000, guid: 377093b7cf6cc10449a06c92e392ce8b, type: 2}
-  - {fileID: 11400000, guid: 39c8911d27836e547978e37a67929e08, type: 2}
-  - {fileID: 11400000, guid: 06995713f52032243814173038abe304, type: 2}
-  - {fileID: 11400000, guid: 4370484081e9cd942a59944169cbb582, type: 2}
-  - {fileID: 11400000, guid: 9899357b11cf98044878e570b61aa241, type: 2}
-  - {fileID: 11400000, guid: 005c7257c7f2f0a4799fa12fd6fd63d5, type: 2}
-  - {fileID: 11400000, guid: 732253d251d057a4b8a22a3fd311c739, type: 2}
-  - {fileID: 11400000, guid: 0cb944898eb203f4ab03d7910cb393cc, type: 2}
-  - {fileID: 11400000, guid: 8426cf42260bfe04398115bd20bf0a6b, type: 2}
-  - {fileID: 11400000, guid: e08ae488b303122499b6eb002597b6ed, type: 2}
-  - {fileID: 11400000, guid: 9cbb41ceddcdc484ab5b657f5932ecda, type: 2}
+  - {fileID: 11400000, guid: 5518ab56dcf9d7d44bea87e01a3bca8d, type: 2}
+  - {fileID: 11400000, guid: 0974e3b8ed8f2c74eab2195c30192b86, type: 2}
+  - {fileID: 11400000, guid: 95088e36fd0b1d7498c83e065e4def25, type: 2}
+  - {fileID: 11400000, guid: e63e858047db3194b849359d9fd9f96c, type: 2}
+  - {fileID: 11400000, guid: 808e68d4afc52b847974ce3c3e9118be, type: 2}
+  - {fileID: 11400000, guid: 405449515b907b64ca2689d6c5c53ccb, type: 2}
+  - {fileID: 11400000, guid: 6b7cd9c5c2c25644c894cb368cedce90, type: 2}
+  - {fileID: 11400000, guid: 2cb0409ffcf6e504fb420b0cdcde7c20, type: 2}
   - {fileID: 11400000, guid: 19b0c9bfe8ef4e942a7893f1a4f6da62, type: 2}
   stagePreviews:
-  - id: Stage01
-    model: {fileID: 2250992415309450338, guid: f697d05120d5a6e49b38432c9e1b177e, type: 3}
-    target: {x: 0, y: 0, z: -0.0000038146973}
-    distance: 29.999996
-    pitch: 55.000008
-  - id: Stage02
-    model: {fileID: 6721807970473989863, guid: db8147462d9692b4ba669628451d6b4e, type: 3}
-    target: {x: 0, y: 0, z: -0.0000019073486}
-    distance: 32.999996
-    pitch: 55.000008
-  - id: Stage03
-    model: {fileID: 2841358596347438483, guid: bb012b115e11cd848af4f5ffcfcee10c, type: 3}
-    target: {x: 0, y: 0, z: -0.0000038146973}
-    distance: 46.499992
-    pitch: 55.000008
-  - id: Stage04
-    model: {fileID: 373278823122575141, guid: 5b8a0baf985fc55458348736855d071c, type: 3}
-    target: {x: 0, y: 0.0000019073486, z: -0.0000038146973}
-    distance: 35.499992
-    pitch: 55.000008
-  - id: Stage05
-    model: {fileID: 271889513783257371, guid: c81065fdc2ae52e4a90b463b2ad4d6e4, type: 3}
-    target: {x: 0, y: 0, z: 0.4999981}
-    distance: 34.499996
-    pitch: 55.000008
-  - id: Stage06
-    model: {fileID: 4682958994377388894, guid: cfab61df06e213e4d8a8653eace7ceef, type: 3}
-    target: {x: 0, y: 0, z: -0.000002861023}
-    distance: 27.499996
-    pitch: 55.000008
-  - id: Stage07
-    model: {fileID: 2638616800185925812, guid: c06ce7a781fba3d42bc173dc7724d087, type: 3}
-    target: {x: 0, y: 0, z: -0.0000019073486}
-    distance: 32.999996
-    pitch: 55.000008
-  - id: Stage08
-    model: {fileID: 7778400331066250390, guid: 99692a3be5508d24da5f1302c182c179, type: 3}
-    target: {x: -0.5, y: 0, z: -0.0000038146973}
-    distance: 29.999996
-    pitch: 55.000008
-  - id: Stage09
-    model: {fileID: 4126858788398202282, guid: 5a67098a0aa71b7449dd8e6e836123d3, type: 3}
-    target: {x: 0, y: 0, z: -0.0000019073486}
-    distance: 31.499994
-    pitch: 55.000008
-  - id: Stage10
-    model: {fileID: 2593430481360594084, guid: 8fc1fe3c9e5d900439561d9613ab7b12, type: 3}
-    target: {x: 0, y: 0, z: -0.0000019073486}
-    distance: 31.499994
-    pitch: 55.000008
-  - id: Stage11
-    model: {fileID: 7475607712876471435, guid: 2e9ab1bb47bd8854986aa7d3ad09ae77, type: 3}
-    target: {x: 0, y: 0, z: -0.0000019073486}
-    distance: 32.999996
-    pitch: 55.000008
-  - id: Stage12
-    model: {fileID: 7809330082274891358, guid: 0ec1723c1d4d2004d8503dc911a4433a, type: 3}
-    target: {x: 0, y: 0, z: 0.4999981}
-    distance: 31.999996
-    pitch: 55.000008
-  - id: Stage13
-    model: {fileID: 6625919109743178094, guid: fdcd193169a00134fbd42aac9ec03ae7, type: 3}
-    target: {x: 0, y: 0, z: -0.0000019073486}
-    distance: 32.999996
-    pitch: 55.000008
-  - id: Stage14
-    model: {fileID: 2251670830224564136, guid: 15391fa18ad19dd449daf550a31c2230, type: 3}
-    target: {x: 0, y: 0.0000019073486, z: -0.0000038146973}
-    distance: 38.499992
-    pitch: 55.000008
-  - id: Stage15
-    model: {fileID: 2283216051699503109, guid: 559953c6e2eb89b448ed921220f991ff, type: 3}
-    target: {x: 0, y: 0, z: 0.4999981}
-    distance: 31.499994
-    pitch: 55.000008
-  - id: Stage16
-    model: {fileID: 2662835364644943063, guid: 87273c3e52c6f404190fb4ee01397d5e, type: 3}
-    target: {x: 0, y: 0, z: -0.000002861023}
-    distance: 27.499996
-    pitch: 55.000008
-  - id: Stage17
-    model: {fileID: 4242072370728386848, guid: b54f82fc0f1456243889ba22ad797188, type: 3}
-    target: {x: 0, y: 0, z: -0.0000019073486}
-    distance: 32.999996
-    pitch: 55.000008
   - id: Stage18
-    model: {fileID: 8647752789050421418, guid: 4c0f31d5257cfd944a42ad1c4bdbd8cf, type: 3}
+    model: {fileID: 5187593053337264563, guid: 52dad18d6cb709c45b4f2551af9fcfba, type: 3}
     target: {x: -0.5, y: 0, z: 1.9799404}
     distance: 25.047155
     pitch: 40
+  - id: DebugStage21
+    model: {fileID: 921734120824133252, guid: f7b550fa44469d545bfc01da4fc1bfd4, type: 3}
+    target: {x: 0, y: 0, z: 2.9418755}
+    distance: 33.60363
+    pitch: 40.000008
+  - id: DebugStage22
+    model: {fileID: 7552577305696643653, guid: eef6b85198a69014ca9299ef305f6ef3, type: 3}
+    target: {x: 0, y: 0, z: 17.71663}
+    distance: 56.07246
+    pitch: 40.000008
+  - id: DebugStage23
+    model: {fileID: 7391728658015531174, guid: d282e355e8fa5384f98ada0d57245aff, type: 3}
+    target: {x: 0, y: 0, z: 14.2941}
+    distance: 45.24028
+    pitch: 40.000008
+  - id: DebugStage24
+    model: {fileID: 7753577904761035103, guid: b45c56da84061aa47b30b92a7f83d42c, type: 3}
+    target: {x: 0, y: 0, z: 15.502054}
+    distance: 49.063404
+    pitch: 40.000008
+  - id: DebugStage25
+    model: {fileID: 4927053570523713490, guid: d78517a0dbd80a6498b2bb276f6deff1, type: 3}
+    target: {x: 0, y: 0, z: 15.502054}
+    distance: 49.063404
+    pitch: 40.000008
+  - id: DebugStage26
+    model: {fileID: 1996327781946335210, guid: eeb7ef48b99b4e747ba80fb7bc63c083, type: 3}
+    target: {x: 0, y: 0, z: 14.2941}
+    distance: 45.24028
+    pitch: 40.000008
+  - id: DebugStage27
+    model: {fileID: 6635240937307647683, guid: 314a1d2f6c0789946b67ee76b377d000, type: 3}
+    target: {x: 0, y: 0, z: 16.508684}
+    distance: 52.24934
+    pitch: 40.000008
+  - id: DebugStage28
+    model: {fileID: 8882417251338581924, guid: a2e82d9ea9cb19e4a9663828f253e1a5, type: 3}
+    target: {x: 0, y: 0, z: 18.72326}
+    distance: 59.258396
+    pitch: 40.000008

@@ -35,6 +35,11 @@ namespace Nakagawa
         static bool s_dirty = true;
         static float s_lastBuildTime = float.NegativeInfinity;
         static bool s_hooked;
+        // 動く床(せり上がり塀・移動床など。RegisterMoving で登録)。位置が毎ステップ変わるので、物理の更新の前に毎回写し直す
+        static readonly List<BoxCollider> s_moving = new List<BoxCollider>();
+        static int s_staticCount;
+        static float s_movingStep = -1.0f;
+        static int s_movingFrame = -1;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         static void ResetStatics()
@@ -43,6 +48,10 @@ namespace Nakagawa
             s_floorIndex.Clear();
             s_dirty = true;
             s_lastBuildTime = float.NegativeInfinity;
+            s_moving.Clear();
+            s_staticCount = 0;
+            s_movingStep = -1.0f;
+            s_movingFrame = -1;
             if (s_hooked)
             {
                 Physics.ContactModifyEvent -= OnContactModify;
@@ -72,26 +81,80 @@ namespace Nakagawa
         static void OnSceneLoaded(Scene scene, LoadSceneMode mode) => s_dirty = true;
         static void OnSceneUnloaded(Scene scene) => s_dirty = true;
 
-        // 物理の更新の前(FixedUpdate)にメインスレッドから呼ぶ。必要なら床の一覧を作り直す
+        // 動く床の箱を、継ぎ目を調べる床に加える(上面が水平な箱。隣り合った塀の上や、床に横付けした移動床の継ぎ目で引っかからないように)
+        // 壁としての側面(外に出ている面)との接触はそのまま残る
+        public static void RegisterMoving(BoxCollider box)
+        {
+            if (box != null && !s_moving.Contains(box)) s_moving.Add(box);
+        }
+
+        public static void UnregisterMoving(BoxCollider box)
+        {
+            s_moving.Remove(box);
+        }
+
+        // 物理の更新の前(FixedUpdate)にメインスレッドから呼ぶ。必要なら床の一覧を作り直す(動く床は毎回写し直す)
         public static void UpdateFloors()
         {
-            if (!s_dirty && Time.time - s_lastBuildTime < kRebuildInterval) return;
-            s_dirty = false;
-            s_lastBuildTime = Time.time;
-
-            s_floors.Clear();
-            s_floorIndex.Clear();
-            foreach (var box in Object.FindObjectsByType<BoxCollider>())
+            bool rebuild = s_dirty || Time.time - s_lastBuildTime >= kRebuildInterval;
+            // 動く床は物理の1ステップに1回だけ写す(積み木ごとに呼ばれるので)
+            if (!rebuild && s_movingStep == Time.fixedTime && s_movingFrame == Time.frameCount) return;
+            s_movingStep = Time.fixedTime;
+            s_movingFrame = Time.frameCount;
+            if (rebuild)
             {
-                if (!IsFloor(box)) continue;
-                Transform t = box.transform;
-                Vector3 scale = t.lossyScale;
-                Vector3 half = Vector3.Scale(box.size, new Vector3(Mathf.Abs(scale.x), Mathf.Abs(scale.y), Mathf.Abs(scale.z))) * 0.5f;
-                Vector3 center = t.TransformPoint(box.center);
-                var worldToLocal = Matrix4x4.TRS(center, t.rotation, Vector3.one).inverse;
-                s_floorIndex[box.GetEntityId()] = s_floors.Count;
-                s_floors.Add(new FloorBox { WorldToLocal = worldToLocal, HalfSize = half, Top = center.y + half.y });
+                s_dirty = false;
+                s_lastBuildTime = Time.time;
+
+                s_floors.Clear();
+                s_floorIndex.Clear();
+                foreach (var box in Object.FindObjectsByType<BoxCollider>())
+                {
+                    if (IsFloor(box)) AddBox(box);
+                }
+                s_staticCount = s_floors.Count;
             }
+            UpdateMovingFloors();
+        }
+
+        static void UpdateMovingFloors()
+        {
+            if (s_floors.Count > s_staticCount)
+            {
+                // 前回写した動く床を外す
+                foreach (var box in s_moving) if (box != null) s_floorIndex.Remove(box.GetEntityId());
+                s_floors.RemoveRange(s_staticCount, s_floors.Count - s_staticCount);
+            }
+            for (int i = s_moving.Count - 1; i >= 0; i--)
+            {
+                var box = s_moving[i];
+                if (box == null) { s_moving.RemoveAt(i); continue; }
+                if (!box.enabled || box.isTrigger || !box.gameObject.activeInHierarchy) continue;
+                if (Vector3.Dot(box.transform.up, Vector3.up) <= 0.999f) continue;
+                AddBox(box);
+            }
+        }
+
+        static void AddBox(BoxCollider box)
+        {
+            Transform t = box.transform;
+            Vector3 scale = t.lossyScale;
+            Vector3 half = Vector3.Scale(box.size, new Vector3(Mathf.Abs(scale.x), Mathf.Abs(scale.y), Mathf.Abs(scale.z))) * 0.5f;
+            Vector3 center = t.TransformPoint(box.center);
+            Quaternion rotation = t.rotation;
+            // 動く物は見た目(補間した Transform)ではなく、物理の位置で調べる
+            var rb = box.attachedRigidbody;
+            if (rb != null)
+            {
+                Transform rt = rb.transform;
+                Vector3 local = rt.InverseTransformPoint(center);
+                Quaternion localRot = Quaternion.Inverse(rt.rotation) * rotation;
+                center = rb.position + rb.rotation * Vector3.Scale(local, rt.lossyScale);
+                rotation = rb.rotation * localRot;
+            }
+            var worldToLocal = Matrix4x4.TRS(center, rotation, Vector3.one).inverse;
+            s_floorIndex[box.GetEntityId()] = s_floors.Count;
+            s_floors.Add(new FloorBox { WorldToLocal = worldToLocal, HalfSize = half, Top = center.y + half.y });
         }
 
         // 床とみなす当たり判定: 動かない箱で、壁(ReflectWall)ではなく、上面が水平
