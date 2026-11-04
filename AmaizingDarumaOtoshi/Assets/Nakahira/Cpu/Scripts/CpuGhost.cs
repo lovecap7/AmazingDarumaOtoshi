@@ -61,6 +61,10 @@ namespace Nakahira
         Vector3 m_lastMoveDir;
         Vector3 m_velocity;
         bool m_batCreep;
+        // 振ると決めてから振るまでの残り(反応の遅れ)と、次の 1 回が空振りの回か
+        bool m_swingPending;
+        float m_swingDelay;
+        bool m_earlySwing;
 
         // 引っかかり
         float m_stuckTimer;
@@ -96,6 +100,8 @@ namespace Nakahira
             m_gateRefreshTimer = 0.0f;
             m_noWarpUntil = 0.0f;
             m_warpInsideTime = 0.0f;
+            m_swingPending = false;
+            m_earlySwing = false;
             m_blacklist.Clear();
         }
 
@@ -294,22 +300,54 @@ namespace Nakahira
         // 攻撃
         //========================================
 
-        // 今振れば、ハンマーがだれかに当たるか
+        // 今振るか:振れば当たる相手に気づいたら、反応の遅れ(GhostSwingReaction)のあとに振る
+        // 空振りする回(GhostEarlySwingChance)は、届く距離に GhostEarlySwingSlack を足して見てしまう
         private bool CanHitAnyone(DarumaGhost ghost, CpuParams p)
         {
             DarumaHammer hammer = ghost.Hammer;
             if (hammer == null || hammer.IsBusy) return false;
+            if (m_swingPending)
+            {
+                m_swingDelay -= Time.deltaTime;
+                if (m_swingDelay > 0.0f) return false;
+                OnSwing(p);
+                return true;
+            }
+
+            float slack = m_earlySwing ? p.GhostEarlySwingSlack : 0.0f;
+            bool hit = false;
             foreach (var s in m_survivors)
             {
                 if (s.IsInvincible) continue;
-                if (WillHit(ghost, hammer, p, s, m_velocity)) return true;
+                if (WillHit(ghost, hammer, p, s, m_velocity, slack))
+                {
+                    hit = true;
+                    break;
+                }
             }
-            return false;
+            if (!hit) return false;
+
+            float delay = Random.Range(p.GhostSwingReactionMin, Mathf.Max(p.GhostSwingReactionMin, p.GhostSwingReactionMax));
+            if (delay > 0.0f)
+            {
+                m_swingPending = true;
+                m_swingDelay = delay;
+                return false;
+            }
+            OnSwing(p);
+            return true;
+        }
+
+        // 振った:次の 1 回が空振りの回か決め直す
+        private void OnSwing(CpuParams p)
+        {
+            m_swingPending = false;
+            m_earlySwing = Random.value < p.GhostEarlySwingChance;
         }
 
         // 今振ると、ハンマーが相手の角度を通るときに相手が届く距離にいるか
         // (相手も自分も今の動きのまま進むとみなす。振っている間も追いかけ続けるので、逃げる相手にも届く。向きは振っている間変わらない)
-        private static bool WillHit(DarumaGhost ghost, DarumaHammer hammer, CpuParams p, DarumaCharacter s, Vector3 selfVelocity)
+        private static bool WillHit(DarumaGhost ghost, DarumaHammer hammer, CpuParams p, DarumaCharacter s, Vector3 selfVelocity, float slack)
         {
             Transform t = ghost.transform;
             Vector3 sp = s.transform.position;
@@ -334,7 +372,7 @@ namespace Nakahira
             }
             // 時間がたつほど相手の動きは変わりやすいので、遠い角度ほど届く距離を控えめにする
             float margin = Mathf.Lerp(1.0f, 0.85f, time / Mathf.Max(0.01f, duration));
-            if (new Vector2(local.x, local.z).magnitude > reach * margin) return false;
+            if (new Vector2(local.x, local.z).magnitude > reach * margin + slack) return false;
             // 空中にいる相手は、ハンマーが通るまでに着地していなければ当たらない(少し先までなら高さの差で判断済み)
             if (!s.IsGrounded && time > 0.15f) return false;
             return true;

@@ -143,7 +143,7 @@ public class MatchSoakTest : MonoBehaviour
             {
                 playerIndex = i,
                 isCpu = true,
-                cpuLevel = Random.Range(1, 10),
+                cpuLevel = Random.Range(1, MatchSetup.MaxCpuLevel + 1),
                 deviceName = "CPU",
                 character = m_roster.characters[Random.Range(0, m_roster.characters.Count)],
                 cpuNumber = count > 1 ? i + 1 : 0,

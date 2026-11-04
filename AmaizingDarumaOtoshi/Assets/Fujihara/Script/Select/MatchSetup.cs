@@ -16,11 +16,14 @@ using UnityEngine.InputSystem;
 //   ・CPU は isCpu = true（Device は null、強さは cpuLevel）
 public static class MatchSetup
 {
+    // CPU の強さの段階数（セレクトで 1〜この数を選ぶ）
+    public const int MaxCpuLevel = 3;
+
     public class Entry
     {
         public int playerIndex;         // 0 = 1P, 1 = 2P, ...
         public bool isCpu;
-        public int cpuLevel;            // CPU の強さ（1〜9）
+        public int cpuLevel;            // CPU の強さ（1〜MaxCpuLevel。1 = よわい、2 = ふつう、3 = つよい）
         public int deviceId = -1;       // InputDevice.deviceId（CPU は -1）
         public string deviceName;
         public CharacterData character;

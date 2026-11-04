@@ -261,6 +261,13 @@ namespace Nakahira
         [Header("幽霊:攻撃")]
         [Tooltip("ハンマーが届く距離の何割まで近づいたら振るか(1 に近いほど届くぎりぎりでも振る)")]
         [Range(0.5f, 1.0f)] public float GhostHitMargin = 0.9f;
+        [Tooltip("振れば当たると気づいてから振るまでの遅れ(秒)の最小・最大。遅れても見込みは直さないので、遅いほど外れやすい")]
+        [Min(0.0f)] public float GhostSwingReactionMin = 0.0f;
+        [Min(0.0f)] public float GhostSwingReactionMax = 0.0f;
+        [Tooltip("届かない距離で振ってしまう(空振り)確率。振るたびに次の 1 回について決める")]
+        [Range(0.0f, 1.0f)] public float GhostEarlySwingChance = 0.0f;
+        [Tooltip("空振りするとき、届く距離に足してしまう距離(m)")]
+        [Min(0.0f)] public float GhostEarlySwingSlack = 1.0f;
 
         [Header("幽霊:積み木を弾いて当てる")]
         [Tooltip("弾いた積み木が相手に当たるとみなす、積み木から相手までの距離の上限(m。積み木は約12mで当たらなくなる)")]

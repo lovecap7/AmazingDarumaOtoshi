@@ -15,6 +15,10 @@ MonoBehaviour:
   characterPrefab: {fileID: 6242312641939630888, guid: 98dfe1d631da6fc429ba3618bb53aa46, type: 3}
   ghostPrefab: {fileID: 8875810368968693823, guid: f0f050629671f114096c296b81b42a53, type: 3}
   gamepadInputPrefab: {fileID: 5892873720667531287, guid: 300128965eb4d164e83f73f763787500, type: 3}
+  cpuParams:
+  - {fileID: 11400000, guid: 07fdb32fcf2bc8e459faa0332cf7392a, type: 2}
+  - {fileID: 11400000, guid: da3a1306d099d154cb6ae64debc78430, type: 2}
+  - {fileID: 11400000, guid: 61306de6ed4e45947be2f1eec470e918, type: 2}
   respawnDelay: 1.5
   respawnInvincibleTime: 2
   resultTime: 4
