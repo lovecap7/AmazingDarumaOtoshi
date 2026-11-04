@@ -61,7 +61,8 @@ public class MatchSelect : MonoBehaviour
     [SerializeField, Range(1, 8)] int minHumans = 1;
     [Tooltip("CPU を含めた参加者が最低何人必要か（1人プレイなら CPU を足して2人以上にする）")]
     [SerializeField, Range(1, 8)] int minParticipants = 2;
-    [SerializeField, Range(1, 9)] int defaultCpuLevel = 3;
+    [Tooltip("CPU を足したときの強さ（1 = よわい、2 = ふつう、3 = つよい）")]
+    [SerializeField, Range(1, MatchSetup.MaxCpuLevel)] int defaultCpuLevel = 3;
     [Tooltip("ルールセレクトで選べる時間（秒）。ストックの時間制限は「なし」→ 並び順、タイムの試合時間は並び順に切り替わる")]
     [SerializeField] float[] timeLimitChoices = { 60f, 120f, 180f };
     [Tooltip("ストックで選べる最大のストック数（1〜この数）")]
@@ -592,7 +593,7 @@ public class MatchSelect : MonoBehaviour
             if (cpu != null && cpu.IsCpu && ui.levelRow.gameObject.activeSelf)
             {
                 if (Hit(ui.minus, p.cursor)) { cpu.cpuLevel = Mathf.Max(1, cpu.cpuLevel - 1); MenuSounds.Cursor(); return; }
-                if (Hit(ui.plus, p.cursor)) { cpu.cpuLevel = Mathf.Min(9, cpu.cpuLevel + 1); MenuSounds.Cursor(); return; }
+                if (Hit(ui.plus, p.cursor)) { cpu.cpuLevel = Mathf.Min(MatchSetup.MaxCpuLevel, cpu.cpuLevel + 1); MenuSounds.Cursor(); return; }
             }
         }
 
@@ -693,7 +694,7 @@ public class MatchSelect : MonoBehaviour
     // CPU を作る。最初はランダムのマスにコインを置く
     Player AddCpu(int i, int level)
     {
-        var p = new Player { index = i, cpuLevel = level };
+        var p = new Player { index = i, cpuLevel = Mathf.Clamp(level, 1, MatchSetup.MaxCpuLevel) };
         p.charToken = MakeToken(p, charRoot);
         slots[i] = p;
         SetCharacter(p, charTiles.Find(t => t.random));

@@ -472,9 +472,20 @@ namespace Nakahira
             if (e.isCpu)
             {
                 go = new GameObject();
-                var cpu = go.AddComponent<CpuDarumaInput>();
-                cpu.level = e.cpuLevel;
-                source = cpu;
+                // 強さに合う CpuParams が MatchSettings にあれば DarumaCpu、無ければ仮の CPU
+                CpuParams cpuParams = m_settings.CpuParamsFor(e.cpuLevel);
+                if (cpuParams != null)
+                {
+                    var cpu = go.AddComponent<DarumaCpu>();
+                    cpu.Params = cpuParams;
+                    source = cpu;
+                }
+                else
+                {
+                    var cpu = go.AddComponent<CpuDarumaInput>();
+                    cpu.level = e.cpuLevel;
+                    source = cpu;
+                }
             }
             else if (device is Gamepad && m_settings.gamepadInputPrefab != null)
             {
