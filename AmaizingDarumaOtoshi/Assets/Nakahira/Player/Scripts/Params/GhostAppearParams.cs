@@ -69,6 +69,21 @@ namespace Nakahira
         [Tooltip("幽霊がぽんと出るときに一瞬大きくなる倍率")]
         [Min(1.0f)] public float PopOvershoot = 1.2f;
 
+        [Header("復活: 魂が出現ポイントへ飛ぶ(時間は DarumaMatch の「復活で魂が移動する時間」)")]
+        [Tooltip("魂が飛び出す高さ(幽霊の位置から)")]
+        public float ReviveStartHeight = 0.75f;
+        [Tooltip("魂がたどり着く高さ(出現ポイントから。ここで光の柱に変わる)")]
+        public float ReviveEndHeight = 0.9f;
+        [Tooltip("弧の高さ(距離 0 のとき, m)")]
+        [Min(0.0f)] public float ReviveArcHeight = 1.5f;
+        [Tooltip("距離 1m ごとに弧を高くする量(m)")]
+        [Min(0.0f)] public float ReviveArcPerMeter = 0.2f;
+        [Tooltip("弧の高さの上限(m)")]
+        [Min(0.0f)] public float ReviveArcMax = 5.0f;
+        [Tooltip("進み方(横: 時間 0〜1 / 縦: 進んだ割合 0〜1)")]
+        public AnimationCurve ReviveCurve = new AnimationCurve(
+            new Keyframe(0.0f, 0.0f, 0.0f, 0.0f), new Keyframe(1.0f, 1.0f, 0.6f, 0.6f));
+
         [Header("光源")]
         [Min(0.0f)] public float LightIntensity = 3.0f;
         [Min(0.1f)] public float LightRange = 3.0f;

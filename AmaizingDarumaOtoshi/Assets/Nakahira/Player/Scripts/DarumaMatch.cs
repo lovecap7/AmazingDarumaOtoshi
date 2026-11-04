@@ -35,6 +35,7 @@ namespace Nakahira
     //     PlayerJoined(人)         ：途中から参加した(直接再生)
     //     PlayerKnocked(被害, 相手)：積み木を崩された(相手が分かったときだけ)
     //     PlayerKO(被害, 相手)     ：顔を飛ばされた / 落ちた(相手は分からなければ null)
+    //     PlayerReviveTraveling(人, 幽霊の位置, 出現ポイント, 秒)：幽霊が復活して魂が飛び始めた(この秒数のあとに PlayerRespawnAppearing が来る)
     //     PlayerRespawnAppearing(人, 位置, 秒)：復活の出現演出が始まった(この秒数のあとに位置へ出て PlayerRespawned が来る)
     //     PlayerRespawned(人)      ：復活した(ストック・タイムの復活、幽霊からの復活)
     //     PlayerOut(人)            ：脱落した(ストックが無くなった)
@@ -90,6 +91,8 @@ namespace Nakahira
         [SerializeField] bool m_addDebugView = true;
         // 復活するとき、出る位置で光る演出(PlayerRespawnAppearing)を見せてからキャラクターを出すまでの時間(0 ならすぐ出す)
         [SerializeField, Min(0.0f)] float m_respawnAppearTime = 0.8f;
+        // 幽霊が復活するとき、幽霊の位置から出現ポイントまで魂が飛ぶ時間(GhostReviveSoulEffect)。そのあと上の出現演出が始まる(0 なら飛ばない)
+        [SerializeField, Min(0.0f)] float m_reviveTravelTime = 0.7f;
 
         [Header("開始のカウントダウン")]
         // カウントダウンの秒数(3 なら 3, 2, 1。0 ならすぐ始める)。シーンのフェードが明けてから数え始める
@@ -134,6 +137,8 @@ namespace Nakahira
         public MatchResult Result { get; private set; }
         // 復活の出現演出の時間
         public float RespawnAppearTime => m_respawnAppearTime;
+        // 幽霊の復活で魂が出現ポイントへ飛ぶ時間(このあと復活の出現演出が始まる)
+        public float ReviveTravelTime => m_reviveTravelTime;
         // 開始のカウントダウン中か(フェードが明けるのを待っている間も含む)。この間は操作・時間・積み木の生成が止まる
         public bool IsCountingDown => m_countdownLeft > 0f;
         // カウントダウンの残り(秒)と、全体の秒数
@@ -159,6 +164,8 @@ namespace Nakahira
         public event Action<MatchPlayer, MatchPlayer> PlayerKnocked;
         public event Action<MatchPlayer, MatchPlayer> PlayerKO;
         public event Action<MatchPlayer, Vector3, float> PlayerRespawnAppearing;
+        // (人, 幽霊の位置, 出現ポイント, 秒): 幽霊が復活して、魂が出現ポイントへ飛び始めた(この秒数のあとに PlayerRespawnAppearing が来る)
+        public event Action<MatchPlayer, Vector3, Vector3, float> PlayerReviveTraveling;
         public event Action<MatchPlayer> PlayerRespawned;
         public event Action<MatchPlayer> PlayerOut;
         public event Action<MatchPlayer, int, ScoreReason> Scored;
@@ -179,6 +186,8 @@ namespace Nakahira
             public MatchPlayer player;
             public Vector3 pos;
             public float timeLeft;
+            // 魂が出現ポイントへ飛んでいる残り(幽霊の復活。0 になったら出現演出を始める)
+            public float travelLeft;
         }
 
         MatchSettings m_settings;
@@ -569,6 +578,20 @@ namespace Nakahira
             PlayerRespawnAppearing?.Invoke(p, pos, m_respawnAppearTime);
         }
 
+        // 幽霊の復活: 幽霊の位置(from)から魂が出現ポイント(pos)へ飛んでから、いつもの復活(出現演出)をする
+        // soul: 魂の見た目(幽霊のプレハブの GhostAppearParams。null なら魂は見えないが、時間は同じだけ待つ)
+        void ReviveFromGhost(MatchPlayer p, Vector3 from, Vector3 pos, GhostAppearParams soul)
+        {
+            if (m_reviveTravelTime <= 0f)
+            {
+                Respawn(p, pos);
+                return;
+            }
+            m_appearing.Add(new Appearing { player = p, pos = pos, timeLeft = m_respawnAppearTime, travelLeft = m_reviveTravelTime });
+            GhostReviveSoulEffect.Play(soul, from, pos, m_reviveTravelTime);
+            PlayerReviveTraveling?.Invoke(p, from, pos, m_reviveTravelTime);
+        }
+
         void RespawnNow(MatchPlayer p, Vector3 pos)
         {
             SpawnMatchCharacter(p, pos, true);
@@ -581,6 +604,19 @@ namespace Nakahira
             for (int i = 0; i < m_appearing.Count;)
             {
                 var a = m_appearing[i];
+                if (a.travelLeft > 0f)
+                {
+                    // 魂が飛んでいる。着いたら出現演出を始める
+                    a.travelLeft -= Time.deltaTime;
+                    if (a.travelLeft > 0f) { i++; continue; }
+                    a.travelLeft = 0f;
+                    if (a.timeLeft > 0f)
+                    {
+                        PlayerRespawnAppearing?.Invoke(a.player, a.pos, a.timeLeft);
+                        i++;
+                        continue;
+                    }
+                }
                 a.timeLeft -= Time.deltaTime;
                 if (a.timeLeft > 0f) { i++; continue; }
                 m_appearing.RemoveAt(i);
@@ -738,8 +774,11 @@ namespace Nakahira
                 Attribute(p);
                 if (Result != null) return;
                 // その場で復活すると、直接殴った相手(近くにいる幽霊など)にすぐ殴り返されるので、出現ポイントのどれかに出す(仮)
+                // 幽霊は消え、魂が出現ポイントへ飛んでから復活する(どこに出るか目で追えるように)
+                Vector3 from = g.transform.position;
+                GhostAppearParams soul = g.AppearParams;
                 Destroy(g.gameObject);
-                Respawn(p, RandomSpawnPoint());
+                ReviveFromGhost(p, from, RandomSpawnPoint(), soul);
             };
             // 魂が上へ飛んで、上から降ってきてから幽霊が出る(それまで幽霊は見えず動かない)
             // ネット対戦のクライアントには届かない(ホストだけで見える)

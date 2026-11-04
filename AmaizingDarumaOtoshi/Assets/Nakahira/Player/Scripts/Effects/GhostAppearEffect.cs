@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using Nakagawa;
 using UnityEngine;
 
@@ -15,11 +14,6 @@ namespace Nakahira
     {
         enum Phase { Rise, Wait, Fall, Land }
 
-        // 魂のメッシュのしっぽの長さ(頭の半径を1として)
-        const float kTailLength = 2.2f;
-        // これ以上の速さでしっぽが一番伸びる(m/秒)
-        const float kStretchSpeed = 40.0f;
-
         DarumaGhost m_ghost;
         GhostAppearParams m_params;
         Vector3 m_from;
@@ -28,16 +22,9 @@ namespace Nakahira
         float m_time;
         float m_totalTime;
 
-        Transform m_soul;
-        Transform m_soulBody;
-        MeshRenderer m_soulGlow, m_soulCore;
-        TrailRenderer m_trail;
+        GhostSoulVisual m_soul;
         Light m_light;
         MeshRenderer m_markerRing, m_markerDisc;
-        Vector3 m_lastSoulPos;
-        Vector3 m_soulDir = Vector3.up;
-
-        static Mesh s_soulMesh;
 
         // やられたキャラクターから魂を出す(落下のときは場外判定の位置から、それ以外はやられた位置の少し上から)
         public static GhostAppearEffect Play(DarumaGhost ghost, DarumaCharacter from)
@@ -67,13 +54,23 @@ namespace Nakahira
             m_landing = ghost.transform.position;
             transform.position = m_landing;
             ghost.BeginAppear();
-            BuildSoul();
+
+            m_soul = new GhostSoulVisual(transform, m_params);
             BuildMarker();
+            if (m_params.LightIntensity > 0.0f)
+            {
+                var lightGo = new GameObject("MarkerLight");
+                lightGo.transform.SetParent(transform, false);
+                m_light = lightGo.AddComponent<Light>();
+                m_light.type = LightType.Point;
+                m_light.shadows = LightShadows.None;
+                m_light.intensity = 0.0f;
+            }
 
             m_phase = Phase.Rise;
             m_time = 0.0f;
             m_totalTime = 0.0f;
-            MoveSoul(m_from, true);
+            m_soul.Move(m_from, true);
             Apply();
         }
 
@@ -110,20 +107,20 @@ namespace Nakahira
             {
                 m_time -= p.RiseTime;
                 m_phase = Phase.Wait;
-                m_soul.gameObject.SetActive(false);
+                m_soul.SetActive(false);
             }
             if (m_phase == Phase.Wait && m_time >= p.WaitTime)
             {
                 m_time -= p.WaitTime;
                 m_phase = Phase.Fall;
-                m_soul.gameObject.SetActive(true);
-                MoveSoul(m_landing + Vector3.up * p.FallHeight, true);
+                m_soul.SetActive(true);
+                m_soul.Move(m_landing + Vector3.up * p.FallHeight, true);
             }
             if (m_phase == Phase.Fall && m_time >= p.FallTime)
             {
                 m_time -= p.FallTime;
                 m_phase = Phase.Land;
-                m_soul.gameObject.SetActive(false);
+                m_soul.SetActive(false);
                 if (m_ghost != null)
                 {
                     m_ghost.FinishAppear();
@@ -155,12 +152,13 @@ namespace Nakahira
         {
             var p = m_params;
             float t = Mathf.Clamp01(m_time / p.RiseTime);
-            MoveSoul(m_from + Vector3.up * (p.RiseHeight * p.RiseCurve.Evaluate(t)), false);
+            m_soul.Move(m_from + Vector3.up * (p.RiseHeight * p.RiseCurve.Evaluate(t)), false);
             // 出た瞬間はぽんと大きくなり、上の方では消えていく(画面の外なので念のため)
-            float pop = EaseOut(Mathf.Clamp01(m_time / 0.08f));
+            float pop = EaseOut(m_time / 0.08f);
             float fade = 1.0f - Smooth((t - 0.75f) / 0.25f);
-            ApplySoul(pop, fade);
+            m_soul.Apply(pop, fade, m_totalTime);
             m_markerRing.enabled = m_markerDisc.enabled = false;
+            SetLight(m_landing, 0.0f);
         }
 
         private void ApplyFall()
@@ -169,8 +167,8 @@ namespace Nakahira
             float t = Mathf.Clamp01(m_time / p.FallTime);
             Vector3 top = m_landing + Vector3.up * p.FallHeight;
             Vector3 bottom = m_landing + Vector3.up * p.LandHeight;
-            MoveSoul(Vector3.LerpUnclamped(top, bottom, p.FallCurve.Evaluate(t)), false);
-            ApplySoul(1.0f, Smooth(t / 0.15f));
+            m_soul.Move(Vector3.LerpUnclamped(top, bottom, p.FallCurve.Evaluate(t)), false);
+            m_soul.Apply(1.0f, Smooth(t / 0.15f), m_totalTime);
             ApplyMarker(p.WaitTime + m_time);
         }
 
@@ -215,102 +213,6 @@ namespace Nakahira
             }
         }
 
-        //========================================
-        // 魂
-        //========================================
-
-        // 魂を動かす。jump なら瞬間移動(軌跡を消す)
-        private void MoveSoul(Vector3 pos, bool jump)
-        {
-            if (!jump)
-            {
-                Vector3 delta = pos - m_lastSoulPos;
-                if (delta.sqrMagnitude > 0.000001f) m_soulDir = delta.normalized;
-                float dt = Time.deltaTime;
-                float speed = dt > 0.0f ? delta.magnitude / dt : 0.0f;
-                m_soulStretch = Mathf.Lerp(1.0f, m_params.TailStretch, Mathf.Clamp01(speed / kStretchSpeed));
-            }
-            m_soul.position = pos;
-            m_lastSoulPos = pos;
-            if (jump) m_trail.Clear();
-        }
-
-        float m_soulStretch = 1.0f;
-
-        // size: 大きさの倍率 / alpha: 濃さの倍率
-        private void ApplySoul(float size, float alpha)
-        {
-            var p = m_params;
-            float flicker = Mathf.Sin(m_totalTime * p.FlickerSpeed);
-            float r = p.SoulRadius * size * (1.0f + 0.08f * flicker);
-
-            // しっぽは進む向きの反対へ。炎のようにゆらゆら揺らす
-            Quaternion rot = Quaternion.FromToRotation(Vector3.up, -m_soulDir);
-            Quaternion sway = Quaternion.Euler(
-                Mathf.Sin(m_totalTime * p.FlickerSpeed * 0.7f) * 10.0f, 0.0f,
-                Mathf.Cos(m_totalTime * p.FlickerSpeed * 0.9f) * 10.0f);
-            m_soulBody.rotation = rot * sway;
-            m_soulBody.localScale = new Vector3(r, r * p.TailLength * m_soulStretch * (1.0f - 0.06f * flicker), r);
-
-            Color glow = p.SoulColor;
-            glow.a = 0.45f * alpha;
-            EffectMeshes.SetColor(m_soulGlow, glow);
-            Color core = p.CoreColor;
-            core.a = alpha;
-            EffectMeshes.SetColor(m_soulCore, core);
-
-            m_trail.time = p.TrailTime;
-            m_trail.widthMultiplier = p.TrailWidth * size;
-            Color trailColor = p.SoulColor;
-            m_trail.colorGradient = TrailGradient(trailColor, 0.7f * alpha);
-
-            if (m_light != null)
-            {
-                m_light.transform.position = m_soul.position;
-                m_light.color = p.SoulColor;
-                m_light.range = p.LightRange;
-                m_light.intensity = p.LightIntensity * alpha;
-            }
-        }
-
-        private void BuildSoul()
-        {
-            var p = m_params;
-            m_soul = new GameObject("Soul").transform;
-            m_soul.SetParent(transform, false);
-            m_soulBody = new GameObject("Body").transform;
-            m_soulBody.SetParent(m_soul, false);
-
-            // 外側の光(大きめ・薄め)と芯。芯を手前に描く
-            m_soulGlow = EffectMeshes.Create("Glow", m_soulBody, SoulMesh, false);
-            m_soulGlow.transform.localScale = Vector3.one * 1.6f;
-            m_soulGlow.sortingOrder = 0;
-            m_soulCore = EffectMeshes.Create("Core", m_soulBody, SoulMesh, false);
-            m_soulCore.sortingOrder = 1;
-
-            m_trail = m_soul.gameObject.AddComponent<TrailRenderer>();
-            m_trail.sharedMaterial = EffectMeshes.AlphaMaterial;
-            m_trail.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            m_trail.receiveShadows = false;
-            m_trail.minVertexDistance = 0.05f;
-            m_trail.numCapVertices = 4;
-            m_trail.widthCurve = new AnimationCurve(new Keyframe(0.0f, 1.0f), new Keyframe(1.0f, 0.0f));
-            m_trail.time = p.TrailTime;
-            m_trail.widthMultiplier = p.TrailWidth;
-
-            if (p.LightIntensity > 0.0f)
-            {
-                var lightGo = new GameObject("Light");
-                lightGo.transform.SetParent(transform, false);
-                m_light = lightGo.AddComponent<Light>();
-                m_light.type = LightType.Point;
-                m_light.shadows = LightShadows.None;
-                m_light.color = p.SoulColor;
-                m_light.range = p.LightRange;
-                m_light.intensity = 0.0f;
-            }
-        }
-
         private void SetLight(Vector3 pos, float intensity)
         {
             if (m_light == null) return;
@@ -318,15 +220,6 @@ namespace Nakahira
             m_light.color = m_params.SoulColor;
             m_light.range = m_params.LightRange;
             m_light.intensity = Mathf.Max(0.0f, intensity);
-        }
-
-        private static Gradient TrailGradient(Color color, float alpha)
-        {
-            var g = new Gradient();
-            g.SetKeys(
-                new[] { new GradientColorKey(color, 0.0f), new GradientColorKey(color, 1.0f) },
-                new[] { new GradientAlphaKey(alpha, 0.0f), new GradientAlphaKey(0.0f, 1.0f) });
-            return g;
         }
 
         //========================================
@@ -352,84 +245,6 @@ namespace Nakahira
             r.transform.localScale = new Vector3(radius, 1.0f, radius);
             c.a = Mathf.Clamp01(alpha);
             EffectMeshes.SetColor(r, c);
-        }
-
-        //========================================
-        // 人魂のメッシュ(丸い頭 + 先が細く透明になるしっぽ。しっぽは +Y 向き)
-        //========================================
-
-        static Mesh SoulMesh => s_soulMesh != null ? s_soulMesh : s_soulMesh = BuildSoulMesh();
-
-        static Mesh BuildSoulMesh()
-        {
-            const int seg = 20;
-            const int headRings = 8;
-            const int tailRings = 12;
-
-            // 輪ごとの (高さ, 半径, 濃さ)
-            var rings = new List<Vector3>();
-            for (int i = 1; i <= headRings; i++)
-            {
-                float a = i / (float)headRings * Mathf.PI * 0.5f;
-                rings.Add(new Vector3(-Mathf.Cos(a), Mathf.Sin(a), 1.0f));
-            }
-            for (int i = 1; i < tailRings; i++)
-            {
-                float s = i / (float)tailRings;
-                float radius = Mathf.Pow(Mathf.Cos(s * Mathf.PI * 0.5f), 0.8f);
-                rings.Add(new Vector3(s * kTailLength, radius, Mathf.Pow(1.0f - s, 1.3f)));
-            }
-
-            var v = new List<Vector3>();
-            var c = new List<Color>();
-            var t = new List<int>();
-
-            // 頭の先
-            v.Add(new Vector3(0.0f, -1.0f, 0.0f));
-            c.Add(Color.white);
-            for (int r = 0; r < rings.Count; r++)
-            {
-                for (int i = 0; i < seg; i++)
-                {
-                    float a = i * Mathf.PI * 2.0f / seg;
-                    v.Add(new Vector3(Mathf.Cos(a) * rings[r].y, rings[r].x, Mathf.Sin(a) * rings[r].y));
-                    c.Add(new Color(1.0f, 1.0f, 1.0f, rings[r].z));
-                }
-            }
-            // しっぽの先
-            int tip = v.Count;
-            v.Add(new Vector3(0.0f, kTailLength, 0.0f));
-            c.Add(new Color(1.0f, 1.0f, 1.0f, 0.0f));
-
-            for (int i = 0; i < seg; i++)
-            {
-                t.Add(0); t.Add(1 + (i + 1) % seg); t.Add(1 + i);
-            }
-            for (int r = 0; r < rings.Count - 1; r++)
-            {
-                int b0 = 1 + r * seg;
-                int b1 = b0 + seg;
-                for (int i = 0; i < seg; i++)
-                {
-                    int i0 = b0 + i, i1 = b0 + (i + 1) % seg;
-                    int j0 = b1 + i, j1 = b1 + (i + 1) % seg;
-                    t.Add(i0); t.Add(j0); t.Add(i1);
-                    t.Add(i1); t.Add(j0); t.Add(j1);
-                }
-            }
-            int last = 1 + (rings.Count - 1) * seg;
-            for (int i = 0; i < seg; i++)
-            {
-                t.Add(last + i); t.Add(last + (i + 1) % seg); t.Add(tip);
-            }
-
-            var mesh = new Mesh { name = "GhostSoul" };
-            mesh.SetVertices(v);
-            mesh.SetColors(c);
-            mesh.SetTriangles(t, 0);
-            mesh.RecalculateNormals();
-            mesh.RecalculateBounds();
-            return mesh;
         }
 
         private static float Smooth(float t)
