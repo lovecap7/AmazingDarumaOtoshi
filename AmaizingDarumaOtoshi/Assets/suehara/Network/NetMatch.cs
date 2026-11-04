@@ -9,7 +9,7 @@ using UnityEngine;
 //  ・接続したら、シーンの Match(最初は非表示の DarumaMatch)に NetMatchDriver を付けて表示する
 //  ・ホスト      : 接続した人ごとに NetPlayer を出す(1人分は NetMatchPlayer)。ルール・時間・試合の始まりと終わり・お知らせを配る
 //  ・クライアント: 届いたルール・時間・結果・お知らせを DarumaMatch に入れる(HUD・カメラなどはいつもどおり DarumaMatch を読む)
-// 試合を始めるのはホスト(StartMatch。テスト用 UI の「試合開始」)。それまでは開始待ちで、自由に動ける
+// 試合を始めるのはホスト(StartMatch。NetSessionMenu の「試合を はじめる」)。開始待ちの間に選んだルールは SetRules で配る。それまでは開始待ちで、自由に動ける
 // 試合が終わったらローカル(MatchResultRelay)と同じく、結果を ResultData に入れて全員でリザルト画面へ移り、
 // ホストの決定でこのシーンに戻る(NetSceneFlow / NetResultFlow)。シーンを読み直すので、次の試合はまた開始待ちから
 public class NetMatch : NetworkBehaviour
@@ -70,6 +70,7 @@ public class NetMatch : NetworkBehaviour
     // ホストが試合を始めたか(false なら開始待ち)
     public bool IsStarted => m_clock.Value.Started;
     public MatchSetup.MatchRules Rules => ToRules(m_rules.Value);
+    public RulesData RulesValue => m_rules.Value;
     public int PlayerCount => m_match != null ? m_match.Players.Count : 0;
 
     void Awake()
@@ -152,6 +153,14 @@ public class NetMatch : NetworkBehaviour
         m_match.BeginNetMatch();
     }
 
+    // ホスト: 開始待ちの間に選んでいるルールを配る(さんかした人の表示に出す。試合はまだ始めない)
+    public void SetRules(MatchSetup.MatchRules rules)
+    {
+        if (!IsServer || m_match == null || IsStarted) return;
+        m_rules.Value = FromRules(rules);
+        m_match.SetNetRules(rules);
+    }
+
     private void Update()
     {
         if (!IsSpawned || m_match == null) return;
@@ -230,7 +239,7 @@ public class NetMatch : NetworkBehaviour
         m_match.NetClientSetClock(c.Started, m_elapsed, m_countdown, c.CountdownLength);
     }
 
-    static RulesData FromRules(MatchSetup.MatchRules r) => new RulesData
+    public static RulesData FromRules(MatchSetup.MatchRules r) => new RulesData
     {
         Mode = (byte)r.mode,
         Stocks = (byte)Mathf.Clamp(r.stocks, 1, 99),

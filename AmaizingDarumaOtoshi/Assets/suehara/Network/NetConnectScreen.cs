@@ -222,6 +222,7 @@ public class NetConnectScreen : MonoBehaviour
             }
             PlayerPrefs.SetString(kAddressKey, input);
             MenuSounds.Decide();
+            NetRoom.JoinedRoom = 0;
             StartClient(input, m_port);
             return;
         }
@@ -255,6 +256,7 @@ public class NetConnectScreen : MonoBehaviour
         {
             string address = m_search.Address;
             ushort port = m_search.GamePort;
+            NetRoom.JoinedRoom = int.Parse(m_address);
             StopSearch();
             StartClient(address, port);
             return;

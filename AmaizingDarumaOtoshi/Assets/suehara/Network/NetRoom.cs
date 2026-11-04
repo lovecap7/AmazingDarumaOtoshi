@@ -28,6 +28,8 @@ public class NetRoom : MonoBehaviour
     public static int Current => s_instance != null ? s_instance.m_room : 0;
     // 問い合わせを待てているか(待てていなければ、番号では見つけてもらえない)
     public static bool IsAnswering => s_instance != null && s_instance.m_udp != null;
+    // さんか: へやばんごうで見つけてつないだへやの番号(IP アドレスでつないだときは 0)
+    public static int JoinedRoom { get; set; }
 
     UdpClient m_udp;
     int m_room;

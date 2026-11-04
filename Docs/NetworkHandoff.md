@@ -62,7 +62,8 @@
 | `NetMatchDriver.cs` / `INetMatchDriver.cs` | Match に付けてネットの試合にする部品。出したキャラ・幽霊を Spawn する |
 | `NetMatchPlayer.cs` / `NetPlayer.prefab` | 接続した人ごとの1人分（PlayerObject）。NetworkCommandSource（入力）と NetMatchPlayer（中身の同期）。MatchPlayer は実行時に付ける |
 | `NetEffects.cs` | NetMatch と同じ GameObject。ホストの生成予告を見た目だけの予告で出す / 割れた積み木の破片を出す |
-| `NetLobbyUI.cs` | LAN の接続画面（NetTestUI の置き換え）。下の「テストのしかた」参照。リザルトから戻ったとき、シーンに入っている2つ目の NetworkManager を消す |
+| `NetLobbyUI.cs` | NetStages の接続まわり。つないでいないときの中央の接続パネル（NetStages を直接開いたときの試験用。クリック操作）、切断したときの戻り（接続画面から来たときは接続画面へ）、NetSessionMenu を自動で付ける。リザルトから戻ったとき、シーンに入っている2つ目の NetworkManager を消す |
+| `NetSessionMenu.cs` | NetStages でつないでいる間の表示とメニュー（2026-11-04。クリックなし）。右上にいまの試合の設定・へやばんごう・人数。Start（+）/ Tab でメニュー（見た目は中川さんの PauseMenu と同じ）: ホストの開始待ちは「試合を はじめる / モード / ストック / 時間 / へやを かいさん / とじる」、試合中とさんかは「かいさん（ぬける）/ とじる」。ホストが変えたルールは `NetMatch.SetRules` ですぐ全員に配る。開いている間はキャラの入力（NetPadKeyboardInput）と、OnGUI で描く開発用の表示（StageSwitcher・TumikiImpactModeToggle・SpawnPointDebugView・StageCameraTuner・CharacterLabUI。OnGUI はどの UI よりも上に出るため）を止める。**Yurube さんの必殺技のゲージ・カットインも OnGUI なのでメニューの上に出る**（止めると必殺技が止まるのでそのまま）。ネット対戦は時間を止められないので、試合中に開いても試合は進む |
 | `NetSceneFlow.cs` | ネットのシーン遷移（自動で1個作られ、シーンをまたいで残る）。ホストの `Load(scene)` で全員を暗くしてから NGO で切り替え、読み終わったら明るくする。リザルトで切断したら NetStages に戻す |
 | `NetResultFlow.cs` | 接続中にリザルト画面が読み込まれたら自動で付く。演出が終わったら画面自身のセレクト行きを止め（`done` / `leaving` をリフレクションで読み書き）、ホストの決定で NetStages に戻す。**ResultTowerScreen / ResultScreen のフィールド名が変わったら直す** |
 | `DarumaCharacter_Net.prefab` | キャラのネット用 Variant。NetworkObject, NetworkTransform, NetworkRigidbody, NetworkDarumaCharacter, NetworkHammerView |
@@ -133,13 +134,14 @@
 - **PC 2台の LAN テストは未実施**。
 
 ### テストのしかた
-本番の流れ: MenuScene から再生 →「たたかう → オンライン」→ ホストは「ホスト」、参加する人は「さんか」でホストの画面のへやばんごうを入れる → ホストが A / Start で試合のシーンへ（そこからは下の 3. 以降と同じ）。
+本番の流れ: MenuScene から再生 →「たたかう → オンライン」→ ホストは「ホスト」、参加する人は「さんか」でホストの画面のへやばんごうを入れる → ホストが A / Start で試合のシーンへ →
+ホストが Start（+ / Tab）のメニューでルールを選んで「試合を はじめる」（かいさん・ぬけるもこのメニュー）。
 
 NetStages を直接開いて試すとき:
 1. NetStages を開いて再生 → 画面中央の「ホストになる」
 2. Multiplayer Play Mode の Player 2 で、IP に `127.0.0.1` を入れて「参加」
    （別の PC からはホストの左上に出る IP を入れる。初回は Windows のファイアウォールの許可が出る）
-3. ホストの左上でモード・ストック・時間を選んで「試合開始」（開始待ちのときだけ。試合が終わったらリザルトのあと、ホストの画面で決定（Enter など）すると戻ってくる）
+3. ホストが Start（+ / Tab）でメニューを開き、モード・ストック・時間を選んで「試合を はじめる」（開始待ちのときだけ。試合が終わったらリザルトのあと、ホストの画面で決定（Enter など）すると戻ってくる）
 4. 操作する側のウィンドウをクリックしてから操作（入力はフォーカス中の画面だけ）
 5. ステージ切り替えはホストの左右キー
 6. ビルドでは `-nethost` でホスト、`-netclient <IP>` で参加して始められる
