@@ -40,6 +40,18 @@ public static class ToyKit
         public LensDistortion lens;
     }
 
+    // カメラの画角を調整したときの画面の縦横比（Game ビューの Free Aspect で、だいたい 2:1）
+    public const float DesignAspect = 2f;
+
+    // 調整したときと同じ左右の範囲が映るように、いまの画面の縦横比に合わせた縦の画角を返す
+    // （1920x1080 の 16:9 では、左右はそのままで、上下が少し広く映る）
+    public static float FitFov(float designFov, float aspect)
+    {
+        if (aspect <= 0f) return designFov;
+        float t = Mathf.Tan(designFov * 0.5f * Mathf.Deg2Rad) * DesignAspect / aspect;
+        return 2f * Mathf.Atan(t) * Mathf.Rad2Deg;
+    }
+
     public static Camera CreateCamera()
     {
         var go = new GameObject("Camera");

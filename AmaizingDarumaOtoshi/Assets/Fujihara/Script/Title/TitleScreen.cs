@@ -124,6 +124,7 @@ public partial class TitleScreen : MonoBehaviour
 
     // ---- 効果 ----
     float chromaPulse, bloomPulse, lensPulse;
+    float designFov = 40f;   // いまの画角（調整したときの縦横比での値。実際のカメラは ToyKit.FitFov で縦横比に合わせる）
     float speedTarget, speedReroll;
     float shockStart = -100f, ringStart = -100f;
     Coroutine slowRoutine;
@@ -254,7 +255,7 @@ public partial class TitleScreen : MonoBehaviour
         yield return Real(0.4f);
 
         // クレーンで引いて全体を見せ、顔がニコッ
-        Cut(Line(cam.transform.position, finalCamPos, lastLook, finalLook, cam.fieldOfView, finalFov, 2.2f));
+        Cut(Line(cam.transform.position, finalCamPos, lastLook, finalLook, designFov, finalFov, 2.2f));
         yield return Real(1.0f);
         yield return HeadSmile();
         StartCoroutine(Reveal());
@@ -866,7 +867,8 @@ public partial class TitleScreen : MonoBehaviour
         cam.transform.position = pos + drift + jolt;
         cam.transform.LookAt(look + drift * 0.5f);
         cam.transform.Rotate(0f, 0f, (Mathf.PerlinNoise(tt * 0.13f, 7.1f) - 0.5f) * 1.2f * driftAmount + UnityEngine.Random.Range(-1f, 1f) * 1.5f * shake * shake, Space.Self);
-        cam.fieldOfView = Mathf.Lerp(shot.f0, shot.f1, e);
+        designFov = Mathf.Lerp(shot.f0, shot.f1, e);
+        cam.fieldOfView = ToyKit.FitFov(designFov, cam.aspect);   // どの縦横比でも、調整したときと同じ左右の範囲を映す
 
         dof.focusDistance.value = Vector3.Distance(pos, look);
         dof.aperture.value = Mathf.Lerp(shot.ap0 > 0f ? shot.ap0 : DefaultAperture, shot.ap1 > 0f ? shot.ap1 : DefaultAperture, e);

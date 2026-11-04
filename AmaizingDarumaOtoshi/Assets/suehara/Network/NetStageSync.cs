@@ -1,4 +1,5 @@
-﻿using Nakagawa;
+﻿using System.Collections.Generic;
+using Nakagawa;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -44,6 +45,11 @@ public class NetStageSync : NetworkBehaviour
         foreach (var spawner in FindObjectsByType<TumikiSpawner>(FindObjectsInactive.Include))
         {
             spawner.enabled = false;
+        }
+        // 接続前の生成予告も消す(残すと時間が来たときにクライアントだけで積み木を作ってしまう)
+        foreach (var warning in new List<TumikiSpawnWarning>(TumikiSpawnWarning.Active))
+        {
+            Destroy(warning.gameObject);
         }
         Show(m_stageIndex.Value);
         m_stageIndex.OnValueChanged += OnIndexChanged;

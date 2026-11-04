@@ -247383,7 +247383,7 @@ MonoBehaviour:
   m_directMode: 1
   m_directStocks: 3
   m_directTimeLimit: 3600
-  m_maxPlayers: 4
+  m_maxPlayers: 5
   m_dummyCount: 0
   m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
   m_dummyStartBlocks: 5

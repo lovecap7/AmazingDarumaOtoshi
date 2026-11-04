@@ -1,6 +1,6 @@
 # ネット対戦 引き継ぎメモ
 
-最終更新: 2026-10-30（Claude との作業セッション2回目のあと）
+最終更新: 2026-11-03（Claude との作業セッション3回目: クライアント側の確認）
 担当: 末原（suehara）
 
 このメモだけで作業を再開できるように、方針・現状・既知の問題・次のタスクをまとめています。
@@ -36,8 +36,16 @@
 - **ホスト**: 試合はいつもどおり DarumaMatch が進める。
   - 出る人は接続した人（`AddNetPlayer` / 切断で `RemoveNetPlayer`）。ボタンを押した人の途中参加・セレクトの内容は使わない。
   - キャラ・幽霊は Instantiate の直後に `NetMatchDriver.OnBodySpawned` で Spawn して全員に配る。
-  - 試合の開始・やり直しは `BeginNetMatch`（シーンは読み直さない）。それまでは「開始待ち」（`IsNetWaiting`）で、時間が進まず、やられても少しして復活し、試合は終わらない。
-  - 試合が終わると、結果を見せてから自動でやり直す（Restart もネットではこれになる）。
+  - 試合の開始は `BeginNetMatch`。それまでは「開始待ち」（`IsNetWaiting`）で、時間が進まず、やられても少しして復活し、試合は終わらない。
+  - 試合が終わったら、ローカル（MatchResultRelay）と同じ流れ（11/03 から）:
+    「しあい しゅうりょう！」を2秒見せる → 全員でリザルト画面（ResultTowerScene）→ ホストの決定（または30秒）で全員 NetStages に戻る（開始待ち）。
+    シーンの切り替えは NGO の SceneManager でホストが全員分行う（`NetSceneFlow`）。試合のたびにシーンを読み直すので、試合中のやり直しはなくした。
+    結果は全員の `ResultData` に入れる（クライアントは積み木を持っていないので、タワーの積み木の色はホストから送る）。
+    戻ったときのステージは `StageSwitcher.RequestStage` で同じものにする。ルールの選択も覚えておく。
+  - DarumaMatch に入れていた「その場でやり直す」分岐（UpdateResult / Restart の `BeginNetMatch`）は、要らなくなったので消した（11/03。中平さんに伝える）。
+    試合が終わったら `NetMatch` が `DarumaMatch.AutoReturnToSelect = false` にして、DarumaMatch が自分でシーンを読み直さないようにする。
+    ホストのステージ切り替え（左右キー）も、終わったあとは SwitchTo → Restart でシーンを読み直してしまうので、`NetMatch` が StageSwitcher を止める。
+    MatchSettings の「リザルト（表彰）」を使わない設定でも、ネット対戦ではリザルト画面を通って戻る。
 - **クライアント**: DarumaMatch は試合を進めない（Update/LateUpdate で何もしない）。
   届いた人・時間・結果を `NetClient〜` メソッドで入れ、同じお知らせ（Started, Finished, PlayerKO など）を出す。
   HUD（MatchHud）・カウントダウン（StartCountdownView）・カメラ（MatchCamera）・名札（MatchDebugView）は、いつもどおり DarumaMatch を読むだけで動く。
@@ -54,7 +62,9 @@
 | `NetMatchDriver.cs` / `INetMatchDriver.cs` | Match に付けてネットの試合にする部品。出したキャラ・幽霊を Spawn する |
 | `NetMatchPlayer.cs` / `NetPlayer.prefab` | 接続した人ごとの1人分（PlayerObject）。NetworkCommandSource（入力）と NetMatchPlayer（中身の同期）。MatchPlayer は実行時に付ける |
 | `NetEffects.cs` | NetMatch と同じ GameObject。ホストの生成予告を見た目だけの予告で出す / 割れた積み木の破片を出す |
-| `NetLobbyUI.cs` | LAN の接続画面（NetTestUI の置き換え）。下の「テストのしかた」参照 |
+| `NetLobbyUI.cs` | LAN の接続画面（NetTestUI の置き換え）。下の「テストのしかた」参照。リザルトから戻ったとき、シーンに入っている2つ目の NetworkManager を消す |
+| `NetSceneFlow.cs` | ネットのシーン遷移（自動で1個作られ、シーンをまたいで残る）。ホストの `Load(scene)` で全員を暗くしてから NGO で切り替え、読み終わったら明るくする。リザルトで切断したら NetStages に戻す |
+| `NetResultFlow.cs` | 接続中にリザルト画面が読み込まれたら自動で付く。演出が終わったら画面自身のセレクト行きを止め（`done` / `leaving` をリフレクションで読み書き）、ホストの決定で NetStages に戻す。**ResultTowerScreen / ResultScreen のフィールド名が変わったら直す** |
 | `DarumaCharacter_Net.prefab` | キャラのネット用 Variant。NetworkObject, NetworkTransform, NetworkRigidbody, NetworkDarumaCharacter, NetworkHammerView |
 | `DarumaGhost_Net.prefab` | 幽霊のネット用 Variant。NetworkObject, NetworkTransform（スケール同期なし）, NetworkDarumaGhost, NetworkHammerView |
 | `Tumiki_Net.prefab` | 積み木のネット用 Variant。NetworkObject（AutoObjectParentSync=OFF）, NetworkTransform（スケール同期なし）, NetworkRigidbody, NetworkTumiki |
@@ -77,9 +87,8 @@
 ### 他の人のスクリプトに足したもの（どれも `ネット対戦用(suehara)` の目印付き。ローカルの動きは変わらない）
 | ファイル（作成者） | 追加 |
 |---|---|
-| `Nakahira/Player/Scripts/DarumaMatch.cs`（中平さん） | ネットの試合の分岐（上の「しくみ」）。`IsNetworked` / `IsNetClient` / `IsNetWaiting`、`SetNetRules`、`AddNetPlayer` / `RemoveNetPlayer` / `BeginNetMatch`、`NetClient〜`。試合中に相手が抜けて1人になったら残った人の勝ち（ストック・ゴースト） |
+| `Nakahira/Player/Scripts/DarumaMatch.cs`（中平さん） | ネットの試合の分岐（上の「しくみ」）。`IsNetworked` / `IsNetClient` / `IsNetWaiting`、`SetNetRules`、`AddNetPlayer` / `RemoveNetPlayer` / `BeginNetMatch`、`NetClient〜`。試合中に相手が抜けて1人になったら残った人の勝ち（ストック・ゴースト）。その場でやり直す分岐は 11/03 に消した |
 | `Fujihara/Script/Game/MatchPlayer.cs`（藤原さん） | `NetStackCount`、`ResetForMatch`（再戦）、`NetApply` / `NetSetBody`（クライアントで値を入れる） |
-| `Fujihara/Script/Game/MatchDebugView.cs`（藤原さん） | 再戦で Started が何度来ても名札を二重に作らない |
 | `Nakahira/Player/Scripts/DarumaHammer.cs`（中平さん） | `ViewOnly`, `PlayVisual(bool shot)`（前回） |
 | `Nakagawa/Scripts/Stage/StageSwitcher.cs`（中川さん） | `SwitchStarting` / `StageApplied(int)` / `StageCount` / `ShowStage(int)`（前回） |
 | `Nakagawa/Scripts/Gimmicks/Common/GimmickClock.cs`（新規）（中川さんのフォルダ） | 共有の時計。接続中はサーバー時間に寄せる。`IsNetClient` を追加 |
@@ -96,14 +105,25 @@
   - 回転台・扇風機・移動床がローカルでも今までどおり動く
   - 「ホストをやめる」でシーンを読み直して最初の画面に戻る / 届かない IP に参加すると約10秒で理由を出して戻る
 - ローカル（AllStages）: エラーなし、今までどおり（試合のネット対応を入れたあとに確認）。
-- **クライアント側の見え方は未確認**（今回の変更すべて）。次の作業の前に確認する。
+- クライアント側（2026-11-03、Multiplayer Play Mode の Player 2）:
+  - 接続 → 試合開始 → 時間切れ → 自動でやり直しまで通った
+  - 不具合1: やり直しても「タイムアップ！/しょうしゃ」が残る（ホストも同じ）。その場でやり直していたのが原因
+    → ローカルと同じ「試合 → リザルト → 戻る（シーンを読み直す）」の流れにして解決。
+    `MatchDebugView`（藤原さん）に入れていた追加（名札の二重防止・結果を消す）は要らなくなったので元に戻した（今は藤原さんのオリジナルのまま）
+  - 試合 → リザルト → NetStages → もう一度試合、の流れを Player 2 と確認済み（11/03）
+  - 直した不具合2: クライアントに、見えるのに乗れない・触れない積み木ができる。
+    接続前にクライアントのステージが出していた生成予告が、接続後にクライアントだけで積み木を作っていた
+    → `NetStageSync` で接続時に予告も消す。`NetworkTumiki` はクライアントで作られた積み木を消して警告を出す（他の出どころの検出も兼ねる）
+  - 残りの項目（HUD のストック・積み木数、カメラ、やられて復活、幽霊、ギミック、切断）も問題なし（ユーザーが目で確認）
+- ホストのまま再生を止めると、NGO の終了処理で NullReferenceException が2件出る（パッケージ内。先に Shutdown してから止めると出ない）。
+- リザルト画面で、テクスチャが消えて水色になる部分が出たことが1回ある（どちらの画面かは不明。次の確認では出なかった）。また出たら画面と場所を記録する。
 - **PC 2台の LAN テストは未実施**。
 
 ### テストのしかた
 1. NetStages を開いて再生 → 画面中央の「ホストになる」
 2. Multiplayer Play Mode の Player 2 で、IP に `127.0.0.1` を入れて「参加」
    （別の PC からはホストの左上に出る IP を入れる。初回は Windows のファイアウォールの許可が出る）
-3. ホストの左上でモード・ストック・時間を選んで「試合開始」（試合中・試合後は「やり直し」）
+3. ホストの左上でモード・ストック・時間を選んで「試合開始」（開始待ちのときだけ。試合が終わったらリザルトのあと、ホストの画面で決定（Enter など）すると戻ってくる）
 4. 操作する側のウィンドウをクリックしてから操作（入力はフォーカス中の画面だけ）
 5. ステージ切り替えはホストの左右キー
 6. ビルドでは `-nethost` でホスト、`-netclient <IP>` で参加して始められる
@@ -134,8 +154,9 @@
 
 ## 6. 次にやること（優先度順・タスク一覧から）
 
-1. **クライアント側の確認**（Multiplayer Play Mode。カウントダウン・HUD・幽霊・結果・ギミック・積み木の演出・切断）
+1. ~~クライアント側の確認~~（2026-11-03 済み。上の「動作確認の状況」）
 2. 共有スクリプトのルール案（`Docs/SharedScriptRules.md`）をチームで決める。今回触ったファイルを作成者に伝える（A-01）
 3. PC 2台で LAN テスト（A-13。フェーズ1の完了条件）
 4. その後 P1: ヒット演出の同期（A-09）、新キャラのネット用 Variant（B-01）、必殺技ボタンを DarumaCommand に追加（B-03）、
    メニュー→ロビー→キャラ選択→リザルトのネット化（B-06〜B-10）、スロー演出（B-11）
+   （B-09 シーン遷移・B-10 リザルトは「試合 → リザルト → NetStages」の形で一部済み。セレクト画面のネット化（B-07）ができたら、戻り先をそこにする）

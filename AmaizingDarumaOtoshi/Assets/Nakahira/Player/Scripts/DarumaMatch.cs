@@ -820,8 +820,7 @@ namespace Nakahira
             float t = Time.unscaledTime - m_finishTime;
             if (t > m_settings.resultTime || (t > 1f && PressedStart()))
             {
-                if (m_net != null) BeginNetMatch();   // ネット対戦用(suehara): シーンを読み直さずにもう一度
-                else if (IsConfigured) BackToSelect();
+                if (IsConfigured) BackToSelect();
                 else Restart();
             }
         }
@@ -829,12 +828,6 @@ namespace Nakahira
         // 同じシーンを読み直して、試合をやり直す(直接再生。参加していた人はボタンを押して参加し直す)
         public void Restart()
         {
-            // ネット対戦用(suehara): シーンは全員で共有しているので読み直さず、その場でやり直す
-            if (m_net != null)
-            {
-                BeginNetMatch();
-                return;
-            }
             if (m_leaving) return;
             m_leaving = true;
             BeforeRestart?.Invoke();
@@ -865,7 +858,8 @@ namespace Nakahira
         //========================================
         // ネット対戦用(suehara)。ローカルの試合では使わない
         //  ・ホスト      : 試合はここでいつもどおり進める。出る人は接続した人(AddNetPlayer)。
-        //                  始め方・やり直しは BeginNetMatch(シーンは読み直さない)。それまでは開始待ち(IsNetWaiting)
+        //                  始め方は BeginNetMatch。それまでは開始待ち(IsNetWaiting)
+        //                  試合が終わったあと(リザルトへ移る・戻る)は suehara/Network の NetMatch が受け持つ
         //  ・クライアント: 試合を進めない。ホストから届いた人・時間・結果を NetClient〜 で入れ、お知らせを出す
         //                  (HUD・カメラ・カウントダウンの表示は、いつもどおりここを読めばよい)
         //========================================
