@@ -11,10 +11,20 @@ namespace Nakagawa
     //  乗っているものは、回転台と同じ仕組みで床の動きの分だけ一緒に運ぶ
     // 奈落の上を渡す足場として使う(上面が床と同じ高さ。当たり判定あり)
     // このTransformの位置が床の上面の中心。開始時は最初の地点にいる
+    // 飛んでいる積み木が側面に当たると、壁と同じように反射する(ITumikiReflectFilter。上面の継ぎ目に触れただけなら反射しない)
     [DefaultExecutionOrder(-10)]
     [RequireComponent(typeof(Rigidbody))]
-    public class MovingFloorGimmick : MonoBehaviour
+    public class MovingFloorGimmick : MonoBehaviour, ITumikiReflectFilter
     {
+        [Header("積み木")]
+        // 飛んでいる積み木が側面に当たったら反射させる
+        [SerializeField] bool m_reflectAtSide = true;
+
+        public bool ShouldReflect(TumikiBlock block, Collider collider, ContactPoint contact)
+        {
+            return m_reflectAtSide && TumikiReflectRules.ShouldReflectAtSide(block, collider, contact);
+        }
+
         public enum LoopMode { Loop, PingPong, OneWay }
 
         [Serializable]
@@ -166,6 +176,13 @@ namespace Nakagawa
                 m_rb.position = pos;
                 transform.position = pos;
             }
+            // 床に横付けしたときの継ぎ目に、積み木が引っかからないように
+            FloorSeamFilter.RegisterMoving(m_collider);
+        }
+
+        private void OnDisable()
+        {
+            FloorSeamFilter.UnregisterMoving(m_collider);
         }
 
         private void OnValidate()

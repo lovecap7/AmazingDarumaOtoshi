@@ -19,6 +19,8 @@ namespace Nakahira
         public int Count => m_blocks.Count;
         public int MaxCount => m_maxCount;
         public float HeadRadius => m_headRadius;
+        // 頭(王冠などの飾りを乗せる位置を読む。未設定なら null)
+        public Transform Head => m_head;
         // 頭を含めたタワー全体の高さ
         public float Height => Count * TumikiBlock.kHeight + m_headRadius * 2.0f;
 
