@@ -1,0 +1,86 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3e963915c89433d4a9c0b836d061dbcc, type: 3}
+  m_Name: GhostAppear_Default
+  m_EditorClassIdentifier: Assembly-CSharp::Nakahira.GhostAppearParams
+  RiseTime: 0.5
+  WaitTime: 1
+  FallTime: 0.5
+  PopTime: 0.3
+  StartHeight: 0.6
+  RiseHeight: 25
+  FallHeight: 25
+  LandHeight: 0.75
+  RiseCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0.3
+      outSlope: 0.3
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 2.2
+      outSlope: 2.2
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  FallCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0.4
+      outSlope: 0.4
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 2
+      outSlope: 2
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  SoulColor: {r: 0.55, g: 0.8, b: 1, a: 1}
+  CoreColor: {r: 0.9, g: 0.97, b: 1, a: 1}
+  SoulRadius: 0.32
+  TailLength: 1
+  TailStretch: 1.8
+  FlickerSpeed: 18
+  TrailTime: 0.25
+  TrailWidth: 0.45
+  MarkerStartRadius: 2
+  MarkerEndRadius: 0.7
+  MarkerAlpha: 0.85
+  FlashTime: 0.35
+  FlashSpread: 3.5
+  PopOvershoot: 1.2
+  LightIntensity: 3
+  LightRange: 3

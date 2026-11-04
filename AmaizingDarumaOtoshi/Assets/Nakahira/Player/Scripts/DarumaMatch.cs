@@ -704,7 +704,7 @@ namespace Nakahira
             {
                 case MatchSetup.MatchMode.Ghost:
                     p.OutOrder = NextOutOrder();
-                    SpawnMatchGhost(p, pos);
+                    SpawnMatchGhost(p, pos, c);
                     break;
                 case MatchSetup.MatchMode.Stock:
                     p.LoseStock();
@@ -723,7 +723,8 @@ namespace Nakahira
             CheckLastOne();
         }
 
-        void SpawnMatchGhost(MatchPlayer p, Vector3 pos)
+        // from: やられたキャラクター(魂が飛んで降ってくる演出の出どころ。null なら演出なしですぐ出る)
+        void SpawnMatchGhost(MatchPlayer p, Vector3 pos, DarumaCharacter from)
         {
             if (GhostPrefab == null) { p.SetOut(p.OutOrder); return; }
             if (m_stageArea != null) pos = m_stageArea.Clamp(pos, 0.5f);
@@ -740,6 +741,9 @@ namespace Nakahira
                 Destroy(g.gameObject);
                 Respawn(p, RandomSpawnPoint());
             };
+            // 魂が上へ飛んで、上から降ってきてから幽霊が出る(それまで幽霊は見えず動かない)
+            // ネット対戦のクライアントには届かない(ホストだけで見える)
+            if (from != null) GhostAppearEffect.Play(ghost, from);
             p.SetGhost(ghost);
         }
 

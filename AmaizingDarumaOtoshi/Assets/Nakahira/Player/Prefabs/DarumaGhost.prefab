@@ -596,6 +596,8 @@ MonoBehaviour:
   m_turnSpeed: 15
   m_radius: 0.45
   m_hammer: {fileID: 6959462667375871619}
+  m_visual: {fileID: 2924209625298616829}
+  m_appearParams: {fileID: 11400000, guid: 1936080a78ca50f4380da945a1c89e12, type: 2}
 --- !u!114 &99992979335490264
 MonoBehaviour:
   m_ObjectHideFlags: 0
