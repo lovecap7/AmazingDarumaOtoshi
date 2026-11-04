@@ -608,6 +608,8 @@ GameObject:
   - component: {fileID: 6242312641939630888}
   - component: {fileID: 1611246128041429823}
   - component: {fileID: 5182239471364050811}
+  - component: {fileID: 5182239471364050821}
+  - component: {fileID: 5182239471364050822}
   m_Layer: 0
   m_Name: Iwa
   m_TagString: Untagged
@@ -733,3 +735,57 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Yurube.IwaPassive
   m_searchRadius: 3
   m_logIwa: 1
+--- !u!114 &5182239471364050821
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9069936943766670842}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0a13560a26218d46964d9c9f251e1ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Yurube.SpecialGauge
+  m_blocksToFill: 5
+--- !u!114 &5182239471364050822
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9069936943766670842}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b7e1a2c3d4e5f60718293a4b5c6d7e8f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Yurube.IwadaruSpecial
+  m_countdown: 3
+  m_maxBlocks: 10
+  m_minRadius: 2.5
+  m_maxRadius: 8
+  m_attackRadiusScale: 1.5
+  m_minHeight: 6
+  m_maxHeight: 18
+  m_minRiseTime: 0.45
+  m_maxRiseTime: 0.8
+  m_minFallTime: 0.55
+  m_maxFallTime: 1.4
+  m_impactRecovery: 0.45
+  m_minMeteorScale: 1
+  m_maxMeteorScale: 1.8
+  m_minDebris: 12
+  m_maxDebris: 60
+  m_minShockwaveRings: 1
+  m_maxShockwaveRings: 3
+  m_minShakeAmplitude: 0.35
+  m_maxShakeAmplitude: 1.1
+  m_minFlashStrength: 0.25
+  m_maxFlashStrength: 0.7
+  m_groundMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_logSpecial: 1
+  m_cutInName: "\u3044\u308F\u3060\u308B\u5D29\u3057"
+  m_cutInColor: {r: 0.62, g: 0.5, b: 0.38, a: 1}
+  m_warningColor: {r: 1, g: 0.22, b: 0.08, a: 0.9}

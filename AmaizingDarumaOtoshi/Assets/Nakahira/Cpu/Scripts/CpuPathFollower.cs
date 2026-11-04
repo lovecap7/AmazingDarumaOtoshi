@@ -17,11 +17,17 @@ namespace Nakahira
         Vector3 m_destination;
         float m_tolerance = 1.0f;
         CpuRidePlan m_ride;
+        CpuWarpPlan m_warp;
         float m_lastPathTime = float.NegativeInfinity;
 
         // 移動床に乗って行く道なら、その乗り方(道は乗り場まで。乗り降りは CpuRide が行う)
         public bool HasRide => m_ride.IsValid;
         public CpuRidePlan Ride => m_ride;
+        // ワープゲートに入って行く道なら、そのゲート(道は入り口まで。入るのは CpuRide が行う)
+        public bool HasWarp => m_warp.IsValid;
+        public CpuWarpPlan Warp => m_warp;
+        // 移動床・ワープゲートを使う道か(近づけなくても諦めない判断などに使う)
+        public bool HasLink => m_ride.IsValid || m_warp.IsValid;
         // 最後に道を求めた時刻(使われなくなった古い道で乗り降りしないように)
         public float LastPathTime => m_lastPathTime;
 
@@ -51,6 +57,7 @@ namespace Nakahira
             m_index = 0;
             m_repathTimer = 0.0f;
             m_ride = default;
+            m_warp = default;
         }
 
         // 求め直す時期なら道を求め直す。求め直せたら true(remaining に道の長さ)
@@ -66,7 +73,7 @@ namespace Nakahira
             m_lastPathTime = Time.time;
             m_count = 0;
             m_index = 0;
-            if (!CpuNavMesh.TryFindPath(pos, m_destination, m_tolerance, m_path, out remaining, out m_ride)) return false;
+            if (!CpuNavMesh.TryFindPath(pos, m_destination, m_tolerance, m_path, out remaining, out m_ride, out m_warp)) return false;
             m_count = m_path.GetCornersNonAlloc(m_corners);
             m_index = Mathf.Min(1, m_count);
             return true;
@@ -74,13 +81,14 @@ namespace Nakahira
 
         // 曲がり角を進め、最後のまっすぐな区間(目的地まで曲がらずに行ける)なら true
         // そうでなければ next に次の曲がり角を入れる
-        // 移動床に乗って行く道なら、目的地ではなく乗り場へ向かう(最後の区間ではない)
+        // 移動床に乗って行く・ワープゲートに入って行く道なら、目的地ではなく乗り場・入り口へ向かう(最後の区間ではない)
         public bool IsOnFinalLeg(Vector3 pos, out Vector3 next)
         {
             while (m_index < m_count - 1 && CpuContext.FlatDistance(pos, m_corners[m_index]) < kCornerReach) m_index++;
-            if (m_ride.IsValid)
+            if (m_ride.IsValid || m_warp.IsValid)
             {
-                next = m_index < m_count ? m_corners[m_index] : m_ride.BoardSpot;
+                Vector3 spot = m_ride.IsValid ? m_ride.BoardSpot : m_warp.EntrySpot;
+                next = m_index < m_count ? m_corners[m_index] : spot;
                 return false;
             }
             if (m_index < m_count - 1)

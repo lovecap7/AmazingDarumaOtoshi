@@ -14,6 +14,22 @@ public class MatchSettings : ScriptableObject
     [Tooltip("ゲームパッドで操作する人の入力（PlayerInput + DarumaInputHandler）")]
     public GameObject gamepadInputPrefab;
 
+    [Header("CPU")]
+    [Tooltip("CPU（DarumaCpu）の考え方・腕前。強さ 1（よわい）・2（ふつう）・3（つよい）の順。足りない強さは一番近いものを使う。空なら仮の CPU（CpuDarumaInput）")]
+    public CpuParams[] cpuParams;
+
+    // 強さ（1〜）に合う CpuParams。無ければ null
+    public CpuParams CpuParamsFor(int level)
+    {
+        if (cpuParams == null) return null;
+        for (int i = Mathf.Clamp(level, 1, cpuParams.Length) - 1; i >= 0; i--)
+        {
+            if (cpuParams[i] != null) return cpuParams[i];
+        }
+        foreach (var p in cpuParams) if (p != null) return p;
+        return null;
+    }
+
     [Header("復活")]
     [Tooltip("ストック・タイムで、やられてから出てくるまでの時間（秒）")]
     public float respawnDelay = 1.5f;

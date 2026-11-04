@@ -1,6 +1,6 @@
 # ネット対戦 引き継ぎメモ
 
-最終更新: 2026-11-03（Claude との作業セッション3回目: クライアント側の確認）
+最終更新: 2026-11-04（Claude との作業セッション4回目: NetStages を AllStages から作り直し）
 担当: 末原（suehara）
 
 このメモだけで作業を再開できるように、方針・現状・既知の問題・次のタスクをまとめています。
@@ -62,7 +62,8 @@
 | `NetMatchDriver.cs` / `INetMatchDriver.cs` | Match に付けてネットの試合にする部品。出したキャラ・幽霊を Spawn する |
 | `NetMatchPlayer.cs` / `NetPlayer.prefab` | 接続した人ごとの1人分（PlayerObject）。NetworkCommandSource（入力）と NetMatchPlayer（中身の同期）。MatchPlayer は実行時に付ける |
 | `NetEffects.cs` | NetMatch と同じ GameObject。ホストの生成予告を見た目だけの予告で出す / 割れた積み木の破片を出す |
-| `NetLobbyUI.cs` | LAN の接続画面（NetTestUI の置き換え）。下の「テストのしかた」参照。リザルトから戻ったとき、シーンに入っている2つ目の NetworkManager を消す |
+| `NetLobbyUI.cs` | NetStages の接続まわり。つないでいないときの中央の接続パネル（NetStages を直接開いたときの試験用。クリック操作）、切断したときの戻り（接続画面から来たときは接続画面へ）、NetSessionMenu を自動で付ける。リザルトから戻ったとき、シーンに入っている2つ目の NetworkManager を消す |
+| `NetSessionMenu.cs` | NetStages でつないでいる間の表示とメニュー（2026-11-04。クリックなし）。右上にいまの試合の設定・へやばんごう・人数。Start（+）/ Tab でメニュー（見た目は中川さんの PauseMenu と同じ）: ホストの開始待ちは「試合を はじめる / モード / ストック / 時間 / へやを かいさん / とじる」、試合中とさんかは「かいさん（ぬける）/ とじる」。ホストが変えたルールは `NetMatch.SetRules` ですぐ全員に配る。開いている間はキャラの入力（NetPadKeyboardInput）と、OnGUI で描く開発用の表示（StageSwitcher・TumikiImpactModeToggle・SpawnPointDebugView・StageCameraTuner・CharacterLabUI。OnGUI はどの UI よりも上に出るため）を止める。**Yurube さんの必殺技のゲージ・カットインも OnGUI なのでメニューの上に出る**（止めると必殺技が止まるのでそのまま）。ネット対戦は時間を止められないので、試合中に開いても試合は進む |
 | `NetSceneFlow.cs` | ネットのシーン遷移（自動で1個作られ、シーンをまたいで残る）。ホストの `Load(scene)` で全員を暗くしてから NGO で切り替え、読み終わったら明るくする。リザルトで切断したら NetStages に戻す |
 | `NetResultFlow.cs` | 接続中にリザルト画面が読み込まれたら自動で付く。演出が終わったら画面自身のセレクト行きを止め（`done` / `leaving` をリフレクションで読み書き）、ホストの決定で NetStages に戻す。**ResultTowerScreen / ResultScreen のフィールド名が変わったら直す** |
 | `DarumaCharacter_Net.prefab` | キャラのネット用 Variant。NetworkObject, NetworkTransform, NetworkRigidbody, NetworkDarumaCharacter, NetworkHammerView |
@@ -75,13 +76,20 @@
 | `NetworkDarumaGhost.cs` | クライアントで DarumaGhost を止める |
 | `NetworkTumiki.cs` | ホストでは `Start` で自分を Spawn。色と状態（炎 / 積まれている / ポンと出る途中）を配る。クライアントで煙・炎・ポンと出る演出。割れて消えたら NetEffects に知らせる |
 | `NetStageSync.cs` | ステージ番号を配る。クライアントでは StageSwitcher と全 TumikiSpawner を止める |
+| `NetConnectScreen.cs`（`suehara/NetConnectScene.unity`） | **本番の入り口**（2026-11-04）。メニューの「たたかう → オンライン」から来る。見た目はセレクト画面と同じ（同じ GameObject に藤原さんの `TitleClubRoomDressing` を付けて部室の背景）。「ホスト」→ へやばんごう・IP・集まった人（1P〜4P）を出し、A / Start で全員 NetStages へ（`NetSceneFlow.Load`）。「さんか」→ へやばんごう（4けた）か IP アドレスをキーボードで入れてつなぐ。NetworkManager はプレハブ（`Network/NetworkManager.prefab`。NetStages のものと同じ設定）から作る。NetStages で切断したら（NetLobbyUI・NetSceneFlow）ここに戻ってくる |
+| `NetRoom.cs` | へやばんごうで LAN の中のホストを見つける。ホストは UDP 47777（使われていれば 47778〜47780）で問い合わせを待ち、番号が合えばゲームのポートを返す（シーンをまたいで答え続け、ホストをやめたら消える）。さんかはブロードキャストとこの PC に問い合わせる。**LAN の中だけ。インターネット越しにするならここを Unity Relay の参加コードに置き換える** |
 
 消したもの: `NetStageSpawner.cs`（NetMatch に置き換え）、`suehara/NetTestUI.cs`（NetLobbyUI に置き換え）
 
 ### Assets/suehara/（テスト用）
-- `NetStages.unity`: AllStages の複製。Match（DarumaMatch）は非表示で置いておき、接続したら NetMatch が表示する。
-  Match のキャラ・幽霊・積み木は `*_Net` を設定済み。TumikiSpawner（全50個）の積み木も `Tumiki_Net`。
+- `NetStages.unity`: AllStages の複製（2026-11-04 に作り直し。ステージ89個）。Match（DarumaMatch）は非表示で置いておき、接続したら NetMatch が表示する。
+  Match のキャラ・幽霊・積み木は `*_Net` を設定済み。TumikiSpawner（全90個）の積み木も `Tumiki_Net`。
   UnityTransport の切断判定は 10 秒（DisconnectTimeoutMS）。
+  **AllStages にステージや設定が足されたら、メニューの「Tools → ネット対戦 → NetStages を AllStages から作り直す」で取り込む**
+  （`suehara/Editor/NetStagesBuilder.cs`）。中身を AllStages で置き換えてから、今の NetStages にあるネット用のルート
+  （NetworkManager・NetLobbyUI・NetStageSync・NetMatch。AllStages に無い名前のルート）を写し、Match を非表示にし、
+  積み木・キャラ・幽霊のプレハブへの参照を `*_Net` に差し替える。シーンの GUID・ビルド設定はそのまま。
+  NetStages だけに入れた、ネット用のルート以外の変更は消えるので、そういう変更は AllStages か、ネット用のルートの中に入れる。
 - `net test.unity`, `Net Cube.prefab`, `NetCubeMover.cs`: 最初の接続テストの名残。
 
 ### 他の人のスクリプトに足したもの（どれも `ネット対戦用(suehara)` の目印付き。ローカルの動きは変わらない）
@@ -95,6 +103,8 @@
 | `Nakagawa/Scripts/GimmickUtil.cs`（中川さん） | ネットのクライアントでは影響を受けるものを見つけない（ギミックがクライアントの積み木・キャラを動かさない。ワープがクライアントのキャラの Kinematic を外す不具合の対策） |
 | `RisingWallGimmick` / `TurntableGimmick` / `FanGimmick` / `MovingFloorGimmick`（中川さん） | GimmickClock で時間を進め、高さ・角度・位置を時間から決める。時計を合わせて一度に動いたときは乗っているものを運ばない |
 | `Nakagawa/Scripts/Spawn/TumikiSpawnWarning.cs`（中川さん） | 見た目だけの予告 `CreateView`（時間が来ても生成しない） |
+| `Fujihara/Scene/MenuScene.unity`（藤原さん。了承済み） | MainMenu の `onlineSceneName` に `NetConnectScene` を入れた（この1か所だけ） |
+| `ProjectSettings/EditorBuildSettings.asset` | `suehara/NetConnectScene.unity` を追加 |
 | `Assets/DefaultNetworkPrefabs.asset` | Net Cube, Tumiki_Net, DarumaCharacter_Net, DarumaGhost_Net, NetPlayer の5件 |
 
 ## 4. 動作確認の状況
@@ -117,13 +127,21 @@
   - 残りの項目（HUD のストック・積み木数、カメラ、やられて復活、幽霊、ギミック、切断）も問題なし（ユーザーが目で確認）
 - ホストのまま再生を止めると、NGO の終了処理で NullReferenceException が2件出る（パッケージ内。先に Shutdown してから止めると出ない）。
 - リザルト画面で、テクスチャが消えて水色になる部分が出たことが1回ある（どちらの画面かは不明。次の確認では出なかった）。また出たら画面と場所を記録する。
+- 2026-11-04: NetStages を作り直したあと、ホストで接続 → 試合開始 → 積み木の生成（ネットワークに乗っている）→ 新しく入ったステージ（DebugStage50）への切り替えまでエラーなし。
+  クライアント側は作り直したあと未確認（シーン内の NetworkObject の識別番号は計算し直してある）。
+- 2026-11-04: 接続画面（NetConnectScene）。メニュー → オンライン → ホスト / さんか（へやばんごう・IP アドレス）→ 全員で NetStages へ →
+  ホストをやめる・切断で接続画面に戻る、まで問題なし（ユーザーが確認）。移る途中でホストが止まったときも接続画面に戻る。
 - **PC 2台の LAN テストは未実施**。
 
 ### テストのしかた
+本番の流れ: MenuScene から再生 →「たたかう → オンライン」→ ホストは「ホスト」、参加する人は「さんか」でホストの画面のへやばんごうを入れる → ホストが A / Start で試合のシーンへ →
+ホストが Start（+ / Tab）のメニューでルールを選んで「試合を はじめる」（かいさん・ぬけるもこのメニュー）。
+
+NetStages を直接開いて試すとき:
 1. NetStages を開いて再生 → 画面中央の「ホストになる」
 2. Multiplayer Play Mode の Player 2 で、IP に `127.0.0.1` を入れて「参加」
    （別の PC からはホストの左上に出る IP を入れる。初回は Windows のファイアウォールの許可が出る）
-3. ホストの左上でモード・ストック・時間を選んで「試合開始」（開始待ちのときだけ。試合が終わったらリザルトのあと、ホストの画面で決定（Enter など）すると戻ってくる）
+3. ホストが Start（+ / Tab）でメニューを開き、モード・ストック・時間を選んで「試合を はじめる」（開始待ちのときだけ。試合が終わったらリザルトのあと、ホストの画面で決定（Enter など）すると戻ってくる）
 4. 操作する側のウィンドウをクリックしてから操作（入力はフォーカス中の画面だけ）
 5. ステージ切り替えはホストの左右キー
 6. ビルドでは `-nethost` でホスト、`-netclient <IP>` で参加して始められる
@@ -131,6 +149,8 @@
 ### 注意
 - Unity のウィンドウが裏にあると、Windows 版ではコンパイルが始まらないことがある（MCP から編集した後はユーザーに Unity をクリックしてもらう）。
 - `DefaultNetworkPrefabs.asset` に NetworkObject のない `DarumaCharacter.prefab` のエントリが紛れ込んだことが2回あった。再生時に「missing a NetworkObject」の警告が出たら外す。
+- エディタで再生すると `TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF - Fallback.asset` が変わることがある。コミットに入れずに元に戻す。
+- MCP の撮影（screenshot）のあと、エディタが一時停止したままになることがあった（エラーではない）。止まっていたら再生を続ける。
 - **MCP からビルドすると、その間 Unity と MCP が止まる**。さらに URP の設定・ProjectSettings・TextMesh Pro のフォント・`Assets/Resources/PerformanceTestRun*.json` が変わるので、コミットに入れずに元に戻す。
 
 ## 5. まだ同期していないもの（既知の穴）

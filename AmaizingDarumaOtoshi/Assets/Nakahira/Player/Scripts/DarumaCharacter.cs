@@ -135,6 +135,8 @@ namespace Nakahira
         public Collider Body => m_body;
         public Rigidbody Rigidbody => m_rb;
         public bool IsGrounded => m_isGrounded;
+        // 必殺技中など、移動だけを受け付ける状態
+        public bool MovementOnly { get; set; }
         // 股抜きショットを始められるか。地上にいて、先に押されたジャンプが実行待ちでないこと
         public bool CanStartShot => m_isGrounded && !m_jumpRequested;
         public bool IsInvincible => m_invincibleTimer > 0.0f;
@@ -150,6 +152,10 @@ namespace Nakahira
         public static event Action<DarumaCharacter> AnyEliminated;
         // いずれかのキャラクターが積み木に上から乗って拾った(成功エフェクトなどの演出用)
         public static event Action<TumikiPickupInfo> AnyPickedUp;
+        // 攻撃(ハンマー・飛んできた積み木)で積み木を崩された(脱落したときは来ない。脱落は Eliminated)。王冠を落とすなどの演出用
+        public event Action<DarumaCharacter> Damaged;
+        // いずれかのキャラクターが攻撃で積み木を崩された
+        public static event Action<DarumaCharacter> AnyDamaged;
 
         // ドメインの再読み込みをしない設定では、前の再生で登録されたまま残った受け取り手が呼ばれ続けるので、再生のたびに空にする
         // (受け取る側はシーンの読み込み時(OnEnable など)に登録し直す)
@@ -158,6 +164,13 @@ namespace Nakahira
         {
             AnyEliminated = null;
             AnyPickedUp = null;
+            AnyDamaged = null;
+        }
+
+        private void RaiseDamaged()
+        {
+            Damaged?.Invoke(this);
+            AnyDamaged?.Invoke(this);
         }
         // 脱落の原因(脱落していなければOther)
         public EliminationCause EliminationCause { get; private set; }
@@ -209,9 +222,9 @@ namespace Nakahira
         {
             Vector2 move = Vector2.ClampMagnitude(command.Move, 1.0f);
             m_moveDirection = new Vector3(move.x, 0.0f, move.y);
-            if (command.Jump) m_jumpRequested = true;
-            if (command.Sweep) m_hammer.TrySweep();
-            if (command.Shot && m_hammer.TryShot()) FaceMoveDirection();
+            if (command.Jump && !MovementOnly) m_jumpRequested = true;
+            if (command.Sweep && !MovementOnly) m_hammer.TrySweep();
+            if (command.Shot && !MovementOnly && m_hammer.TryShot()) FaceMoveDirection();
         }
 
         // 振り向きの途中でも、スティックの方向へ即座に向きを合わせる(ニュートラルなら今の向きのまま)
@@ -453,6 +466,7 @@ namespace Nakahira
                 + dir * (kBodyRadius + TumikiBlock.kRadius + 0.05f)
                 + Vector3.up * (TumikiBlock.kHeight * 0.5f);
             knocked.Launch(dir, speed, attacker, this);
+            RaiseDamaged();
             return true;
         }
 
@@ -483,6 +497,7 @@ namespace Nakahira
             block.StartHitStop(duration, timeScale, shake);
             projectile.ComputeImpact(block.transform.position, out Vector3 dir, out float speed);
             block.Push(dir, speed, projectile.Owner, projectile.ReturnCount, this);
+            RaiseDamaged();
             return true;
         }
 

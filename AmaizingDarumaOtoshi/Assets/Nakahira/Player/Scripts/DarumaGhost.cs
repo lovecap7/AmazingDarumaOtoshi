@@ -9,6 +9,7 @@ namespace Nakahira
     // ・ジャンプ・積み木を積む・股抜きショットはできない
     // ・当たり判定を持たないので、攻撃を受けず、生存者や積み木もすり抜ける
     // ・遅いハンマーで薙ぎ払いができ、生存者にダメージを与えると復活を要求する
+    // ・出たときは魂が降ってくる演出(GhostAppearEffect)が終わるまで見えず、動かない(IsAppearing)
     [RequireComponent(typeof(HitStop))]
     public class DarumaGhost : MonoBehaviour, IDarumaAttacker
     {
@@ -18,8 +19,14 @@ namespace Nakahira
         // 壁との当たり判定に使う半径
         [SerializeField] float m_radius = 0.45f;
         [SerializeField] DarumaHammer m_hammer;
+        [Header("出現の演出")]
+        // 見た目の子オブジェクト(出現の演出で大きさを変える)
+        [SerializeField] Transform m_visual;
+        // 魂が飛んで降ってくる演出の値(未設定なら演出なしですぐ出る)
+        [SerializeField] GhostAppearParams m_appearParams;
 
         IDarumaCommandSource m_commandSource;
+        readonly List<Renderer> m_hiddenRenderers = new List<Renderer>();
         StageArea m_stageArea;
         HitStop m_hitStop;
         Vector3 m_moveDirection;
@@ -36,6 +43,10 @@ namespace Nakahira
         static void ResetStatics() => s_active.Clear();
 
         public Collider Body => null;
+        // CPU が操作を決めるための読み取り用(ハンマー・移動の速さ・壁との当たり判定の半径)
+        public DarumaHammer Hammer => m_hammer;
+        public float MoveSpeed => m_params != null ? m_params.MoveSpeed : 0.0f;
+        public float Radius => m_radius;
         public float LocalTimeScale => Mathf.Max(0.01f, m_hitStop.TimeScale);
 
         private void Awake()
@@ -43,8 +54,44 @@ namespace Nakahira
             m_hitStop = GetComponent<HitStop>();
         }
 
-        private void OnEnable() => s_active.Add(this);
+        public Transform Visual => m_visual;
+        public GhostAppearParams AppearParams => m_appearParams;
+
+        // 出現の演出中(魂が降ってくるまで)。見えない・動かない・ギミックの対象にならない(Active に入らない)
+        public bool IsAppearing { get; private set; }
+
+        private void OnEnable()
+        {
+            if (!IsAppearing) s_active.Add(this);
+        }
+
         private void OnDisable() => s_active.Remove(this);
+
+        // 出現の演出を始める(GhostAppearEffect から呼ぶ)
+        public void BeginAppear()
+        {
+            if (IsAppearing) return;
+            IsAppearing = true;
+            m_moveDirection = Vector3.zero;
+            s_active.Remove(this);
+            m_hiddenRenderers.Clear();
+            foreach (var r in GetComponentsInChildren<Renderer>())
+            {
+                if (!r.enabled) continue;
+                r.enabled = false;
+                m_hiddenRenderers.Add(r);
+            }
+        }
+
+        // 出現の演出が終わった。ここから動かせる
+        public void FinishAppear()
+        {
+            if (!IsAppearing) return;
+            IsAppearing = false;
+            foreach (var r in m_hiddenRenderers) if (r != null) r.enabled = true;
+            m_hiddenRenderers.Clear();
+            if (isActiveAndEnabled && !s_active.Contains(this)) s_active.Add(this);
+        }
 
         // 瞬間移動する(ワープなど)。浮いている高さはそのままで、ステージ範囲内に収める
         public void Teleport(Vector3 position, float yawDegrees)
@@ -85,7 +132,7 @@ namespace Nakahira
 
         private void Update()
         {
-            if (IsSuspended) return;
+            if (IsSuspended || IsAppearing) return;
             if (m_commandSource != null)
             {
                 DarumaCommand command = m_commandSource.ReadCommand();

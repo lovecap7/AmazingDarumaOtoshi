@@ -13,16 +13,16 @@ MonoBehaviour:
   m_Name: daruking
   m_EditorClassIdentifier: Assembly-CSharp::CharacterData
   id: daruking
-  displayName: "\u3060\u308b\u304d\u3093\u3050"
+  displayName: "\uFF5E\uFF5E\uFF5E"
   color: {r: 0.55, g: 0.35, b: 0.7, a: 1}
   portrait: {fileID: 0}
   prefab: {fileID: 9069936943766670842, guid: f5f7f025287ece1ed1a8a07c2d3aced3, type: 3}
   passiveColor: 0
   passiveCount: 0
-  passiveName: "2\u500b\u307e\u3067"
-  passiveText: "\u7a4d\u307f\u6728\u306f2\u500b\u307e\u3067\u3057\u304b\u7a4d\u3081\u306a\u3044"
+  passiveName: "\uFF5E\uFF5E\uFF5E"
+  passiveText: "\uFF5E\uFF5E\uFF5E"
   hammerPower: 3
   hammerSpeed: 3
   hammerReach: 3
-  specialName: ""
-  specialText: ""
+  specialName: "\uFF5E\uFF5E\uFF5E"
+  specialText: "\uFF5E\uFF5E\uFF5E"

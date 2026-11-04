@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
@@ -20,7 +20,7 @@ using UnityEngine.UI;
 //   - 各プレイヤーは自分のカーソルでキャラ（またはランダム）を選ぶ。B で取り消し、何も選んでいなければ B で抜ける
 //   - CPU のコインはプレイヤーがカーソルで掴んで（A）キャラの上に置く（A）と、その CPU のキャラになる。CPU の強さは枠の －／＋
 //   - 参加者全員が選ぶと「じゅんびOK！」。Start / Enter でステージセレクトへ
-//   - （showCharacterInfo がオンのときだけ。今はオフ）各枠は Y / RB（キーボードは C・Tab）で「キャラ → パッシブ → ハンマー性能 → 必殺技」と表示が切り替わる（LB / Q で戻る）
+//   - キャラの性能（パッシブ・ハンマー・必殺技）はここでは出さず、メニューの「ずかん」で見る（CharacterBook）
 //     枠の下の丸をカーソルで押しても切り替わる（CPU の枠も見られる）。中身は CharacterData に書く
 // ・ステージセレクト（ローカル。stageVote がオフ）：画面右にステージが並び、えらべるのは 1P（一番小さい番号のプレイヤー）だけ
 //   1P のカーソルが乗っているステージが画面左にプレビューされる（右スティック / IJKL で見回せる。触らなければゆっくり回る）
@@ -45,12 +45,15 @@ public class MatchSelect : MonoBehaviour
 
     [Header("データ")]
     [SerializeField] SelectRoster roster;
-    [Tooltip("ステージセレクトで横に並べるステージの数（最大）。ステージが多いときは増やすと1つずつが小さくなり、少ない行に収まる")]
+    [Tooltip("ステージセレクト（オンライン用の投票。stageVote がオン）で横に並べるステージの数（最大）。ステージが多いときは増やすと1つずつが小さくなり、少ない行に収まる")]
     [SerializeField, Range(1, 20)] int stageColumns = 7;
     [Tooltip("オン：全員が投票して抽選で決める（オンライン用）。オフ：1P だけがえらび、左に動かせるプレビューが出る（ローカル）")]
     [SerializeField] bool stageVote = false;
-    [Tooltip("キャラクターセレクトの枠で、Y でパッシブ・ハンマー性能・必殺技の説明に切り替えられるようにする（今は出さない）")]
-    [SerializeField] bool showCharacterInfo = false;
+    [Tooltip("ステージセレクト（ローカル）で、右側に横に並べるステージの数（n 列）。行の数はステージの数から決まり、入りきるように1つずつの大きさが変わる（おまかせも1マス）")]
+    [SerializeField, Range(1, 10)] int localStageColumns = 4;
+
+    [Tooltip("画面に出す文字（▶ で開く）。見出し・ボタン・ボタンの説明は始まったときに作るので、再生中に変えたら再生し直す")]
+    [SerializeField] SelectTexts texts = new SelectTexts();
 
     [Header("ルール")]
     [SerializeField, Range(1, 8)] int maxPlayers = 4;
@@ -58,7 +61,8 @@ public class MatchSelect : MonoBehaviour
     [SerializeField, Range(1, 8)] int minHumans = 1;
     [Tooltip("CPU を含めた参加者が最低何人必要か（1人プレイなら CPU を足して2人以上にする）")]
     [SerializeField, Range(1, 8)] int minParticipants = 2;
-    [SerializeField, Range(1, 9)] int defaultCpuLevel = 3;
+    [Tooltip("CPU を足したときの強さ（1 = よわい、2 = ふつう、3 = つよい）")]
+    [SerializeField, Range(1, MatchSetup.MaxCpuLevel)] int defaultCpuLevel = 3;
     [Tooltip("ルールセレクトで選べる時間（秒）。ストックの時間制限は「なし」→ 並び順、タイムの試合時間は並び順に切り替わる")]
     [SerializeField] float[] timeLimitChoices = { 60f, 120f, 180f };
     [Tooltip("ストックで選べる最大のストック数（1〜この数）")]
@@ -104,12 +108,24 @@ public class MatchSelect : MonoBehaviour
     public enum StartScreen { Auto, Mode, Rule, Character }
     public static StartScreen NextStartScreen = StartScreen.Auto;
 
+    // ---- お知らせ（ほかの人の演出・記録用。受け取る側は何をしてもよく、セレクト画面の動きは変わらない） ----
+    // セレクト画面を開いた（true：試合から戻ってきた）
+    public static event System.Action<bool> Opened;
+    // プレイヤー・CPU が枠から抜けた（番号 0 = 1P、入力機器（CPU は null））。B で抜けた・CPU に切り替えた・コントローラーが抜かれた など
+    public static event System.Action<int, InputDevice> PlayerLeft;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetEvents()
+    {
+        Opened = null;
+        PlayerLeft = null;
+    }
+
     struct PadState
     {
         public Vector2 move;
         public Vector2 look;        // ステージのプレビューを見回す（右スティック / IJKL）
         public bool a, b, start;
-        public bool next, prev;     // 枠の表示（キャラ／パッシブ／ハンマー／必殺技）を切り替える
     }
 
     // 1人分（プレイヤーまたは CPU）。番号・機器・選んだキャラ・投票したステージを必ずここにまとめて持つ
@@ -152,20 +168,7 @@ public class MatchSelect : MonoBehaviour
         public Image bg, portrait, portraitImage, typeButton;
         public TextMeshProUGUI label, name, device, join, ok, portraitLetter, typeText, level;
         public RectTransform levelRow, minus, plus;
-
-        // 表示の切り替え（0 キャラ／1 パッシブ／2 ハンマー性能／3 必殺技）
-        public int page;
-        public float pageTime = -100f;
-        public RectTransform info, passivePage, hammerPage, specialPage, dotsRow;
-        public TextMeshProUGUI pageTitle, infoEmpty, passiveCount, passiveEffect, specialName, specialText, okSmall;
-        public Image[] passiveIcons, dots;
-        public Image passiveHead;
-        public Image[,] hammerHeads, hammerHandles;
     }
-
-    static readonly string[] PageNames = { "キャラ", "パッシブ", "ハンマー性能", "ひっさつわざ" };
-    static readonly string[] HammerStatNames = { "パワー", "はやさ", "リーチ" };
-    const int PageCount = 4, PassiveIconMax = 9, HammerSteps = 5;
 
     class Chip
     {
@@ -251,6 +254,7 @@ public class MatchSelect : MonoBehaviour
 
         // 試合から戻ってきたときは、ルールはそのままでキャラクターセレクトから始める（スマブラと同じ）
         bool fromMatch = MatchSetup.Players.Count > 0;
+        Opened?.Invoke(fromMatch);
 
         // 毎回まっさらな状態から選び直す（前回の試合の選択は引き継がない。ルールだけは引き継ぐ）
         MatchSetup.Clear();
@@ -322,14 +326,11 @@ public class MatchSelect : MonoBehaviour
         UpdatePreview(dt);
         UpdateBackground();
 
-        hint.text = phase == Phase.Mode
-            ? "←→：モードをえらぶ　A / Start：決定　B：メニューへ"
-            : phase == Phase.Rule
-            ? "↑↓ / A：項目をえらぶ　←→：切り替え　Start：キャラクターセレクトへ　B：モードセレクトへ"
-            : phase == Phase.Character
-            ? "A：参加・えらぶ・CPUのコインをつかむ　B：取り消し・抜ける　" + (showCharacterInfo ? "Y：せつめい切り替え　" : "") + "Start：次へ"
-            : phase == Phase.Stage && !stageVote ? "A：決定　B：キャラクターセレクトへ　右スティック（IJKL）：ステージを見回す　えらべるのは " + (Chooser() != null ? Chooser().Label : "1P") + " だけ"
-            : phase == Phase.Stage ? "A：投票　B：取り消し（投票していなければキャラクターセレクトへ）　全員が投票したら抽選！"
+        hint.text = phase == Phase.Mode ? texts.hintMode
+            : phase == Phase.Rule ? texts.hintRule
+            : phase == Phase.Character ? texts.hintCharacter
+            : phase == Phase.Stage && !stageVote ? SelectTexts.F(texts.hintStageLocal, Chooser() != null ? Chooser().Label : "1P")
+            : phase == Phase.Stage ? texts.hintStageVote
             : "";
     }
 
@@ -393,7 +394,7 @@ public class MatchSelect : MonoBehaviour
         phase = Phase.Rule;
         phaseFrame = Time.frameCount;
         BuildRuleRows();
-        ruleHeader.text = "ルール：" + MatchSetup.Rules.ModeName;
+        ruleHeader.text = SelectTexts.F(texts.ruleHeader, SelectTexts.At(texts.modeNames, (int)MatchSetup.Rules.mode));
         ruleIndex = ruleRows.FindIndex(r => r.kind != RuleKind.Info);
     }
 
@@ -435,18 +436,16 @@ public class MatchSelect : MonoBehaviour
             switch (row.kind)
             {
                 case RuleKind.Stocks:
-                    SetRule(row, rules.stocks + " ストック", "やられるとストックが1つ減る。無くなったら脱落、最後まで残った人の勝ち");
+                    SetRule(row, SelectTexts.F(texts.stocksValue, rules.stocks), texts.descStocks);
                     break;
                 case RuleKind.StockTime:
-                    SetRule(row, rules.stockTimeLimit > 0f ? TimeText(rules.stockTimeLimit) : "なし",
-                        rules.stockTimeLimit > 0f ? "時間切れになったら、残りストックが一番多い人の勝ち（同じなら積み木が多い人）" : "最後の1人になるまで続ける");
+                    SetRule(row, LimitText(rules.stockTimeLimit), rules.stockTimeLimit > 0f ? texts.descStockTimeOn : texts.descStockTimeOff);
                     break;
                 case RuleKind.TimeLength:
-                    SetRule(row, TimeText(rules.timeLength), "決めた時間いっぱい戦う。やられても何度でも復活できる");
+                    SetRule(row, TimeText(rules.timeLength), texts.descTimeLength);
                     break;
                 case RuleKind.GhostTime:
-                    SetRule(row, rules.ghostTimeLimit > 0f ? TimeText(rules.ghostTimeLimit) : "なし",
-                        rules.ghostTimeLimit > 0f ? "時間切れになったら、生き残っている中で積み木が一番多い人の勝ち" : "最後の1人になるまで続ける");
+                    SetRule(row, LimitText(rules.ghostTimeLimit), rules.ghostTimeLimit > 0f ? texts.descGhostTimeOn : texts.descGhostTimeOff);
                     break;
             }
         }
@@ -494,8 +493,11 @@ public class MatchSelect : MonoBehaviour
         return next < offset ? 0f : timeLimitChoices[next - offset];
     }
 
-    static string TimeText(float seconds) =>
-        seconds % 60f == 0f ? Mathf.RoundToInt(seconds / 60f) + "分" : Mathf.RoundToInt(seconds) + "秒";
+    string TimeText(float seconds) =>
+        seconds % 60f == 0f ? SelectTexts.F(texts.minutes, Mathf.RoundToInt(seconds / 60f)) : SelectTexts.F(texts.seconds, Mathf.RoundToInt(seconds));
+
+    // 時間制限（0 = なし）
+    string LimitText(float seconds) => seconds > 0f ? TimeText(seconds) : texts.none;
 
     static void SetRule(RuleRow row, string value, string desc)
     {
@@ -506,17 +508,17 @@ public class MatchSelect : MonoBehaviour
     static void Bounce(TextMeshProUGUI t) => t.rectTransform.localScale = Vector3.one * 1.25f;
 
     // キャラクターセレクトの右上に出すルールの説明
-    static string RuleSummaryText()
+    string RuleSummaryText()
     {
         var r = MatchSetup.Rules;
         switch (r.mode)
         {
             case MatchSetup.MatchMode.Stock:
-                return "モード：ストック（" + r.stocks + "ストック　時間制限 " + (r.stockTimeLimit > 0f ? TimeText(r.stockTimeLimit) : "なし") + "）";
+                return SelectTexts.F(texts.summaryStock, r.stocks, LimitText(r.stockTimeLimit));
             case MatchSetup.MatchMode.Time:
-                return "モード：タイム（" + TimeText(r.timeLength) + "）";
+                return SelectTexts.F(texts.summaryTime, TimeText(r.timeLength));
             default:
-                return "モード：ゴースト（時間制限 " + (r.ghostTimeLimit > 0f ? TimeText(r.ghostTimeLimit) : "なし") + "）";
+                return SelectTexts.F(texts.summaryGhost, LimitText(r.ghostTimeLimit));
         }
     }
 
@@ -547,9 +549,6 @@ public class MatchSelect : MonoBehaviour
 
             var s = Read(p.device);
             MoveCursor(p, s, dt);
-
-            // Y / RB（キーボードは C・Tab）で次、LB（Q）で前の表示へ（自分の枠だけ）
-            if (showCharacterInfo && (s.next || s.prev)) TurnPage(panels[p.index], s.next ? 1 : -1);
 
             if (s.start && ready && p.holding == null) { MenuSounds.Decide(); GoToStageSelect(); return; }
             if (s.a) PressA(p);
@@ -590,13 +589,11 @@ public class MatchSelect : MonoBehaviour
         {
             var ui = panels[i];
             if (Hit(ui.typeButton.rectTransform, p.cursor)) { ToggleSlot(p, i); return; }
-            // 枠の下の丸：カーソルで押しても表示が切り替わる（CPU の枠もこれで見られる）
-            if (showCharacterInfo && slots[i] != null && Hit(ui.dotsRow, p.cursor)) { TurnPage(ui, 1); return; }
             var cpu = slots[i];
             if (cpu != null && cpu.IsCpu && ui.levelRow.gameObject.activeSelf)
             {
                 if (Hit(ui.minus, p.cursor)) { cpu.cpuLevel = Mathf.Max(1, cpu.cpuLevel - 1); MenuSounds.Cursor(); return; }
-                if (Hit(ui.plus, p.cursor)) { cpu.cpuLevel = Mathf.Min(9, cpu.cpuLevel + 1); MenuSounds.Cursor(); return; }
+                if (Hit(ui.plus, p.cursor)) { cpu.cpuLevel = Mathf.Min(MatchSetup.MaxCpuLevel, cpu.cpuLevel + 1); MenuSounds.Cursor(); return; }
             }
         }
 
@@ -607,13 +604,6 @@ public class MatchSelect : MonoBehaviour
         }
 
         if (tile != null) { MenuSounds.Decide(); SetCharacter(p, tile); }
-    }
-
-    void TurnPage(Panel ui, int step)
-    {
-        ui.page = (ui.page + step + PageCount) % PageCount;
-        ui.pageTime = Time.unscaledTime;
-        MenuSounds.Cursor();
     }
 
     void Grab(Player p, Player cpu)
@@ -704,7 +694,7 @@ public class MatchSelect : MonoBehaviour
     // CPU を作る。最初はランダムのマスにコインを置く
     Player AddCpu(int i, int level)
     {
-        var p = new Player { index = i, cpuLevel = level };
+        var p = new Player { index = i, cpuLevel = Mathf.Clamp(level, 1, MatchSetup.MaxCpuLevel) };
         p.charToken = MakeToken(p, charRoot);
         slots[i] = p;
         SetCharacter(p, charTiles.Find(t => t.random));
@@ -721,6 +711,7 @@ public class MatchSelect : MonoBehaviour
         if (p.stageToken != null) Destroy(p.stageToken.gameObject);
         slots[p.index] = null;
         Debug.Log($"{p.Label} 退出");
+        PlayerLeft?.Invoke(p.index, p.device);
     }
 
     void SetCharacter(Player p, Tile tile)
@@ -873,7 +864,7 @@ public class MatchSelect : MonoBehaviour
 
         var hovered = TileAt(stageTiles, p.cursor);
         if (hovered != null) ShowPreview(hovered);
-        stageStatus.text = p.Label + " が えらんでね";
+        stageStatus.text = SelectTexts.F(texts.chooserStatus, p.Label);
     }
 
     IEnumerator ChooseStage(Tile tile)
@@ -917,9 +908,9 @@ public class MatchSelect : MonoBehaviour
 
         previewImage.enabled = previewInfo != null;
         previewFrame.GetComponent<Image>().color = tile.random ? RandomColor : tile.stage.color;
-        previewLetter.text = previewInfo != null ? "" : tile.random ? "？" : Initial(tile.stage.displayName);
-        previewName.text = tile.random ? "おまかせ" : tile.stage.displayName;
-        stageDescription.text = tile.random ? "どのステージになるかは、決めるまで分からない" : tile.stage.description;
+        previewLetter.text = previewInfo != null ? "" : tile.random ? texts.randomLetter : Initial(tile.stage.displayName);
+        previewName.text = tile.random ? texts.randomStage : tile.stage.displayName;
+        stageDescription.text = tile.random ? texts.randomStageDescription : tile.stage.description;
     }
 
     // プレビューのカメラ：本編のカメラと同じ距離・角度から、見ている点のまわりを回る。触らなければゆっくり回る
@@ -971,13 +962,13 @@ public class MatchSelect : MonoBehaviour
         else if (allVotedTime < 0f) allVotedTime = Time.unscaledTime;
         else if (Time.unscaledTime - allVotedTime >= lotteryDelay) StartCoroutine(Lottery());
 
-        stageStatus.text = all ? "ちゅうせん するよ！" : $"とうひょう　{voted} / {humans}";
+        stageStatus.text = all ? texts.voteAll : SelectTexts.F(texts.voteStatus, voted, humans);
 
         // 番号の小さいプレイヤーのカーソルが乗っているステージの説明を出す
         Tile hovered = null;
         foreach (var p in Humans()) { hovered = TileAt(stageTiles, p.cursor); if (hovered != null) break; }
         stageDescription.text = hovered == null ? ""
-            : hovered.random ? "<b>おまかせ</b>　どのステージになるかは抽選まで分からない"
+            : hovered.random ? texts.randomStageVoteDescription
             : "<b>" + hovered.stage.displayName + "</b>　" + hovered.stage.description;
     }
 
@@ -1023,7 +1014,7 @@ public class MatchSelect : MonoBehaviour
         foreach (Transform c in lotteryRoot) Destroy(c.gameObject);
         var dim = ToyKit.UIImage("Dim", lotteryRoot, new Color(0.15f, 0.1f, 0.1f, 0.55f));
         ToyKit.Stretch(dim);
-        var title = ToyKit.UIText("Title", lotteryRoot, font, "ステージ ちゅうせん！", 90f, Color.white);
+        var title = ToyKit.UIText("Title", lotteryRoot, font, texts.lotteryTitle, 90f, Color.white);
         title.fontSharedMaterial = popMat;
         ToyKit.Anchor(title.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 330f), new Vector2(1400f, 140f));
 
@@ -1041,7 +1032,7 @@ public class MatchSelect : MonoBehaviour
             var pos = new Vector2((i - (n - 1) * 0.5f) * (cardSize.x + gap), 0f);
             bool hidden = p.randomStage;
             var card = MakeTile(lotteryRoot, pos, cardSize, hidden ? RandomColor : votes[i].color, hidden ? null : votes[i].preview,
-                                hidden ? "おまかせ" : votes[i].displayName, hidden ? "？" : Initial(votes[i].displayName));
+                                hidden ? texts.randomStage : votes[i].displayName, hidden ? texts.randomLetter : Initial(votes[i].displayName));
             cards.Add(card);
 
             // 札の上に投票した人
@@ -1106,7 +1097,7 @@ public class MatchSelect : MonoBehaviour
 
         // 決定！
         MenuSounds.Decide();
-        var popText = ToyKit.UIText("Decided", lotteryRoot, font, "けってい！　" + won.displayName, 110f, ToyKit.Palette[0]);
+        var popText = ToyKit.UIText("Decided", lotteryRoot, font, SelectTexts.F(texts.decided, won.displayName), 110f, ToyKit.Palette[0]);
         popText.fontSharedMaterial = popMat;
         ToyKit.Anchor(popText.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, -300f), new Vector2(1600f, 180f));
         for (float t = 0f; t < 1f; t += Time.unscaledDeltaTime / 0.5f)
@@ -1216,115 +1207,30 @@ public class MatchSelect : MonoBehaviour
             ui.bg.color = !used ? new Color(0.86f, 0.84f, 0.83f, 0.85f) : cpu ? new Color(0.8f, 0.8f, 0.82f) : Color.Lerp(PlayerColors[i % PlayerColors.Length], Color.white, 0.55f);
             ui.label.text = used ? NameOf(p) : (i + 1) + "P";
             ui.label.color = !used ? new Color(0.6f, 0.58f, 0.57f) : cpu ? CpuColor : PlayerColors[i % PlayerColors.Length];
-            ui.typeText.text = !used ? "なし" : cpu ? "CPU" : "プレイヤー";
+            ui.typeText.text = !used ? texts.typeNone : cpu ? texts.typeCpu : texts.typePlayer;
             ui.typeButton.color = !used ? new Color(0.75f, 0.73f, 0.72f) : cpu ? CpuColor : PlayerColors[i % PlayerColors.Length];
-            // キャラ（0）以外の表示のときは、顔・名前の代わりに説明を出す
-            int page = used && showCharacterInfo ? ui.page : 0;
-            bool chara = page == 0;
             bool okNow = used && p.HasCharacter && p.heldBy == null;
             ui.join.gameObject.SetActive(!used);
-            ui.name.gameObject.SetActive(used && chara);
-            ui.device.gameObject.SetActive(used && !cpu && chara);
-            ui.levelRow.gameObject.SetActive(cpu && chara);
-            ui.portrait.gameObject.SetActive(used && chara);
+            ui.name.gameObject.SetActive(used);
+            ui.device.gameObject.SetActive(used && !cpu);
+            ui.levelRow.gameObject.SetActive(cpu);
+            ui.portrait.gameObject.SetActive(used);
             ui.ok.gameObject.SetActive(okNow);
-            ui.okSmall.gameObject.SetActive(okNow && !chara);
-            ui.dotsRow.gameObject.SetActive(used && showCharacterInfo);
-            ui.info.gameObject.SetActive(used && !chara);
-            for (int d = 0; d < ui.dots.Length; d++)
-            {
-                ui.dots[d].color = d == page ? ToyKit.Ink : new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.25f);
-                ui.dots[d].rectTransform.localScale = Vector3.one * (d == page ? 1.25f : 1f);
-            }
             if (!used) continue;
 
-            if (!chara)
-            {
-                // 説明するキャラ：選んだキャラ。まだなら、カーソルが乗っているキャラ
-                var shown = p.heldBy != null ? null : p.character;
-                bool random = p.heldBy == null && p.randomCharacter;
-                if (shown == null && !random && !cpu && phase == Phase.Character)
-                {
-                    var hover = TileAt(charTiles, p.cursor);
-                    if (hover != null) { shown = hover.character; random = hover.random; }
-                }
-                FillInfo(ui, page, shown, random);
-                // 切り替えた瞬間に少し弾ませる
-                float pt = (Time.unscaledTime - ui.pageTime) / 0.25f;
-                ui.info.localScale = Vector3.one * (pt < 1f ? Mathf.Lerp(0.92f, 1f, 1f - (1f - pt) * (1f - pt)) : 1f);
-                continue;
-            }
-
-            if (cpu) ui.level.text = "Lv " + p.cpuLevel;
+            if (cpu) ui.level.text = SelectTexts.F(texts.cpuLevel, p.cpuLevel);
             else ui.device.text = p.device.displayName + " #" + p.device.deviceId;   // 同じ種類のコントローラーでも見分けられるように
 
-            if (p.heldBy != null) SetPortrait(ui, null, "えらんでね", new Color(0.92f, 0.9f, 0.88f), "");
-            else if (p.randomCharacter) SetPortrait(ui, null, "ランダム", RandomColor, "？");
+            if (p.heldBy != null) SetPortrait(ui, null, texts.chooseCharacter, new Color(0.92f, 0.9f, 0.88f), "");
+            else if (p.randomCharacter) SetPortrait(ui, null, texts.randomCharacter, RandomColor, texts.randomLetter);
             else if (p.character != null) SetPortrait(ui, p.character.portrait, p.character.displayName, p.character.color, Initial(p.character.displayName));
             else
             {
                 // まだ選んでいない：カーソルが乗っているキャラを薄く見せる
                 var hover = !cpu && phase == Phase.Character ? TileAt(charTiles, p.cursor) : null;
                 if (hover != null && !hover.random) SetPortrait(ui, hover.character.portrait, hover.character.displayName, hover.character.color * 0.75f, Initial(hover.character.displayName));
-                else SetPortrait(ui, null, "えらんでね", new Color(0.92f, 0.9f, 0.88f), "");
+                else SetPortrait(ui, null, texts.chooseCharacter, new Color(0.92f, 0.9f, 0.88f), "");
             }
-        }
-    }
-
-    // パッシブ・ハンマー性能・必殺技の表示
-    void FillInfo(Panel ui, int page, CharacterData c, bool random)
-    {
-        ui.pageTitle.text = PageNames[page];
-        bool has = c != null;
-        ui.infoEmpty.gameObject.SetActive(!has);
-        ui.infoEmpty.text = random ? "ランダムは\nおたのしみ！" : "キャラをえらぶと\nここに出るよ";
-        ui.passivePage.gameObject.SetActive(has && page == 1);
-        ui.hammerPage.gameObject.SetActive(has && page == 2);
-        ui.specialPage.gameObject.SetActive(has && page == 3);
-        if (!has) return;
-
-        switch (page)
-        {
-            case 1:
-            {
-                // 左：条件の色の積み木を、条件の数だけ縦に積む（てっぺんに顔）＝「これだけ積めばいい」
-                // 右：「3こ積むと」＋ 効果の短い名前
-                int n = Mathf.Min(c.passiveCount, PassiveIconMax);
-                var col = Nakahira.TumikiColorUtil.ToUnityColor(c.passiveColor);
-                const float bottom = -100f, stackMaxH = 104f;
-                float bh = n > 0 ? Mathf.Min(26f, stackMaxH / n) : 0f;
-                float sx = ui.passiveHead.rectTransform.anchoredPosition.x;
-                for (int k = 0; k < ui.passiveIcons.Length; k++)
-                {
-                    var ic = ui.passiveIcons[k];
-                    ic.gameObject.SetActive(k < n);
-                    if (k >= n) continue;
-                    ic.color = col;
-                    ic.rectTransform.sizeDelta = new Vector2(58f, bh - 2f);
-                    ic.rectTransform.anchoredPosition = new Vector2(sx, bottom + bh * (k + 0.5f));
-                }
-                float headR = 15f;
-                ui.passiveHead.rectTransform.anchoredPosition = new Vector2(sx, bottom + bh * n + headR);
-                ui.passiveCount.text = c.passiveCount <= 0 ? "いつも" : c.passiveCount + "こ積むと";
-                ui.passiveEffect.text = string.IsNullOrEmpty(c.passiveName) ? "（未設定）" : c.passiveName;
-                break;
-            }
-            case 2:
-            {
-                int[] values = { c.hammerPower, c.hammerSpeed, c.hammerReach };
-                for (int row = 0; row < 3; row++)
-                    for (int k = 0; k < HammerSteps; k++)
-                    {
-                        bool on = k < values[row];
-                        ui.hammerHeads[row, k].color = on ? ToyKit.Palette[0] : new Color(0.55f, 0.52f, 0.5f, 0.3f);
-                        ui.hammerHandles[row, k].color = on ? new Color(0.93f, 0.8f, 0.55f) : new Color(0.55f, 0.52f, 0.5f, 0.3f);
-                    }
-                break;
-            }
-            case 3:
-                ui.specialName.text = string.IsNullOrEmpty(c.specialName) ? "（未設定）" : c.specialName;
-                ui.specialText.text = c.specialText;
-                break;
         }
     }
 
@@ -1349,7 +1255,7 @@ public class MatchSelect : MonoBehaviour
             chip.rect.gameObject.SetActive(p != null && phase != Phase.Lottery && stageVote);   // 抽選中とローカル（投票しない）は隠す
             if (p == null) { chip.shown = null; continue; }
             chip.rect.GetComponent<Image>().color = p.Color;
-            string chara = p.randomCharacter ? "ランダム" : p.character != null ? p.character.displayName : "-";
+            string chara = p.randomCharacter ? texts.randomCharacter : p.character != null ? p.character.displayName : "-";
 
             object shown;
             string sub;
@@ -1357,28 +1263,28 @@ public class MatchSelect : MonoBehaviour
             {
                 // CPU は投票しないので、キャラを出す
                 if (p.character != null) SetChipIcon(chip, p.character.portrait, p.character.color, Initial(p.character.displayName), true);
-                else SetChipIcon(chip, null, RandomColor, "？", true);
+                else SetChipIcon(chip, null, RandomColor, texts.randomLetter, true);
                 chip.ok.gameObject.SetActive(false);
                 shown = p.character;
-                sub = "CPU Lv" + p.cpuLevel;
+                sub = SelectTexts.F(texts.chipCpuLevel, p.cpuLevel);
             }
             else if (p.HasVote)
             {
-                if (p.randomStage) SetChipIcon(chip, null, RandomColor, "？", true);
+                if (p.randomStage) SetChipIcon(chip, null, RandomColor, texts.randomLetter, true);
                 else SetChipIcon(chip, p.stage.preview, p.stage.color, Initial(p.stage.displayName), true);
                 chip.ok.gameObject.SetActive(true);
                 shown = p.randomStage ? (object)"random" : p.stage;
-                sub = p.randomStage ? "おまかせ" : p.stage.displayName;
+                sub = p.randomStage ? texts.randomStage : p.stage.displayName;
             }
             else
             {
                 var hover = phase == Phase.Stage ? TileAt(stageTiles, p.cursor) : null;
                 if (hover == null) SetChipIcon(chip, null, new Color(0.92f, 0.9f, 0.88f), "", false);
-                else if (hover.random) SetChipIcon(chip, null, RandomColor * 0.8f, "？", false);
+                else if (hover.random) SetChipIcon(chip, null, RandomColor * 0.8f, texts.randomLetter, false);
                 else SetChipIcon(chip, hover.stage.preview, hover.stage.color * 0.8f, Initial(hover.stage.displayName), false);
                 chip.ok.gameObject.SetActive(false);
                 shown = null;
-                sub = "えらんでね";
+                sub = texts.chooseCharacter;
             }
 
             // 投票した（変えた）瞬間にアイコンを弾ませる
@@ -1445,8 +1351,6 @@ public class MatchSelect : MonoBehaviour
             s.a = g.buttonSouth.wasPressedThisFrame;
             s.b = g.buttonEast.wasPressedThisFrame;
             s.start = g.startButton.wasPressedThisFrame;
-            s.next = g.buttonNorth.wasPressedThisFrame || g.rightShoulder.wasPressedThisFrame;
-            s.prev = g.leftShoulder.wasPressedThisFrame;
         }
         else if (device is Keyboard k)
         {
@@ -1457,8 +1361,6 @@ public class MatchSelect : MonoBehaviour
             s.start = k.enterKey.wasPressedThisFrame || k.numpadEnterKey.wasPressedThisFrame;
             s.a = k.spaceKey.wasPressedThisFrame || k.zKey.wasPressedThisFrame || s.start;
             s.b = k.escapeKey.wasPressedThisFrame || k.xKey.wasPressedThisFrame || k.backspaceKey.wasPressedThisFrame;
-            s.next = k.cKey.wasPressedThisFrame || k.tabKey.wasPressedThisFrame;
-            s.prev = k.qKey.wasPressedThisFrame;
         }
         return s;
     }
@@ -1532,12 +1434,18 @@ public class MatchSelect : MonoBehaviour
         previewLetter.fontSharedMaterial = letterMat;
         ToyKit.Stretch(previewLetter.rectTransform);
 
-        var tip = ToyKit.UIText("Tip", previewFrame, font, "右スティックで見回せる", 26f, Color.white);
+        var tip = ToyKit.UIText("Tip", previewFrame, font, texts.previewTip, 26f, Color.white);
         tip.fontSharedMaterial = letterMat;
         tip.alignment = TextAlignmentOptions.BottomRight;
         ToyKit.Stretch(tip.rectTransform);
         tip.rectTransform.offsetMin = new Vector2(20f, 18f);
         tip.rectTransform.offsetMax = new Vector2(-24f, -18f);
+
+        // 名前・説明の後ろに敷く薄い板（背景の部室に文字が紛れないように）。一番後ろに置く
+        var plate = ToyKit.UIImage("InfoPlate", stageRoot, new Color(1f, 0.98f, 0.94f, 0.78f), uiSprite);
+        plate.GetComponent<Image>().pixelsPerUnitMultiplier = 0.4f;
+        ToyKit.Anchor(plate, new Vector2(0.5f, 0.5f), new Vector2(x, -300f), new Vector2(900f, 270f));
+        plate.SetAsFirstSibling();
 
         previewName = ToyKit.UIText("Name", stageRoot, font, "", 64f, ToyKit.Ink);
         previewName.fontSharedMaterial = popMat;
@@ -1570,26 +1478,26 @@ public class MatchSelect : MonoBehaviour
         // ---- モードセレクト ----
         modeRoot = Layer("ModeSelect", canvas);
         modeGroup = modeRoot.gameObject.AddComponent<CanvasGroup>();
-        Header(modeRoot, "モードセレクト", ToyKit.Palette[1]);
+        Header(modeRoot, texts.modeHeader, ToyKit.Palette[1]);
         modeCards = new[]
         {
-            MakeModeCard(MatchSetup.MatchMode.Stock, "ストック", ToyKit.Palette[1], new Vector2(-580f, -10f),
-                "ストックが無くなるまで\n戦う。最後まで\n残った人の勝ち！"),
-            MakeModeCard(MatchSetup.MatchMode.Time, "タイム", ToyKit.Palette[4], new Vector2(0f, -10f),
-                "時間いっぱい戦って\n点をかせぐ。\n一番点が多い人の勝ち！"),
-            MakeModeCard(MatchSetup.MatchMode.Ghost, "ゴースト", ToyKit.Palette[3], new Vector2(580f, -10f),
-                "やられても幽霊になって\n相手を叩けば復活！\n最後の1人まで戦う"),
+            MakeModeCard(MatchSetup.MatchMode.Stock, SelectTexts.At(texts.modeNames, 0), ToyKit.Palette[1], new Vector2(-580f, -10f),
+                SelectTexts.At(texts.modeDescriptions, 0)),
+            MakeModeCard(MatchSetup.MatchMode.Time, SelectTexts.At(texts.modeNames, 1), ToyKit.Palette[4], new Vector2(0f, -10f),
+                SelectTexts.At(texts.modeDescriptions, 1)),
+            MakeModeCard(MatchSetup.MatchMode.Ghost, SelectTexts.At(texts.modeNames, 2), ToyKit.Palette[3], new Vector2(580f, -10f),
+                SelectTexts.At(texts.modeDescriptions, 2)),
         };
 
         // ---- ルールセレクト（行はモードを選んだときに作る） ----
         ruleRoot = Layer("RuleSelect", canvas);
         ruleGroup = ruleRoot.gameObject.AddComponent<CanvasGroup>();
-        ruleHeader = Header(ruleRoot, "ルール", ToyKit.Palette[2]);
+        ruleHeader = Header(ruleRoot, SelectTexts.F(texts.ruleHeader, ""), ToyKit.Palette[2]);
 
         // ---- キャラクターセレクト ----
         charRoot = Layer("CharacterSelect", canvas);
         charGroup = charRoot.gameObject.AddComponent<CanvasGroup>();
-        Header(charRoot, "キャラクターセレクト", ToyKit.Palette[0]);
+        Header(charRoot, texts.characterHeader, ToyKit.Palette[0]);
 
         // 決めたルール（右上）
         ruleSummary = ToyKit.UIText("RuleSummary", charRoot, font, "", 32f, ToyKit.Ink);
@@ -1604,7 +1512,7 @@ public class MatchSelect : MonoBehaviour
             bool random = i == roster.characters.Count;
             var c = random ? null : roster.characters[i];
             var tile = MakeTile(charRoot, grid[i].pos, grid[i].size, random ? RandomColor : c.color,
-                                random ? null : c.portrait, random ? "ランダム" : c.displayName, random ? "？" : Initial(c.displayName));
+                                random ? null : c.portrait, random ? texts.randomCharacter : c.displayName, random ? texts.randomLetter : Initial(c.displayName));
             tile.character = c;
             tile.random = random;
             charTiles.Add(tile);
@@ -1621,13 +1529,13 @@ public class MatchSelect : MonoBehaviour
         readyGroup = readyBanner.gameObject.AddComponent<CanvasGroup>();
         readyGroup.alpha = 0f;
         readyGroup.blocksRaycasts = false;
-        var rt = ToyKit.UIText("Text", readyBanner, font, "じゅんびOK！", 96f, Color.white);
+        var rt = ToyKit.UIText("Text", readyBanner, font, texts.ready, 96f, Color.white);
         rt.fontSharedMaterial = popMat;
         ToyKit.Anchor(rt.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(-150f, 8f), new Vector2(900f, 140f));
-        var rs = ToyKit.UIText("Sub", readyBanner, font, "Start でステージセレクトへ", 38f, Color.white);
+        var rs = ToyKit.UIText("Sub", readyBanner, font, texts.readySub, 38f, Color.white);
         ToyKit.Anchor(rs.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(520f, -10f), new Vector2(700f, 60f));
 
-        needMoreText = ToyKit.UIText("NeedMore", charRoot, font, "あいて（CPU か ほかのプレイヤー）を くわえてね！\n<size=60%>枠の右上のボタンで CPU にできます</size>", 54f, ToyKit.Palette[0]);
+        needMoreText = ToyKit.UIText("NeedMore", charRoot, font, texts.needMore, 54f, ToyKit.Palette[0]);
         needMoreText.fontSharedMaterial = popMat;
         ToyKit.Anchor(needMoreText.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, -120f), new Vector2(1600f, 150f));
         needMoreText.alpha = 0f;
@@ -1635,20 +1543,20 @@ public class MatchSelect : MonoBehaviour
         // ---- ステージセレクト ----
         stageRoot = Layer("StageSelect", canvas);
         stageGroup = stageRoot.gameObject.AddComponent<CanvasGroup>();
-        Header(stageRoot, "ステージセレクト", ToyKit.Palette[4]);
+        Header(stageRoot, texts.stageHeader, ToyKit.Palette[4]);
 
         // 投票（オンライン用）は画面いっぱいに並べる。ローカルは右半分に並べ、左半分をプレビューにする
         int sc = roster.stages.Count + 1;   // 最後におまかせ
         var sgrid = stageVote
             ? GridLayout(sc, stageColumns, new Vector2(1760f, 470f), new Vector2(380f, 240f), 18f, 345f)
-            : GridLayout(sc, 4, new Vector2(900f, 790f), new Vector2(280f, 180f), 14f, 350f);
+            : GridLayout(sc, localStageColumns, new Vector2(900f, 790f), new Vector2(280f, 180f), 14f, 350f);
         for (int i = 0; i < sc; i++)
         {
             bool random = i == roster.stages.Count;
             var st = random ? null : roster.stages[i];
             var pos = sgrid[i].pos + (stageVote ? Vector2.zero : new Vector2(480f, 0f));
             var tile = MakeTile(stageRoot, pos, sgrid[i].size, random ? RandomColor : st.color,
-                                random ? null : st.preview, random ? "おまかせ" : st.displayName, random ? "？" : Initial(st.displayName));
+                                random ? null : st.preview, random ? texts.randomStage : st.displayName, random ? texts.randomLetter : Initial(st.displayName));
             tile.stage = st;
             tile.random = random;
             stageTiles.Add(tile);
@@ -1687,7 +1595,7 @@ public class MatchSelect : MonoBehaviour
             var letter = ToyKit.UIText("Letter", icon.rectTransform, font, "", ih * 0.6f, Color.white);
             letter.fontSharedMaterial = letterMat;
             ToyKit.Stretch(letter.rectTransform);
-            var ok = ToyKit.UIText("OK", icon.rectTransform, font, "OK!", 44f, ToyKit.Palette[0]);
+            var ok = ToyKit.UIText("OK", icon.rectTransform, font, texts.ok, 44f, ToyKit.Palette[0]);
             ok.fontSharedMaterial = popMat;
             ok.rectTransform.localRotation = Quaternion.Euler(0f, 0f, -12f);
             ToyKit.Anchor(ok.rectTransform, new Vector2(1f, 1f), Vector2.zero, new Vector2(120f, 60f));
@@ -1751,17 +1659,17 @@ public class MatchSelect : MonoBehaviour
         switch (rules.mode)
         {
             case MatchSetup.MatchMode.Stock:
-                rows.Add(new KeyValuePair<RuleKind, string>(RuleKind.Stocks, "ストック数"));
-                rows.Add(new KeyValuePair<RuleKind, string>(RuleKind.StockTime, "時間制限"));
+                rows.Add(new KeyValuePair<RuleKind, string>(RuleKind.Stocks, texts.ruleStocks));
+                rows.Add(new KeyValuePair<RuleKind, string>(RuleKind.StockTime, texts.ruleStockTime));
                 break;
             case MatchSetup.MatchMode.Time:
-                rows.Add(new KeyValuePair<RuleKind, string>(RuleKind.TimeLength, "試合時間"));
+                rows.Add(new KeyValuePair<RuleKind, string>(RuleKind.TimeLength, texts.ruleTimeLength));
                 break;
             default:
-                rows.Add(new KeyValuePair<RuleKind, string>(RuleKind.GhostTime, "時間制限"));
+                rows.Add(new KeyValuePair<RuleKind, string>(RuleKind.GhostTime, texts.ruleGhostTime));
                 break;
         }
-        rows.Add(new KeyValuePair<RuleKind, string>(RuleKind.Next, "キャラクターセレクトへ"));
+        rows.Add(new KeyValuePair<RuleKind, string>(RuleKind.Next, texts.ruleNext));
 
         // 上から順に、全体が画面の中央に来るように並べる
         const float gap = 22f;
@@ -1917,7 +1825,7 @@ public class MatchSelect : MonoBehaviour
         ToyKit.Anchor(tb, new Vector2(1f, 1f), new Vector2(-95f, -38f), new Vector2(170f, 56f));
         var tbo = tb.gameObject.AddComponent<Outline>(); tbo.effectColor = ToyKit.Ink; tbo.effectDistance = new Vector2(2f, -2f);
         ui.typeButton = tb.GetComponent<Image>();
-        ui.typeText = ToyKit.UIText("Text", tb, font, "なし", 30f, Color.white);
+        ui.typeText = ToyKit.UIText("Text", tb, font, texts.typeNone, 30f, Color.white);
         ui.typeText.fontSharedMaterial = letterMat;
         ToyKit.Stretch(ui.typeText.rectTransform);
 
@@ -1943,131 +1851,19 @@ public class MatchSelect : MonoBehaviour
         ToyKit.Anchor(ui.levelRow, new Vector2(1f, 0.5f), new Vector2(-w * 0.28f, -75f), new Vector2(w * 0.5f, 56f));
         ui.minus = SmallButton(ui.levelRow, "－", new Vector2(-w * 0.19f, 0f));
         ui.plus = SmallButton(ui.levelRow, "＋", new Vector2(w * 0.19f, 0f));
-        ui.level = ToyKit.UIText("Text", ui.levelRow, font, "Lv 3", 34f, ToyKit.Ink);
+        ui.level = ToyKit.UIText("Text", ui.levelRow, font, SelectTexts.F(texts.cpuLevel, 3), 34f, ToyKit.Ink);
         ToyKit.Anchor(ui.level.rectTransform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(120f, 56f));
 
-        ui.join = ToyKit.UIText("Join", r, font, "A / Start で参加", 40f, new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.6f));
+        ui.join = ToyKit.UIText("Join", r, font, texts.join, 40f, new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.6f));
         ui.join.enableAutoSizing = true; ui.join.fontSizeMin = 16f; ui.join.fontSizeMax = 40f;
         ToyKit.Anchor(ui.join.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, -30f), new Vector2(w - 30f, 80f));
 
-        ui.ok = ToyKit.UIText("OK", ui.portrait.rectTransform, font, "OK!", 56f, ToyKit.Palette[0]);
+        ui.ok = ToyKit.UIText("OK", ui.portrait.rectTransform, font, texts.ok, 56f, ToyKit.Palette[0]);
         ui.ok.fontSharedMaterial = popMat;
         ui.ok.rectTransform.localRotation = Quaternion.Euler(0f, 0f, -12f);
         ToyKit.Anchor(ui.ok.rectTransform, new Vector2(1f, 1f), new Vector2(0f, 0f), new Vector2(160f, 80f));
 
-        BuildPanelInfo(ui, r, w);
         return ui;
-    }
-
-    // 枠の説明の表示（パッシブ・ハンマー性能・必殺技）。Y で キャラ → パッシブ → ハンマー → 必殺技 と切り替える
-    void BuildPanelInfo(Panel ui, RectTransform r, float w)
-    {
-        var faded = new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.7f);
-        var center = new Vector2(0.5f, 0.5f);
-
-        ui.info = new GameObject("Info", typeof(RectTransform)).GetComponent<RectTransform>();
-        ui.info.SetParent(r, false);
-        ToyKit.Stretch(ui.info);
-        ui.pageTitle = ToyKit.UIText("PageTitle", ui.info, font, "", 28f, faded);
-        ui.pageTitle.enableAutoSizing = true; ui.pageTitle.fontSizeMin = 18f; ui.pageTitle.fontSizeMax = 28f;
-        ToyKit.Anchor(ui.pageTitle.rectTransform, center, new Vector2(0f, 38f), new Vector2(w - 40f, 36f));
-        ui.infoEmpty = ToyKit.UIText("Empty", ui.info, font, "", 30f, faded);
-        ToyKit.Anchor(ui.infoEmpty.rectTransform, center, new Vector2(0f, -35f), new Vector2(w - 40f, 100f));
-
-        // パッシブ：左に条件の積み木を縦に積み、右に「3こ積むと」＋ 効果の短い名前
-        ui.passivePage = SubPage("Passive", ui.info);
-        float stackX = -w * 0.5f + 64f;
-        ui.passiveIcons = new Image[PassiveIconMax];
-        for (int k = 0; k < PassiveIconMax; k++)
-        {
-            var ic = ToyKit.UIImage("Block" + k, ui.passivePage, Color.white, uiSprite);
-            ToyKit.Anchor(ic, center, new Vector2(stackX, 0f), new Vector2(46f, 20f));
-            var o = ic.gameObject.AddComponent<Outline>(); o.effectColor = ToyKit.Ink; o.effectDistance = new Vector2(2f, -2f);
-            ui.passiveIcons[k] = ic.GetComponent<Image>();
-        }
-        var face = ToyKit.UIImage("Face", ui.passivePage, new Color(0.99f, 0.85f, 0.18f), knobSprite);
-        face.GetComponent<Image>().type = Image.Type.Simple;
-        ToyKit.Anchor(face, center, new Vector2(stackX, 0f), new Vector2(30f, 30f));
-        var ho = face.gameObject.AddComponent<Outline>(); ho.effectColor = ToyKit.Ink; ho.effectDistance = new Vector2(2f, -2f);
-        ui.passiveHead = face.GetComponent<Image>();
-
-        float textX = (stackX + 45f + w * 0.5f - 15f) * 0.5f, textW = w * 0.5f - 15f - (stackX + 45f);
-        ui.passiveCount = ToyKit.UIText("Condition", ui.passivePage, font, "", 28f, new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.8f));
-        ToyKit.Anchor(ui.passiveCount.rectTransform, center, new Vector2(textX, -22f), new Vector2(textW, 36f));
-        ui.passiveEffect = ToyKit.UIText("Effect", ui.passivePage, font, "", 46f, ToyKit.Ink);
-        ui.passiveEffect.fontStyle = FontStyles.Bold;
-        ui.passiveEffect.enableAutoSizing = true; ui.passiveEffect.fontSizeMin = 24f; ui.passiveEffect.fontSizeMax = 46f;
-        ToyKit.Anchor(ui.passiveEffect.rectTransform, center, new Vector2(textX, -66f), new Vector2(textW, 56f));
-
-        // ハンマー性能：パワー／はやさ／リーチ を、ハンマーのアイコン5段階で
-        ui.hammerPage = SubPage("Hammer", ui.info);
-        ui.hammerHeads = new Image[3, HammerSteps];
-        ui.hammerHandles = new Image[3, HammerSteps];
-        float x0 = -w * 0.5f + 165f;
-        float stepX = Mathf.Min(46f, (w * 0.5f - 25f - x0) / (HammerSteps - 0.5f));
-        for (int row = 0; row < 3; row++)
-        {
-            float y = 6f - row * 42f;
-            var label = ToyKit.UIText("Stat" + row, ui.hammerPage, font, HammerStatNames[row], 28f, ToyKit.Ink);
-            label.alignment = TextAlignmentOptions.Left;
-            ToyKit.Anchor(label.rectTransform, center, new Vector2(-w * 0.5f + 80f, y), new Vector2(120f, 40f));
-            for (int k = 0; k < HammerSteps; k++)
-            {
-                float x = x0 + k * stepX;
-                // 柄を先に置いて、頭をその上に重ねる（小さなハンマーの形）
-                var handle = ToyKit.UIImage("Handle", ui.hammerPage, Color.white);
-                ToyKit.Anchor(handle, center, new Vector2(x, y - 9f), new Vector2(6f, 18f));
-                var head = ToyKit.UIImage("Head", ui.hammerPage, Color.white, uiSprite);
-                ToyKit.Anchor(head, center, new Vector2(x, y + 5f), new Vector2(Mathf.Min(34f, stepX - 6f), 18f));
-                ui.hammerHandles[row, k] = handle.GetComponent<Image>();
-                ui.hammerHeads[row, k] = head.GetComponent<Image>();
-            }
-        }
-
-        // 必殺技：名前 ＋ 1文
-        ui.specialPage = SubPage("Special", ui.info);
-        ui.specialName = ToyKit.UIText("Name", ui.specialPage, font, "", 40f, ToyKit.Ink);
-        ui.specialName.fontStyle = FontStyles.Bold;
-        ui.specialName.enableAutoSizing = true; ui.specialName.fontSizeMin = 22f; ui.specialName.fontSizeMax = 40f;
-        ToyKit.Anchor(ui.specialName.rectTransform, center, new Vector2(0f, 0f), new Vector2(w - 30f, 52f));
-        ui.specialText = InfoText("Text", ui.specialPage, w, -60f, 64f);
-
-        // 下の丸：いまどの表示か（カーソルで押しても切り替わる）
-        ui.dotsRow = new GameObject("Dots", typeof(RectTransform)).GetComponent<RectTransform>();
-        ui.dotsRow.SetParent(r, false);
-        ToyKit.Anchor(ui.dotsRow, new Vector2(0.5f, 0f), new Vector2(0f, 20f), new Vector2(PageCount * 26f + 30f, 30f));
-        ui.dots = new Image[PageCount];
-        for (int d = 0; d < PageCount; d++)
-        {
-            var dot = ToyKit.UIImage("Dot" + d, ui.dotsRow, ToyKit.Ink, knobSprite);
-            dot.GetComponent<Image>().type = Image.Type.Simple;
-            ToyKit.Anchor(dot, center, new Vector2((d - (PageCount - 1) * 0.5f) * 26f, 0f), new Vector2(14f, 14f));
-            ui.dots[d] = dot.GetComponent<Image>();
-        }
-
-        // 説明を出している間の「OK!」（顔が隠れるので右下に小さく。説明の文字と重ならない高さ）
-        ui.okSmall = ToyKit.UIText("OKSmall", r, font, "OK!", 32f, ToyKit.Palette[0]);
-        ui.okSmall.fontSharedMaterial = popMat;
-        ui.okSmall.rectTransform.localRotation = Quaternion.Euler(0f, 0f, -10f);
-        ToyKit.Anchor(ui.okSmall.rectTransform, new Vector2(1f, 0f), new Vector2(-50f, 19f), new Vector2(90f, 40f));
-        ui.info.gameObject.SetActive(false);
-    }
-
-    static RectTransform SubPage(string name, Transform parent)
-    {
-        var page = new GameObject(name, typeof(RectTransform)).GetComponent<RectTransform>();
-        page.SetParent(parent, false);
-        ToyKit.Stretch(page);
-        return page;
-    }
-
-    TextMeshProUGUI InfoText(string name, Transform parent, float w, float y, float h)
-    {
-        var t = ToyKit.UIText(name, parent, font, "", 24f, new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.85f));
-        t.textWrappingMode = TextWrappingModes.Normal;
-        t.enableAutoSizing = true; t.fontSizeMin = 14f; t.fontSizeMax = 24f;
-        ToyKit.Anchor(t.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, y), new Vector2(w - 30f, h));
-        return t;
     }
 
     RectTransform SmallButton(Transform parent, string text, Vector2 pos)

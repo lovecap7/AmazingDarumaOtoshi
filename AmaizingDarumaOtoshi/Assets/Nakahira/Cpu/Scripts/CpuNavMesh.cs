@@ -12,6 +12,7 @@ namespace Nakahira
     // ステージの床の配置が変わったら MarkDirty を呼ぶと、次に道を聞かれたときに作り直す
     // 動くギミックは焼き込まない:せり上がり塀・扇風機は当たり判定がある間だけ切り抜き(CpuGimmickObstacle)、
     // 移動床は乗り場から乗って行く道として使う(CpuMovingFloors / CpuRide)
+    // プレイヤーを送るワープゲートの中は歩けないエリアにし、入り口から入って行く道として使う(CpuWarpGates / CpuRide)
     public static class CpuNavMesh
     {
         // ナビメッシュを作る範囲(ワールドの原点を中心とした立方体の一辺 m)
@@ -40,6 +41,7 @@ namespace Nakahira
         static readonly List<NavMeshBuildMarkup> s_markups = new List<NavMeshBuildMarkup>();
         static readonly Vector3[] s_corners = new Vector3[64];
         static readonly List<Hazard> s_hazards = new List<Hazard>();
+        static NavMeshPath s_warpPath;   // MonoBehaviour の初期化中には作れないので、使うときに作る
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         static void ResetStatics()
@@ -61,16 +63,18 @@ namespace Nakahira
 
         // from から to まで行ける道を求める。to の近く(水平に goalTolerance m 以内)まで行けなければ false
         // 道(曲がり角)は path に入る。length は道の長さ(水平)
-        // 歩いて行けなければ、移動床に乗って行く道を探す(そのときの path は乗り場までの道。length は乗る手間も含む)
+        // 歩いて行けなければ、移動床に乗って行く道・ワープゲートに入って行く道を探し、短い方を使う
+        // (そのときの path は乗り場・入り口までの道。length は乗る・ワープする手間も含む)
         public static bool TryFindPath(Vector3 from, Vector3 to, float goalTolerance, NavMeshPath path, out float length)
         {
-            return TryFindPath(from, to, goalTolerance, path, out length, out _);
+            return TryFindPath(from, to, goalTolerance, path, out length, out _, out _);
         }
 
-        // ride:移動床に乗って行くなら、その乗り方(歩いて行けるなら無効)
-        public static bool TryFindPath(Vector3 from, Vector3 to, float goalTolerance, NavMeshPath path, out float length, out CpuRidePlan ride)
+        // ride:移動床に乗って行くなら、その乗り方 / warp:ワープゲートに入って行くなら、そのゲート(歩いて行けるならどちらも無効)
+        public static bool TryFindPath(Vector3 from, Vector3 to, float goalTolerance, NavMeshPath path, out float length, out CpuRidePlan ride, out CpuWarpPlan warp)
         {
             ride = default;
+            warp = default;
             EnsureBuilt();
             // 移動床の上にいるなら、今止まっている(動いていれば次に止まる)地点の乗り場から道を求める
             // (床はナビメッシュに無いので。床が動いている間は降りない:CpuRide)
@@ -80,12 +84,35 @@ namespace Nakahira
                 extra = FlatDistance(from, dock);
                 from = dock;
             }
-            if (TryFindDirect(from, to, goalTolerance, path, out length) || CpuMovingFloors.TryFindRide(from, to, goalTolerance, path, out length, out ride))
+            if (TryFindDirect(from, to, goalTolerance, path, out length))
             {
                 length += extra;
                 return true;
             }
-            return false;
+
+            // 歩いて行けない:移動床とワープゲートのうち短い方(ワープは別の道に求めてから比べる)
+            if (s_warpPath == null) s_warpPath = new NavMeshPath();
+            bool hasRide = CpuMovingFloors.TryFindRide(from, to, goalTolerance, path, out float rideLength, out ride);
+            bool hasWarp = CpuWarpGates.TryFindWarp(from, to, goalTolerance, s_warpPath, out float warpLength, out warp);
+            if (hasWarp && (!hasRide || warpLength < rideLength))
+            {
+                ride = default;
+                CopyPath(s_warpPath, path);
+                length = warpLength + extra;
+                return true;
+            }
+            warp = default;
+            if (!hasRide) return false;
+            length = rideLength + extra;
+            return true;
+        }
+
+        // src の道を dst に写す(NavMeshPath は直接写せないので、同じ道を求め直す)
+        private static void CopyPath(NavMeshPath src, NavMeshPath dst)
+        {
+            int count = src.GetCornersNonAlloc(s_corners);
+            if (count == 0) return;
+            NavMesh.CalculatePath(s_corners[0], s_corners[count - 1], NavMesh.AllAreas, dst);
         }
 
         // from から to まで歩いて行ける道を求める(移動床は使わない)
@@ -153,6 +180,7 @@ namespace Nakahira
 
             AttachObstacles();
             CpuMovingFloors.Build();
+            CpuWarpGates.Build();
         }
 
         private static bool IsDynamicGimmick(Collider col)
@@ -198,6 +226,22 @@ namespace Nakahira
                         area = kNotWalkableArea,
                     });
                 }
+            }
+
+            // プレイヤーを送るワープゲート:ふだんの道で間違って入らないよう、中を歩けないエリアにする
+            // (ワープして行く道は CpuWarpGates がゲートのそばの入り口から求め、入るのは CpuRide が行う)
+            foreach (var gate in CpuWarpGates.PlayerGates())
+            {
+                Vector3 c = gate.transform.position;
+                float r = gate.WarpRadius + CpuWarpGates.kKeepOutMargin;
+                s_hazards.Add(new Hazard { Center = c, Radius = gate.WarpRadius });
+                s_sources.Add(new NavMeshBuildSource
+                {
+                    shape = NavMeshBuildSourceShape.Box,
+                    size = new Vector3(r * 2.0f, kAgentHeight, r * 2.0f),
+                    transform = Matrix4x4.Translate(c),
+                    area = kNotWalkableArea,
+                });
             }
         }
 

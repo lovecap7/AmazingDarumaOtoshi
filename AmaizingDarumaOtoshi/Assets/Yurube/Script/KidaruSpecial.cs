@@ -83,13 +83,7 @@ namespace Yurube
 
             if (m_gauge == null || !IsLocalHuman()) return;
 
-            var keyboard = Keyboard.current;
-            bool pressed = keyboard != null && keyboard.lKey.wasPressedThisFrame;
-
-            var gamepad = Gamepad.current;
-            if (gamepad != null && gamepad.buttonNorth.wasPressedThisFrame) pressed = true;
-
-            if (pressed) TryActivate();
+            if (SpecialInput.WasPressed(m_character)) TryActivate();
         }
 
         // 既存の無敵処理はUpdateでRendererを点滅させる。
@@ -245,28 +239,8 @@ namespace Yurube
         // 試合中だけ、画面左下にゲージを出す(ラボはラボUI側で表示する)
         private void OnGUI()
         {
-            if (m_gauge == null || DarumaMatch.Current == null) return;
-
-            MatchPlayer me = null;
-            foreach (var p in DarumaMatch.Current.Players)
-            {
-                if (p.Character == m_character) { me = p; break; }
-            }
-            if (me == null || me.IsCpu) return;
-
-            var rect = new Rect(20.0f, Screen.height - 64.0f, 260.0f, 34.0f);
-            GUI.Box(rect, GUIContent.none);
-            GUI.Label(new Rect(rect.x + 8.0f, rect.y + 2.0f, 244.0f, 18.0f),
-                IsActive
-                    ? $"POWER UP {RemainingSeconds:F1}s"
-                    : (m_gauge.IsFull ? "SPECIAL READY [L / Y]" : $"SPECIAL {m_gauge.Blocks}/{m_gauge.BlocksToFill}"));
-
-            var bar = new Rect(rect.x + 8.0f, rect.y + 22.0f, 244.0f, 6.0f);
-            GUI.color = new Color(0.0f, 0.0f, 0.0f, 0.6f);
-            GUI.DrawTexture(bar, Texture2D.whiteTexture);
-            GUI.color = IsActive || m_gauge.IsFull ? new Color(1.0f, 0.85f, 0.2f) : new Color(0.9f, 0.7f, 0.1f);
-            GUI.DrawTexture(new Rect(bar.x, bar.y, bar.width * m_gauge.Normalized, bar.height), Texture2D.whiteTexture);
-            GUI.color = Color.white;
+            SpecialGaugeHUD.Draw(m_gauge, m_character,
+                IsActive ? $"POWER UP {RemainingSeconds:F1}s" : null);
         }
 
         private void OnDisable()
