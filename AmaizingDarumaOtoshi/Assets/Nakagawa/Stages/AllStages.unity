@@ -247380,17 +247380,18 @@ MonoBehaviour:
   m_characterPrefab: {fileID: 6242312641939630888, guid: 98dfe1d631da6fc429ba3618bb53aa46, type: 3}
   m_ghostPrefab: {fileID: 8875810368968693823, guid: f0f050629671f114096c296b81b42a53, type: 3}
   m_reviveInvincibleTime: 1.5
-  m_directMode: 0
-  m_directStocks: 1
+  m_directMode: 2
+  m_directStocks: 3
   m_directTimeLimit: 3600
   m_maxPlayers: 3
   m_dummyCount: 0
   m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
   m_dummyStartBlocks: 5
-  m_cpuCount: 5
+  m_cpuCount: 4
   m_cpuParams: {fileID: 11400000, guid: 61306de6ed4e45947be2f1eec470e918, type: 2}
   m_addDebugView: 1
   m_respawnAppearTime: 0.8
+  m_reviveTravelTime: 0.7
   m_startCountdown: 3
   m_countdownInDirectPlay: 0
 --- !u!4 &1218044442

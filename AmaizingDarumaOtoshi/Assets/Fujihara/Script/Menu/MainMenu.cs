@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using TMPro;
@@ -43,25 +43,27 @@ public class MainMenu : MonoBehaviour
     [Tooltip("たたかうの選び方。KnockTwice：叩き飛ばすと「ローカル／オンライン」の積み木が飛んできて、もう一度叩く　Board：看板のボタンで選ぶ")]
     [SerializeField] BattleStyle battleStyle = BattleStyle.KnockTwice;
 
-    [Header("項目（上から。並びは固定：たたかう／サウンド／ビデオ／クレジット／やめる）")]
-    [SerializeField] string[] labels = { "たたかう", "サウンド", "ビデオ", "クレジット", "やめる" };
+    [Header("項目（上から。並びは固定：たたかう／サウンド／ビデオ／ずかん（クレジット）／やめる）")]
+    [SerializeField] string[] labels = { "たたかう", "サウンド", "ビデオ", "ずかん", "やめる" };
+    [Tooltip("ずかんに並べるキャラクター（セレクト画面と同じ SelectRoster）。未設定ならずかんの代わりにクレジットを流す")]
+    [SerializeField] SelectRoster roster;
     [Tooltip("看板の説明（たたかう・サウンド・ビデオは看板に操作画面が出るので使わない）")]
     [SerializeField] string[] descriptions =
     {
         "",
         "",
         "",
-        "このゲームを\nつくった人たち",
+        "キャラクターの\nせいのうを 見る",
         "ゲームをおわります",
     };
-    [Tooltip("下の帯に出す、項目の説明（上から たたかう／サウンド／ビデオ／クレジット／やめる）")]
+    [Tooltip("下の帯に出す、項目の説明（上から たたかう／サウンド／ビデオ／ずかん／やめる）")]
     [TextArea(1, 3)]
     [SerializeField] string[] helpTexts =
     {
         "だるまを叩き合って、相手の頭を落とせば勝ち！　ローカル（この画面でみんなで）かオンラインで遊べます。",
         "BGM や効果音の音量を調整します。",
         "画面モード・解像度・垂直同期を変更します。",
-        "このゲームをつくった人たちを紹介します。",
+        "キャラクターの名前・パッシブ・必殺技が見られます。",
         "ゲームを終了します。",
     };
     [Tooltip("カメラの構図を、下の帯（説明＋操作ガイド）より上の範囲に収める割合。1：構図まるごと帯の上に収める（少し引いて上へ寄せる）　0：帯を気にせず画面いっぱい")]
@@ -120,6 +122,9 @@ public class MainMenu : MonoBehaviour
         public string guideDecide = "けってい";
         public string keyBack = "B";
         public string guideBack = "もどる";
+
+        [Header("ずかん（クレジットの項目で開く）")]
+        public CharacterBook.Texts book = new CharacterBook.Texts();
 
         [Header("看板の飾り")]
         [Tooltip("得点板の色帯の両はしの札（左、右）")]
@@ -262,6 +267,7 @@ public class MainMenu : MonoBehaviour
     readonly Dictionary<GameObject, string> rowHelps = new Dictionary<GameObject, string>();
     CanvasGroup titleGroup;
     CreditRoll credits;
+    CharacterBook book;
     CanvasGroup battleGroup, soundGroup, videoGroup, descGroup;
     TextMeshProUGUI descText, boardTitle, battleNote;
     Image boardDim;
@@ -1023,9 +1029,15 @@ public class MainMenu : MonoBehaviour
         ToyKit.Anchor(title.rectTransform, new Vector2(0f, 1f), new Vector2(330f, -90f), new Vector2(500f, 120f));
         titleGroup = title.gameObject.AddComponent<CanvasGroup>();
 
+        // ずかん（4番目の項目で開く。下の帯より後ろに置いて、帯の説明と操作ガイドは見えるようにする）
+        var bookGo = new GameObject("Book", typeof(RectTransform));
+        bookGo.transform.SetParent(overlay, false);
+        book = bookGo.AddComponent<CharacterBook>();
+        book.Setup(font, letterMat, uiSprite, knobSprite, roster, texts.book);
+
         BuildHelpBand();
 
-        // クレジット（背景をボカした上に流す）
+        // クレジット（背景をボカした上に流す。ずかんにキャラがいないときだけ使う）
         var cr = ToyKit.UIImage("Credits", overlay, new Color(ToyKit.Horizon.r, ToyKit.Horizon.g, ToyKit.Horizon.b, 0.55f));
         ToyKit.Stretch(cr);
         cr.gameObject.AddComponent<CanvasGroup>();
@@ -1194,7 +1206,7 @@ public class MainMenu : MonoBehaviour
             }
 
             case Phase.Credits:
-                if (!credits.IsBusy) phase = Phase.Browse;
+                if (!credits.IsBusy && !book.IsBusy) phase = Phase.Browse;
                 break;
 
             case Phase.Choose:
@@ -1277,7 +1289,8 @@ public class MainMenu : MonoBehaviour
                 wobbleIdx = index;
                 wobbleTime = sim;
                 yield return new WaitForSecondsRealtime(0.35f);
-                credits.Play();
+                if (book.HasEntries) book.Open();   // キャラのずかん
+                else credits.Play();
                 phase = Phase.Credits;
                 break;
         }
@@ -1617,7 +1630,7 @@ public class MainMenu : MonoBehaviour
         cam.fieldOfView = 2f * Mathf.Atan(halfW / Mathf.Max(0.1f, cam.aspect)) * Mathf.Rad2Deg;
 
         // クレジット中は全体を大きくボカす
-        bool blurAll = phase == Phase.Credits || credits.IsBusy;
+        bool blurAll = phase == Phase.Credits || credits.IsBusy || book.IsBusy;
         Vector3 subject = focusChoice ? ChoiceSlot(0) : focusBoard ? boardCenter : new Vector3(stackX * 0.4f, 2f, 0.5f);
         float focus = blurAll ? 0.6f : Vector3.Distance(camPos, subject);
         post.dof.focusDistance.value = Mathf.Lerp(post.dof.focusDistance.value, focus, k * 2f);
@@ -1628,12 +1641,14 @@ public class MainMenu : MonoBehaviour
     {
         titleGroup.alpha = 1f - dim;
 
-        // 下の帯は、始まりの演出とクレジットの間は隠す
-        bool hide = phase == Phase.Intro || phase == Phase.Credits || credits.IsBusy;
+        // 下の帯は、始まりの演出と（流れる）クレジットの間は隠す。ずかんの間は出す
+        bool bookOpen = book.IsBusy;
+        bool hide = phase == Phase.Intro || credits.IsBusy || phase == Phase.Credits && !bookOpen;
         helpGroup.alpha = Mathf.MoveTowards(helpGroup.alpha, hide ? 0f : 1f, Time.unscaledDeltaTime * 4f);
-        helpText.text = HelpText();
         var g = texts;
-        if (phase == Phase.Panel && outIdx == Battle || phase == Phase.Choose) SetGuides(g.keySelect, g.guideSelect, g.keyDecide, g.guideDecide, g.keyBack, g.guideBack);
+        helpText.text = bookOpen ? g.book.help : HelpText();
+        if (bookOpen) SetGuides(g.keySelect, g.guideSelect, g.keyBack, g.guideBack);
+        else if (phase == Phase.Panel && outIdx == Battle || phase == Phase.Choose) SetGuides(g.keySelect, g.guideSelect, g.keyDecide, g.guideDecide, g.keyBack, g.guideBack);
         else if (phase == Phase.Panel) SetGuides(g.keySelect, g.guideSelect, g.keyChange, g.guideChange, g.keyBack, g.guideBack);
         else if (!hide) SetGuides(g.keySelect, g.guideSelect, g.keyDecide, g.guideDecide);
     }
