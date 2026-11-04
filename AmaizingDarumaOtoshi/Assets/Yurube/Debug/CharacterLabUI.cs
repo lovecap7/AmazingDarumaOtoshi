@@ -139,6 +139,7 @@ namespace Yurube.Lab
             if (GUILayout.Button("あかだる: 必殺技", m_button)) PresetAkadaruSpecial();
             if (GUILayout.Button("あおだる: 必殺技", m_button)) PresetAodaruSpecial();
             if (GUILayout.Button("みだる: 必殺技", m_button)) PresetMidaruSpecial();
+            if (GUILayout.Button("いわだる: 必殺技", m_button)) PresetIwadaruSpecial();
 
             // ---- 切替 ----
             GUILayout.Space(6.0f);
@@ -386,6 +387,19 @@ namespace Yurube.Lab
             // 5個積むとゲージが満タンになる
             m_lab.AddBlocks(character, TumikiColor.Blue, 5);
             m_lab.SelectedColor = TumikiColor.Blue;
+
+            var special = character != null ? character.GetComponent<ISpecialAbility>() : null;
+            if (special != null) special.TryActivate();
+        }
+
+        void PresetIwadaruSpecial()
+        {
+            m_lab.SelectCharacter("iwadaru");
+            var character = m_lab.Character;
+            m_lab.ClearStack(character);
+            // 5個積むとゲージが満タン。予告円の大きさも5個ぶんになる
+            m_lab.AddBlocks(character, TumikiColor.Red, 5);
+            m_lab.SelectedColor = TumikiColor.Red;
 
             var special = character != null ? character.GetComponent<ISpecialAbility>() : null;
             if (special != null) special.TryActivate();

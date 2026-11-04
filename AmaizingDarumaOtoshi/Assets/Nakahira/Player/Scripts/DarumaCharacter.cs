@@ -135,6 +135,8 @@ namespace Nakahira
         public Collider Body => m_body;
         public Rigidbody Rigidbody => m_rb;
         public bool IsGrounded => m_isGrounded;
+        // 必殺技中など、移動だけを受け付ける状態
+        public bool MovementOnly { get; set; }
         // 股抜きショットを始められるか。地上にいて、先に押されたジャンプが実行待ちでないこと
         public bool CanStartShot => m_isGrounded && !m_jumpRequested;
         public bool IsInvincible => m_invincibleTimer > 0.0f;
@@ -209,9 +211,9 @@ namespace Nakahira
         {
             Vector2 move = Vector2.ClampMagnitude(command.Move, 1.0f);
             m_moveDirection = new Vector3(move.x, 0.0f, move.y);
-            if (command.Jump) m_jumpRequested = true;
-            if (command.Sweep) m_hammer.TrySweep();
-            if (command.Shot && m_hammer.TryShot()) FaceMoveDirection();
+            if (command.Jump && !MovementOnly) m_jumpRequested = true;
+            if (command.Sweep && !MovementOnly) m_hammer.TrySweep();
+            if (command.Shot && !MovementOnly && m_hammer.TryShot()) FaceMoveDirection();
         }
 
         // 振り向きの途中でも、スティックの方向へ即座に向きを合わせる(ニュートラルなら今の向きのまま)
