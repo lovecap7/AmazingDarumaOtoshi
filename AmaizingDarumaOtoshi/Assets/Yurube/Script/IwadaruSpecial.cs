@@ -45,11 +45,7 @@ namespace Yurube
         [Tooltip("着弾時に飛び散る岩の最小数")]
         [SerializeField, Min(1)] int m_minDebris = 12;
         [Tooltip("着弾時に飛び散る岩の最大数")]
-        [SerializeField, Min(1)] int m_maxDebris = 60;
-        [Tooltip("着弾時の衝撃波の最小本数")]
-        [SerializeField, Min(1)] int m_minShockwaveRings = 1;
-        [Tooltip("着弾時の衝撃波の最大本数")]
-        [SerializeField, Min(1)] int m_maxShockwaveRings = 3;
+        [SerializeField, Min(1)] int m_maxDebris = 40;
         [Tooltip("着弾時の画面揺れの最小振幅")]
         [SerializeField, Min(0.0f)] float m_minShakeAmplitude = 0.35f;
         [Tooltip("着弾時の画面揺れの最大振幅")]
@@ -58,6 +54,44 @@ namespace Yurube
         [SerializeField, Range(0.0f, 1.0f)] float m_minFlashStrength = 0.25f;
         [Tooltip("着弾フラッシュの最大強さ")]
         [SerializeField, Range(0.0f, 1.0f)] float m_maxFlashStrength = 0.7f;
+        [Tooltip("クレーター半径のステージ半径に対する比率")]
+        [SerializeField, Range(0.2f, 0.4f)] float m_craterRadiusRatio = 0.35f;
+        [Tooltip("ステージ半径の上書き(0なら床コライダーから自動取得)")]
+        [SerializeField, Min(0.0f)] float m_stageRadiusOverride = 0.0f;
+        [Tooltip("クレーター深さの半径に対する比率")]
+        [SerializeField, Range(0.05f, 0.2f)] float m_craterDepthRatio = 0.14f;
+        [Tooltip("外周の輪郭ノイズ強度")]
+        [SerializeField, Range(0.0f, 0.3f)] float m_craterOutlineNoise = 0.18f;
+        [Tooltip("中心の発光強度")]
+        [SerializeField, Range(0.0f, 4.0f)] float m_craterEmission = 2.2f;
+        [Tooltip("主亀裂の本数")]
+        [SerializeField, Range(4, 6)] int m_crackCount = 5;
+        [Tooltip("亀裂の長さ(クレーター半径に対する倍率)")]
+        [SerializeField, Range(1.2f, 1.8f)] float m_crackLengthScale = 1.5f;
+        [Tooltip("クレーターが残る時間(秒)")]
+        [SerializeField, Min(1.0f)] float m_craterLifetime = 10.0f;
+        [Tooltip("クレーターが消えるまでの時間(秒)")]
+        [SerializeField, Min(0.1f)] float m_craterFadeTime = 2.5f;
+        [Tooltip("岩片の上向き初速")]
+        [SerializeField, Min(0.0f)] float m_debrisUpSpeed = 14.0f;
+        [Tooltip("岩片の外向き初速")]
+        [SerializeField, Min(0.0f)] float m_debrisOutSpeed = 3.5f;
+        [Tooltip("岩片が消えるまでの時間(秒)")]
+        [SerializeField, Min(0.2f)] float m_debrisLifetime = 3.4f;
+        [Tooltip("着弾時のヒットストップ時間(秒)")]
+        [SerializeField, Min(0.0f)] float m_hitStopDuration = 0.05f;
+        [Tooltip("ヒットストップ中のTime.timeScale")]
+        [SerializeField, Range(0.01f, 1.0f)] float m_hitStopTimeScale = 0.05f;
+        [Tooltip("隕石キル時にEliminationCinematicのスロー/撃破エフェクトを抑制する")]
+        [SerializeField] bool m_skipEliminationCinematic = true;
+        [Tooltip("撃破時に通常の破片演出を出す積み木の最大数(残りは即消去)")]
+        [SerializeField, Min(0)] int m_maxStackShatter = 2;
+        [Tooltip("衝撃波リング開始半径(クレーター半径比)")]
+        [SerializeField, Range(0.3f, 1.0f)] float m_shockwaveStartRatio = 0.3f;
+        [Tooltip("衝撃波リング終了半径(ステージ半径比)")]
+        [SerializeField, Range(0.8f, 1.0f)] float m_shockwaveEndRatio = 0.85f;
+        [Tooltip("衝撃波リングの持続時間(秒)")]
+        [SerializeField, Range(0.4f, 0.6f)] float m_shockwaveDuration = 0.5f;
         [Tooltip("予告円を投影する地面のレイヤー")]
         [SerializeField] LayerMask m_groundMask = ~0;
         [Tooltip("発動・着弾をConsoleに出す(テスト用)")]
@@ -132,6 +166,10 @@ namespace Yurube
             m_hitboxView = CircleHitboxView.Create("IwaAttackHitbox", null,
                 () => DebugCenter, () => m_attackRadius, () => IsActive,
                 new Color(1.0f, 0.15f, 0.10f, 0.95f));
+
+            // 初回発動時のシェーダー・メッシュ生成スパイクを避けるためのウォームアップ
+            IwaCraterEffect.Warmup();
+            IwaShockwaveRing.Warmup();
         }
 
         private void Update()
@@ -334,6 +372,21 @@ namespace Yurube
 
         void ApplyImpact()
         {
+            // 撃破時だけEliminationCinematicがEffect_Eliminationを生成し、
+            // Time.timeScaleを0.15へ落とすため、隕石キルでは一時的に止める。
+            EliminationCinematic[] cinematics = null;
+            bool[] cinematicEnabled = null;
+            if (m_skipEliminationCinematic)
+            {
+                cinematics = FindObjectsByType<EliminationCinematic>(FindObjectsInactive.Exclude);
+                cinematicEnabled = new bool[cinematics.Length];
+                for (int i = 0; i < cinematics.Length; i++)
+                {
+                    cinematicEnabled[i] = cinematics[i].enabled;
+                    if (cinematics[i].enabled) cinematics[i].enabled = false;
+                }
+            }
+
             // 敵キャラクター: 自分以外を即死。既存の無敵は尊重する
             foreach (var character in FindObjectsByType<DarumaCharacter>(FindObjectsInactive.Exclude))
             {
@@ -349,6 +402,14 @@ namespace Yurube
                 character.Eliminate(EliminationCause.Other, Vector3.up, character.transform.position);
             }
 
+            if (cinematics != null)
+            {
+                for (int i = 0; i < cinematics.Length; i++)
+                {
+                    if (cinematics[i] != null) cinematics[i].enabled = cinematicEnabled[i];
+                }
+            }
+
             // 範囲内の積み木を破壊
             foreach (var block in FindObjectsByType<TumikiBlock>(FindObjectsInactive.Exclude))
             {
@@ -362,19 +423,9 @@ namespace Yurube
                 block.Break(Vector3.up * 2.0f, 0.0f, 0.0f);
             }
 
-            // 地面の衝撃波。積み木数が多いほど本数と半径が増える
+            // 着弾直後の白〜薄黄色の衝撃波リング。
+            // 以前の赤橙のGimmickShockwave複数リングは、クレーター発光と重複するため置き換えた。
             float effectT = m_blockFactor;
-            int rings = Mathf.RoundToInt(Mathf.Lerp(m_minShockwaveRings, m_maxShockwaveRings, effectT));
-            for (int i = 0; i < rings; i++)
-            {
-                float ringT = rings > 1 ? i / (float)(rings - 1) : 1.0f;
-                float radius = m_attackRadius * Mathf.Lerp(0.70f, 1.0f, ringT);
-                Color waveColor = i == 0
-                    ? new Color(1.0f, 0.55f, 0.2f, 0.95f)
-                    : new Color(1.0f, 0.82f, 0.55f, Mathf.Lerp(0.8f, 0.55f, i / 2.0f));
-                GimmickShockwave.Create(m_targetPosition + Vector3.up * 0.03f,
-                    waveColor, radius, 0.55f + i * 0.12f);
-            }
 
             // 画面揺れも積み木数で大きく変える
             var camera = Camera.main;
@@ -405,51 +456,175 @@ namespace Yurube
             light.shadows = LightShadows.None;
             Destroy(lightObject, 0.45f);
 
-            SpawnDebris();
+            Material groundMaterial = GetGroundMaterial(m_targetPosition);
+            float stageRadius = GetStageRadius(m_targetPosition);
+            float craterRadius = Mathf.Clamp(stageRadius * m_craterRadiusRatio,
+                0.8f, stageRadius * 0.45f);
+            float craterDepth = craterRadius * m_craterDepthRatio;
+
+            IwaShockwaveRing.Spawn(
+                m_targetPosition,
+                stageRadius,
+                craterRadius * m_shockwaveStartRatio,
+                stageRadius * m_shockwaveEndRatio,
+                m_shockwaveDuration);
+
+            IwaImpactHitStop.Spawn(m_hitStopDuration, m_hitStopTimeScale);
+            SpawnDebris(groundMaterial, craterRadius);
+
+            // あかだると同じ焦げシェーダーで、着弾地点の地面を焼く
+            GroundScorch.SpawnCircle(
+                new Vector3(m_targetPosition.x, m_groundY, m_targetPosition.z),
+                craterRadius, 5.0f, 2.5f,
+                new Color(0.06f, 0.04f, 0.03f),
+                new Color(0.30f, 0.14f, 0.04f),
+                0.56f);
+
+            // 地面が割れてえぐれる演出
+            IwaCraterEffect.Spawn(
+                new Vector3(m_targetPosition.x, m_groundY, m_targetPosition.z),
+                craterRadius,
+                craterDepth,
+                m_craterLifetime,
+                m_craterFadeTime,
+                m_craterOutlineNoise,
+                m_craterEmission,
+                groundMaterial);
+
+            IwaGroundCracks.Spawn(
+                new Vector3(m_targetPosition.x, m_groundY, m_targetPosition.z),
+                craterRadius, m_crackCount, m_crackLengthScale,
+                m_craterLifetime, m_craterFadeTime);
+
+            IwaDustEffect.Spawn(
+                new Vector3(m_targetPosition.x, m_groundY, m_targetPosition.z),
+                craterRadius);
         }
 
-        void SpawnDebris()
+        float GetStageRadius(Vector3 position)
         {
-            if (m_meteorRockMaterial == null) return;
+            if (m_stageRadiusOverride > 0.0f) return m_stageRadiusOverride;
 
-            float t = m_blockFactor;
-            int count = Mathf.Clamp(Mathf.RoundToInt(Mathf.Lerp(m_minDebris, m_maxDebris, t)),
-                m_minDebris, m_maxDebris);
-            float spread = Mathf.Lerp(0.7f, 3.0f, t);
-            float minSize = Mathf.Lerp(0.14f, 0.28f, t);
-            float maxSize = Mathf.Lerp(0.42f, 0.95f, t);
-            float speed = Mathf.Lerp(4.0f, 16.0f, t);
-            float lifetime = Mathf.Lerp(2.2f, 3.4f, t);
-
-            for (int i = 0; i < count; i++)
+            Vector3 origin = new Vector3(position.x, position.y + 6.0f, position.z);
+            RaycastHit[] hits = Physics.RaycastAll(origin, Vector3.down, 12.0f,
+                m_groundMask, QueryTriggerInteraction.Ignore);
+            float best = float.MaxValue;
+            float radius = 0.0f;
+            foreach (var hit in hits)
             {
-                var debris = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                debris.name = "IwadaruDebris";
-                var collider = debris.GetComponent<Collider>();
-                if (collider != null) Destroy(collider);
+                if (hit.collider == null) continue;
+                if (hit.normal.y < 0.5f) continue;
+                if (hit.collider.GetComponentInParent<DarumaCharacter>() != null) continue;
+                if (hit.collider.GetComponentInParent<TumikiBlock>() != null) continue;
+                if (hit.distance >= best) continue;
+                Bounds bounds = hit.collider.bounds;
+                best = hit.distance;
+                radius = Mathf.Min(bounds.extents.x, bounds.extents.z);
+            }
+            return radius > 0.1f ? Mathf.Clamp(radius, 1.5f, 30.0f) : 10.0f;
+        }
 
-                debris.transform.position = m_targetPosition + new Vector3(
-                    Random.Range(-spread, spread),
-                    0.35f + Random.Range(0.0f, 1.2f),
-                    Random.Range(-spread, spread));
-                debris.transform.rotation = Random.rotation;
-                float size = Random.Range(minSize, maxSize);
-                debris.transform.localScale = new Vector3(size, size * Random.Range(0.5f, 1.0f), size);
+        Material GetGroundMaterial(Vector3 position)
+        {
+            Vector3 origin = new Vector3(position.x, position.y + 6.0f, position.z);
+            RaycastHit[] hits = Physics.RaycastAll(origin, Vector3.down, 12.0f,
+                m_groundMask, QueryTriggerInteraction.Ignore);
+            float best = float.MaxValue;
+            Material found = null;
+            foreach (var hit in hits)
+            {
+                if (hit.collider == null) continue;
+                if (hit.normal.y < 0.5f) continue;
+                if (hit.collider.GetComponentInParent<DarumaCharacter>() != null) continue;
+                if (hit.collider.GetComponentInParent<TumikiBlock>() != null) continue;
+                if (hit.distance >= best) continue;
+                var renderer = hit.collider.GetComponent<Renderer>();
+                if (renderer == null || renderer.sharedMaterial == null) continue;
+                best = hit.distance;
+                found = renderer.sharedMaterial;
+            }
+            return found;
+        }
 
-                var renderer = debris.GetComponent<MeshRenderer>();
-                if (renderer != null)
+        void SpawnDebris(Material groundMaterial, float craterRadius)
+        {
+            float t = m_blockFactor;
+            int total = Mathf.Clamp(Mathf.RoundToInt(Mathf.Lerp(m_minDebris, m_maxDebris, t)),
+                m_minDebris, m_maxDebris);
+            int largeCount = Mathf.Clamp(total / 20, 1, 2);
+            int mediumCount = Mathf.Clamp(total / 5, 2, 8);
+            int smallCount = Mathf.Max(0, total - largeCount - mediumCount);
+
+            Material material = groundMaterial != null ? groundMaterial : m_meteorRockMaterial;
+            float maxRadius = Mathf.Max(0.5f, craterRadius * 0.9f);
+
+            int[] counts = { largeCount, mediumCount, smallCount };
+            for (int sizeClass = 0; sizeClass < counts.Length; sizeClass++)
+            {
+                for (int i = 0; i < counts[sizeClass]; i++)
                 {
-                    renderer.sharedMaterial = m_meteorRockMaterial;
-                    renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                }
+                    float angle = Random.Range(0.0f, Mathf.PI * 2.0f);
+                    float radial = Mathf.Pow(Random.value, 1.5f) * maxRadius;
+                    float centerFactor = 1.0f - radial / maxRadius;
 
-                var body = debris.AddComponent<Rigidbody>();
-                body.mass = Mathf.Max(0.2f, size * 5.0f);
-                Vector3 direction = new Vector3(
-                    Random.Range(-1.0f, 1.0f), Random.Range(0.5f, 1.6f), Random.Range(-1.0f, 1.0f)).normalized;
-                body.linearVelocity = direction * speed * Random.Range(0.6f, 1.3f);
-                body.angularVelocity = Random.insideUnitSphere * Mathf.Lerp(8.0f, 22.0f, t);
-                Destroy(debris, lifetime);
+                    float size;
+                    if (sizeClass == 0) size = Mathf.Lerp(0.62f, 1.05f, t) * Random.Range(0.8f, 1.2f);
+                    else if (sizeClass == 1) size = Mathf.Lerp(0.30f, 0.55f, t) * Random.Range(0.8f, 1.2f);
+                    else size = Mathf.Lerp(0.12f, 0.27f, t) * Random.Range(0.75f, 1.25f);
+
+                    Vector3 baseScale = new Vector3(
+                        size * Random.Range(0.72f, 1.5f),
+                        size * Random.Range(0.55f, 1.35f),
+                        size * Random.Range(0.72f, 1.45f));
+
+                    var debris = new GameObject($"IwadaruDebris_{sizeClass}_{i}");
+                    debris.transform.position = new Vector3(
+                        m_targetPosition.x + Mathf.Cos(angle) * radial,
+                        m_groundY + 0.10f + baseScale.y * Random.Range(0.1f, 0.45f),
+                        m_targetPosition.z + Mathf.Sin(angle) * radial);
+                    debris.transform.rotation = Random.rotation;
+
+                    var filter = debris.AddComponent<MeshFilter>();
+                    var mesh = IwaCraterEffect.GetRockMesh(Random.Range(0, 6));
+                    filter.sharedMesh = mesh;
+                    var renderer = debris.AddComponent<MeshRenderer>();
+                    if (renderer != null)
+                    {
+                        if (material != null) renderer.sharedMaterial = material;
+                        renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                        renderer.receiveShadows = false;
+
+                        // 床と同じ色を基準に、明度だけ±10%ばらす
+                        if (material != null)
+                        {
+                            Color baseColor = material.HasProperty("_BaseColor")
+                                ? material.GetColor("_BaseColor")
+                                : material.HasProperty("_Color") ? material.GetColor("_Color") : Color.gray;
+                            float brightness = Random.Range(0.9f, 1.1f);
+                            baseColor.r = Mathf.Clamp01(baseColor.r * brightness);
+                            baseColor.g = Mathf.Clamp01(baseColor.g * brightness);
+                            baseColor.b = Mathf.Clamp01(baseColor.b * brightness);
+                            var block = new MaterialPropertyBlock();
+                            block.SetColor("_BaseColor", baseColor);
+                            block.SetColor("_Color", baseColor);
+                            renderer.SetPropertyBlock(block);
+                        }
+                    }
+
+                    var body = debris.AddComponent<Rigidbody>();
+                    body.mass = Mathf.Max(0.2f, size * 5.0f);
+                    Vector3 radialDirection = new Vector3(Mathf.Cos(angle), 0.0f, Mathf.Sin(angle));
+                    float upSpeed = Mathf.Lerp(5.0f, m_debrisUpSpeed, t) * (0.7f + 0.6f * centerFactor);
+                    float classOutward = sizeClass == 0 ? 0.45f : sizeClass == 1 ? 0.8f : 1.35f;
+                    float outSpeed = Mathf.Lerp(0.8f, m_debrisOutSpeed, t)
+                        * Random.Range(0.35f, 0.85f) * classOutward;
+                    body.linearVelocity = radialDirection * outSpeed + Vector3.up * upSpeed;
+                    body.angularVelocity = Random.insideUnitSphere * Mathf.Lerp(8.0f, 22.0f, t);
+
+                    var piece = debris.AddComponent<IwaDebrisPiece>();
+                    piece.Begin(mesh, baseScale,
+                        Random.Range(m_debrisLifetime * 0.65f, m_debrisLifetime), 0.65f, false);
+                }
             }
         }
 
@@ -457,10 +632,22 @@ namespace Yurube
         {
             if (character == null || character.Stack == null) return;
 
+            int shattered = 0;
             while (character.Stack.Count > 0)
             {
                 var block = character.Stack.RemoveAt(0);
-                if (block != null) block.Break(Vector3.up * 2.0f, 0.0f, 0.0f);
+                if (block == null) continue;
+
+                // 撃破時に全段のTumikiShatterを出すと重いので、演出する段数を制限する
+                if (shattered < m_maxStackShatter)
+                {
+                    block.Break(Vector3.up * 2.0f, 0.0f, 0.0f);
+                    shattered++;
+                }
+                else
+                {
+                    block.Consume();
+                }
             }
         }
 

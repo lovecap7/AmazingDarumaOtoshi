@@ -608,6 +608,8 @@ GameObject:
   - component: {fileID: 6242312641939630888}
   - component: {fileID: 1611246128041429823}
   - component: {fileID: 5182239471364050811}
+  - component: {fileID: 5182239471364050851}
+  - component: {fileID: 5182239471364050852}
   m_Layer: 0
   m_Name: DaruKing
   m_TagString: Untagged
@@ -733,3 +735,35 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Yurube.DaruKingPassive
   m_maxStack: 2
   m_logLimit: 1
+--- !u!114 &5182239471364050851
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9069936943766670842}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0a13560a26218d46964d9c9f251e1ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Yurube.SpecialGauge
+  m_blocksToFill: 2
+--- !u!114 &5182239471364050852
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9069936943766670842}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c3e5a7f9b1d24f6083a5c7e9b1d3f527, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Yurube.DaruKingSpecial
+  m_specialName: "\u30A8\u30AF\u30B9\u30AB\u30EA\u30D0\u30FC"
+  m_chargeDuration: 2
+  m_anyButtonMinTime: 0.15
+  m_attackLength: 14
+  m_attackWidth: 3.2
+  m_effectDuration: 1
+  m_logSpecial: 1

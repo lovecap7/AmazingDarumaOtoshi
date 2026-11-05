@@ -56,7 +56,8 @@ namespace Yurube.Lab
         {
             if (!m_show || m_lab == null) return;
             // カットイン中はラボUIも描かない（必殺技ゲージ等が前面に残らないようにする）
-            if (SpecialCutIn.IsPlaying || IwadaruCutIn.IsPlaying || HebidaruCutIn.IsPlaying) return;
+            if (SpecialCutIn.IsPlaying || IwadaruCutIn.IsPlaying
+                || HebidaruCutIn.IsPlaying || DaruKingCutIn.IsPlaying) return;
             EnsureStyles();
             DrawMainPanel();
             DrawHelp();
@@ -152,6 +153,7 @@ namespace Yurube.Lab
             if (GUILayout.Button("みだる: 必殺技", m_button)) PresetMidaruSpecial();
             if (GUILayout.Button("いわだる: 必殺技", m_button)) PresetIwadaruSpecial();
             if (GUILayout.Button("へびだる: 必殺技", m_button)) PresetHebidaruSpecial();
+            if (GUILayout.Button("だるきんぐ: 必殺技", m_button)) PresetDaruKingSpecial();
 
             // ---- 切替 ----
             GUILayout.Space(6.0f);
@@ -437,6 +439,22 @@ namespace Yurube.Lab
             if (special != null) special.TryActivate();
         }
 
+        void PresetDaruKingSpecial()
+        {
+            if (!CanStartSpecialPreset()) return;
+            m_lab.SelectCharacter("daruking");
+            var character = m_lab.Character;
+            m_lab.ClearStack(character);
+            // だるきんぐは2段まで。ゲージを満タンにして詠唱を開始する
+            m_lab.AddBlocks(character, TumikiColor.Red, 2);
+            var gauge = character != null ? character.GetComponent<SpecialGauge>() : null;
+            if (gauge != null) gauge.Fill();
+            m_lab.SelectedColor = TumikiColor.Red;
+
+            var special = character != null ? character.GetComponent<ISpecialAbility>() : null;
+            if (special != null) special.TryActivate();
+        }
+
         void PresetMidaruSpecial()
         {
             if (!CanStartSpecialPreset()) return;
@@ -455,7 +473,8 @@ namespace Yurube.Lab
         {
             // カットイン中はゲームが止まっているが、ラボのボタンは押せる。
             // ここで止めないと、別キャラに切り替わってその必殺技まで連続で出てしまう。
-            if (SpecialCutIn.IsPlaying || IwadaruCutIn.IsPlaying || HebidaruCutIn.IsPlaying)
+            if (SpecialCutIn.IsPlaying || IwadaruCutIn.IsPlaying
+                || HebidaruCutIn.IsPlaying || DaruKingCutIn.IsPlaying)
                 return false;
 
             var current = m_lab.Character;
@@ -472,6 +491,9 @@ namespace Yurube.Lab
 
             var hebi = current.GetComponent<HebidaruSpecial>();
             if (hebi != null && hebi.IsActive) return false;
+
+            var daruking = current.GetComponent<DaruKingSpecial>();
+            if (daruking != null && daruking.IsActive) return false;
 
             return true;
         }

@@ -775,13 +775,30 @@ MonoBehaviour:
   m_minMeteorScale: 1
   m_maxMeteorScale: 1.8
   m_minDebris: 12
-  m_maxDebris: 60
-  m_minShockwaveRings: 1
-  m_maxShockwaveRings: 3
+  m_maxDebris: 40
   m_minShakeAmplitude: 0.35
   m_maxShakeAmplitude: 1.1
   m_minFlashStrength: 0.25
   m_maxFlashStrength: 0.7
+  m_craterRadiusRatio: 0.35
+  m_stageRadiusOverride: 0
+  m_craterDepthRatio: 0.14
+  m_craterOutlineNoise: 0.18
+  m_craterEmission: 2.2
+  m_crackCount: 5
+  m_crackLengthScale: 1.5
+  m_craterLifetime: 10
+  m_craterFadeTime: 2.5
+  m_debrisUpSpeed: 14
+  m_debrisOutSpeed: 3.5
+  m_debrisLifetime: 3.4
+  m_hitStopDuration: 0.05
+  m_hitStopTimeScale: 0.05
+  m_skipEliminationCinematic: 1
+  m_maxStackShatter: 2
+  m_shockwaveStartRatio: 0.3
+  m_shockwaveEndRatio: 0.85
+  m_shockwaveDuration: 0.5
   m_groundMask:
     serializedVersion: 2
     m_Bits: 4294967295
