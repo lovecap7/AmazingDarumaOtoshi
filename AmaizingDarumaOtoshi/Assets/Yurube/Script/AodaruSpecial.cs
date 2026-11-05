@@ -22,9 +22,15 @@ namespace Yurube
         [Tooltip("発動をConsoleに出す(テスト用)")]
         [SerializeField] bool m_logSpecial = true;
 
+        [Header("カットイン")]
+        [Tooltip("画面下部に表示する必殺技名")]
+        [SerializeField] string m_cutInName = "六腕";
+
         DarumaCharacter m_character;
         SpecialGauge m_gauge;
         AodaruSixArms m_arms;
+
+        public bool IsActive => m_arms != null;
 
         private void Awake()
         {
@@ -75,6 +81,9 @@ namespace Yurube
                 m_knockSpeed,
                 m_knockInterval,
                 energySource);
+
+            // あかだる・いわだる・へびだると同じタイミングで専用カットインを再生する
+            AodaruCutIn.Show(m_cutInName, m_character);
 
             if (m_logSpecial) Debug.Log("[あおだる] 必殺技『六腕』発動", this);
             return true;

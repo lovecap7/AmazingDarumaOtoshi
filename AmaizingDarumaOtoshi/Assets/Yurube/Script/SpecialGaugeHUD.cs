@@ -17,6 +17,13 @@ namespace Yurube
         {
             if (gauge == null || character == null || DarumaMatch.Current == null) return;
 
+            // カットイン中はゲージを描かない。
+            // IMGUIの描画順やカットインの初回生成フレームに依存せず、
+            // 必ずカットインが最前面になるようにする。
+            if (SpecialCutIn.IsPlaying || IwadaruCutIn.IsPlaying
+                || HebidaruCutIn.IsPlaying || DaruKingCutIn.IsPlaying
+                || AodaruCutIn.IsPlaying) return;
+
             MatchPlayer me = null;
             foreach (var p in DarumaMatch.Current.Players)
             {
@@ -31,11 +38,40 @@ namespace Yurube
 
             EnsureStyles();
 
-            int index = Mathf.Clamp(me.Index, 0, 7);
-            const float width = 310.0f;
+            int listIndex = 0;
+            int playerCount = DarumaMatch.Current.Players.Count;
+            for (int i = 0; i < playerCount; i++)
+            {
+                if (DarumaMatch.Current.Players[i] == me)
+                {
+                    listIndex = i;
+                    break;
+                }
+            }
+
+            // MatchHud と同じ 1920x1080 基準の配置。
+            // 各プレイヤーのストックパネルの真上に必殺技ゲージを置く。
+            const float panelWidth = 300.0f;
+            const float panelHeight = 128.0f;
+            const float panelSpacing = 24.0f;
+            const float panelBottom = 120.0f;
+            const float width = 300.0f;
             const float height = 54.0f;
-            float x = 20.0f;
-            float y = Screen.height - 72.0f - index * 60.0f;
+
+            Matrix4x4 oldMatrix = GUI.matrix;
+            Color oldColor = GUI.color;
+            float hudScale = Mathf.Max(0.5f, Screen.height / 1080.0f);
+            GUI.matrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity,
+                new Vector3(hudScale, hudScale, 1.0f));
+
+            float virtualWidth = Screen.width / hudScale;
+            float virtualHeight = Screen.height / hudScale;
+            float totalWidth = playerCount * panelWidth + (playerCount - 1) * panelSpacing;
+            float panelCenterX = virtualWidth * 0.5f - totalWidth * 0.5f
+                + panelWidth * 0.5f + listIndex * (panelWidth + panelSpacing);
+            float x = panelCenterX - width * 0.5f;
+            float gaugeBottom = panelBottom + panelHeight * 0.5f + 10.0f;
+            float y = virtualHeight - gaugeBottom - height;
 
             bool full = gauge.IsFull;
             float pulse = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 7.0f);
@@ -67,7 +103,7 @@ namespace Yurube
 
             // 名前
             GUI.color = Color.white;
-            string name = $"P{index + 1} SPECIAL";
+            string name = $"P{me.Index + 1} SPECIAL";
             GUI.Label(new Rect(x + 10.0f, y + 3.0f, 150.0f, 20.0f), name, s_nameStyle);
 
             // 状態表示
@@ -117,6 +153,8 @@ namespace Yurube
             }
 
             GUI.color = Color.white;
+            GUI.matrix = oldMatrix;
+            GUI.color = oldColor;
         }
 
         static void EnsureStyles()
@@ -125,17 +163,17 @@ namespace Yurube
             s_stylesReady = true;
 
             s_nameStyle = new GUIStyle(GUI.skin.label);
-            s_nameStyle.fontSize = 14;
+            s_nameStyle.fontSize = 18;
             s_nameStyle.fontStyle = FontStyle.Bold;
             s_nameStyle.alignment = TextAnchor.MiddleLeft;
             s_nameStyle.normal.textColor = Color.white;
 
             s_statusStyle = new GUIStyle(s_nameStyle);
-            s_statusStyle.fontSize = 13;
+            s_statusStyle.fontSize = 16;
             s_statusStyle.alignment = TextAnchor.MiddleRight;
 
             s_readyStyle = new GUIStyle(s_nameStyle);
-            s_readyStyle.fontSize = 16;
+            s_readyStyle.fontSize = 20;
             s_readyStyle.fontStyle = FontStyle.Bold;
             s_readyStyle.alignment = TextAnchor.MiddleRight;
         }

@@ -28,7 +28,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0.016999999, z: 0}
-  m_LocalScale: {x: 1.5, y: 1, z: 1.5}
+  m_LocalScale: {x: 1.2750001, y: 1, z: 1.2750001}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 4675370070209600420}
@@ -156,7 +156,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 3f8edeb3d81e4a84a90adab9311acd22, type: 2}
+  - {fileID: 2100000, guid: 8da402d98e6269a44a94853372770427, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -208,7 +208,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0.015999999, z: 0}
-  m_LocalScale: {x: 1.5, y: 1, z: 1.5}
+  m_LocalScale: {x: 1.2750001, y: 1, z: 1.2750001}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 4675370070209600420}
@@ -335,10 +335,15 @@ MonoBehaviour:
   - {fileID: 7594670601524635508}
   - {fileID: 4553794273067287833}
   - {fileID: 3473534261308291889}
-  m_accelerateColor: {r: 1, g: 0.55, b: 0.1, a: 1}
+  m_accelerateColor: {r: 1, g: 0.42, b: 0, a: 1}
   m_decelerateColor: {r: 0.1, g: 0.85, b: 0.8, a: 1}
   m_baseAlpha: 0.6
+  m_accelerateBaseAlpha: 0.9
   m_ringCycle: 1.2
+  m_ringRiseHeight: 0.8
+  m_ringRadiusRate: 0.85
+  m_ringTeeth: 10
+  m_ringZigzagHeight: 0.12
   m_surfaceOffset: 0.01
   m_accelerateEffect:
     Material: {fileID: 0}
@@ -432,7 +437,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0.015, z: 0}
-  m_LocalScale: {x: 1.5, y: 1, z: 1.5}
+  m_LocalScale: {x: 1.2750001, y: 1, z: 1.2750001}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 4675370070209600420}

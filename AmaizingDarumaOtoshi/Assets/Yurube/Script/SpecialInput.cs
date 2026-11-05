@@ -77,8 +77,89 @@ namespace Yurube
             return gamepad != null && gamepad.buttonNorth.wasPressedThisFrame;
         }
 
-        static bool IsKeyboardSpecialOwner(MatchPlayer me)
+        // 詠唱完了用。移動スティック／移動キーは除外し、行動ボタンだけを見る。
+        public static bool WasAnyActionPressed(DarumaCharacter character)
         {
+            if (character == null) return false;
+
+            if (DarumaMatch.Current != null)
+            {
+                MatchPlayer me = null;
+                foreach (var p in DarumaMatch.Current.Players)
+                {
+                    if (p.Character == character)
+                    {
+                        me = p;
+                        break;
+                    }
+                }
+
+                if (me == null || me.IsCpu) return false;
+
+                var playerInput = me.GetComponent<PlayerInput>();
+                if (playerInput != null)
+                {
+                    bool hasGamepad = false;
+                    foreach (var device in playerInput.devices)
+                    {
+                        if (device is Gamepad pad)
+                        {
+                            hasGamepad = true;
+                            if (AnyGamepadAction(pad)) return true;
+                        }
+                    }
+
+                    if (hasGamepad) return false;
+
+                    bool hasKeyboard = false;
+                    foreach (var device in playerInput.devices)
+                    {
+                        if (device is Keyboard) hasKeyboard = true;
+                    }
+
+                    if (hasKeyboard && IsKeyboardSpecialOwner(me))
+                        return AnyKeyboardAction(Keyboard.current);
+
+                    return false;
+                }
+
+                if (me.GetComponent<KeyboardDarumaInput>() != null)
+                    return IsKeyboardSpecialOwner(me) && AnyKeyboardAction(Keyboard.current);
+
+                return false;
+            }
+
+            // ラボなど試合外
+            if (AnyKeyboardAction(Keyboard.current)) return true;
+            return AnyGamepadAction(Gamepad.current);
+        }
+
+        static bool AnyGamepadAction(Gamepad pad)
+        {
+            if (pad == null) return false;
+            return pad.buttonSouth.wasPressedThisFrame
+                || pad.buttonEast.wasPressedThisFrame
+                || pad.buttonWest.wasPressedThisFrame
+                || pad.buttonNorth.wasPressedThisFrame
+                || pad.leftShoulder.wasPressedThisFrame
+                || pad.rightShoulder.wasPressedThisFrame
+                || pad.leftTrigger.wasPressedThisFrame
+                || pad.rightTrigger.wasPressedThisFrame
+                || pad.startButton.wasPressedThisFrame
+                || pad.selectButton.wasPressedThisFrame;
+        }
+
+        static bool AnyKeyboardAction(Keyboard keyboard)
+        {
+            if (keyboard == null) return false;
+            return keyboard.spaceKey.wasPressedThisFrame
+                || keyboard.jKey.wasPressedThisFrame
+                || keyboard.kKey.wasPressedThisFrame
+                || keyboard.lKey.wasPressedThisFrame
+                || keyboard.enterKey.wasPressedThisFrame;
+        }
+
+        static bool IsKeyboardSpecialOwner(MatchPlayer me)        {
             if (DarumaMatch.Current == null) return true;
 
             int ownerIndex = int.MaxValue;
