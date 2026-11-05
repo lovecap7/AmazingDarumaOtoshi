@@ -21,7 +21,8 @@ namespace Yurube
             // IMGUIの描画順やカットインの初回生成フレームに依存せず、
             // 必ずカットインが最前面になるようにする。
             if (SpecialCutIn.IsPlaying || IwadaruCutIn.IsPlaying
-                || HebidaruCutIn.IsPlaying || DaruKingCutIn.IsPlaying) return;
+                || HebidaruCutIn.IsPlaying || DaruKingCutIn.IsPlaying
+                || AodaruCutIn.IsPlaying) return;
 
             MatchPlayer me = null;
             foreach (var p in DarumaMatch.Current.Players)

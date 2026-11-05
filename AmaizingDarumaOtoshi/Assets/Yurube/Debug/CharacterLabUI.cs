@@ -57,7 +57,8 @@ namespace Yurube.Lab
             if (!m_show || m_lab == null) return;
             // カットイン中はラボUIも描かない（必殺技ゲージ等が前面に残らないようにする）
             if (SpecialCutIn.IsPlaying || IwadaruCutIn.IsPlaying
-                || HebidaruCutIn.IsPlaying || DaruKingCutIn.IsPlaying) return;
+                || HebidaruCutIn.IsPlaying || DaruKingCutIn.IsPlaying
+                || AodaruCutIn.IsPlaying) return;
             EnsureStyles();
             DrawMainPanel();
             DrawHelp();
@@ -474,7 +475,8 @@ namespace Yurube.Lab
             // カットイン中はゲームが止まっているが、ラボのボタンは押せる。
             // ここで止めないと、別キャラに切り替わってその必殺技まで連続で出てしまう。
             if (SpecialCutIn.IsPlaying || IwadaruCutIn.IsPlaying
-                || HebidaruCutIn.IsPlaying || DaruKingCutIn.IsPlaying)
+                || HebidaruCutIn.IsPlaying || DaruKingCutIn.IsPlaying
+                || AodaruCutIn.IsPlaying)
                 return false;
 
             var current = m_lab.Character;
