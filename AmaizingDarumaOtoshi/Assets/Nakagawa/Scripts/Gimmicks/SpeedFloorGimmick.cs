@@ -6,9 +6,9 @@ namespace Nakagawa
 {
     // 加速床 / 減速床。乗っている間、今の向きのまま速さだけを変える
     //  加速床(オレンジ): 速さを上限まで上げる。乗った瞬間に一瞬スローがかかる。止まっているものは向いている方向へ動き出す
-    //                    床から外へ広がる光の輪を流し、乗っているものからオレンジの火花を出す
+    //                    45度回したひし形が、黄色と加速床の色で交互に中央から広がり続け、乗っているものからオレンジの火花を出す
     //  減速床(青緑)    : 速さを1秒あたり一定の割合で割って下限まで下げる
-    //                    光の輪は外から中心へ縮み、乗っているものから小さな泡を出す
+    //                    上下にギザギザの光の輪が上から床へ降りてきて、乗っているものから小さな泡を出す
     // 積み木の速さは床を出ても残る(弾道の速さが変わる)。プレイヤーは移動入力で速さが決まるので、乗っている間だけ変わる
     // 落ちている積み木が動き出したら、弾と同じく攻撃判定を持ち、最後に殴ったプレイヤーを持ち主として引き継ぐ
     // 床には当たり判定を付けない(床の上に置く)。このTransformの位置が床の表面の中心
@@ -47,11 +47,22 @@ namespace Nakagawa
         [SerializeField] Renderer m_base;
         // 流れる光の輪(この数だけ時間をずらして流す。大きさは床の短い辺に合わせる)
         [SerializeField] Renderer[] m_rings;
-        [SerializeField] Color m_accelerateColor = GimmickPalette.Accelerate;
+        // 加速床は濃く明るいオレンジ(床の下地は通常の半透明で塗り、明るい床の上でも色が抜けないようにする)
+        [SerializeField] Color m_accelerateColor = new Color(1.0f, 0.42f, 0.0f, 1.0f);
         [SerializeField] Color m_decelerateColor = GimmickPalette.Decelerate;
+        // 下地の不透明度(減速床)
         [SerializeField, Range(0.0f, 1.0f)] float m_baseAlpha = 0.6f;
-        // 輪が端から端まで流れる時間
+        // 下地の不透明度(加速床)
+        [SerializeField, Range(0.0f, 1.0f)] float m_accelerateBaseAlpha = 0.9f;
+        // 輪が下から上まで(減速床は上から下まで)動く時間
         [SerializeField] float m_ringCycle = 1.2f;
+        // 輪が上下に動く高さ。加速床は床からこの高さまで昇り、減速床はこの高さから床へ降りる(輪の大きさは変えない)
+        [SerializeField, Min(0.0f)] float m_ringRiseHeight = 0.8f;
+        // 輪の半径(床の短い辺の半分に対する割合)
+        [SerializeField, Range(0.1f, 1.0f)] float m_ringRadiusRate = 0.85f;
+        // 輪のギザギザ: 山の数と、上下の振れ幅(m)
+        [SerializeField, Min(3)] int m_ringTeeth = 10;
+        [SerializeField, Min(0.0f)] float m_ringZigzagHeight = 0.12f;
         [SerializeField] float m_surfaceOffset = 0.01f;
 
         [Header("乗っているものの演出")]
@@ -86,6 +97,16 @@ namespace Nakagawa
             Shockwave = true, ShockwaveColor = GimmickPalette.Decelerate, ShockwaveRadius = 1.0f, ShockwaveTime = 0.4f,
         };
 
+        [Header("加速床の模様")]
+        // 45度回したひし形(正方形)を中央から広げる。頂点が床の辺に触れたら、次のひし形を中央から広げ始める(色は交互)
+        // 広がりきったひし形は床の形で切り取る。加速床では上の光の輪は出さない
+        [SerializeField] Color m_patternColorA = new Color(1.0f, 0.88f, 0.1f, 1.0f);   // 黄色
+        // 次の色(未設定=透明なら加速床の色)
+        [SerializeField] Color m_patternColorB = new Color(0.0f, 0.0f, 0.0f, 0.0f);
+        // 1つのひし形が中央から床の辺に触れるまでの時間(秒)
+        [SerializeField, Min(0.05f)] float m_patternCycle = 0.5f;
+        [SerializeField, Range(0.0f, 1.0f)] float m_patternAlpha = 1.0f;
+
         readonly List<IGimmickAffectable> m_found = new List<IGimmickAffectable>();
         // 乗っている相手ごとの、床が決めた今の速さ(プレイヤーの速さは毎ステップ入力から決まるので、床の側で覚えておく)
         readonly Dictionary<IGimmickAffectable, float> m_riders = new Dictionary<IGimmickAffectable, float>();
@@ -100,7 +121,141 @@ namespace Nakagawa
         {
             m_effects = new GimmickTargetEffects("SpeedFloorEffect",
                 () => m_mode == Mode.Accelerate ? m_accelerateEffect : m_decelerateEffect);
+            UseZigzagRings();
+            CreatePattern();
             ApplyShape();
+        }
+
+        // ---------------- 加速床の模様(ひし形) ----------------
+        MeshRenderer m_pattern;
+        Mesh m_patternMesh;
+        readonly List<Vector3> m_pVerts = new List<Vector3>();
+        readonly List<Color> m_pColors = new List<Color>();
+        readonly List<int> m_pTris = new List<int>();
+        readonly List<Vector2> m_poly = new List<Vector2>();
+        readonly List<Vector2> m_polyTmp = new List<Vector2>();
+
+        bool UsesPattern => m_mode == Mode.Accelerate && Application.isPlaying;
+
+        // 実行中だけ模様を作り、加速床の光の輪は消す(プレハブ・シーンは変えない)
+        private void CreatePattern()
+        {
+            if (!UsesPattern) return;
+            if (m_rings != null)
+            {
+                foreach (var r in m_rings) if (r != null) r.enabled = false;
+            }
+            m_patternMesh = new Mesh { name = "SpeedFloorPattern", hideFlags = HideFlags.DontSave };
+            m_patternMesh.MarkDynamic();
+            m_pattern = EffectMeshes.Create("Pattern", transform, m_patternMesh, false);
+            m_pattern.transform.localPosition = Vector3.up * (m_surfaceOffset * 2.0f);
+        }
+
+        private void OnDestroy()
+        {
+            if (m_patternMesh != null) Destroy(m_patternMesh);
+        }
+
+        // ひし形 k は k * 周期 に中央で生まれ、一定の速さで広がる(周期の時間で頂点が床の短い方の辺に触れる)
+        // 床を覆い切ったひし形より下(古いもの)は見えないので描かない。古い順に描き、新しいものが上に重なる
+        private void UpdatePattern()
+        {
+            if (m_pattern == null) return;
+            float hx = m_size.x * 0.5f, hz = m_size.y * 0.5f;
+            float touch = Mathf.Min(hx, hz);
+            float cycle = Mathf.Max(0.05f, m_patternCycle);
+            float speed = touch / cycle;
+            // 床をすべて覆うのに必要な広さ(ひし形の |x| + |z| が角に届く)
+            float coverAge = (hx + hz) / speed;
+            int newest = Mathf.FloorToInt(m_time / cycle);
+            int oldest = Mathf.Max(0, Mathf.FloorToInt((m_time - coverAge) / cycle));
+
+            Color a = m_patternColorA;
+            Color b = m_patternColorB.a > 0.0f ? m_patternColorB : m_accelerateColor;
+            // 重なった下の色が透けて濁らないよう、不透明度はそろえる(既定は不透明)
+            a.a = b.a = m_patternAlpha;
+            // 頂点の色はリニア色空間では変換されないので、インスペクターの色と同じに見えるよう変換しておく
+            if (QualitySettings.activeColorSpace == ColorSpace.Linear)
+            {
+                a = a.linear;
+                b = b.linear;
+            }
+
+            m_pVerts.Clear();
+            m_pColors.Clear();
+            m_pTris.Clear();
+            for (int k = oldest; k <= newest; k++)
+            {
+                float d = speed * (m_time - k * cycle);
+                if (d <= 0.0f) continue;
+                BuildClippedDiamond(d, hx, hz);
+                AddPolygon(k % 2 == 0 ? a : b);
+            }
+            m_patternMesh.Clear();
+            m_patternMesh.SetVertices(m_pVerts);
+            m_patternMesh.SetColors(m_pColors);
+            m_patternMesh.SetTriangles(m_pTris, 0);
+            m_patternMesh.RecalculateBounds();
+            EffectMeshes.SetColor(m_pattern, Color.white);
+        }
+
+        // 半径 d のひし形(|x| + |z| <= d)を床の四角(|x| <= hx, |z| <= hz)で切り取った形を m_poly に入れる
+        private void BuildClippedDiamond(float d, float hx, float hz)
+        {
+            m_poly.Clear();
+            m_poly.Add(new Vector2(d, 0.0f));
+            m_poly.Add(new Vector2(0.0f, d));
+            m_poly.Add(new Vector2(-d, 0.0f));
+            m_poly.Add(new Vector2(0.0f, -d));
+            Clip(new Vector2(1, 0), hx);
+            Clip(new Vector2(-1, 0), hx);
+            Clip(new Vector2(0, 1), hz);
+            Clip(new Vector2(0, -1), hz);
+        }
+
+        // m_poly を「dot(p, n) <= limit」の側だけ残して切る
+        private void Clip(Vector2 n, float limit)
+        {
+            m_polyTmp.Clear();
+            int count = m_poly.Count;
+            for (int i = 0; i < count; i++)
+            {
+                Vector2 p = m_poly[i], q = m_poly[(i + 1) % count];
+                float dp = Vector2.Dot(p, n) - limit, dq = Vector2.Dot(q, n) - limit;
+                if (dp <= 0.0f) m_polyTmp.Add(p);
+                if ((dp < 0.0f && dq > 0.0f) || (dp > 0.0f && dq < 0.0f)) m_polyTmp.Add(Vector2.Lerp(p, q, dp / (dp - dq)));
+            }
+            m_poly.Clear();
+            m_poly.AddRange(m_polyTmp);
+        }
+
+        // 凸な多角形を扇形の三角形で足す(上から見て表になる向き)
+        private void AddPolygon(Color color)
+        {
+            if (m_poly.Count < 3) return;
+            int start = m_pVerts.Count;
+            foreach (var p in m_poly)
+            {
+                m_pVerts.Add(new Vector3(p.x, 0.0f, p.y));
+                m_pColors.Add(color);
+            }
+            for (int i = 1; i < m_poly.Count - 1; i++)
+            {
+                m_pTris.Add(start);
+                m_pTris.Add(start + i + 1);
+                m_pTris.Add(start + i);
+            }
+        }
+
+        // 輪の形を上下にギザギザの輪にする(実行中だけ。プレハブ・シーンの形は変えない)
+        private void UseZigzagRings()
+        {
+            if (!Application.isPlaying || m_rings == null) return;
+            Mesh mesh = EffectMeshes.ZigzagRing(m_ringTeeth, m_ringZigzagHeight);
+            foreach (var r in m_rings)
+            {
+                if (r != null && r.TryGetComponent(out MeshFilter mf)) mf.sharedMesh = mesh;
+            }
         }
 
         private void OnDisable()
@@ -209,14 +364,15 @@ namespace Nakagawa
         private void Update()
         {
             if (!GimmickClock.IsHeld) m_time += Time.deltaTime;
-            UpdateRings();
+            if (UsesPattern) UpdatePattern();
+            else UpdateRings();
         }
 
-        // 光の輪: 加速床は中心から外へ広がり、減速床は外から中心へ縮む。端に近いほど薄い
+        // 光の輪: 同じ大きさのまま、加速床は床から昇り、減速床は上から床へ降りる。上下の端に近いほど薄い
         private void UpdateRings()
         {
             if (m_rings == null || m_rings.Length == 0) return;
-            float maxRadius = Mathf.Min(m_size.x, m_size.y) * 0.5f;
+            float radius = RingRadius;
             float cycle = Mathf.Max(0.05f, m_ringCycle);
             for (int i = 0; i < m_rings.Length; i++)
             {
@@ -224,12 +380,17 @@ namespace Nakagawa
                 if (r == null) continue;
                 float t = Mathf.Repeat(m_time / cycle + (float)i / m_rings.Length, 1.0f);
                 if (m_mode == Mode.Decelerate) t = 1.0f - t;
-                float radius = Mathf.Lerp(0.1f, maxRadius, t);
                 r.transform.localScale = new Vector3(radius, 1.0f, radius);
+                // 加速床は t が 0→1 で昇り、減速床は t が 1→0 で降りる
+                r.transform.localPosition = Vector3.up * (RingBaseHeight(i) + m_ringRiseHeight * t);
                 float alpha = Mathf.Sin(t * Mathf.PI) * 0.9f;
                 EffectMeshes.SetColor(r, GimmickPalette.WithAlpha(EffectMeshes.Brighten(MainColor, 0.3f), alpha));
             }
         }
+
+        // 輪の床からの高さ(上下に動く前。ギザギザの谷が床に埋まらない高さ)
+        private float RingBaseHeight(int i) => m_surfaceOffset * 1.5f + i * 0.001f + (Application.isPlaying ? m_ringZigzagHeight : 0.0f);
+        private float RingRadius => Mathf.Min(m_size.x, m_size.y) * 0.5f * m_ringRadiusRate;
 
         // 大きさ・色を合わせる(エディタから設定を変えたときにも呼ぶ)
         public void ApplyShape()
@@ -238,14 +399,15 @@ namespace Nakagawa
             {
                 m_base.transform.localScale = new Vector3(m_size.x, 1.0f, m_size.y);
                 m_base.transform.localPosition = Vector3.up * m_surfaceOffset;
-                EffectMeshes.SetColor(m_base, GimmickPalette.WithAlpha(MainColor, m_baseAlpha));
+                float alpha = m_mode == Mode.Accelerate ? m_accelerateBaseAlpha : m_baseAlpha;
+                EffectMeshes.SetColor(m_base, GimmickPalette.WithAlpha(MainColor, alpha));
             }
             if (m_rings == null) return;
-            float radius = Mathf.Min(m_size.x, m_size.y) * 0.5f;
+            float radius = RingRadius;
             for (int i = 0; i < m_rings.Length; i++)
             {
                 if (m_rings[i] == null) continue;
-                m_rings[i].transform.localPosition = Vector3.up * (m_surfaceOffset * 1.5f + i * 0.001f);
+                m_rings[i].transform.localPosition = Vector3.up * RingBaseHeight(i);
                 m_rings[i].transform.localScale = new Vector3(radius, 1.0f, radius);
                 EffectMeshes.SetColor(m_rings[i], GimmickPalette.WithAlpha(MainColor, 0.5f));
             }

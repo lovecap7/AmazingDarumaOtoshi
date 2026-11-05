@@ -9,7 +9,7 @@ namespace Nakagawa
     //  ・前の試合の勝者(CrownKeeper の持ち主)が、ゲームを抜けずに次の試合にも出ていれば、その人の頭に王冠を乗せて始める
     //  ・王冠をかぶっている人が攻撃で積み木を崩される(DarumaCharacter.Damaged)か、やられると、王冠が飛んで床に落ちる
     //  ・落ちている王冠に生きているキャラクターが触れると、その人の頭に乗る(落ちた直後は少しの間だれも拾えない)
-    //  ・場外に落ちたら、ステージの真ん中の上から降ってくる
+    //  ・場外に落ちたら、その試合ではもう出てこない(リスポーンしない)
     //  ・試合で勝者が決まったら、その人を次の王冠の持ち主にする(CrownKeeper)
     // 王冠は物理の当たり判定を持たない(積み木やキャラクターの動きには影響しない)。床は下向きの判定で探す
     // DarumaMatch と同じ GameObject に付ける。シーンに無ければ試合のシーンを読んだときに自動で付く(AutoAttach)
@@ -39,13 +39,38 @@ namespace Nakagawa
         [SerializeField] float m_spinSpeed = 90.0f;
         [SerializeField] float m_bobHeight = 0.08f;
 
+        [Header("壁")]
+        // 壁を調べる球の半径(王冠の大きさに対する割合)
+        [SerializeField, Min(0.05f)] float m_wallRadius = 0.4f;
+        // 壁で跳ね返ったあとの水平の速さの割合
+        [SerializeField, Range(0.0f, 1.0f)] float m_wallBounce = 0.4f;
+
+        [Header("エフェクト")]
+        // 頭から落ちたとき: 金の粒が飛び散る
+        [SerializeField] GimmickBurstSettings m_dropEffect = new GimmickBurstSettings
+        {
+            ColorA = new Color(1.0f, 0.9f, 0.4f, 1.0f), ColorB = new Color(1.0f, 0.7f, 0.15f, 1.0f),
+            Count = 24, Speed = new Vector2(2.0f, 5.0f), Size = new Vector2(0.06f, 0.16f), Lifetime = new Vector2(0.3f, 0.6f),
+            Gravity = 0.8f, Shape = GimmickBurstShape.Sphere, ShapeSize = new Vector3(0.2f, 0, 0),
+            Shockwave = false,
+        };
+        // 拾ってかぶったとき: 光が立ち上り、足元に輪が広がる
+        [SerializeField] GimmickBurstSettings m_pickupEffect = new GimmickBurstSettings
+        {
+            ColorA = new Color(1.0f, 0.95f, 0.6f, 1.0f), ColorB = new Color(1.0f, 0.78f, 0.2f, 1.0f),
+            Count = 30, Speed = new Vector2(1.5f, 4.0f), Size = new Vector2(0.07f, 0.18f), Lifetime = new Vector2(0.4f, 0.8f),
+            Gravity = -0.3f, Shape = GimmickBurstShape.Ring, ShapeSize = new Vector3(0.5f, 0, 0),
+            Shockwave = true, ShockwaveColor = new Color(1.0f, 0.85f, 0.3f, 1.0f), ShockwaveRadius = 1.6f, ShockwaveTime = 0.4f,
+        };
+
         [Header("拾う")]
         // 体の中心からこの距離(水平)以内に入ったら拾う
         [SerializeField, Min(0.1f)] float m_pickupRadius = 0.85f;
 
         [Header("場外")]
-        // ステージの範囲の中心よりこれだけ下に落ちたら、ステージの真ん中の上から降らせる
+        // ステージの範囲の中心よりこれだけ下に落ちたら、王冠はなくなる
         [SerializeField] float m_fallLimit = 8.0f;
+        // ステージの切り替えなどで持ち主の体ごと消えて、かぶせ直す人がいないときに、真ん中のこの高さから降らせる
         [SerializeField] float m_respawnHeight = 6.0f;
 
         [Header("ネット対戦")]
@@ -68,6 +93,8 @@ namespace Nakagawa
         Vector3 m_groundLocal;
         bool m_grounded;
         bool m_started;
+        // 場外に落ちてなくなった(この試合ではもう出さない)
+        bool m_lost;
         readonly List<Transform> m_bodies = new List<Transform>();
 
         public bool IsWorn => m_state == State.Worn;
@@ -141,7 +168,7 @@ namespace Nakagawa
         // 直接再生で途中から参加した人が持ち主なら、かぶせる
         private void OnJoined(MatchPlayer p)
         {
-            if (!m_started || m_state != State.None || !CrownKeeper.IsHolder(p)) return;
+            if (!m_started || m_lost || m_state != State.None || !CrownKeeper.IsHolder(p)) return;
             m_ownerPlayer = p;
             if (p.Character != null) Wear(p, p.Character);
         }
@@ -230,6 +257,7 @@ namespace Nakagawa
             if (direction.sqrMagnitude < 0.0001f) direction = Random.insideUnitSphere;
             direction.y = 0.0f;
             direction = direction.sqrMagnitude > 0.0001f ? direction.normalized : Vector3.forward;
+            GimmickBurst.Play(m_dropEffect, m_crown.position + Vector3.up * (m_size * 0.25f));
             DropAt(m_crown.position, direction * m_popSideSpeed + Vector3.up * m_popUpSpeed);
         }
 
@@ -270,6 +298,22 @@ namespace Nakagawa
             {
                 m_velocity.y -= m_gravity * dt;
                 Vector3 next = basePos + m_velocity * dt;
+                // 壁(見える壁・上の見えない壁)に当たったら、壁の手前で止めて水平の速さを跳ね返す
+                if (SweepWall(basePos, next - basePos, out RaycastHit wall))
+                {
+                    Vector3 move = next - basePos;
+                    Vector3 h = new Vector3(move.x, 0.0f, move.z);
+                    float travel = Mathf.Max(0.0f, wall.distance - 0.01f);
+                    Vector3 stop = h.sqrMagnitude > 0.0001f ? h.normalized * Mathf.Min(travel, h.magnitude) : Vector3.zero;
+                    next = new Vector3(basePos.x + stop.x, next.y, basePos.z + stop.z);
+                    Vector3 n = wall.normal;
+                    n.y = 0.0f;
+                    if (n.sqrMagnitude < 0.0001f) n = -h;
+                    n.Normalize();
+                    Vector3 hv = new Vector3(m_velocity.x, 0.0f, m_velocity.z);
+                    if (Vector3.Dot(hv, n) < 0.0f) hv = Vector3.Reflect(hv, n) * m_wallBounce;
+                    m_velocity = new Vector3(hv.x, m_velocity.y, hv.z);
+                }
                 if (m_velocity.y <= 0.0f && FindFloor(basePos + Vector3.up * 0.2f, 0.2f + basePos.y - next.y, out RaycastHit hit))
                 {
                     SetGround(hit);
@@ -279,11 +323,11 @@ namespace Nakagawa
                 else basePos = next;
             }
 
-            // 場外に落ちたら真ん中の上から降らせる
+            // 場外に落ちたら、この試合ではもう出てこない(リスポーンしない)
             Vector3 center = StageCenter();
             if (basePos.y < center.y - m_fallLimit)
             {
-                DropAt(center + Vector3.up * m_respawnHeight, Vector3.zero);
+                Lose();
                 return;
             }
 
@@ -293,6 +337,20 @@ namespace Nakagawa
             m_crown.SetPositionAndRotation(basePos + Vector3.up * (0.05f + bob), Quaternion.Euler(0.0f, spin, 0.0f));
 
             if (m_looseTime >= m_pickupDelay) TryPickup();
+        }
+
+        // 場外に落ちてなくなる。この試合の間はだれもかぶらない(次の持ち主は試合の勝者で決まる)
+        private void Lose()
+        {
+            Unhook();
+            if (m_crown != null) Destroy(m_crown.gameObject);
+            m_crown = null;
+            m_owner = null;
+            m_ownerPlayer = null;
+            m_state = State.None;
+            m_grounded = false;
+            m_ground = null;
+            m_lost = true;
         }
 
         private void SetGround(RaycastHit hit)
@@ -321,7 +379,56 @@ namespace Nakagawa
                 best = p;
                 bestDist = dist;
             }
-            if (best != null) Wear(best, best.Character);
+            if (best == null) return;
+            Wear(best, best.Character);
+            // 拾った人の足元に輪、王冠の位置に光
+            GimmickBurst.Play(m_pickupEffect, best.Character.transform.position + Vector3.up * 0.05f);
+            if (m_crown != null) GimmickBurst.Play(m_dropEffect, m_crown.position, 0.7f);
+        }
+
+        // 水平に動く先に壁があるか(王冠の大きさの球で調べる)
+        // 壁: 積み木を跳ね返す物(ReflectWall・扇風機など ITumikiReflector)、外周の見えない壁(InvWall)、動かない物の横向きの面
+        private bool SweepWall(Vector3 from, Vector3 move, out RaycastHit wall)
+        {
+            wall = default;
+            Vector3 h = new Vector3(move.x, 0.0f, move.z);
+            float length = h.magnitude;
+            if (length < 0.0001f) return false;
+            Vector3 dir = h / length;
+            float radius = m_size * m_wallRadius;
+            // 床に触れないよう、球の下端が王冠の底より少し上になる高さから調べる
+            Vector3 origin = from + Vector3.up * (radius + m_size * 0.1f);
+            int n = Physics.SphereCastNonAlloc(origin, radius, dir, s_hits, length, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+            float best = float.MaxValue;
+            bool found = false;
+            for (int i = 0; i < n; i++)
+            {
+                var hit = s_hits[i];
+                if (!IsWall(hit.collider, out bool marked)) continue;
+                if (hit.distance <= 0.0f)
+                {
+                    // 最初から重なっている: 壁の目印がある物だけ、進む向きの反対を面の向きとして止める(床などは無視)
+                    if (!marked) continue;
+                    hit.normal = -dir;
+                }
+                if (Mathf.Abs(hit.normal.y) >= 0.5f || hit.distance >= best) continue;
+                best = hit.distance;
+                wall = hit;
+                found = true;
+            }
+            return found;
+        }
+
+        // marked: 壁の目印がある(ReflectWall などの ITumikiReflector・見えない壁)
+        private static bool IsWall(Collider c, out bool marked)
+        {
+            marked = false;
+            if (c.GetComponentInParent<TumikiBlock>() != null || c.GetComponentInParent<DarumaCharacter>() != null) return false;
+            if (c.GetComponentInParent<DarumaGhost>() != null) return false;
+            marked = c.GetComponentInParent<ITumikiReflector>() != null || c.name == "InvWall";
+            if (marked) return true;
+            // 動かない物(床の段差・柱など)の横向きの面も壁として扱う
+            return c.attachedRigidbody == null;
         }
 
         // 下向きに床(積み木・キャラクター・触れるだけの判定以外)を探す
@@ -390,6 +497,8 @@ namespace Nakagawa
             }
 
             var root = new GameObject("Crown").transform;
+            // かぶっている人の輪郭(PlayerOutlines)を王冠には付けない
+            root.gameObject.AddComponent<OutlineExclude>();
             var band = Part(PrimitiveType.Cylinder, "Band", root);
             band.localScale = new Vector3(0.8f, 0.11f, 0.8f);
             band.localPosition = new Vector3(0.0f, 0.11f, 0.0f);

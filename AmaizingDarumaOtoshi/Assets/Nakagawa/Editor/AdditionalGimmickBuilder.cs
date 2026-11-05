@@ -264,7 +264,8 @@ namespace Nakagawa.EditorTools
         static void BuildSpeedFloor(string name, SpeedFloorGimmick.Mode mode, Meshes meshes, Glow glow)
         {
             var root = new GameObject(name);
-            var floor = MeshVisual("Base", root.transform, meshes.Quad, glow.Additive);
+            // 加速床の下地は通常の半透明で塗る(加算だと明るい床の上で色が抜けて見えにくい)
+            var floor = MeshVisual("Base", root.transform, meshes.Quad, mode == SpeedFloorGimmick.Mode.Accelerate ? glow.Alpha : glow.Additive);
             var rings = new Renderer[3];
             for (int i = 0; i < rings.Length; i++) rings[i] = MeshVisual($"Ring{i}", root.transform, meshes.Ring, glow.Additive);
 

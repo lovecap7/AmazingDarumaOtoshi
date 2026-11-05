@@ -142,6 +142,55 @@ namespace Nakagawa
             return NewMesh(name, v, c, t);
         }
 
+        // 上下にギザギザに折れ曲がった輪(半径1)。山と谷を teeth 個ずつ交互に並べ、amplitude(m)だけ上下にずらす
+        // 帯は内側が少し低く外側が少し高い斜めの面にして、真上からも横からも見えるようにする(縁はぼける)
+        // 同じ形は使い回す(ギミックごとに作らない)
+        public static Mesh ZigzagRing(int teeth, float amplitude, float width = 0.14f, float slant = 0.06f)
+        {
+            teeth = Mathf.Max(3, teeth);
+            var key = (teeth, Mathf.RoundToInt(amplitude * 1000.0f), Mathf.RoundToInt(width * 1000.0f), Mathf.RoundToInt(slant * 1000.0f));
+            s_zigzag ??= new System.Collections.Generic.Dictionary<(int, int, int, int), Mesh>();
+            if (s_zigzag.TryGetValue(key, out Mesh cached) && cached != null) return cached;
+
+            int points = teeth * 2;
+            float[] radii = { 1.0f - width, 1.0f - width * 0.5f, 1.0f };
+            float[] heights = { -slant, 0.0f, slant };
+            float[] alphas = { 0.0f, 1.0f, 0.0f };
+            int rows = radii.Length;
+            var v = new Vector3[points * rows];
+            var c = new Color[v.Length];
+            for (int r = 0; r < rows; r++)
+            {
+                for (int i = 0; i < points; i++)
+                {
+                    float a = i * Mathf.PI * 2.0f / points;
+                    float y = (i % 2 == 0 ? amplitude : -amplitude) + heights[r];
+                    v[r * points + i] = new Vector3(Mathf.Cos(a) * radii[r], y, Mathf.Sin(a) * radii[r]);
+                    c[r * points + i] = new Color(1.0f, 1.0f, 1.0f, alphas[r]);
+                }
+            }
+            var t = new int[(rows - 1) * points * 6];
+            int k = 0;
+            for (int r = 0; r < rows - 1; r++)
+            {
+                for (int i = 0; i < points; i++)
+                {
+                    int i0 = r * points + i;
+                    int i1 = r * points + (i + 1) % points;
+                    int j0 = i0 + points;
+                    int j1 = i1 + points;
+                    t[k++] = i0; t[k++] = j0; t[k++] = i1;
+                    t[k++] = i1; t[k++] = j0; t[k++] = j1;
+                }
+            }
+            var mesh = NewMesh($"EffectZigzagRing{teeth}", v, c, t);
+            mesh.hideFlags = HideFlags.DontSave;
+            s_zigzag[key] = mesh;
+            return mesh;
+        }
+
+        static System.Collections.Generic.Dictionary<(int, int, int, int), Mesh> s_zigzag;
+
         static Mesh NewMesh(string name, Vector3[] v, Color[] c, int[] t)
         {
             var mesh = new Mesh { name = name };
