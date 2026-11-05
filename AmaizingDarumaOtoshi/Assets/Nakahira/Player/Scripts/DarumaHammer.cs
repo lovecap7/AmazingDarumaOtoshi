@@ -80,6 +80,8 @@ namespace Nakahira
 
         // 薙ぎ払いが積み木・キャラクターに当たった(カメラの揺れ・効果音など演出用)
         public static event System.Action<HammerHitInfo> Hit;
+        // 股抜きショットで積み木を打ち出した(演出用。Target は打ち出した積み木、Point は打ち出した位置)
+        public static event System.Action<HammerHitInfo> ShotFired;
 
         public bool IsBusy => m_action != Action.None;
         // このハンマーの性能。キャラクターのパッシブが、実行時に複製へ差し替えるために使う
@@ -372,6 +374,7 @@ namespace Nakahira
             block.Launch(root.forward, m_params.ShotSpeed, m_owner);
             if (embedded) Nakagawa.TumikiPlacement.IgnoreCharactersAfterEmbed(block);
             BeginHitStop(block, null);
+            ShotFired?.Invoke(new HammerHitInfo(this, m_owner, block, pos, false, 0));
         }
     }
 }
