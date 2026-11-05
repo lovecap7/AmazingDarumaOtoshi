@@ -26,6 +26,8 @@ namespace Yurube
         SpecialGauge m_gauge;
         AodaruSixArms m_arms;
 
+        public bool IsActive => m_arms != null;
+
         private void Awake()
         {
             m_character = GetComponent<DarumaCharacter>();

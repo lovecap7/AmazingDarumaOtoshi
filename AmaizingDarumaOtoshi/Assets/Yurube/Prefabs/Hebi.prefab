@@ -763,11 +763,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Yurube.HebidaruSpecial
   m_specialName: "\u53CD\u8EE2\u6BD2\u6CBC"
-  m_swampRadius: 4.5
+  m_minSwampRadius: 2.5
+  m_maxSwampRadius: 6.5
+  m_swampRadiusScale: 1.5
+  m_maxBlocks: 10
   m_swampDuration: 8
+  m_swampFadeDuration: 0.7
   m_debuffDuration: 3
   m_slowMultiplier: 0.55
   m_tickInterval: 0.15
-  m_followCaster: 0
+  m_followCaster: 1
   m_swampOffset: {x: 0, y: 0, z: 0}
   m_logSpecial: 1

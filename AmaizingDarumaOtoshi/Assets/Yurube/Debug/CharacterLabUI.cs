@@ -40,12 +40,23 @@ namespace Yurube.Lab
         {
             var keyboard = Keyboard.current;
             if (keyboard != null && keyboard.hKey.wasPressedThisFrame) m_show = !m_show;
+            if (keyboard != null && keyboard.f3Key.wasPressedThisFrame && m_lab != null)
+            {
+                var current = m_lab.Character;
+                if (current != null && (current.GetComponent<IwadaruSpecial>() != null
+                    || current.GetComponent<HebidaruSpecial>() != null))
+                {
+                    TronHitboxView.Visible = !TronHitboxView.Visible;
+                }
+            }
             if (m_lab != null && m_lab.Blocks != null) m_flying = m_lab.Blocks.CountFlying();
         }
 
         private void OnGUI()
         {
             if (!m_show || m_lab == null) return;
+            // カットイン中はラボUIも描かない（必殺技ゲージ等が前面に残らないようにする）
+            if (SpecialCutIn.IsPlaying || IwadaruCutIn.IsPlaying || HebidaruCutIn.IsPlaying) return;
             EnsureStyles();
             DrawMainPanel();
             DrawHelp();
@@ -210,7 +221,10 @@ namespace Yurube.Lab
             GUILayout.Label($"ゲージ: {gauge.Blocks}/{gauge.BlocksToFill}" + (gauge.IsFull ? "  READY" : ""), m_label);
             if (GUILayout.Button("ゲージ満タン", m_button)) gauge.Fill();
 
-            if (character.GetComponent<AkadaruSpecial>() != null)
+            bool hasHitboxView = character.GetComponent<AkadaruSpecial>() != null
+                || character.GetComponent<IwadaruSpecial>() != null
+                || character.GetComponent<HebidaruSpecial>() != null;
+            if (hasHitboxView)
             {
                 bool showHitbox = TronHitboxView.Visible;
                 bool newShowHitbox = GUILayout.Toggle(showHitbox, "当たり判定を表示 (F3)");
@@ -323,6 +337,7 @@ namespace Yurube.Lab
 
         void PresetKidaruSpecial()
         {
+            if (!CanStartSpecialPreset()) return;
             m_lab.SelectCharacter("kidaru");
             var character = m_lab.Character;
             m_lab.ClearStack(character);
@@ -369,6 +384,7 @@ namespace Yurube.Lab
 
         void PresetAkadaruSpecial()
         {
+            if (!CanStartSpecialPreset()) return;
             m_lab.SelectCharacter("akadaru");
             var character = m_lab.Character;
             m_lab.ClearStack(character);
@@ -382,6 +398,7 @@ namespace Yurube.Lab
 
         void PresetAodaruSpecial()
         {
+            if (!CanStartSpecialPreset()) return;
             m_lab.SelectCharacter("aodaru");
             var character = m_lab.Character;
             m_lab.ClearStack(character);
@@ -395,6 +412,7 @@ namespace Yurube.Lab
 
         void PresetIwadaruSpecial()
         {
+            if (!CanStartSpecialPreset()) return;
             m_lab.SelectCharacter("iwadaru");
             var character = m_lab.Character;
             m_lab.ClearStack(character);
@@ -407,6 +425,7 @@ namespace Yurube.Lab
 
         void PresetHebidaruSpecial()
         {
+            if (!CanStartSpecialPreset()) return;
             m_lab.SelectCharacter("hebidaru");
             var character = m_lab.Character;
             m_lab.ClearStack(character);
@@ -420,7 +439,9 @@ namespace Yurube.Lab
 
         void PresetMidaruSpecial()
         {
-            m_lab.SelectCharacter("midaru");            var character = m_lab.Character;
+            if (!CanStartSpecialPreset()) return;
+            m_lab.SelectCharacter("midaru");
+            var character = m_lab.Character;
             m_lab.ClearStack(character);
             // 5個積むとゲージが満タン。押した瞬間に撃って5発に分裂する
             m_lab.AddBlocks(character, TumikiColor.Red, 5);
@@ -428,6 +449,31 @@ namespace Yurube.Lab
 
             var special = character != null ? character.GetComponent<ISpecialAbility>() : null;
             if (special != null) special.TryActivate();
+        }
+
+        bool CanStartSpecialPreset()
+        {
+            // カットイン中はゲームが止まっているが、ラボのボタンは押せる。
+            // ここで止めないと、別キャラに切り替わってその必殺技まで連続で出てしまう。
+            if (SpecialCutIn.IsPlaying || IwadaruCutIn.IsPlaying || HebidaruCutIn.IsPlaying)
+                return false;
+
+            var current = m_lab.Character;
+            if (current == null) return true;
+
+            var iwa = current.GetComponent<IwadaruSpecial>();
+            if (iwa != null && iwa.IsActive) return false;
+
+            var kidaru = current.GetComponent<KidaruSpecial>();
+            if (kidaru != null && kidaru.IsActive) return false;
+
+            var aodaru = current.GetComponent<AodaruSpecial>();
+            if (aodaru != null && aodaru.IsActive) return false;
+
+            var hebi = current.GetComponent<HebidaruSpecial>();
+            if (hebi != null && hebi.IsActive) return false;
+
+            return true;
         }
 
         static string ColorName(TumikiColor color)

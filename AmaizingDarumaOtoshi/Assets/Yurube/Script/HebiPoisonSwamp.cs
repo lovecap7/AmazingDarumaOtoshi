@@ -33,6 +33,7 @@ namespace Yurube
         DarumaCharacter m_owner;
         float m_radius = 4.5f;
         float m_duration = 8.0f;
+        float m_fadeDuration = 0.7f;
         float m_debuffDuration = 3.0f;
         float m_slowMultiplier = 0.55f;
         float m_tickInterval = 0.15f;
@@ -41,12 +42,19 @@ namespace Yurube
         float m_timeLeft;
         float m_tickTimer;
         bool m_finished;
+        bool m_fading;
+        float m_fadeTime;
+        float m_fadeScale = 1.0f;
+        float m_fadeAlpha = 1.0f;
 
         Vector3 m_center;
         float m_groundY;
 
         GameObject m_disc;
         GameObject m_boundary;
+        LineRenderer m_boundaryLine;
+        Material m_boundaryLineMaterial;
+        CircleHitboxView m_hitboxView;
         Material m_discMaterial;
         Material m_boundaryMaterial;
         Material m_bubbleMaterial;
@@ -59,13 +67,14 @@ namespace Yurube
 
         public event Action Finished;
 
-        public void Initialize(DarumaCharacter owner, float radius, float duration,
+        public void Initialize(DarumaCharacter owner, float radius, float duration, float fadeDuration,
             float debuffDuration, float slowMultiplier, float tickInterval,
             bool followCaster, Vector3 centerOffset)
         {
             m_owner = owner;
             m_radius = Mathf.Max(0.5f, radius);
             m_duration = Mathf.Max(0.1f, duration);
+            m_fadeDuration = Mathf.Max(0.0f, fadeDuration);
             m_debuffDuration = Mathf.Max(0.1f, debuffDuration);
             m_slowMultiplier = Mathf.Clamp01(slowMultiplier);
             m_tickInterval = Mathf.Max(0.02f, tickInterval);
@@ -76,6 +85,9 @@ namespace Yurube
 
             UpdateCenter(true);
             CreateVisuals();
+            m_hitboxView = CircleHitboxView.Create("HebiSwampHitbox", transform,
+                () => transform.position, () => m_radius, () => !m_fading,
+                new Color(0.55f, 1.0f, 0.30f, 0.95f));
         }
 
         private void Update()
@@ -90,12 +102,24 @@ namespace Yurube
 
             if (m_followCaster) UpdateCenter(false);
 
-            AnimateVisuals();
+            if (m_fading)
+            {
+                m_fadeTime += Time.deltaTime;
+                UpdateFadeValues();
+                AnimateVisuals();
+                if (m_fadeTime >= m_fadeDuration) ClearAndDestroy(false);
+                return;
+            }
 
+            AnimateVisuals();
             m_timeLeft -= Time.deltaTime;
             if (m_timeLeft <= 0.0f)
             {
-                ClearAndDestroy(false);
+                m_fading = true;
+                m_fadeTime = 0.0f;
+                UpdateFadeValues();
+                AnimateVisuals();
+                if (m_fadeDuration <= 0.001f) ClearAndDestroy(false);
                 return;
             }
 
@@ -105,6 +129,16 @@ namespace Yurube
                 m_tickTimer = 0.0f;
                 ApplyDebuffToEnemies();
             }
+        }
+
+        void UpdateFadeValues()
+        {
+            float t = m_fadeDuration <= 0.001f
+                ? 1.0f
+                : Mathf.Clamp01(m_fadeTime / m_fadeDuration);
+            float eased = Mathf.SmoothStep(0.0f, 1.0f, t);
+            m_fadeScale = Mathf.Lerp(1.0f, 0.18f, eased);
+            m_fadeAlpha = 1.0f - eased;
         }
 
         void UpdateCenter(bool force)
@@ -190,8 +224,61 @@ namespace Yurube
             m_boundary = CreateQuad("HebiPoisonBoundary", m_boundaryMaterial,
                 m_center + Vector3.up * 0.01f, m_radius * 2.0f, Quaternion.Euler(90.0f, 0.0f, 0.0f));
 
+            CreateBoundaryLine();
             CreateBubbles();
             CreateRipples();
+        }
+
+        void CreateBoundaryLine()
+        {
+            var lineObject = new GameObject("HebiPoisonBoundaryLine");
+            lineObject.transform.SetParent(transform, false);
+            m_boundaryLine = lineObject.AddComponent<LineRenderer>();
+            m_boundaryLine.useWorldSpace = true;
+            m_boundaryLine.loop = true;
+            m_boundaryLine.positionCount = 64;
+            m_boundaryLine.widthMultiplier = 0.12f;
+            m_boundaryLine.numCornerVertices = 2;
+            m_boundaryLine.numCapVertices = 2;
+            m_boundaryLine.textureMode = LineTextureMode.Stretch;
+            m_boundaryLine.alignment = LineAlignment.View;
+            m_boundaryLine.startColor = new Color(0.55f, 1.0f, 0.35f, 0.9f);
+            m_boundaryLine.endColor = new Color(0.55f, 1.0f, 0.35f, 0.9f);
+            m_boundaryLine.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            m_boundaryLine.receiveShadows = false;
+
+            Shader shader = Shader.Find("Sprites/Default");
+            if (shader == null) shader = Shader.Find("Universal Render Pipeline/Unlit");
+            if (shader == null) shader = Shader.Find("Unlit/Color");
+            if (shader != null)
+            {
+                m_boundaryLineMaterial = new Material(shader);
+                if (m_boundaryLineMaterial.HasProperty("_Color"))
+                    m_boundaryLineMaterial.SetColor("_Color", new Color(0.55f, 1.0f, 0.35f, 0.9f));
+                if (m_boundaryLineMaterial.HasProperty("_BaseColor"))
+                    m_boundaryLineMaterial.SetColor("_BaseColor", new Color(0.55f, 1.0f, 0.35f, 0.9f));
+                m_boundaryLine.sharedMaterial = m_boundaryLineMaterial;
+            }
+
+            m_created.Add(lineObject);
+            UpdateBoundaryLine(Time.time);
+        }
+
+        void UpdateBoundaryLine(float time)
+        {
+            if (m_boundaryLine == null) return;
+            Vector3 center = transform.position + Vector3.up * 0.075f;
+            float radius = m_radius * m_fadeScale;
+            for (int i = 0; i < 64; i++)
+            {
+                float angle = i * Mathf.PI * 2.0f / 64.0f;
+                m_boundaryLine.SetPosition(i, center + new Vector3(
+                    Mathf.Cos(angle) * radius, 0.0f, Mathf.Sin(angle) * radius));
+            }
+            float pulse = 0.55f + 0.30f * (0.5f + 0.5f * Mathf.Sin(time * 4.0f));
+            Color color = new Color(0.55f, 1.0f, 0.35f, pulse * m_fadeAlpha);
+            m_boundaryLine.startColor = color;
+            m_boundaryLine.endColor = color;
         }
 
         GameObject CreateQuad(string name, Material material, Vector3 position, float scale, Quaternion rotation)
@@ -261,16 +348,30 @@ namespace Yurube
             if (m_disc != null)
             {
                 m_disc.transform.rotation = Quaternion.Euler(90.0f, time * 7.0f, 0.0f);
-                m_disc.transform.localScale = new Vector3(m_radius * 2.0f, m_radius * 2.0f, 1.0f);
+                m_disc.transform.localScale = new Vector3(
+                    m_radius * 2.0f * m_fadeScale,
+                    m_radius * 2.0f * m_fadeScale,
+                    1.0f);
             }
+            if (m_discMaterial != null && m_discMaterial.HasProperty("_Color"))
+                m_discMaterial.SetColor("_Color", new Color(1.0f, 1.0f, 1.0f, m_fadeAlpha));
 
             if (m_boundary != null)
             {
                 float pulse = 0.62f + 0.18f * Mathf.Sin(time * 4.0f);
+                m_boundary.transform.localScale = new Vector3(
+                    m_radius * 2.0f * m_fadeScale,
+                    m_radius * 2.0f * m_fadeScale,
+                    1.0f);
                 var block = new MaterialPropertyBlock();
-                block.SetColor("_Color", new Color(0.55f, 1.0f, 0.35f, pulse));
+                block.SetColor("_Color", new Color(0.55f, 1.0f, 0.35f, pulse * m_fadeAlpha));
                 m_boundary.GetComponent<MeshRenderer>().SetPropertyBlock(block);
             }
+
+            UpdateBoundaryLine(time);
+
+            if (m_bubbleMaterial != null && m_bubbleMaterial.HasProperty("_Color"))
+                m_bubbleMaterial.SetColor("_Color", new Color(0.55f, 1.0f, 0.45f, 0.8f * m_fadeAlpha));
 
             for (int i = 0; i < m_bubbles.Count; i++)
             {
@@ -278,9 +379,11 @@ namespace Yurube
                 if (bubble.Transform == null) continue;
 
                 float cycle = Mathf.Repeat(time * bubble.Speed + bubble.Phase, 1.0f);
-                float scale = bubble.Size * (0.7f + 0.5f * Mathf.Sin(cycle * Mathf.PI));
+                float scale = bubble.Size * (0.7f + 0.5f * Mathf.Sin(cycle * Mathf.PI)) * m_fadeScale;
                 bubble.Transform.position = transform.position + new Vector3(
-                    bubble.BasePosition.x, 0.06f + cycle * 0.55f, bubble.BasePosition.z);
+                    bubble.BasePosition.x * m_fadeScale,
+                    0.06f + cycle * 0.55f,
+                    bubble.BasePosition.z * m_fadeScale);
                 bubble.Transform.localScale = new Vector3(scale, scale, 1.0f);
                 bubble.Transform.rotation = Camera.main != null
                     ? Camera.main.transform.rotation
@@ -293,12 +396,13 @@ namespace Yurube
                 if (ripple.Transform == null) continue;
 
                 float cycle = Mathf.Repeat(time * 0.45f + ripple.Phase, 1.0f);
-                float scale = m_radius * (0.25f + cycle * 0.68f);
+                float scale = m_radius * (0.25f + cycle * 0.68f) * m_fadeScale;
                 ripple.Transform.position = m_center + Vector3.up * 0.015f;
                 ripple.Transform.localScale = new Vector3(scale, scale, 1.0f);
 
                 var block = new MaterialPropertyBlock();
-                block.SetColor("_Color", new Color(0.7f, 0.45f, 1.0f, (1.0f - cycle) * 0.45f));
+                block.SetColor("_Color", new Color(0.7f, 0.45f, 1.0f,
+                    (1.0f - cycle) * 0.45f * m_fadeAlpha));
                 ripple.Transform.GetComponent<MeshRenderer>().SetPropertyBlock(block);
             }
         }
@@ -337,8 +441,10 @@ namespace Yurube
 
             if (m_discMaterial != null) Destroy(m_discMaterial);
             if (m_boundaryMaterial != null) Destroy(m_boundaryMaterial);
+            if (m_boundaryLineMaterial != null) Destroy(m_boundaryLineMaterial);
             if (m_bubbleMaterial != null) Destroy(m_bubbleMaterial);
             if (m_rippleMaterial != null) Destroy(m_rippleMaterial);
+            if (m_hitboxView != null) Destroy(m_hitboxView.gameObject);
 
             Destroy(gameObject);
         }
@@ -360,8 +466,10 @@ namespace Yurube
 
             if (m_discMaterial != null) Destroy(m_discMaterial);
             if (m_boundaryMaterial != null) Destroy(m_boundaryMaterial);
+            if (m_boundaryLineMaterial != null) Destroy(m_boundaryLineMaterial);
             if (m_bubbleMaterial != null) Destroy(m_bubbleMaterial);
             if (m_rippleMaterial != null) Destroy(m_rippleMaterial);
+            if (m_hitboxView != null) Destroy(m_hitboxView.gameObject);
         }
 
         static Texture2D GetSwampTexture()
@@ -379,7 +487,7 @@ namespace Yurube
                 {
                     Vector2 d = new Vector2(x, y) - center;
                     float r = d.magnitude / max;
-                    if (r >= 0.5f)
+                    if (r >= 1.0f)
                     {
                         pixels[y * size + x] = new Color32(0, 0, 0, 0);
                         continue;
@@ -390,7 +498,7 @@ namespace Yurube
                     float swirl = Mathf.Sin(angle * 3.0f + r * 26.0f + n * 4.0f) * 0.5f + 0.5f;
                     float green = Mathf.Lerp(0.20f, 0.52f, swirl);
                     float purple = Mathf.Lerp(0.22f, 0.42f, 1.0f - swirl);
-                    float alpha = Mathf.Clamp01((0.5f - r) / 0.08f) * 0.78f;
+                    float alpha = Mathf.Clamp01((1.0f - r) / 0.10f) * 0.78f;
 
                     // 毒の泡
                     float bubble = Mathf.Sin(x * 0.13f + n * 8.0f) * Mathf.Sin(y * 0.11f - n * 6.0f);
@@ -428,8 +536,8 @@ namespace Yurube
                 for (int x = 0; x < size; x++)
                 {
                     float r = Vector2.Distance(new Vector2(x, y), center) / max;
-                    float ring = Mathf.Clamp01(1.0f - Mathf.Abs(r - 0.48f) / 0.02f);
-                    float inner = Mathf.Clamp01(1.0f - Mathf.Abs(r - 0.37f) / 0.02f) * 0.25f;
+                    float ring = Mathf.Clamp01(1.0f - Mathf.Abs(r - 0.98f) / 0.02f);
+                    float inner = Mathf.Clamp01(1.0f - Mathf.Abs(r - 0.82f) / 0.025f) * 0.25f;
                     float alpha = Mathf.Clamp01(ring + inner);
                     pixels[y * size + x] = new Color32(255, 255, 255, (byte)(alpha * 255.0f));
                 }
