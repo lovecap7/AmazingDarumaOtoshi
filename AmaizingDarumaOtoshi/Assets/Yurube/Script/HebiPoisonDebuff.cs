@@ -9,6 +9,7 @@ namespace Yurube
     public class HebiPoisonDebuff : MonoBehaviour
     {
         DarumaCharacter m_target;
+        HebiPoisonDebuffVisual m_visual;
         float m_remaining;
         float m_slowMultiplier = 1.0f;
         bool m_active;
@@ -46,6 +47,9 @@ namespace Yurube
             m_target.MovementInverted = true;
             m_target.MoveSpeedMultiplier = Mathf.Min(m_target.MoveSpeedMultiplier, m_slowMultiplier);
             enabled = true;
+
+            if (m_visual == null)
+                m_visual = HebiPoisonDebuffVisual.Attach(m_target);
         }
 
         private void Update()
@@ -77,6 +81,12 @@ namespace Yurube
 
         void Restore()
         {
+            if (m_visual != null)
+            {
+                Destroy(m_visual.gameObject);
+                m_visual = null;
+            }
+
             if (m_target == null)
             {
                 m_slowMultiplier = 1.0f;

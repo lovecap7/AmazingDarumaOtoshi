@@ -7,7 +7,11 @@ namespace Yurube
     // F3 キー、またはキャラクターラボのトグルで表示を切り替える。
     public class TronHitboxView : MonoBehaviour
     {
-        public static bool Visible { get; set; }
+        public static bool Visible
+        {
+            get => SpecialHitboxDebug.Visible;
+            set => SpecialHitboxDebug.Visible = value;
+        }
 
         BoxCollider m_box;
         GameObject m_visual;

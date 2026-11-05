@@ -163,7 +163,8 @@ namespace Yurube
                 // へびだるの頭は実寸が小さいため、カットインでは巨人化させて画面いっぱいに見せる
                 m_subject.localScale = Vector3.one * 2.0f;
                 m_subject.localPosition = new Vector3(0.0f, 1.5f, 0.0f);
-                m_subject.localRotation = Quaternion.identity;
+                // へびだるの頭は +Z 側が顔。カメラは -Z にいるため180度回す
+                m_subject.localRotation = Quaternion.Euler(0.0f, 180.0f, 0.0f);
                 m_created.Add(subject);
             }
 
@@ -359,10 +360,12 @@ namespace Yurube
 
             if (m_subject != null)
             {
-                m_subject.localRotation = Quaternion.Euler(
-                    Mathf.Sin(age * 4.0f) * 2.5f,
-                    Mathf.Sin(age * 3.0f) * 5.0f,
-                    Mathf.Sin(age * 5.0f) * 2.5f);
+                // 正面(目・牙)をカメラへ向けたまま、わずかに揺らす
+                m_subject.localRotation = Quaternion.Euler(0.0f, 180.0f, 0.0f)
+                    * Quaternion.Euler(
+                        Mathf.Sin(age * 4.0f) * 2.5f,
+                        Mathf.Sin(age * 3.0f) * 5.0f,
+                        Mathf.Sin(age * 5.0f) * 2.5f);
             }
 
             for (int i = 0; i < m_bubbles.Count; i++)

@@ -84,6 +84,7 @@ namespace Yurube
         SpecialGauge m_gauge;
         State m_state = State.Idle;
         float m_stateTime;
+        CircleHitboxView m_hitboxView;
         int m_snapshotBlocks;
         float m_attackRadius;
         float m_meteorHeight;
@@ -103,6 +104,8 @@ namespace Yurube
 
         GameObject m_warning;
         Material m_warningMaterial;
+        LineRenderer m_warningLine;
+        Material m_warningLineMaterial;
         GameObject m_meteor;
         Material m_meteorRockMaterial;
         Material m_meteorTrailMaterial;
@@ -115,6 +118,9 @@ namespace Yurube
         public bool IsActive => m_state != State.Idle;
         public int LastBlocks => m_snapshotBlocks;
         public float AttackRadius => m_attackRadius;
+        public Vector3 DebugCenter => m_character != null
+            ? (m_state == State.Countdown ? m_character.transform.position : m_targetPosition)
+            : m_targetPosition;
         public float CountdownRemaining => m_state == State.Countdown
             ? Mathf.Max(0.0f, m_countdown - m_stateTime)
             : 0.0f;
@@ -123,6 +129,9 @@ namespace Yurube
         {
             m_character = GetComponent<DarumaCharacter>();
             m_gauge = GetComponent<SpecialGauge>();
+            m_hitboxView = CircleHitboxView.Create("IwaAttackHitbox", null,
+                () => DebugCenter, () => m_attackRadius, () => IsActive,
+                new Color(1.0f, 0.15f, 0.10f, 0.95f));
         }
 
         private void Update()
@@ -358,7 +367,8 @@ namespace Yurube
             int rings = Mathf.RoundToInt(Mathf.Lerp(m_minShockwaveRings, m_maxShockwaveRings, effectT));
             for (int i = 0; i < rings; i++)
             {
-                float radius = m_attackRadius * (1.0f + i * 0.22f);
+                float ringT = rings > 1 ? i / (float)(rings - 1) : 1.0f;
+                float radius = m_attackRadius * Mathf.Lerp(0.70f, 1.0f, ringT);
                 Color waveColor = i == 0
                     ? new Color(1.0f, 0.55f, 0.2f, 0.95f)
                     : new Color(1.0f, 0.82f, 0.55f, Mathf.Lerp(0.8f, 0.55f, i / 2.0f));
@@ -659,7 +669,39 @@ namespace Yurube
             }
 
             m_warning = quad;
+            CreateWarningOutline();
             UpdateWarning();
+        }
+
+        void CreateWarningOutline()
+        {
+            var lineObject = new GameObject("IwadaruWarningOutline");
+            m_warningLine = lineObject.AddComponent<LineRenderer>();
+            m_warningLine.useWorldSpace = true;
+            m_warningLine.loop = true;
+            m_warningLine.positionCount = 64;
+            m_warningLine.widthMultiplier = 0.12f;
+            m_warningLine.numCornerVertices = 2;
+            m_warningLine.numCapVertices = 2;
+            m_warningLine.textureMode = LineTextureMode.Stretch;
+            m_warningLine.alignment = LineAlignment.View;
+            m_warningLine.startColor = m_warningColor;
+            m_warningLine.endColor = m_warningColor;
+            m_warningLine.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            m_warningLine.receiveShadows = false;
+
+            Shader shader = Shader.Find("Sprites/Default");
+            if (shader == null) shader = Shader.Find("Universal Render Pipeline/Unlit");
+            if (shader == null) shader = Shader.Find("Unlit/Color");
+            if (shader != null)
+            {
+                m_warningLineMaterial = new Material(shader);
+                if (m_warningLineMaterial.HasProperty("_Color"))
+                    m_warningLineMaterial.SetColor("_Color", m_warningColor);
+                if (m_warningLineMaterial.HasProperty("_BaseColor"))
+                    m_warningLineMaterial.SetColor("_BaseColor", m_warningColor);
+                m_warningLine.sharedMaterial = m_warningLineMaterial;
+            }
         }
 
         void UpdateWarning()
@@ -678,6 +720,19 @@ namespace Yurube
                 m_attackRadius * 2.0f,
                 m_attackRadius * 2.0f,
                 1.0f);
+
+            if (m_warningLine != null)
+            {
+                Vector3 center = new Vector3(position.x, ground + 0.08f, position.z);
+                for (int i = 0; i < 64; i++)
+                {
+                    float angle = i * Mathf.PI * 2.0f / 64.0f;
+                    m_warningLine.SetPosition(i, center + new Vector3(
+                        Mathf.Cos(angle) * m_attackRadius,
+                        0.0f,
+                        Mathf.Sin(angle) * m_attackRadius));
+                }
+            }
         }
 
         float GetGroundY(Vector3 position)
@@ -699,8 +754,12 @@ namespace Yurube
         {
             if (m_warning != null) Destroy(m_warning);
             if (m_warningMaterial != null) Destroy(m_warningMaterial);
+            if (m_warningLine != null) Destroy(m_warningLine.gameObject);
+            if (m_warningLineMaterial != null) Destroy(m_warningLineMaterial);
             m_warning = null;
             m_warningMaterial = null;
+            m_warningLine = null;
+            m_warningLineMaterial = null;
         }
 
         void EndSpecial()
@@ -768,6 +827,8 @@ namespace Yurube
         private void OnDestroy()
         {
             Abort();
+            if (m_hitboxView != null) Destroy(m_hitboxView.gameObject);
+            m_hitboxView = null;
         }
 
         private void OnGUI()
@@ -837,12 +898,12 @@ namespace Yurube
                     if (r > 1.0f) continue;
 
                     float alpha = 0.0f;
-                    if (r < 0.5f) alpha = 0.20f;
+                    if (r < 1.0f) alpha = 0.20f;
                     // 外周のリング(クアッドの外周 = 実際の攻撃半径)
-                    alpha += Mathf.Clamp01(1.0f - Mathf.Abs(r - 0.48f) / 0.02f) * 0.95f;
+                    alpha += Mathf.Clamp01(1.0f - Mathf.Abs(r - 0.98f) / 0.02f) * 0.95f;
                     // 中心の十字
-                    if ((Mathf.Abs(d.x) < 2.0f && r < 0.42f) ||
-                        (Mathf.Abs(d.y) < 2.0f && r < 0.42f))
+                    if ((Mathf.Abs(d.x) < 2.0f && r < 0.82f) ||
+                        (Mathf.Abs(d.y) < 2.0f && r < 0.82f))
                         alpha += 0.35f;
 
                     pixels[y * size + x] = new Color32(255, 255, 255,

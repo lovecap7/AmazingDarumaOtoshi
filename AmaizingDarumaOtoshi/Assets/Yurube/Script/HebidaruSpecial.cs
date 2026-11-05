@@ -11,10 +11,18 @@ namespace Yurube
     {
         [Header("必殺技")]
         [SerializeField] string m_specialName = "反転毒沼";
-        [Tooltip("毒沼の半径(m)。表示円と当たり判定の両方に使う")]
-        [SerializeField, Min(0.5f)] float m_swampRadius = 4.5f;
+        [Tooltip("積み木1個のときの毒沼の半径(m)。表示円と当たり判定の両方に使う")]
+        [SerializeField, Min(0.5f)] float m_minSwampRadius = 2.5f;
+        [Tooltip("最大積み木数のときの毒沼の半径(m)")]
+        [SerializeField, Min(0.5f)] float m_maxSwampRadius = 6.5f;
+        [Tooltip("毒沼の半径の全体倍率(表示円・当たり判定の両方に適用)")]
+        [SerializeField, Min(0.1f)] float m_swampRadiusScale = 1.5f;
+        [Tooltip("性能計算に使う最大積み木数")]
+        [SerializeField, Min(1)] int m_maxBlocks = 10;
         [Tooltip("毒沼がフィールドに残る時間(秒)")]
         [SerializeField, Min(0.1f)] float m_swampDuration = 8.0f;
+        [Tooltip("毒沼が消えるときのフェード時間(秒)")]
+        [SerializeField, Min(0.0f)] float m_swampFadeDuration = 0.7f;
         [Tooltip("毒沼に入った敵に付与するデバフの持続時間(秒)")]
         [SerializeField, Min(0.1f)] float m_debuffDuration = 3.0f;
         [Tooltip("デバフ中の移動速度倍率(1で通常、0.5で半分)")]
@@ -22,7 +30,7 @@ namespace Yurube
         [Tooltip("毒沼の当たり判定を確認する間隔(秒)")]
         [SerializeField, Min(0.02f)] float m_tickInterval = 0.15f;
         [Tooltip("毒沼が発動者に追従するか")]
-        [SerializeField] bool m_followCaster = false;
+        [SerializeField] bool m_followCaster = true;
         [Tooltip("毒沼の中心位置オフセット")]
         [SerializeField] Vector3 m_swampOffset = Vector3.zero;
         [Tooltip("発動ログをConsoleに出す(テスト用)")]
@@ -38,6 +46,10 @@ namespace Yurube
         SpecialGauge m_gauge;
         HebiPoisonSwamp m_swamp;
         State m_state = State.Idle;
+        int m_snapshotBlocks;
+        float m_activeSwampRadius;
+
+        public bool IsActive => m_state != State.Idle || m_swamp != null;
 
         private void Awake()
         {
@@ -68,6 +80,14 @@ namespace Yurube
             if (m_character == null || m_gauge == null || !m_gauge.IsFull) return false;
             if (!IsLocalHuman()) return false;
 
+            int blocks = m_character.Stack != null ? m_character.Stack.Count : 0;
+            m_snapshotBlocks = Mathf.Clamp(blocks, 1, m_maxBlocks);
+            float t = m_maxBlocks > 1
+                ? Mathf.InverseLerp(1.0f, m_maxBlocks, m_snapshotBlocks)
+                : 1.0f;
+            m_activeSwampRadius = Mathf.Lerp(m_minSwampRadius, m_maxSwampRadius, t)
+                * Mathf.Max(0.1f, m_swampRadiusScale);
+
             m_gauge.Consume();
             m_state = State.CutIn;
 
@@ -86,13 +106,13 @@ namespace Yurube
 
             var go = new GameObject("HebiPoisonSwamp");
             var swamp = go.AddComponent<HebiPoisonSwamp>();
-            swamp.Initialize(m_character, m_swampRadius, m_swampDuration, m_debuffDuration,
-                m_slowMultiplier, m_tickInterval, m_followCaster, m_swampOffset);
+            swamp.Initialize(m_character, m_activeSwampRadius, m_swampDuration, m_swampFadeDuration,
+                m_debuffDuration, m_slowMultiplier, m_tickInterval, m_followCaster, m_swampOffset);
             swamp.Finished += OnSwampFinished;
             m_swamp = swamp;
 
             if (m_logSpecial)
-                Debug.Log($"[へびだる] 毒沼発生 半径{m_swampRadius:0.0}m / {m_swampDuration:0.0}秒", this);
+                Debug.Log($"[へびだる] 毒沼発生 積み木{m_snapshotBlocks}個 / 半径{m_activeSwampRadius:0.0}m / {m_swampDuration:0.0}秒", this);
         }
 
         void OnSwampFinished()
