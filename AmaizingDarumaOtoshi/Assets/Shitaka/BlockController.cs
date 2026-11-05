@@ -105,6 +105,9 @@ public class BlockController : MonoBehaviour
     HashSet<BlockController> hitImmuneTargets;
     float hitImmuneUntil;
 
+    int reflectCount; // 打ち返された回数(飛行が終わるとリセットされる)
+    public int ReflectCount => reflectCount;
+
 
     private void Awake()
     {
@@ -176,6 +179,28 @@ public class BlockController : MonoBehaviour
         currentSpeed *= speedRatio;
     }
 
+    // 打ち返される(ハンマーなど)。プレイヤー側が呼ぶ。
+    // 偶数回目の打ち返しのとき、攻撃力が1上がる。飛んでいない積み木には何もしない
+    public bool HitBack(Vector3 newDir, float speedRatio = 1.0f)
+    {
+        if (!isFlying) return false; // 打ち出しはLaunchを使う。ここは飛行中の積み木の打ち返し専用
+
+        Vector3 flat = new Vector3(newDir.x, 0.0f, newDir.z);
+        if (flat.sqrMagnitude < 0.0001f) return false; // 向きが決まらないときは、打ち返しとして扱わない
+
+        Bounce(flat, speedRatio);
+        reflectCount++;
+
+        if (reflectCount % 2 == 0)
+        {
+            info.AddAttackBonus(1);
+        }
+
+        // テスト用：確認できたら削除してよい
+        Debug.Log($"[HitBack] {reflectCount}回目 攻撃力 {info.AttackPower}", this);
+        return true;
+    }
+
     private void FixedUpdate()
     {
         // 更新の最初で状態を確定させる
@@ -228,7 +253,12 @@ public class BlockController : MonoBehaviour
         v.x = 0.0f;
         v.z = 0.0f;
         rb.linearVelocity = v;
-        OnFlightEnded?.Invoke(); 
+
+        // 打ち返しの回数と、攻撃力の上乗せ分をリセットする
+        reflectCount = 0;
+        info.ResetAttackBonus();
+
+        OnFlightEnded?.Invoke();
     }
 
     private void OnCollisionEnter(Collision collision)

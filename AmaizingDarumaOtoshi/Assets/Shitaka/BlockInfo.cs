@@ -1,8 +1,7 @@
-using NUnit.Framework;
 using System;
 using UnityEngine;
 
-public class BlockInfo: MonoBehaviour
+public class BlockInfo : MonoBehaviour
 {
     [SerializeField] BlockColor color;
     public BlockColor Color => color;
@@ -18,6 +17,21 @@ public class BlockInfo: MonoBehaviour
         OnColorChanged?.Invoke(color);
     }
 
-    [SerializeField] int attackPower = 1;
-    public int AttackPower => attackPower;
+    [SerializeField] int attackPower = 1; // 基本の攻撃力
+    int attackBonus;                      // 打ち返しなどで一時的に上乗せされる分(飛行が終わるとリセットされる)
+
+    // 実際に使われる攻撃力(基本+上乗せ)
+    public int AttackPower => attackPower + attackBonus;
+
+    // 攻撃力を上乗せする
+    public void AddAttackBonus(int amount)
+    {
+        attackBonus += amount;
+    }
+
+    // 上乗せ分を元に戻す
+    public void ResetAttackBonus()
+    {
+        attackBonus = 0;
+    }
 }
