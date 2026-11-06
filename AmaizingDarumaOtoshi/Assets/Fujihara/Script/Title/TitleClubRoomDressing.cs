@@ -25,6 +25,8 @@ public class TitleClubRoomDressing : MonoBehaviour
     [SerializeField] string boardTitle = "練習メニュー";
     [SerializeField] string[] boardNotes = { "素振り 1000回", "積み上げ 100段", "うち返し 500本", "走り込み！！" };
     [SerializeField] string boardGoal = "目指せ全国！";
+    [Tooltip("ホワイトボードに赤丸のなぐり書き（Drawn）を描く")]
+    [SerializeField] bool drawBoardCircle = false;
 
     [Header("配置")]
     [Tooltip("部屋全体のずれ。だるま落としの演出（原点）が作業台の上に来るよう、部屋を下（台の高さ）と左へずらす")]
@@ -315,6 +317,7 @@ public class TitleClubRoomDressing : MonoBehaviour
             Write(boardGoal, new Vector3(center.x + 3.2f, center.y - 2.4f, z), new Vector2(5.2f, 1.2f), 9f, new Color(0.85f, 0.1f, 0.1f), 6f);
         }
         // 赤丸と「！」のなぐり書き
+        if (!drawBoardCircle) return;
         var red = TitleDressingKit.Unlit(new Color(0.85f, 0.12f, 0.1f));
         Circle(new Vector3(center.x + 3.4f, center.y + 1.6f, z), 1.1f, red);
     }

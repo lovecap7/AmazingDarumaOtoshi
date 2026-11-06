@@ -335,7 +335,9 @@ public class MatchSelect : MonoBehaviour
     }
 
     // いま見せている画面（0 = モード, 1 = ルール, 2 = キャラ, 3 = ステージ）
-    int Screen() => phase == Phase.Mode ? 0 : phase == Phase.Rule ? 1 : phase == Phase.Character ? 2 : 3;
+    // 画面を去るところ（Leaving）は、去る前の画面のまま
+    int leavingScreen = 3;
+    int Screen() => phase == Phase.Leaving ? leavingScreen : phase == Phase.Mode ? 0 : phase == Phase.Rule ? 1 : phase == Phase.Character ? 2 : 3;
 
     // 画面をすべらせずに、いまの画面へ一気に切り替える
     void SnapScreens()
@@ -356,8 +358,8 @@ public class MatchSelect : MonoBehaviour
         if (phaseFrame != Time.frameCount)
         {
             int n = modeCards.Length;
-            if (MenuInput.Left()) { modeIndex = (modeIndex + n - 1) % n; MenuSounds.Cursor(); }
-            else if (MenuInput.Right()) { modeIndex = (modeIndex + 1) % n; MenuSounds.Cursor(); }
+            if (MenuInput.LeftRepeat()) { modeIndex = (modeIndex + n - 1) % n; MenuSounds.Cursor(); }
+            else if (MenuInput.RightRepeat()) { modeIndex = (modeIndex + 1) % n; MenuSounds.Cursor(); }
             else if (MenuInput.Submit() || MenuInput.Start())
             {
                 MenuSounds.Decide();
@@ -403,8 +405,8 @@ public class MatchSelect : MonoBehaviour
         var rules = MatchSetup.Rules;
         if (phaseFrame != Time.frameCount)
         {
-            if (MenuInput.Up()) { ruleIndex = NextRuleRow(-1); MenuSounds.Cursor(); }
-            else if (MenuInput.Down()) { ruleIndex = NextRuleRow(1); MenuSounds.Cursor(); }
+            if (MenuInput.UpRepeat()) { ruleIndex = NextRuleRow(-1); MenuSounds.Cursor(); }
+            else if (MenuInput.DownRepeat()) { ruleIndex = NextRuleRow(1); MenuSounds.Cursor(); }
             else if (MenuInput.Start()) { MenuSounds.Decide(); GoToCharacterSelect(); return; }
             else if (MenuInput.Cancel()) { MenuSounds.Cancel(); GoToModeSelect(); return; }
             else if (MenuInput.Submit())
@@ -414,11 +416,11 @@ public class MatchSelect : MonoBehaviour
                 ruleIndex = NextRuleRow(1);
                 MenuSounds.Cursor();
             }
-            else if (MenuInput.Left() || MenuInput.Right())
+            else if (MenuInput.LeftRepeat() || MenuInput.RightRepeat())
             {
                 MenuSounds.Cursor();
-                // ←→：値を切り替える
-                int dir = MenuInput.Left() ? -1 : 1;
+                // ←→：値を切り替える（長押しでくり返す）
+                int dir = MenuInput.LeftRepeat() ? -1 : 1;
                 var row = ruleRows[ruleIndex];
                 switch (row.kind)
                 {
@@ -814,6 +816,8 @@ public class MatchSelect : MonoBehaviour
 
     void Back()
     {
+        // 戻るときは今の画面のまま暗転させる（Leaving のまま Screen() がステージ画面を返して、一瞬すべって見えないように）
+        leavingScreen = Screen();
         phase = Phase.Leaving;
         Fader.Load(backSceneName);
     }
