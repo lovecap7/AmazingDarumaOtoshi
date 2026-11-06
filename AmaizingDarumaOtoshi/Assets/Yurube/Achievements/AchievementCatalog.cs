@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Yurube.Achievements
 {
-    // 実績の一覧（最初に入れる20個）。
+    // 実績の一覧（最初に入れる21個）。
     // 実績を増やすときは CreateDefaults() に1行足すだけでよい。判定は AchievementMetric を見て
     // AchievementManager が共通で行うので、ほかのコードを直す必要はない。
     // ID はセーブに残るので、一度出したら変えない（変えると解除済みが消える）。
@@ -163,6 +163,13 @@ namespace Yurube.Achievements
                     "全キャラクターを一度ずつ使用。だるまの輪、完成。",
                     AchievementCategory.Challenge, "全キャラクターを最低1回ずつ使用する", AchievementMetric.CharacterUsedDistinct, 1,
                     AchievementRarity.Gold),
+
+                // ---- メタ実績（ほかのすべての実績を解除すると解除される） ----
+                // 目標の数は AchievementManager が「自分以外の実績の数」から自動で決める
+                new AchievementDefinition("all_non_platinum", "やりこみの達人",
+                    "ほかの実績はぜんぶ制覇。最後に残ったのは、この輝き。",
+                    AchievementCategory.Challenge, "「やりこみの達人」以外のすべての実績を解除する", AchievementMetric.AllOtherUnlocked, 1,
+                    AchievementRarity.Platinum),
             };
             return list;
         }

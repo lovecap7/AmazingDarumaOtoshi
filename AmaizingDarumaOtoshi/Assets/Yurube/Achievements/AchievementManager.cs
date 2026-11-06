@@ -23,6 +23,8 @@ namespace Yurube.Achievements
         static readonly HashSet<string> s_usedCharacters = new HashSet<string>();
         static string s_storageKey = NormalStorageKey;
         static bool s_ready;
+        // メタ実績の数え直し中か（解除→数え直し→解除…の繰り返しを防ぐ）
+        static bool s_refreshingMeta;
 
         // 実績を解除した（通知・メニューの更新用）
         public static event Action<AchievementData> Unlocked;
@@ -76,6 +78,7 @@ namespace Yurube.Achievements
             s_usedCharacters.Clear();
             s_storageKey = NormalStorageKey;
             s_ready = false;
+            s_refreshingMeta = false;
             Unlocked = null;
             Changed = null;
         }
@@ -214,7 +217,42 @@ namespace Yurube.Achievements
             {
                 data.Progress = Mathf.Min(CountOf(data.Definition.metric), Mathf.Max(1, data.Target));
             }
+            RefreshMetaAchievements();
             Changed?.Invoke();
+        }
+
+        // 「ほかのすべてを解除」のような、ほかの実績の状態から決まる実績を数え直す。
+        // 解除済みの場合は進捗を満タンで見せる（条件を満たして解除されたため）
+        static void RefreshMetaAchievements()
+        {
+            if (s_refreshingMeta) return;
+            s_refreshingMeta = true;
+            try
+            {
+                // 自分（同じ条件の実績）以外の、すべての実績の数
+                int target = 0, count = 0;
+                foreach (var data in s_all)
+                {
+                    if (data.Definition.metric == AchievementMetric.AllOtherUnlocked) continue;
+                    target++;
+                    if (data.IsUnlocked) count++;
+                }
+
+                s_counters[AchievementMetric.AllOtherUnlocked] = count;
+                foreach (var data in s_all)
+                {
+                    if (data.Definition.metric != AchievementMetric.AllOtherUnlocked) continue;
+                    data.Definition.target = Mathf.Max(1, target);
+                    data.Progress = data.IsUnlocked
+                        ? data.Definition.target
+                        : Mathf.Min(count, data.Definition.target);
+                    if (!data.IsUnlocked && target > 0 && count >= target) Unlock(data);
+                }
+            }
+            finally
+            {
+                s_refreshingMeta = false;
+            }
         }
 
         static void Unlock(AchievementData data)
@@ -230,6 +268,8 @@ namespace Yurube.Achievements
             {
                 Debug.Log("[Achievement] 全実績解除。報酬キャラクター「" + AchievementRewards.RewardCharacterName + "」が選べるようになりました");
             }
+            // ほかの実績の解除で条件を満たす実績（「ほかのすべてを解除」など）を見直す
+            RefreshMetaAchievements();
         }
 
         //========================================

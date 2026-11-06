@@ -29,6 +29,7 @@ namespace Yurube.Achievements
         WinWithLowStack,      // 積み木1個以下での勝利（累計）
         SpecialActivated,     // 必殺技を発動した回数（累計）
         CharacterUsedDistinct,// 使ったことのあるキャラクターの種類数
+        AllOtherUnlocked, // ほかのすべての実績を解除した数（メタ実績用。目標は自動で決まる）
     }
 
     // 実績1つ分の「決まった内容」。進捗や解除状態は AchievementData が持つ。
