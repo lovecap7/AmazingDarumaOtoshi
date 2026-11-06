@@ -28,6 +28,8 @@ namespace Yurube
         [SerializeField] float m_rainbowSpeed = 0.5f;
         [Tooltip("発光の強さ")]
         [SerializeField] float m_emissionIntensity = 1.5f;
+        [Tooltip("画面下部に表示する必殺技名")]
+        [SerializeField] string m_cutInName = "黄金化";
 
         DarumaCharacter m_character;
         SpecialGauge m_gauge;
@@ -134,6 +136,17 @@ namespace Yurube
             LastDuration = duration;
 
             m_gauge.Consume();
+
+            // 積み木を吸収するカットインを先に再生する。
+            // 実ゲームの積み木は消費せず、見た目だけを複製する。
+            var cutInBlocks = new List<TumikiBlock>(Mathf.Max(0, blocks));
+            for (int i = 0; i < blocks; i++)
+            {
+                var stackBlock = m_character.Stack.Get(i);
+                if (stackBlock != null) cutInBlocks.Add(stackBlock);
+            }
+            KidaruCutIn.Show(m_cutInName, m_character, cutInBlocks);
+
             m_character.SetInvincible(duration);
             m_activeUntil = Time.time + duration;
             if (m_wheel != null) m_wheel.Begin();

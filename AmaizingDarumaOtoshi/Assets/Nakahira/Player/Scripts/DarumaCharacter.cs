@@ -137,6 +137,8 @@ namespace Nakahira
         public bool IsGrounded => m_isGrounded;
         // 必殺技中など、移動だけを受け付ける状態
         public bool MovementOnly { get; set; }
+        // 方向入力での旋回は許可しつつ、並進移動だけを止める(だるきんぐの照準詠唱など)
+        public bool MovementLocked { get; set; }
         // 毒などのデバフ: 移動入力の左右前後を反転する(攻撃・カメラ操作は反転しない)
         public bool MovementInverted { get; set; }
         // 毒などのデバフ: 水平移動速度の倍率(1で通常)
@@ -318,7 +320,9 @@ namespace Nakahira
         private void UpdateMove(ref Vector3 v, float dt)
         {
             Vector3 moveDir = m_moveDirection;
-            Vector3 horizontal = moveDir * MoveSpeed * Mathf.Max(0.0f, MoveSpeedMultiplier);
+            Vector3 horizontal = MovementLocked
+                ? Vector3.zero
+                : moveDir * MoveSpeed * Mathf.Max(0.0f, MoveSpeedMultiplier);
             v.x = horizontal.x;
             v.z = horizontal.z;
 
