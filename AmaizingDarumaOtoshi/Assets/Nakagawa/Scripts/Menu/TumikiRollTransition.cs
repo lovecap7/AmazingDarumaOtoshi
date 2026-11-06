@@ -45,11 +45,12 @@ public class TumikiRollTransition : ISceneTransition
     public float thickness = 0.5f;           // 厚み（直径に対する割合。ゲームの積み木と同じ 0.5）
     public float yaw = 25f;                  // 横の厚みが見えるように回す角度
     public float spacingX = 0.5f;            // 横の間隔（直径に対する割合）
-    // 転がる速さ（画面の縦幅 / 秒）。入ってくるときと抜けるときは速く、全面が埋まっている間は遅く
+    // 転がる速さ（画面の縦幅 / 秒）。入ってくるときと抜けるときは速く、全面が埋まっている間は止める。
+    // 埋まっている間（シーンの読み込み・有効化・GC が走る間）に動いていると、その重さがカクつきとして見えるため。
     public float speedFast = 2.5f;
-    public float speedSlow = 0.5f;
+    public float speedSlow = 0f;
     public float speedEase = 0.4f;           // 速さを切り替える時間（秒。easeInCubic）
-    public float minHold = 0.35f;            // 埋まってから抜け始めるまでの最短の時間（遅くなったのが見えるように）
+    public float minHold = 0.35f;            // 埋まって止まってから抜け始めるまでの最短の時間
     // 段の色（上から）。段の数はこの色の数で、画面の縦幅をちょうど等分して並べる
     public Color[] rowColors =
     {
@@ -145,7 +146,13 @@ public class TumikiRollTransition : ISceneTransition
 
         material = new Material(Shader.Find("Universal Render Pipeline/Particles/Unlit"));
         material.SetFloat("_Cull", 0f);   // 両面
-        stage.SetActive(false);
+
+        // ステージは起動中ずっと有効のままにしておく（毎回 SetActive すると、その分がカクつきになる）。
+        // カメラは普段は切っておき、遷移のときだけ有効にする。円柱と RenderTexture も、
+        // 起動時の黒画面の間にここで作っておく。
+        stage.SetActive(true);
+        cam.enabled = false;
+        Layout();
     }
 
     public bool Plays(string fromScene, string toScene)
@@ -160,8 +167,8 @@ public class TumikiRollTransition : ISceneTransition
     {
         dir = pendingDir;   // 向きは転がし始めるときに決める（転がっている途中で Plays を聞かれても変わらない）
         Layout();
-        stage.SetActive(true);
         image.enabled = true;
+        cam.enabled = true;
         clock = 0f;
         currentSpeed = speedFast;
         easeFrom = easeTo = speedFast;   // 入ってくるときは速く
@@ -169,17 +176,23 @@ public class TumikiRollTransition : ISceneTransition
         state = State.Covering;
         Tick(0f);
         while (state == State.Covering) yield return null;
+
+        // 覆いきったあと、円柱が止まるまで待つ。
+        // 止まった状態なら、この後の読み込み・シーン有効化・GC が重くても画面が変わらず、カクつきが見えない。
+        float stopAt = clock + speedEase + 0.02f;
+        while (clock < stopAt) yield return null;
+        holdStart = clock;
     }
 
     public IEnumerator Reveal()
     {
-        // 遅くなったのが見えるまでは埋めたまま待ってから、速くして抜ける
+        // 止まっているのを見せる時間を確保してから、速くして抜ける
         while (state == State.Holding && clock - holdStart < minHold) yield return null;
         StartEase(speedFast);
         state = State.Revealing;
         while (state == State.Revealing) yield return null;
         image.enabled = false;
-        if (stage != null) stage.SetActive(false);
+        cam.enabled = false;
     }
 
     // ---------------- 並べる ----------------

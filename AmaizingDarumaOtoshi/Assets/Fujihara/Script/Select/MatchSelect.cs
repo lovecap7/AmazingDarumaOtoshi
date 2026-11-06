@@ -300,10 +300,16 @@ public class MatchSelect : MonoBehaviour
         float dt = Time.unscaledDeltaTime;
         if (fade.color.a > 0f) fade.color = new Color(1f, 1f, 1f, Mathf.MoveTowards(fade.color.a, 0f, dt * 2f));
 
-        if (phase == Phase.Mode) UpdateModeSelect(dt);
-        else if (phase == Phase.Rule) UpdateRuleSelect(dt);
-        else if (phase == Phase.Character) UpdateCharacterSelect(dt);
-        else if (phase == Phase.Stage) UpdateStageSelect(dt);
+        // シーン遷移の演出が終わるまでは操作を受け付けない。
+        // 遷移中に B を受けると Back() が Phase.Leaving になったあと、Fader が忙しくて Fader.Load が
+        // 無視され、シーンが切り替わらないまま Leaving で固まって操作できなくなるため。
+        if (!Fader.IsBusy)
+        {
+            if (phase == Phase.Mode) UpdateModeSelect(dt);
+            else if (phase == Phase.Rule) UpdateRuleSelect(dt);
+            else if (phase == Phase.Character) UpdateCharacterSelect(dt);
+            else if (phase == Phase.Stage) UpdateStageSelect(dt);
+        }
 
         // 画面の切り替え（モード → ルール → キャラ → ステージ）。左から順に並んでいて、横にすべって切り替わる
         float k = 1f - Mathf.Exp(-10f * dt);
@@ -832,6 +838,8 @@ public class MatchSelect : MonoBehaviour
 
     void Back()
     {
+        // 遷移中は Fader.Load が無視される。Leaving にしてから無視されると、切り替わらないまま固まるので先に抜ける
+        if (Fader.IsBusy) return;
         // 戻るときは今の画面のまま暗転させる（Leaving のまま Screen() がステージ画面を返して、一瞬すべって見えないように）
         leavingScreen = Screen();
         phase = Phase.Leaving;
@@ -1168,7 +1176,9 @@ public class MatchSelect : MonoBehaviour
         foreach (var p in slots)
         {
             if (p == null) continue;
-            var character = p.randomCharacter ? roster.characters[Random.Range(0, roster.characters.Count)] : p.character;
+            var character = p.randomCharacter
+                ? Yurube.Achievements.AchievementRewards.RandomAvailable(roster.characters)
+                : p.character;
             entries.Add(new MatchSetup.Entry
             {
                 playerIndex = p.index,
@@ -1525,12 +1535,14 @@ public class MatchSelect : MonoBehaviour
         ruleSummary.rectTransform.pivot = new Vector2(1f, 1f);
         ToyKit.Anchor(ruleSummary.rectTransform, new Vector2(1f, 1f), new Vector2(-50f, -60f), new Vector2(900f, 50f));
 
-        int count = roster.characters.Count + 1;   // 最後にランダム
+        // 報酬キャラクター（だるきんぐ）は、実績を全部解除するまで一覧に出さない
+        var characters = Yurube.Achievements.AchievementRewards.AvailableCharacters(roster.characters);
+        int count = characters.Count + 1;   // 最後にランダム
         var grid = GridLayout(count, 8, new Vector2(1760f, 430f), new Vector2(205f, 205f), 16f, 350f);
         for (int i = 0; i < count; i++)
         {
-            bool random = i == roster.characters.Count;
-            var c = random ? null : roster.characters[i];
+            bool random = i == characters.Count;
+            var c = random ? null : characters[i];
             var tile = MakeTile(charRoot, grid[i].pos, grid[i].size, random ? RandomColor : c.color,
                                 random ? null : c.portrait, random ? texts.randomCharacter : c.displayName, random ? texts.randomLetter : Initial(c.displayName));
             tile.character = c;

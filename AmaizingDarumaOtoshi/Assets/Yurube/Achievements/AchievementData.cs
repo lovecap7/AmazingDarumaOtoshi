@@ -23,10 +23,17 @@ namespace Yurube.Achievements
 
         public string Id => Definition.id;
         public string Name => Definition.name;
-        public string Description => Definition.description;
+        // ひとこと（ポエム）。メニューの「じっせき」だけで見せる
+        public string Poem => Definition.poem;
+        // 解除条件。ゲーム中の通知にも出す
         public string ConditionText => Definition.condition;
         public AchievementCategory Category => Definition.category;
         public string CategoryName => Definition.CategoryName;
+        // レアリティ（表示だけに使う）
+        public AchievementRarity Rarity => Definition.rarity;
+        public string RarityName => AchievementRarityInfo.NameOf(Definition.rarity);
+        public string RarityEnglishName => AchievementRarityInfo.EnglishNameOf(Definition.rarity);
+        public Color RarityColor => AchievementRarityInfo.ColorOf(Definition.rarity);
         public Sprite Icon => Definition.icon;
         // 解除に必要な数（CharacterUsedDistinct は全キャラクター数に置き換わることがある）
         public int Target => Definition.target;

@@ -4,6 +4,7 @@ namespace Yurube.Achievements
 {
     // メニューの「じっせき」（Nakagawa さんの AchievementBook）に、このシステムの実績を並べる係。
     // AchievementBook は static な Entries を開いたときに読むだけなので、起動時と変化したときにここで入れ直す。
+    // メニューでは「ポエム（ひとこと）」と「解除条件」の両方を見せる（ゲーム中の通知は解除条件だけ）。
     // メニュー側のコードは変更していない。
     public static class AchievementMenuBridge
     {
@@ -35,7 +36,13 @@ namespace Yurube.Achievements
             entries.Clear();
             foreach (var data in AchievementManager.All)
             {
-                entries.Add(new AchievementBook.Entry(data.Name, data.Description, data.IsUnlocked));
+                // 1行目にポエム、2行目に解除条件（AchievementBook は1つの説明欄しか持たないため）。
+                // レアリティは文字ではなく、行の帯と下地の色で示す
+                string text = data.Poem + "\n条件：" + data.ConditionText;
+                var entry = new AchievementBook.Entry(data.Name, text, data.IsUnlocked);
+                entry.rarityColor = data.RarityColor;
+                entry.raritySprite = AchievementVisuals.Bar(data.RarityColor);
+                entries.Add(entry);
             }
         }
     }

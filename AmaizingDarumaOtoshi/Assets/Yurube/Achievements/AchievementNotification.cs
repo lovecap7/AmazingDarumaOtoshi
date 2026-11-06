@@ -93,10 +93,11 @@ namespace Yurube.Achievements
         Coroutine m_routine;
 
         RectTransform m_panel;
+        Image m_panelImage;
         CanvasGroup m_group;
         Image m_icon;
         Image m_accent;
-        TextMeshProUGUI m_iconText, m_caption, m_name, m_description;
+        TextMeshProUGUI m_iconText, m_caption, m_name, m_condition;
 
         void Push(AchievementData data)
         {
@@ -122,6 +123,7 @@ namespace Yurube.Achievements
 
             // パネル（画面の右上。右の外から滑り込む）
             m_panel = ToyKit.UIRounded("Panel", canvas, new Color(ToyKit.Horizon.r, ToyKit.Horizon.g, ToyKit.Horizon.b, 0.97f), 34f);
+            m_panelImage = m_panel.GetComponent<Image>();
             m_panel.anchorMin = m_panel.anchorMax = m_panel.pivot = new Vector2(1f, 1f);
             m_panel.anchoredPosition = new Vector2(HiddenX, ShowY);
             m_panel.sizeDelta = new Vector2(PanelWidth, PanelHeight);
@@ -158,20 +160,31 @@ namespace Yurube.Achievements
             m_name.alignment = TextAlignmentOptions.Left;
             ToyKit.Anchor(m_name.rectTransform, new Vector2(0f, 1f), new Vector2(386f, -44f), new Vector2(480f, 46f));
 
-            m_description = ToyKit.UIText("Description", m_panel, font, "", 24f, new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.85f));
-            m_description.alignment = TextAlignmentOptions.Left;
-            m_description.textWrappingMode = TextWrappingModes.Normal;
-            m_description.enableAutoSizing = true;
-            m_description.fontSizeMin = 14f;
-            m_description.fontSizeMax = 24f;
-            ToyKit.Anchor(m_description.rectTransform, new Vector2(0f, 1f), new Vector2(386f, -95f), new Vector2(480f, 48f));
+            m_condition = ToyKit.UIText("Description", m_panel, font, "", 24f, new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.85f));
+            m_condition.alignment = TextAlignmentOptions.Left;
+            m_condition.textWrappingMode = TextWrappingModes.Normal;
+            m_condition.enableAutoSizing = true;
+            m_condition.fontSizeMin = 14f;
+            m_condition.fontSizeMax = 24f;
+            ToyKit.Anchor(m_condition.rectTransform, new Vector2(0f, 1f), new Vector2(386f, -95f), new Vector2(480f, 48f));
         }
 
         void Fill(AchievementData data)
         {
             var settings = AchievementSettings.Instance;
-            Color color = ColorFor(data.Category);
-            m_accent.color = settings != null ? settings.AccentColor : color;
+
+            // レアリティは文字ではなく色と光沢で示す（パネル・左の帯・アイコンが金属風になる）
+            if (m_panelImage != null)
+            {
+                Color panelBase = new Color(ToyKit.Horizon.r, ToyKit.Horizon.g, ToyKit.Horizon.b, 0.97f);
+                m_panelImage.sprite = AchievementVisuals.Plate(Color.Lerp(panelBase, data.RarityColor, 0.5f));
+                m_panelImage.color = Color.white;
+            }
+            m_accent.sprite = AchievementVisuals.Bar(data.RarityColor);
+            m_accent.type = Image.Type.Simple;
+            m_accent.color = Color.white;
+            m_caption.text = "実績解除！";
+            m_caption.color = ToyKit.Ink;
 
             Sprite sprite = data.Icon != null ? data.Icon : (settings != null ? settings.DefaultIcon : null);
             if (sprite != null)
@@ -184,21 +197,16 @@ namespace Yurube.Achievements
             }
             else
             {
-                m_icon.sprite = ToyKit.RoundedSprite;
+                m_icon.sprite = AchievementVisuals.Plate(data.RarityColor);
                 m_icon.type = Image.Type.Sliced;
                 m_icon.preserveAspect = false;
-                m_icon.color = color;
+                m_icon.color = Color.white;
                 m_iconText.text = data.CategoryName;
             }
 
             m_name.text = data.Name;
-            m_description.text = data.Description;
-        }
-
-        static Color ColorFor(AchievementCategory category)
-        {
-            int index = (int)category % ToyKit.Palette.Length;
-            return ToyKit.Palette[index];
+            // ゲーム中の通知は解除条件だけ（ポエムはメニューの「じっせき」で見せる）
+            m_condition.text = data.ConditionText;
         }
 
         void PlaySound()

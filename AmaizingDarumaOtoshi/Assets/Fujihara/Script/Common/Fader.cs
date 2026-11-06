@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
@@ -33,9 +33,6 @@ public class Fader : MonoBehaviour
     RectTransform root;
     ISceneTransition built;   // root の下に組み立て済みの演出
     bool busy;
-
-    // 遷移を始めた時点で次のシーンを裏で読み込み始めるか（false で前の形：隠れてから読み込む）
-    public static bool PreloadScenes = true;
 
     // フェード中（シーン遷移の途中・遷移後に明るくなるまで）か。開始演出などを明るくなってから始めるのに使う
     public static bool IsBusy => instance != null && instance.busy;
@@ -148,18 +145,10 @@ public class Fader : MonoBehaviour
         var t = Current();
         if (t != null && !t.Plays(SceneManager.GetActiveScene().name, sceneName)) t = null;   // この組み合わせは黒いフェード
 
-        // 読み込みを先に始める：隠している間に裏で読み込んでおき、隠れきったら有効にするだけにする
-        // （隠れてから読み込み始めると、読み込みと有効化の重さがまとめて来てカクつくため）
-        // 隠している間は今の画面の動きを邪魔しないよう、1フレームに使う読み込み時間を少なめにする
         var priorityWas = Application.backgroundLoadingPriority;
-        AsyncOperation operation = null;
-        if (PreloadScenes)
-        {
-            Application.backgroundLoadingPriority = ThreadPriority.BelowNormal;
-            operation = LoadSceneAsync(sceneName);
-            if (operation != null) operation.allowSceneActivation = false;
-        }
 
+        // まず画面を隠しきる（積み木は、覆いきって止まるまで待つ）。
+        // そのあとで読み込みを始めるので、読み込み中の重さは「止まった画面」の裏に隠れる。
         if (t != null)
         {
             BlackVisible(false);
@@ -169,12 +158,26 @@ public class Fader : MonoBehaviour
         }
         else yield return Fade(0f, 1f, FadeOutTime);   // 暗くする
 
-        // 隠れたので、残りの読み込みは急いで終わらせて有効にする
+        // 隠れて止まってから、読み込みと有効化をまとめて行う
         Application.backgroundLoadingPriority = ThreadPriority.High;
-        if (operation == null) operation = LoadSceneAsync(sceneName);
-        else operation.allowSceneActivation = true;
+        var operation = LoadSceneAsync(sceneName);
         while (operation != null && !operation.isDone) yield return null;
         Application.backgroundLoadingPriority = priorityWas;
+
+        // シーンが有効になった直後のフレームは、新しいシーンの Start（UI・カメラの組み立てなど）で重くなりやすい。
+        // 明け始める前に、まだ画面を隠したまま数フレーム待って、フェードインの1フレーム目にカクつきが出ないようにする。
+        yield return null;
+        yield return null;
+
+        // シーンを切り替えると、エンジンが未使用アセットの解放（Resources.UnloadUnusedAssets）を自動で走らせる。
+        // これがメインスレッドで数百 ms かかることがあり、しかも走るタイミングはエンジン任せ。
+        // フェードイン中に当たると一瞬カクつくので、画面を隠している間に自分で走らせて終わりを待つ。
+        var unload = Resources.UnloadUnusedAssets();
+        while (unload != null && !unload.isDone) yield return null;
+        // 新しいシーンの Start で増えたゴミも、隠れている間に回収しておく（明け始めの GC を避ける）
+        System.GC.Collect();
+        yield return null;
+        yield return null;
 
         if (t != null)
         {

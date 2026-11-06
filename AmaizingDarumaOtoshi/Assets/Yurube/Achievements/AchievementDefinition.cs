@@ -42,12 +42,12 @@ namespace Yurube.Achievements
         [Tooltip("プレイヤーに見せる実績名")]
         public string name;
 
-        [Tooltip("解除したときの説明文")]
-        [TextArea(1, 3)] public string description;
+        [Tooltip("解除したときのひとこと（ポエム）。メニューの「じっせき」でだけ見せる。ゲーム中の通知には出さない")]
+        [TextArea(1, 3)] public string poem;
 
         public AchievementCategory category;
 
-        [Tooltip("一覧に出す解除条件の文")]
+        [Tooltip("一覧に出す解除条件の文。ゲーム中の通知にもこれを出す")]
         [TextArea(1, 3)] public string condition;
 
         [Tooltip("解除条件の種類")]
@@ -56,21 +56,26 @@ namespace Yurube.Achievements
         [Tooltip("解除に必要な数。CharacterUsedDistinct は 0 にすると全キャラクター数になる")]
         [Min(1)] public int target = 1;
 
+        [Tooltip("レアリティ（銅・銀・金・プラチナ）。表示だけに使う")]
+        public AchievementRarity rarity = AchievementRarity.Bronze;
+
         [Tooltip("通知・一覧に出すアイコン（未設定ならカテゴリーの色で代用）")]
         public Sprite icon;
 
         public AchievementDefinition() { }
 
-        public AchievementDefinition(string id, string name, string description, AchievementCategory category,
-                                     string condition, AchievementMetric metric, int target)
+        public AchievementDefinition(string id, string name, string poem, AchievementCategory category,
+                                     string condition, AchievementMetric metric, int target,
+                                     AchievementRarity rarity = AchievementRarity.Bronze)
         {
             this.id = id;
             this.name = name;
-            this.description = description;
+            this.poem = poem;
             this.category = category;
             this.condition = condition;
             this.metric = metric;
             this.target = target;
+            this.rarity = rarity;
         }
 
         public string CategoryName => AchievementCatalog.CategoryName(category);

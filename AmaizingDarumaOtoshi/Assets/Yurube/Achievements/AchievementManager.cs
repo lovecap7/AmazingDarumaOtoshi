@@ -49,6 +49,21 @@ namespace Yurube.Achievements
             }
         }
 
+        // すべての実績を解除したか（報酬キャラクター「だるきんぐ」の解放条件）
+        public static bool AllUnlocked
+        {
+            get
+            {
+                var all = All;
+                if (all.Count == 0) return false;
+                for (int i = 0; i < all.Count; i++)
+                {
+                    if (!all[i].IsUnlocked) return false;
+                }
+                return true;
+            }
+        }
+
         //========================================
         // 初期化・保存先
         //========================================
@@ -211,6 +226,10 @@ namespace Yurube.Achievements
             Debug.Log("[Achievement] 解除: " + data.Id + " " + data.Name);
             Unlocked?.Invoke(data);
             AchievementNotification.Enqueue(data);
+            if (AllUnlocked)
+            {
+                Debug.Log("[Achievement] 全実績解除。報酬キャラクター「" + AchievementRewards.RewardCharacterName + "」が選べるようになりました");
+            }
         }
 
         //========================================
@@ -438,6 +457,45 @@ namespace Yurube.Achievements
                       && (blob.characters == null || blob.characters.Count == 0);
             if (empty) PlayerPrefs.DeleteKey(key);
             else PlayerPrefs.SetString(key, JsonUtility.ToJson(blob));
+            PlayerPrefs.Save();
+            Changed?.Invoke();
+        }
+
+        // 保存先を指定して、その保存データを全解除にする（報酬キャラの解放を試す用）。
+        // いま使っている保存先なら、ふつうの解除処理（通知あり）で全解除する。
+        public static void DebugUnlockAllStorage(string key)
+        {
+            Initialize();
+            if (string.IsNullOrEmpty(key)) return;
+            if (key == s_storageKey)
+            {
+                DebugUnlockAll();
+                return;
+            }
+
+            // 別の保存先：保存データを全解除の内容で作り直す
+            var blob = new SaveBlob();
+            var counters = new Dictionary<AchievementMetric, int>();
+            var usedCharacters = new List<string>();
+            foreach (var data in s_all)
+            {
+                blob.unlocked.Add(data.Id);
+                blob.unlockedAt.Add(DateTime.Now.ToString("o"));
+                int target = Mathf.Max(1, data.Target);
+
+                var metric = data.Definition.metric;
+                counters.TryGetValue(metric, out int current);
+                if (target > current) counters[metric] = target;
+
+                if (metric == AchievementMetric.CharacterUsedDistinct)
+                {
+                    for (int i = usedCharacters.Count; i < target; i++) usedCharacters.Add("debug_" + i);
+                }
+            }
+            foreach (var pair in counters) blob.counters.Add((int)pair.Key + "=" + pair.Value);
+            blob.characters.AddRange(usedCharacters);
+
+            PlayerPrefs.SetString(key, JsonUtility.ToJson(blob));
             PlayerPrefs.Save();
             Changed?.Invoke();
         }

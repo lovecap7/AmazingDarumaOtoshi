@@ -256,6 +256,10 @@ namespace Yurube.Lab
             var visible = VisibleAchievements();
             GUILayout.Label("表示 " + visible.Count + " 件 / 全 " + AchievementManager.All.Count + " 件 ・ 解除 "
                             + AchievementManager.UnlockedCount + " 件", m_small);
+            GUILayout.Label("報酬キャラ「" + AchievementRewards.RewardCharacterName + "」："
+                            + (AchievementRewards.IsRewardUnlocked ? "解放済み" : "未解放")
+                            + "（ラボのデータで " + AchievementManager.UnlockedCount + "/"
+                            + AchievementManager.All.Count + "）", m_small);
             GUILayout.Space(2f);
 
             m_listScroll = GUILayout.BeginScrollView(m_listScroll, false, true);
@@ -294,7 +298,8 @@ namespace Yurube.Lab
                 if (m_category.HasValue && data.Category != m_category.Value) continue;
                 if (search.Length > 0 &&
                     data.Name.IndexOf(search, System.StringComparison.OrdinalIgnoreCase) < 0 &&
-                    data.Description.IndexOf(search, System.StringComparison.OrdinalIgnoreCase) < 0) continue;
+                    data.Poem.IndexOf(search, System.StringComparison.OrdinalIgnoreCase) < 0 &&
+                    data.ConditionText.IndexOf(search, System.StringComparison.OrdinalIgnoreCase) < 0) continue;
                 list.Add(data);
             }
             return list;
@@ -317,8 +322,12 @@ namespace Yurube.Lab
             GUI.Label(stateRect, data.IsUnlocked ? "★" : "☆", m_state);
 
             GUI.Label(new Rect(row.x + 40f, row.y + 5f, row.width - 150f, 22f), data.Name, m_rowName);
-            GUI.Label(new Rect(row.x + 40f, row.y + 27f, row.width - 150f, 18f),
-                      data.CategoryName + " ・ " + (data.IsUnlocked ? "解除済み" : data.ConditionText), m_rowInfo);
+            GUI.Label(new Rect(row.x + 40f, row.y + 27f, row.width - 160f, 18f),
+                      data.CategoryName + " ・ "
+                      + (data.IsUnlocked ? "解除済み" : data.ConditionText), m_rowInfo);
+            // レアリティは文字ではなく色で示す（右端の光沢つきの帯）
+            GUI.DrawTexture(new Rect(row.xMax - 8f, row.y, 8f, row.height),
+                            AchievementVisuals.Gradient(data.RarityColor), ScaleMode.StretchToFill);
             GUI.Label(new Rect(row.xMax - 110f, row.y + 6f, 100f, 18f), data.ProgressText, m_progressText);
 
             if (data.HasProgress)
@@ -367,8 +376,14 @@ namespace Yurube.Lab
             GUILayout.Label("選択中の実績", m_section);
             GUILayout.Label(data.Name, m_title);
             GUILayout.Label("カテゴリー：" + data.CategoryName + "　ID：" + data.Id, m_small);
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("レアリティ：", m_label, GUILayout.Width(84f));
+            Rect swatch = GUILayoutUtility.GetRect(20f, 20f, GUILayout.Width(20f), GUILayout.Height(20f), GUILayout.ExpandWidth(false));
+            GUI.DrawTexture(swatch, AchievementVisuals.Gradient(data.RarityColor), ScaleMode.StretchToFill);
+            GUILayout.Label("（色だけ。ゲーム中もメニューも文字は出さない）", m_small);
+            GUILayout.EndHorizontal();
             GUILayout.Label("解除条件：" + data.ConditionText, m_label);
-            GUILayout.Label(data.Description, m_label);
+            GUILayout.Label("ポエム（メニューの「じっせき」で表示）：" + data.Poem, m_label);
             GUILayout.Space(4f);
 
             if (data.HasProgress)
@@ -661,6 +676,13 @@ namespace Yurube.Lab
             {
                 AchievementManager.DebugClearStorage(AchievementManager.NormalStorageKey);
                 Flash("本編の実績データを全部消しました（ラボのデータはそのまま）");
+            }
+
+            if (GUILayout.Button("本編を全解除（報酬キャラの解放テスト）", m_button))
+            {
+                AchievementManager.DebugUnlockAllStorage(AchievementManager.NormalStorageKey);
+                Flash("本編の実績を全解除しました。セレクト画面で「"
+                      + AchievementRewards.RewardCharacterName + "」が選べるようになります");
             }
 
             GUI.enabled = previousEnabled;
