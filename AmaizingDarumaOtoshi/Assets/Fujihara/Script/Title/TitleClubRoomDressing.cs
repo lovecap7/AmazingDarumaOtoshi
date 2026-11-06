@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
-// 【試作】部室のタイトル。TitleClubRoomScene 専用。
+// 部室のタイトル。TitleScene（もとの TitleClubRoomScene）専用。
 // 汗と泥の運動部ふうの「だるま落とし部」の部室（熱血・GFF 向け）。窓の外は青空と校庭。だるま落としの演出（TitleScreen）はそのまま。
 // TitleScreen が舞台を作ったあとに背景だけを部室に差し替える。
 //  ・汚れ：泥としみと足跡の床、すり傷としみの壁、へこんでさびたロッカー
@@ -33,6 +33,12 @@ public class TitleClubRoomDressing : MonoBehaviour
     [SerializeField] Vector3 roomOffset = new Vector3(-3f, -5f, 0f);
     [Tooltip("部員（頭＋積み木の体）の大きさ。演出のおもちゃの何倍か")]
     [SerializeField] float memberScale = 3.2f;
+    [Tooltip("部員の白い積み木に使うマテリアル。TitleScreen に積み木のモデルが入っているときだけ使う（空なら白い単色）")]
+    [SerializeField] Material memberWhiteBlockMaterial;
+    [Tooltip("素振りの部員の積み木（下・上）。入れるとこちらを優先する（和柄の積み木など）")]
+    [SerializeField] Material[] swingerBlockMaterials;
+    [Tooltip("走り込みの部員の積み木（下・上）。入れるとこちらを優先する（和柄の積み木など）")]
+    [SerializeField] Material[] runnerBlockMaterials;
 
     const float BackZ = 26f, SideX = 26f, Height = 24f;
     const float WinLeft = -11f, WinRight = 23f, WinBottom = 5f, WinTop = 17f;
@@ -551,7 +557,10 @@ public class TitleClubRoomDressing : MonoBehaviour
 
     Member swinger, runner;
 
-    Member CreateMember(Vector3 pos, float yaw, Color bodyA, Color bodyB, float hammerScale)
+    // paletteA：下の積み木の色（ToyKit.Palette の番号）。上の積み木は bodyB（白）
+    // タイトル（TitleScreen）に頭・積み木のモデルが入っていれば、部員もそのモデルにする
+    // blockMats：入っていれば下・上の積み木のマテリアルとして優先して使う
+    Member CreateMember(Vector3 pos, float yaw, int paletteA, Color bodyB, float hammerScale, Material[] blockMats = null)
     {
         float s = memberScale;
         var m = new Member { basePos = pos };
@@ -559,13 +568,26 @@ public class TitleClubRoomDressing : MonoBehaviour
         m.root.position = pos;
         m.root.rotation = Quaternion.Euler(0f, yaw, 0f);
         float bh = ToyKit.BlockH * s;
-        var cols = new[] { bodyA, bodyB };
+        var title = FindAnyObjectByType<TitleScreen>();
+        var blockMesh = title != null ? title.BlockModelMesh : null;
+        var cols = new[] { Palette[paletteA % Palette.Length], bodyB };
+        var size = new Vector3(ToyKit.BlockW * s * 0.85f, bh, ToyKit.BlockD * s * 0.85f);
         for (int i = 0; i < 2; i++)
         {
             var b = ToyKit.Primitive(PrimitiveType.Cylinder, "BodyBlock", m.root);   // 本編と同じ円柱の積み木
-            b.localScale = new Vector3(ToyKit.BlockW * s * 0.85f, bh * 0.5f, ToyKit.BlockD * s * 0.85f);
+            b.localScale = new Vector3(size.x, size.y * 0.5f, size.z);
             b.localPosition = new Vector3(0f, bh * (i + 0.5f), 0f);
             b.GetComponent<Renderer>().sharedMaterial = ToyKit.Lit(cols[i], 0.5f);
+            var modelMat = i == 0 ? (title != null ? title.BlockModelMaterial(paletteA) : null) : memberWhiteBlockMaterial;
+            if (blockMats != null && i < blockMats.Length && blockMats[i] != null) modelMat = blockMats[i];
+            if (blockMesh != null && modelMat != null)
+            {
+                var bounds = blockMesh.bounds;
+                b.GetComponent<MeshFilter>().sharedMesh = blockMesh;
+                b.localScale = new Vector3(size.x / bounds.size.x, size.y / bounds.size.y, size.z / bounds.size.z);
+                b.localPosition = new Vector3(0f, bh * (i + 0.5f), 0f) - Vector3.Scale(bounds.center, b.localScale);
+                b.GetComponent<Renderer>().sharedMaterial = modelMat;
+            }
         }
         var face = ToyKit.CreateHead();
         m.head = face.root;
@@ -573,6 +595,7 @@ public class TitleClubRoomDressing : MonoBehaviour
         m.head.localScale = Vector3.one * s;
         m.head.localPosition = new Vector3(0f, bh * 2f + ToyKit.HeadR * s, 0f);
         m.head.localRotation = Quaternion.Euler(0f, 180f, 0f);   // 顔（-Z）を体の前（+Z）へ
+        if (title != null && title.HasHeadModel) title.AttachHeadModel(m.head);
         // 手の位置にハンマーの根元（体の右側）
         m.hammerPivot = new GameObject("HammerPivot").transform;
         m.hammerPivot.SetParent(m.root, false);
@@ -587,9 +610,9 @@ public class TitleClubRoomDressing : MonoBehaviour
     {
         float yard = roomOffset.y + YardY;   // 校庭の地面の高さ
         // 窓の外：素振り（こちらを向いて、横に振る）
-        swinger = CreateMember(new Vector3(-3f, yard, BackZ + 10f), 180f, Palette[0], new Color(0.95f, 0.95f, 0.92f), 0.8f);
+        swinger = CreateMember(new Vector3(-3f, yard, BackZ + 10f), 180f, 0, new Color(0.95f, 0.95f, 0.92f), 0.8f, swingerBlockMaterials);
         // さらに奥：走り込み（左右に往復）
-        runner = CreateMember(new Vector3(0f, yard, BackZ + 22f), 90f, Palette[4], new Color(0.95f, 0.95f, 0.92f), 0.6f);
+        runner = CreateMember(new Vector3(0f, yard, BackZ + 22f), 90f, 4, new Color(0.95f, 0.95f, 0.92f), 0.6f, runnerBlockMaterials);
         runner.hammer.gameObject.SetActive(false);
     }
 

@@ -34,6 +34,20 @@ public partial class TitleScreen : MonoBehaviour
     [SerializeField] float hammerScale = 0.75f;
     [SerializeField] float buttonScale = 0.9f;
 
+    [Header("ロゴ・ボタンの上に乗る顔")]
+    [Tooltip("顔に使うモデル（Blender で作ったものなど。足元が原点のもの）。空なら黄色いスマイルの顔")]
+    [SerializeField] GameObject headModel;
+    [Tooltip("顔のモデルの高さ（この高さになるように大きさをそろえる）。スマイルの顔は直径 0.9")]
+    [SerializeField] float headModelHeight = 1.0f;
+    [Tooltip("顔のモデルの向き（Y 軸まわりの角度）。顔がカメラを向くように合わせる")]
+    [SerializeField] float headModelYaw = 180f;
+
+    [Header("文字の積み木のモデル")]
+    [Tooltip("文字の積み木に使うメッシュ（Blender で作った積み木など）。空なら角の丸い箱")]
+    [SerializeField] Mesh blockModelMesh;
+    [Tooltip("文字の積み木のマテリアル。ToyKit.Palette と同じ順（赤・橙・黄・緑・青・紫）")]
+    [SerializeField] Material[] blockModelMaterials;
+
     [Header("ロゴの配置")]
     [SerializeField] float[] logoRowY = { 5.75f, 4.55f };
     [SerializeField] float logoX = 0f;
@@ -45,6 +59,8 @@ public partial class TitleScreen : MonoBehaviour
     [SerializeField] float buttonZ = -0.6f;
     [Tooltip("ON：ボタンを頭の下に横から差し込み、頭をボタンの上に乗せる（だるま落としの逆）。buttonX/Z は 0 にする")]
     [SerializeField] bool headOnButtons = false;
+    [Tooltip("OFF：てっぺんの顔（だるま）を最初から出さない。顔が着地したときの煙・キラキラも出さない")]
+    [SerializeField] bool showHead = true;
 
     [Header("最終カメラ")]
     [SerializeField] Vector3 finalCamPos = new Vector3(0.6f, 2.8f, -12f);
@@ -317,7 +333,7 @@ public partial class TitleScreen : MonoBehaviour
         yield return Sim(0.25f);
 
         SetHappy(true);
-        Emit(sparkle, new Vector3(0f, HeadR + 0.3f, 0f), Quaternion.Euler(-90f, 0f, 0f), 25);
+        if (showHead) Emit(sparkle, new Vector3(0f, HeadR + 0.3f, 0f), Quaternion.Euler(-90f, 0f, 0f), 25);
         headHopStart = sim;
         headHopHeight = 0.22f;
     }
@@ -634,10 +650,13 @@ public partial class TitleScreen : MonoBehaviour
                 headLandTime = headSquashStart = sim;
                 headHopStart = sim;
                 headHopHeight = 0.3f;
-                Emit(puff, new Vector3(0f, 0.05f, 0f), Quaternion.Euler(-90f, 0f, 0f), 18);
-                ringStart = Time.unscaledTime;
-                groundRing.position = new Vector3(0f, 0.02f, 0f);
-                shake = Mathf.Max(shake, 0.5f);
+                if (showHead)
+                {
+                    Emit(puff, new Vector3(0f, 0.05f, 0f), Quaternion.Euler(-90f, 0f, 0f), 18);
+                    ringStart = Time.unscaledTime;
+                    groundRing.position = new Vector3(0f, 0.02f, 0f);
+                    shake = Mathf.Max(shake, 0.5f);
+                }
             }
         }
         else y = HeadR;

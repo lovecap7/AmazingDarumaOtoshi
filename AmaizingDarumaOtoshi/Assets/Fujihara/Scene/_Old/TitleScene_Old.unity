@@ -119,81 +119,6 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!1 &687044618
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 687044620}
-  - component: {fileID: 687044621}
-  - component: {fileID: 687044622}
-  m_Layer: 0
-  m_Name: TitleClubRoomDressing
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &687044620
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 687044618}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &687044621
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 687044618}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: eecf673ce8b0ec2438b102301b53905a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::TitleClubRoomDressing
-  wallColor: {r: 0.88, g: 0.84, b: 0.74, a: 1}
-  floorColor: {r: 0.62, g: 0.6, b: 0.56, a: 1}
-  banner: "\u5168\u56FD\u5236\u8987"
-  slogans:
-  - "\u6839\u6027"
-  - "\u4E00\u6483\u5165\u9B42"
-  boardTitle: "\u7DF4\u7FD2\u30E1\u30CB\u30E5\u30FC"
-  boardNotes:
-  - "\uFF5E\uFF5E\uFF5E"
-  - "\uFF5E\uFF5E\uFF5E"
-  - "\uFF5E\uFF5E\uFF5E"
-  - "\uFF5E\uFF5E\uFF5E"
-  boardGoal: "\uFF5E\uFF5E\uFF5E\uFF5E\uFF5E\uFF01"
-  roomOffset: {x: -3, y: -5, z: 0}
-  memberScale: 3.2
---- !u!114 &687044622
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 687044618}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 724ea90110c9daf46a441f92ce2b35a2, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ClubOpeningMovie
-  playMovie: 1
-  shakeStrength: 1
-  rushShake: 1
 --- !u!1 &1114148917
 GameObject:
   m_ObjectHideFlags: 0
@@ -253,19 +178,17 @@ MonoBehaviour:
   logoRowY:
   - 5.75
   - 4.55
-  logoX: -6
   logoZ: 2
   logoSpacing: 1.95
-  buttonX: 0
-  buttonZ: 0
-  headOnButtons: 1
-  finalCamPos: {x: -0.5, y: 3.4, z: -9.5}
-  finalLook: {x: -4.5, y: 2.6, z: 5}
-  finalFov: 46
+  buttonX: 3.6
+  buttonZ: -0.6
+  finalCamPos: {x: 0.6, y: 2.8, z: -12}
+  finalLook: {x: 0.6, y: 3, z: 1.5}
+  finalFov: 40
   attractDelay: 30
+  showOnomatopoeia: 0
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
   - {fileID: 1114148919}
-  - {fileID: 687044620}
