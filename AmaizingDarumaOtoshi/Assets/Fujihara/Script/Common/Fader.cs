@@ -34,6 +34,9 @@ public class Fader : MonoBehaviour
     ISceneTransition built;   // root の下に組み立て済みの演出
     bool busy;
 
+    // 遷移を始めた時点で次のシーンを裏で読み込み始めるか（false で前の形：隠れてから読み込む）
+    public static bool PreloadScenes = true;
+
     // フェード中（シーン遷移の途中・遷移後に明るくなるまで）か。開始演出などを明るくなってから始めるのに使う
     public static bool IsBusy => instance != null && instance.busy;
 
@@ -144,6 +147,19 @@ public class Fader : MonoBehaviour
 
         var t = Current();
         if (t != null && !t.Plays(SceneManager.GetActiveScene().name, sceneName)) t = null;   // この組み合わせは黒いフェード
+
+        // 読み込みを先に始める：隠している間に裏で読み込んでおき、隠れきったら有効にするだけにする
+        // （隠れてから読み込み始めると、読み込みと有効化の重さがまとめて来てカクつくため）
+        // 隠している間は今の画面の動きを邪魔しないよう、1フレームに使う読み込み時間を少なめにする
+        var priorityWas = Application.backgroundLoadingPriority;
+        AsyncOperation operation = null;
+        if (PreloadScenes)
+        {
+            Application.backgroundLoadingPriority = ThreadPriority.BelowNormal;
+            operation = LoadSceneAsync(sceneName);
+            if (operation != null) operation.allowSceneActivation = false;
+        }
+
         if (t != null)
         {
             BlackVisible(false);
@@ -153,8 +169,12 @@ public class Fader : MonoBehaviour
         }
         else yield return Fade(0f, 1f, FadeOutTime);   // 暗くする
 
-        var operation = LoadSceneAsync(sceneName);
+        // 隠れたので、残りの読み込みは急いで終わらせて有効にする
+        Application.backgroundLoadingPriority = ThreadPriority.High;
+        if (operation == null) operation = LoadSceneAsync(sceneName);
+        else operation.allowSceneActivation = true;
         while (operation != null && !operation.isDone) yield return null;
+        Application.backgroundLoadingPriority = priorityWas;
 
         if (t != null)
         {
