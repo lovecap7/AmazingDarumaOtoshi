@@ -64,14 +64,18 @@ public partial class TitleScreen
         {
             int col = i < lineTop.Length ? i : i - lineTop.Length;
             blocks[i] = MakeBlock(all[i].ToString(), Palette[col % Palette.Length], blockMesh, new Vector2(1.05f, 0.68f), BlockD);
+            UseBlockModel(blocks[i], col % Palette.Length, new Vector3(BlockW, BlockH, BlockD), 0f);
         }
 
         // ---- ボタン（上から：はじめる、やめる） ----
         buttons = new Block[menuLabels.Length];
-        var buttonColors = new[] { Palette[0], Palette[4], Palette[3], Palette[5] };
+        var buttonColorIndex = new[] { 0, 4, 3, 5 };
         for (int i = 0; i < menuLabels.Length; i++)
         {
-            buttons[i] = MakeBlock(menuLabels[i], buttonColors[i % buttonColors.Length], buttonMesh, new Vector2(2.1f, 0.6f), ButtonSize.z);
+            int ci = buttonColorIndex[i % buttonColorIndex.Length];
+            buttons[i] = MakeBlock(menuLabels[i], Palette[ci], buttonMesh, new Vector2(2.1f, 0.6f), ButtonSize.z);
+            // ボタンは横長の楕円の積み木にする。文字が円柱の正面から浮かないよう、文字の幅は少し狭める
+            UseBlockModel(buttons[i], ci, ButtonModelSize, ButtonModelTextWidth);
             var box = buttons[i].t.gameObject.AddComponent<BoxCollider>();   // マウスで選べるように
             box.size = ButtonSize;
             buttons[i].t.gameObject.SetActive(false);
@@ -79,6 +83,8 @@ public partial class TitleScreen
 
         var face = ToyKit.CreateHead();
         head = face.root; eyesNormal = face.eyesNormal; eyesHappy = face.eyesHappy; cheeks = face.cheeks;
+        if (headModel != null) UseHeadModel();
+        if (!showHead) head.gameObject.SetActive(false);
         hammer = ToyKit.CreateHammer();
         hammer.localScale = Vector3.one * hammerScale;
 
@@ -93,6 +99,78 @@ public partial class TitleScreen
         shockwave = fx.shockwave; groundRing = fx.groundRing; shockMat = fx.shockMat; ringMat = fx.ringMat;
 
         BuildUI();
+    }
+
+    // 顔をモデル（headModel）に差し替える：スマイルの球と目・口は隠し、モデルを同じ場所に置く
+    // 頭の位置（head）は球の中心なので、モデルの足元が球の下端（中心から HeadR 下）に来るようにずらす
+    // （まばたき・ニコッは隠した目に効くだけなので、モデルの見た目は変わらない）
+    void UseHeadModel() => AttachHeadModel(head);
+
+    // ---- 部室の部員など、ほかの演出からも同じモデルを使うための窓口 ----
+    public bool HasHeadModel => headModel != null;
+    public Mesh BlockModelMesh => blockModelMesh;
+    // ToyKit.Palette の番号の色の積み木マテリアル（なければ null）
+    public Material BlockModelMaterial(int paletteIndex)
+    {
+        if (blockModelMaterials == null || blockModelMaterials.Length == 0) return null;
+        return blockModelMaterials[((paletteIndex % blockModelMaterials.Length) + blockModelMaterials.Length) % blockModelMaterials.Length];
+    }
+
+    // スマイルの頭（ToyKit.CreateHead の root）をモデルに差し替える。球と目・口は隠し、モデルの足元を球の下端に合わせる。
+    // 頭が拡大されていても、頭のローカル座標で headModelHeight の高さになる
+    public void AttachHeadModel(Transform headRoot)
+    {
+        if (headModel == null || headRoot == null) return;
+        foreach (Transform c in headRoot) c.gameObject.SetActive(false);
+        var model = Instantiate(headModel, headRoot, false);
+        model.name = "HeadModel";
+        model.transform.localRotation = Quaternion.Euler(0f, headModelYaw, 0f);
+
+        var renderers = model.GetComponentsInChildren<Renderer>();
+        if (renderers.Length == 0) return;
+        var b = renderers[0].bounds;
+        foreach (var r in renderers) b.Encapsulate(r.bounds);
+        float parentScale = Mathf.Max(headRoot.lossyScale.y, 1e-4f);
+        float sizeY = b.size.y / parentScale;   // 頭のローカル座標での高さ
+        float s = sizeY > 0f ? headModelHeight / sizeY : 1f;
+        model.transform.localScale = Vector3.one * s;
+        float bottom = (b.min.y - headRoot.position.y) / parentScale * s;
+        model.transform.localPosition = new Vector3(0f, -HeadR - bottom, 0f);
+    }
+
+    // ボタンをモデルにしたときの大きさ（横長の楕円の円柱）と文字の幅
+    static readonly Vector3 ButtonModelSize = new Vector3(2.5f, 0.7f, 1.3f);
+    const float ButtonModelTextWidth = 1.75f;
+
+    // 積み木の本体をモデル（blockModelMesh）に差し替える。
+    // size の大きさにそろえ、マテリアルは色ごとに複製する（光らせるため）。
+    // 文字はモデルの正面に付け直す。textWidth > 0 なら文字の枠の幅も変える
+    void UseBlockModel(Block b, int paletteIndex, Vector3 size, float textWidth)
+    {
+        if (blockModelMesh == null || blockModelMaterials == null || blockModelMaterials.Length == 0) return;
+        var src = blockModelMaterials[paletteIndex % blockModelMaterials.Length];
+        if (src == null) return;
+
+        var body = b.t.Find("Body");
+        body.GetComponent<MeshFilter>().sharedMesh = blockModelMesh;
+        var bounds = blockModelMesh.bounds;
+        body.localScale = new Vector3(size.x / bounds.size.x, size.y / bounds.size.y, size.z / bounds.size.z);
+        body.localPosition = -Vector3.Scale(bounds.center, body.localScale);
+
+        var text = b.t.GetComponentInChildren<TextMeshPro>();
+        if (text != null)
+        {
+            var p = text.transform.localPosition;
+            text.transform.localPosition = new Vector3(p.x, p.y, -size.z * 0.5f - 0.006f);
+            if (textWidth > 0f) text.rectTransform.sizeDelta = new Vector2(textWidth, text.rectTransform.sizeDelta.y);
+        }
+
+        var mat = new Material(src);
+        mat.EnableKeyword("_EMISSION");
+        mat.SetColor("_EmissionColor", Color.black);
+        body.GetComponent<MeshRenderer>().sharedMaterial = mat;
+        Destroy(b.mat);
+        b.mat = mat;
     }
 
     Block MakeBlock(string label, Color color, Mesh mesh, Vector2 textBox, float depth)

@@ -6,7 +6,7 @@ using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 using UnityEngine.UI;
 
-// 【試作】部室タイトル（TitleClubRoomScene）のオープニングムービー。
+// 部室タイトル（TitleScene。もとの TitleClubRoomScene）のオープニングムービー。
 // 野球ゲームのアニメ OP のように、部活の青春をカットの積み重ねで見せてからタイトル画面へ入る。
 //  1. ノート「目指せ！全国制覇！！」         5. 新聞「だるま落とし部 快進撃！」
 //  2. 部室：ホワイトボードの前に集まる部員     6. 全国大会：ライバルとのにらみ合い・打ち合い

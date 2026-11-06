@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
@@ -300,10 +300,16 @@ public class MatchSelect : MonoBehaviour
         float dt = Time.unscaledDeltaTime;
         if (fade.color.a > 0f) fade.color = new Color(1f, 1f, 1f, Mathf.MoveTowards(fade.color.a, 0f, dt * 2f));
 
-        if (phase == Phase.Mode) UpdateModeSelect(dt);
-        else if (phase == Phase.Rule) UpdateRuleSelect(dt);
-        else if (phase == Phase.Character) UpdateCharacterSelect(dt);
-        else if (phase == Phase.Stage) UpdateStageSelect(dt);
+        // シーン遷移の演出が終わるまでは操作を受け付けない。
+        // 遷移中に B を受けると Back() が Phase.Leaving になったあと、Fader が忙しくて Fader.Load が
+        // 無視され、シーンが切り替わらないまま Leaving で固まって操作できなくなるため。
+        if (!Fader.IsBusy)
+        {
+            if (phase == Phase.Mode) UpdateModeSelect(dt);
+            else if (phase == Phase.Rule) UpdateRuleSelect(dt);
+            else if (phase == Phase.Character) UpdateCharacterSelect(dt);
+            else if (phase == Phase.Stage) UpdateStageSelect(dt);
+        }
 
         // 画面の切り替え（モード → ルール → キャラ → ステージ）。左から順に並んでいて、横にすべって切り替わる
         float k = 1f - Mathf.Exp(-10f * dt);
@@ -358,8 +364,9 @@ public class MatchSelect : MonoBehaviour
         if (phaseFrame != Time.frameCount)
         {
             int n = modeCards.Length;
-            if (MenuInput.LeftRepeat()) { modeIndex = (modeIndex + n - 1) % n; MenuSounds.Cursor(); }
-            else if (MenuInput.RightRepeat()) { modeIndex = (modeIndex + 1) % n; MenuSounds.Cursor(); }
+            // 押しっぱなしのくり返しは端で止まる。押し直したときだけ反対の端へ回る
+            if (MenuInput.LeftRepeat() && MenuInput.StepRepeat(ref modeIndex, n, MenuInput.Dir.Left, -1)) MenuSounds.Cursor();
+            else if (MenuInput.RightRepeat() && MenuInput.StepRepeat(ref modeIndex, n, MenuInput.Dir.Right, 1)) MenuSounds.Cursor();
             else if (MenuInput.Submit() || MenuInput.Start())
             {
                 MenuSounds.Decide();
@@ -405,15 +412,24 @@ public class MatchSelect : MonoBehaviour
         var rules = MatchSetup.Rules;
         if (phaseFrame != Time.frameCount)
         {
-            if (MenuInput.UpRepeat()) { ruleIndex = NextRuleRow(-1); MenuSounds.Cursor(); }
-            else if (MenuInput.DownRepeat()) { ruleIndex = NextRuleRow(1); MenuSounds.Cursor(); }
+            // 押しっぱなしのくり返しは端で止まる。押し直したときだけ反対の端へ回る
+            if (MenuInput.UpRepeat())
+            {
+                int next = NextRuleRow(-1, MenuInput.RepeatStarted(MenuInput.Dir.Up));
+                if (next != ruleIndex) { ruleIndex = next; MenuSounds.Cursor(); }
+            }
+            else if (MenuInput.DownRepeat())
+            {
+                int next = NextRuleRow(1, MenuInput.RepeatStarted(MenuInput.Dir.Down));
+                if (next != ruleIndex) { ruleIndex = next; MenuSounds.Cursor(); }
+            }
             else if (MenuInput.Start()) { MenuSounds.Decide(); GoToCharacterSelect(); return; }
             else if (MenuInput.Cancel()) { MenuSounds.Cancel(); GoToModeSelect(); return; }
             else if (MenuInput.Submit())
             {
                 // A：次の項目へ進む（「キャラクターセレクトへ」の上で押したら決定）
                 if (ruleRows[ruleIndex].kind == RuleKind.Next) { MenuSounds.Decide(); GoToCharacterSelect(); return; }
-                ruleIndex = NextRuleRow(1);
+                ruleIndex = NextRuleRow(1, true);
                 MenuSounds.Cursor();
             }
             else if (MenuInput.LeftRepeat() || MenuInput.RightRepeat())
@@ -473,13 +489,19 @@ public class MatchSelect : MonoBehaviour
     }
 
     // 上下で次に選べる行（説明だけの行は飛ばす）
-    int NextRuleRow(int dir)
+    // wrap = false：端まで来たら止まる（押しっぱなしのくり返し用）。true：反対の端へ回る（押し直したとき用）
+    int NextRuleRow(int dir, bool wrap)
     {
         int n = ruleRows.Count, i = ruleIndex;
-        for (int step = 0; step < n; step++)
+        for (int step = 1; step < n; step++)
         {
-            i = (i + dir + n) % n;
-            if (ruleRows[i].kind != RuleKind.Info) return i;
+            int j = i + dir * step;
+            if (j < 0 || j >= n)
+            {
+                if (!wrap) return ruleIndex;
+                j = (j % n + n) % n;
+            }
+            if (ruleRows[j].kind != RuleKind.Info) return j;
         }
         return ruleIndex;
     }
@@ -816,6 +838,8 @@ public class MatchSelect : MonoBehaviour
 
     void Back()
     {
+        // 遷移中は Fader.Load が無視される。Leaving にしてから無視されると、切り替わらないまま固まるので先に抜ける
+        if (Fader.IsBusy) return;
         // 戻るときは今の画面のまま暗転させる（Leaving のまま Screen() がステージ画面を返して、一瞬すべって見えないように）
         leavingScreen = Screen();
         phase = Phase.Leaving;
@@ -1152,7 +1176,9 @@ public class MatchSelect : MonoBehaviour
         foreach (var p in slots)
         {
             if (p == null) continue;
-            var character = p.randomCharacter ? roster.characters[Random.Range(0, roster.characters.Count)] : p.character;
+            var character = p.randomCharacter
+                ? Yurube.Achievements.AchievementRewards.RandomAvailable(roster.characters)
+                : p.character;
             entries.Add(new MatchSetup.Entry
             {
                 playerIndex = p.index,
@@ -1509,12 +1535,14 @@ public class MatchSelect : MonoBehaviour
         ruleSummary.rectTransform.pivot = new Vector2(1f, 1f);
         ToyKit.Anchor(ruleSummary.rectTransform, new Vector2(1f, 1f), new Vector2(-50f, -60f), new Vector2(900f, 50f));
 
-        int count = roster.characters.Count + 1;   // 最後にランダム
+        // 報酬キャラクター（だるきんぐ）は、実績を全部解除するまで一覧に出さない
+        var characters = Yurube.Achievements.AchievementRewards.AvailableCharacters(roster.characters);
+        int count = characters.Count + 1;   // 最後にランダム
         var grid = GridLayout(count, 8, new Vector2(1760f, 430f), new Vector2(205f, 205f), 16f, 350f);
         for (int i = 0; i < count; i++)
         {
-            bool random = i == roster.characters.Count;
-            var c = random ? null : roster.characters[i];
+            bool random = i == characters.Count;
+            var c = random ? null : characters[i];
             var tile = MakeTile(charRoot, grid[i].pos, grid[i].size, random ? RandomColor : c.color,
                                 random ? null : c.portrait, random ? texts.randomCharacter : c.displayName, random ? texts.randomLetter : Initial(c.displayName));
             tile.character = c;

@@ -26,6 +26,10 @@ public class AchievementBook : MonoBehaviour
         public string name;
         public string description;
         public bool unlocked;
+        // レアリティの色。行の下地に使う（未設定なら白＝今までの見た目）
+        public Color rarityColor = Color.white;
+        // レアリティの帯の画像（光沢つき。未設定なら帯は出さない）
+        public Sprite raritySprite;
         public Entry(string name, string description, bool unlocked) { this.name = name; this.description = description; this.unlocked = unlocked; }
     }
 
@@ -34,6 +38,8 @@ public class AchievementBook : MonoBehaviour
 
     const float CardW = 1700f, CardH = 640f, RowH = 92f, RowGap = 10f;
     const float TopSpace = 150f, BottomSpace = 250f;   // 見出しの高さ、MainMenu の下の帯の高さ
+    // 選択中の行の色。金（黄色）のレアリティと紛れないよう、青系にする
+    static readonly Color SelectedRowColor = new Color(0.58f, 0.80f, 0.96f);
 
     TMP_FontAsset font;
     Material letterMat;
@@ -43,6 +49,8 @@ public class AchievementBook : MonoBehaviour
     CanvasGroup group;
     RectTransform card, listContent;
     readonly List<Image> rowBgs = new List<Image>();
+    // 行ごとの下地の色（レアリティの色を混ぜたもの）
+    readonly List<Color> rowBaseColors = new List<Color>();
 
     int index;
     bool open;
@@ -93,8 +101,9 @@ public class AchievementBook : MonoBehaviour
         if (!open || Time.frameCount == openedFrame) return;
 
         int n = rowBgs.Count;
-        if (n > 0 && MenuInput.UpRepeat()) { index = (index + n - 1) % n; MenuSounds.Cursor(); }
-        else if (n > 0 && MenuInput.DownRepeat()) { index = (index + 1) % n; MenuSounds.Cursor(); }
+        // 押しっぱなしのくり返しは端で止まる。押し直したときだけ反対の端へ回る
+        if (n > 0 && MenuInput.UpRepeat() && MenuInput.StepRepeat(ref index, n, MenuInput.Dir.Up, -1)) MenuSounds.Cursor();
+        else if (n > 0 && MenuInput.DownRepeat() && MenuInput.StepRepeat(ref index, n, MenuInput.Dir.Down, 1)) MenuSounds.Cursor();
         else if (MenuInput.Cancel()) { Close(); return; }
         UpdateRows(dt);
     }
@@ -120,7 +129,12 @@ public class AchievementBook : MonoBehaviour
     {
         float k = 1f - Mathf.Exp(-14f * dt);
         for (int i = 0; i < rowBgs.Count; i++)
-            rowBgs[i].color = Color.Lerp(rowBgs[i].color, i == index ? ToyKit.Palette[2] : new Color(1f, 0.98f, 0.94f, 0.92f), k);
+        {
+            // 選んでいる行は青系（黄色は金のレアリティと紛れるので使わない）、それ以外はレアリティの色を混ぜた下地
+            Color rowColor = i == index ? SelectedRowColor
+                : i < rowBaseColors.Count ? rowBaseColors[i] : new Color(1f, 0.98f, 0.94f, 0.92f);
+            rowBgs[i].color = Color.Lerp(rowBgs[i].color, rowColor, k);
+        }
         // 選んでいる行が見えるように送る
         float view = CardH - 60f;
         float rowTop = index * (RowH + RowGap);
@@ -176,6 +190,7 @@ public class AchievementBook : MonoBehaviour
     {
         foreach (Transform c in listContent) Destroy(c.gameObject);
         rowBgs.Clear();
+        rowBaseColors.Clear();
         listContent.anchoredPosition = Vector2.zero;
         listContent.sizeDelta = new Vector2(0f, Entries.Count * (RowH + RowGap));
         for (int i = 0; i < Entries.Count; i++)
@@ -188,10 +203,27 @@ public class AchievementBook : MonoBehaviour
             holder.sizeDelta = new Vector2(0f, RowH);
             holder.anchoredPosition = new Vector2(0f, -i * (RowH + RowGap));
 
-            var bg = ToyKit.UIImage("Bg", holder, Color.white, uiSprite);
+            // レアリティは文字ではなく色で示す（下地に色を混ぜ、左に光沢のある帯を出す）
+            Color cream = new Color(1f, 0.98f, 0.94f, 0.92f);
+            Color baseColor = Color.Lerp(cream, e.rarityColor, 0.45f);
+            var bg = ToyKit.UIImage("Bg", holder, baseColor, uiSprite);
             ToyKit.Stretch(bg);
             bg.GetComponent<Image>().pixelsPerUnitMultiplier = 0.4f;
             rowBgs.Add(bg.GetComponent<Image>());
+            rowBaseColors.Add(baseColor);
+
+            if (e.raritySprite != null)
+            {
+                var strip = ToyKit.UIImage("Rarity", holder, Color.white, e.raritySprite);
+                var stripImage = strip.GetComponent<Image>();
+                stripImage.type = Image.Type.Simple;
+                stripImage.pixelsPerUnitMultiplier = 1f;
+                strip.anchorMin = new Vector2(0f, 0f);
+                strip.anchorMax = new Vector2(0f, 1f);
+                strip.pivot = new Vector2(0f, 0.5f);
+                strip.sizeDelta = new Vector2(14f, -12f);
+                strip.anchoredPosition = new Vector2(6f, 0f);
+            }
 
             var name = ToyKit.UIText("Name", holder, font, e.unlocked ? e.name : texts.locked, 40f, ToyKit.Ink);
             name.fontStyle = FontStyles.Bold;

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using TMPro;
@@ -1284,8 +1284,9 @@ public class MainMenu : MonoBehaviour
                 if (hover >= 0 && hover != cursor) { navDir = hover > cursor ? 1 : -1; cursor = hover; MenuSounds.Cursor(); }
 
                 int n = ItemCount;
-                if (MenuInput.UpRepeat()) { cursor = (cursor + n - 1) % n; navDir = -1; MenuSounds.Cursor(); }
-                else if (MenuInput.DownRepeat()) { cursor = (cursor + 1) % n; navDir = 1; MenuSounds.Cursor(); }
+                // 押しっぱなしのくり返しは端で止まる。押し直したときだけ反対の端へ回る
+                if (MenuInput.UpRepeat() && MenuInput.StepRepeat(ref cursor, n, MenuInput.Dir.Up, -1)) { navDir = -1; MenuSounds.Cursor(); }
+                else if (MenuInput.DownRepeat() && MenuInput.StepRepeat(ref cursor, n, MenuInput.Dir.Down, 1)) { navDir = 1; MenuSounds.Cursor(); }
                 else if (MenuInput.Submit() || (click && hover >= 0))
                 {
                     // たたかう（KnockTwice）は叩き飛ばした瞬間に撃墜の音を鳴らすので、決定の音は重ねない

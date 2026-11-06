@@ -89,6 +89,7 @@ public static class MenuInput
     static readonly float[] nextRepeat = new float[4];
     static readonly bool[] wasHeld = new bool[4];
     static readonly bool[] result = new bool[4];
+    static readonly bool[] firstPress = new bool[4];
     static readonly int[] computedFrame = { -1, -1, -1, -1 };
 
     static bool Repeat(Dir d)
@@ -107,8 +108,12 @@ public static class MenuInput
         }
         computedFrame[i] = frame;
 
+        // 押した瞬間か（長押しの2回目以降のくり返しではないか）
+        bool fresh = pressed || (held && !wasHeld[i]);
+        firstPress[i] = fresh;
+
         bool fire = false;
-        if (pressed || (held && !wasHeld[i]))
+        if (fresh)
         {
             fire = true;
             holdStart[i] = now;
@@ -123,6 +128,27 @@ public static class MenuInput
         wasHeld[i] = held;
         result[i] = fire;
         return fire;
+    }
+
+    // いま返っているその方向の入力が「押した瞬間」か（長押しのくり返しなら false）。
+    // 長押しの移動を端で止め、押し直したときだけ反対の端へ回したいときに使う。
+    public static bool RepeatStarted(Dir d) => firstPress[(int)d];
+
+    // 長押しでの移動。端では止まり、押し直したとき（RepeatStarted）だけ反対の端へ回る。
+    // index を実際に動かせたら true（動かせなかったら index はそのまま）。
+    public static bool StepRepeat(ref int index, int count, Dir d, int delta)
+    {
+        if (count <= 0) return false;
+        int next = index + delta;
+        if (next < 0 || next >= count)
+        {
+            // 押しっぱなしのくり返しは端で止まる。押し直したときだけ回る
+            if (!RepeatStarted(d)) return false;
+            next = (next % count + count) % count;
+        }
+        if (next == index) return false;
+        index = next;
+        return true;
     }
 
     // Start ボタン / Enter（「決定して次へ」）
