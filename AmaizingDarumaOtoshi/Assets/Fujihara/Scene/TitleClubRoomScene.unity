@@ -172,11 +172,11 @@ MonoBehaviour:
   - "\u4E00\u6483\u5165\u9B42"
   boardTitle: "\u7DF4\u7FD2\u30E1\u30CB\u30E5\u30FC"
   boardNotes:
-  - "\u7D20\u632F\u308A 1000\u56DE"
-  - "\u7A4D\u307F\u4E0A\u3052 100\u6BB5"
-  - "\u3046\u3061\u8FD4\u3057 500\u672C"
-  - "\u8D70\u308A\u8FBC\u307F\uFF01\uFF01"
-  boardGoal: "\u76EE\u6307\u305B\u5168\u56FD\uFF01"
+  - "\uFF5E\uFF5E\uFF5E"
+  - "\uFF5E\uFF5E\uFF5E"
+  - "\uFF5E\uFF5E\uFF5E"
+  - "\uFF5E\uFF5E\uFF5E"
+  boardGoal: "\uFF5E\uFF5E\uFF5E\uFF5E\uFF5E\uFF01"
   roomOffset: {x: -3, y: -5, z: 0}
   memberScale: 3.2
 --- !u!114 &687044622

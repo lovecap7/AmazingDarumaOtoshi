@@ -90,8 +90,8 @@ public class CharacterBook : MonoBehaviour
         if (Time.frameCount != openedFrame)
         {
             int n = EntryCount;
-            if (MenuInput.Up()) { index = (index + n - 1) % n; MenuSounds.Cursor(); }
-            else if (MenuInput.Down()) { index = (index + 1) % n; MenuSounds.Cursor(); }
+            if (MenuInput.UpRepeat()) { index = (index + n - 1) % n; MenuSounds.Cursor(); }
+            else if (MenuInput.DownRepeat()) { index = (index + 1) % n; MenuSounds.Cursor(); }
             else if (MenuInput.Cancel()) { Close(); return; }
             else if (MenuInput.AnyClick())
             {
