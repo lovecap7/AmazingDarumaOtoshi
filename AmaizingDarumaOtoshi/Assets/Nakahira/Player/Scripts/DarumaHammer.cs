@@ -51,6 +51,8 @@ namespace Nakahira
         [SerializeField] float m_sweepStartYaw = 110.0f;  // 右
         [SerializeField] float m_sweepEndYaw = -110.0f;   // 左
         [SerializeField] float m_sweepHeight = 0.25f;     // 最下段の中心の高さ
+        // 薙ぎ払いの間、柄を軸にハンマーをひねる角度(頭の長い向きを振る向きにそろえる。見た目だけ)
+        [SerializeField] float m_sweepRoll = 90.0f;
         // ハンマーの頭の半分の太さ(届く距離と、当たりの角度の余裕に使う)
         [SerializeField] float m_hammerHalfWidth = 0.2f;
         // 対象の中心の高さがこれ以上ずれていたら当たらない
@@ -184,7 +186,36 @@ namespace Nakahira
             GetPose(out Vector3 pos, out Quaternion rot);
             transform.localPosition = pos;
             transform.localRotation = rot;
+            UpdateTrail();
         }
+
+        private void OnDestroy()
+        {
+            if (m_trail != null) Destroy(m_trail.gameObject);
+        }
+
+        // 振っている間、ハンマーの頭からトレイルを出す(プレハブは HammerParams の「トレイル」)
+        private void UpdateTrail()
+        {
+            HammerTrail prefab = m_params != null ? m_params.TrailPrefab : null;
+            // 再生中にプレハブを差し替えたら作り直す
+            if (prefab != m_trailSource)
+            {
+                if (m_trail != null) Destroy(m_trail.gameObject);
+                m_trail = null;
+                m_trailSource = prefab;
+                if (prefab != null)
+                {
+                    m_trail = Instantiate(prefab);
+                    m_trail.name = prefab.name + "_" + (m_root != null ? m_root.name : name);
+                }
+            }
+            if (m_trail == null) return;
+            m_trail.Tick(IsBusy, transform.TransformPoint(0.0f, 0.0f, m_armLength));
+        }
+
+        HammerTrail m_trail;
+        HammerTrail m_trailSource;
 
         // 現在の支点の位置と回転(プレイヤーのローカル)
         private void GetPose(out Vector3 pos, out Quaternion rot)
@@ -193,7 +224,7 @@ namespace Nakahira
             {
                 case Action.Sweep:
                     pos = new Vector3(0.0f, m_sweepHeight, 0.0f);
-                    rot = Quaternion.Euler(0.0f, CurrentSweepYaw(), 0.0f);
+                    rot = Quaternion.Euler(0.0f, CurrentSweepYaw(), 0.0f) * Quaternion.Euler(0.0f, 0.0f, m_sweepRoll);
                     break;
                 case Action.Shot:
                     // 頭が真下に来たときに最下段の高さになるよう支点を上げる
