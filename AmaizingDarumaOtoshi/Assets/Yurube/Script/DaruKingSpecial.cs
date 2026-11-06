@@ -17,12 +17,24 @@ namespace Yurube
         [SerializeField, Min(0.1f)] float m_chargeDuration = 2.0f;
         [Tooltip("発動直後の入力を詠唱完了として拾わないための最小時間(秒)")]
         [SerializeField, Min(0.0f)] float m_anyButtonMinTime = 0.15f;
-        [Tooltip("攻撃判定の長さ(m)")]
+        [Tooltip("攻撃判定の長さ(m)。ステージ端まで伸ばす場合はフォールバック値")]
         [SerializeField, Min(0.5f)] float m_attackLength = 14.0f;
+        [Tooltip("ステージ端まで攻撃を伸ばす")]
+        [SerializeField] bool m_useStageLength = true;
+        [Tooltip("ステージ端より少し外側まで演出を伸ばす距離(m)")]
+        [SerializeField, Min(0.0f)] float m_stageOvershoot = 2.0f;
+        [Tooltip("ステージ範囲が取れない場合の攻撃長(m)")]
+        [SerializeField, Min(1.0f)] float m_fallbackStageLength = 60.0f;
         [Tooltip("攻撃判定の太さ(m)")]
         [SerializeField, Min(0.1f)] float m_attackWidth = 3.2f;
         [Tooltip("攻撃エフェクトの表示時間(秒)")]
         [SerializeField, Min(0.2f)] float m_effectDuration = 1.0f;
+        [Tooltip("無敵時間に追加する余裕(秒)")]
+        [SerializeField, Min(0.0f)] float m_invincibleExtra = 0.35f;
+        [Tooltip("無敵中の発光色が一周する速さ")]
+        [SerializeField] float m_rainbowSpeed = 0.5f;
+        [Tooltip("無敵中の発光の強さ")]
+        [SerializeField] float m_rainbowEmission = 1.5f;
         [Tooltip("発動ログをConsoleに出す(テスト用)")]
         [SerializeField] bool m_logSpecial = true;
 
@@ -31,6 +43,7 @@ namespace Yurube
             Idle,
             Charging,
             CutIn,
+            Recover,
         }
 
         DarumaCharacter m_character;
@@ -41,6 +54,16 @@ namespace Yurube
 
         Vector3 m_attackOrigin;
         Vector3 m_attackDirection = Vector3.forward;
+        float m_resolvedLength = 14.0f;
+        bool m_previousMovementOnly;
+        bool m_previousMovementLocked;
+        bool m_movementFlagsStored;
+
+        // 無敵表示: きだる/いわだると同じ発光レインボー
+        Renderer[] m_rainbowRenderers;
+        Material[][] m_originalMaterials;
+        Material[][] m_rainbowMaterials;
+        bool m_rainbowActive;
 
         GameObject m_guide;
         Material m_guideMaterial;
@@ -117,8 +140,29 @@ namespace Yurube
             if (m_state == State.CutIn && !DaruKingCutIn.IsPlaying)
             {
                 FireExcalibur();
-                m_state = State.Idle;
+                m_state = State.Recover;
+                m_stateTime = 0.0f;
+                return;
             }
+
+            if (m_state == State.Recover)
+            {
+                m_stateTime += Time.deltaTime;
+                if (m_stateTime >= m_effectDuration) EndSpecial();
+            }
+        }
+
+        // 無敵の点滅で表示が消えないよう、必殺技中は表示固定＋レインボーにする
+        private void LateUpdate()
+        {
+            if (m_state == State.Idle || m_character == null) return;
+            if (!m_character.IsInvincible) return;
+
+            foreach (var renderer in m_character.GetComponentsInChildren<Renderer>(true))
+            {
+                if (renderer != null) renderer.enabled = true;
+            }
+            ApplyRainbow();
         }
 
         public bool TryActivate()
@@ -131,6 +175,20 @@ namespace Yurube
             m_state = State.Charging;
             m_stateTime = 0.0f;
             m_attackApplied = false;
+
+            // 方向入力での旋回だけ残し、並進移動と攻撃を止める
+            m_previousMovementOnly = m_character.MovementOnly;
+            m_previousMovementLocked = m_character.MovementLocked;
+            m_movementFlagsStored = true;
+            m_character.MovementOnly = true;
+            m_character.MovementLocked = true;
+
+            // 詠唱・カットイン・攻撃エフェクト終了まで内部無敵
+            float invincibleTime = m_chargeDuration + 1.4f + m_effectDuration + m_invincibleExtra;
+            m_character.SetInvincible(invincibleTime);
+            BeginRainbow();
+
+            m_resolvedLength = ResolveAttackLength(HorizontalForward());
             CreateGuide();
 
             if (m_logSpecial) Debug.Log("[だるきんぐ] エクスカリバー詠唱開始", this);
@@ -143,6 +201,7 @@ namespace Yurube
 
             m_attackDirection = HorizontalForward();
             m_attackOrigin = m_character.transform.position;
+            m_resolvedLength = ResolveAttackLength(m_attackDirection);
             DestroyGuide();
 
             m_state = State.CutIn;
@@ -151,7 +210,11 @@ namespace Yurube
             GameObject subject = m_character.Stack != null && m_character.Stack.Head != null
                 ? m_character.Stack.Head.gameObject
                 : m_character.gameObject;
+            // カットインの顔クローンにレインボーマテリアルが写らないよう、
+            // いったん元のマテリアルへ戻してからカットインを生成する。
+            EndRainbow();
             DaruKingCutIn.Show(m_specialName, subject);
+            BeginRainbow();
 
             if (m_logSpecial)
                 Debug.Log($"[だるきんぐ] エクスカリバー方向確定 {m_attackDirection}", this);
@@ -219,18 +282,45 @@ namespace Yurube
 
             Vector3 direction = HorizontalForward();
             Vector3 origin = m_character.transform.position;
-            Vector3 center = origin + direction * (m_attackLength * 0.5f) + Vector3.up * 0.06f;
+            m_resolvedLength = ResolveAttackLength(direction);
+            Vector3 center = origin + direction * (m_resolvedLength * 0.5f) + Vector3.up * 0.06f;
             m_guide.transform.position = center;
             m_guide.transform.rotation = Quaternion.LookRotation(direction, Vector3.up);
-            m_guide.transform.localScale = new Vector3(m_attackWidth, 0.03f, m_attackLength);
+            m_guide.transform.localScale = new Vector3(m_attackWidth, 0.03f, m_resolvedLength);
 
             if (m_guideLine != null)
             {
                 Vector3 start = origin + Vector3.up * 0.10f;
-                Vector3 end = origin + direction * m_attackLength + Vector3.up * 0.10f;
+                Vector3 end = origin + direction * m_resolvedLength + Vector3.up * 0.10f;
                 m_guideLine.SetPosition(0, start);
                 m_guideLine.SetPosition(1, end);
             }
+        }
+
+        // ステージ範囲(StageArea)の端までを攻撃長にする。
+        // StageArea.Clampを二分探索し、矩形ステージの外周までの距離を求める。
+        float ResolveAttackLength(Vector3 direction)
+        {
+            if (!m_useStageLength) return m_attackLength;
+            if (m_character == null) return m_attackLength;
+
+            var match = DarumaMatch.Current;
+            if (match == null || match.StageArea == null) return m_fallbackStageLength;
+
+            Vector3 origin = m_character.transform.position;
+            float low = 0.0f;
+            float high = Mathf.Max(20.0f, m_fallbackStageLength);
+            for (int i = 0; i < 22; i++)
+            {
+                float mid = (low + high) * 0.5f;
+                Vector3 point = origin + direction * mid;
+                Vector3 clamped = match.StageArea.Clamp(point, 0.0f);
+                float dx = clamped.x - point.x;
+                float dz = clamped.z - point.z;
+                if (dx * dx + dz * dz < 0.0004f) low = mid;
+                else high = mid;
+            }
+            return Mathf.Max(1.0f, low + m_stageOvershoot);
         }
 
         void CreateChargeEffect()
@@ -371,7 +461,7 @@ namespace Yurube
             // あかだると同じ焦げシェーダーで、斬撃ラインの地面を焼く
             GroundScorch.SpawnLine(
                 m_attackOrigin + Vector3.up * 0.02f,
-                m_attackOrigin + m_attackDirection * m_attackLength + Vector3.up * 0.02f,
+                m_attackOrigin + m_attackDirection * m_resolvedLength + Vector3.up * 0.02f,
                 m_attackWidth, 6.0f, 2.5f,
                 new Color(0.055f, 0.04f, 0.03f),
                 new Color(1.0f, 0.72f, 0.12f),
@@ -386,7 +476,7 @@ namespace Yurube
             }
 
             if (m_logSpecial)
-                Debug.Log($"[だるきんぐ] エクスカリバー発射 長さ{m_attackLength:0.0}m 太さ{m_attackWidth:0.0}m", this);
+                Debug.Log($"[だるきんぐ] エクスカリバー発射 長さ{m_resolvedLength:0.0}m 太さ{m_attackWidth:0.0}m", this);
         }
 
         void CreateBeam()
@@ -404,10 +494,10 @@ namespace Yurube
             m_beamLineMaterial = CreateEffectMaterial(new Color(1.0f, 1.0f, 0.90f, 0.95f));
 
             // 巨大な聖剣そのものを攻撃範囲いっぱいに投影する
-            CreateBeamPart("Blade", new Vector3(0.0f, 0.72f, m_attackLength * 0.5f),
-                new Vector3(m_attackWidth, 0.50f, m_attackLength), m_beamGoldMaterial);
-            CreateBeamPart("BladeCore", new Vector3(0.0f, 0.78f, m_attackLength * 0.5f),
-                new Vector3(m_attackWidth * 0.27f, 0.22f, m_attackLength * 0.98f), m_beamWhiteMaterial);
+            CreateBeamPart("Blade", new Vector3(0.0f, 0.72f, m_resolvedLength * 0.5f),
+                new Vector3(m_attackWidth, 0.50f, m_resolvedLength), m_beamGoldMaterial);
+            CreateBeamPart("BladeCore", new Vector3(0.0f, 0.78f, m_resolvedLength * 0.5f),
+                new Vector3(m_attackWidth * 0.27f, 0.22f, m_resolvedLength * 0.98f), m_beamWhiteMaterial);
             CreateBeamPart("Guard", new Vector3(0.0f, 0.72f, -0.30f),
                 new Vector3(m_attackWidth * 1.35f, 0.30f, 0.30f), m_beamGoldMaterial);
             CreateBeamPart("Grip", new Vector3(0.0f, 0.72f, -0.85f),
@@ -416,11 +506,11 @@ namespace Yurube
                 new Vector3(0.34f, 0.34f, 0.34f), m_beamWhiteMaterial);
 
             // 聖剣から立ち上る光の幕と光柱
-            CreateBeamPart("LightCurtain", new Vector3(0.0f, 1.90f, m_attackLength * 0.5f),
-                new Vector3(m_attackWidth * 1.15f, 3.8f, m_attackLength), m_beamCurtainMaterial);
+            CreateBeamPart("LightCurtain", new Vector3(0.0f, 1.90f, m_resolvedLength * 0.5f),
+                new Vector3(m_attackWidth * 1.15f, 3.8f, m_resolvedLength), m_beamCurtainMaterial);
             for (int i = 0; i < 5; i++)
             {
-                float z = m_attackLength * (i + 1) / 6.0f;
+                float z = m_resolvedLength * (i + 1) / 6.0f;
                 CreateBeamPart($"LightPillar{i}", new Vector3(0.0f, 1.70f, z),
                     new Vector3(0.12f, 3.4f, 0.12f),
                     i % 2 == 0 ? m_beamWhiteMaterial : m_beamGoldMaterial);
@@ -432,7 +522,7 @@ namespace Yurube
 
             GimmickShockwave.Create(m_attackOrigin + Vector3.up * 0.03f,
                 new Color(1.0f, 0.82f, 0.30f, 0.95f), m_attackWidth * 2.0f, 0.5f);
-            GimmickShockwave.Create(m_attackOrigin + m_attackDirection * m_attackLength + Vector3.up * 0.03f,
+            GimmickShockwave.Create(m_attackOrigin + m_attackDirection * m_resolvedLength + Vector3.up * 0.03f,
                 new Color(1.0f, 1.0f, 0.85f, 0.9f), m_attackWidth * 2.4f, 0.6f);
 
             // 出現フレームでいきなり全開にならないよう、透明・縮小から始める
@@ -474,7 +564,7 @@ namespace Yurube
             line.startColor = new Color(1.0f, 1.0f, 0.90f, 0.95f);
             line.endColor = new Color(1.0f, 1.0f, 0.90f, 0.95f);
             line.SetPosition(0, new Vector3(x, 1.0f, 0.0f));
-            line.SetPosition(1, new Vector3(x, 1.0f, m_attackLength));
+            line.SetPosition(1, new Vector3(x, 1.0f, m_resolvedLength));
         }
 
         void UpdateBeamEffect(float dt)
@@ -543,7 +633,7 @@ namespace Yurube
                 Vector3 delta = character.transform.position - m_attackOrigin;
                 delta.y = 0.0f;
                 float along = Vector3.Dot(delta, m_attackDirection);
-                if (along < 0.0f || along > m_attackLength) continue;
+                if (along < 0.0f || along > m_resolvedLength) continue;
 
                 Vector3 closest = m_attackOrigin + m_attackDirection * along;
                 Vector3 offset = character.transform.position - closest;
@@ -567,6 +657,109 @@ namespace Yurube
             return material;
         }
 
+        void EndSpecial()
+        {
+            m_state = State.Idle;
+            m_stateTime = 0.0f;
+
+            if (m_character != null)
+            {
+                m_character.SetInvincible(0.0f);
+                if (m_movementFlagsStored)
+                {
+                    m_character.MovementOnly = m_previousMovementOnly;
+                    m_character.MovementLocked = m_previousMovementLocked;
+                }
+            }
+            m_movementFlagsStored = false;
+            EndRainbow();
+        }
+
+        // きだる/いわだると同じ無敵レインボー
+        void BeginRainbow()
+        {
+            if (m_rainbowActive || m_character == null) return;
+
+            var all = m_character.GetComponentsInChildren<Renderer>(true);
+            var list = new List<Renderer>();
+            foreach (var renderer in all)
+            {
+                if (renderer is MeshRenderer || renderer is SkinnedMeshRenderer)
+                    list.Add(renderer);
+            }
+
+            m_rainbowRenderers = list.ToArray();
+            m_originalMaterials = new Material[m_rainbowRenderers.Length][];
+            m_rainbowMaterials = new Material[m_rainbowRenderers.Length][];
+            for (int i = 0; i < m_rainbowRenderers.Length; i++)
+            {
+                var originals = m_rainbowRenderers[i].sharedMaterials;
+                m_originalMaterials[i] = originals;
+                var copies = new Material[originals.Length];
+                for (int j = 0; j < originals.Length; j++)
+                {
+                    if (originals[j] == null) continue;
+                    copies[j] = new Material(originals[j]);
+                    copies[j].EnableKeyword("_EMISSION");
+                }
+                m_rainbowMaterials[i] = copies;
+                m_rainbowRenderers[i].sharedMaterials = copies;
+            }
+
+            m_rainbowActive = true;
+            ApplyRainbow();
+        }
+
+        void ApplyRainbow()
+        {
+            if (!m_rainbowActive || m_rainbowMaterials == null) return;
+
+            float hue = Mathf.Repeat(Time.time * m_rainbowSpeed, 1.0f);
+            Color rainbow = Color.HSVToRGB(hue, 0.85f, 1.0f);
+            Color emission = rainbow * Mathf.Max(1.0f, m_rainbowEmission);
+            for (int i = 0; i < m_rainbowMaterials.Length; i++)
+            {
+                var materials = m_rainbowMaterials[i];
+                if (materials == null) continue;
+                for (int j = 0; j < materials.Length; j++)
+                {
+                    var material = materials[j];
+                    if (material == null) continue;
+                    if (material.HasProperty("_BaseColor")) material.SetColor("_BaseColor", rainbow);
+                    if (material.HasProperty("_Color")) material.SetColor("_Color", rainbow);
+                    if (material.HasProperty("_EmissionColor")) material.SetColor("_EmissionColor", emission);
+                }
+            }
+        }
+
+        void EndRainbow()
+        {
+            if (!m_rainbowActive) return;
+
+            if (m_rainbowRenderers != null)
+            {
+                for (int i = 0; i < m_rainbowRenderers.Length; i++)
+                {
+                    if (m_rainbowMaterials != null && i < m_rainbowMaterials.Length && m_rainbowMaterials[i] != null)
+                    {
+                        foreach (var material in m_rainbowMaterials[i])
+                        {
+                            if (material != null) Destroy(material);
+                        }
+                    }
+                    if (m_rainbowRenderers[i] == null) continue;
+                    if (m_originalMaterials != null && m_originalMaterials[i] != null)
+                        m_rainbowRenderers[i].sharedMaterials = m_originalMaterials[i];
+                    m_rainbowRenderers[i].enabled = true;
+                }
+            }
+
+            m_rainbowRenderers = null;
+            m_originalMaterials = null;
+            m_rainbowMaterials = null;
+            m_rainbowActive = false;
+        }
+
         void ClearBeam()
         {
             if (m_beam != null) Destroy(m_beam);
@@ -586,13 +779,14 @@ namespace Yurube
         {
             DestroyGuide();
             ClearBeam();
-            m_state = State.Idle;
+            EndSpecial();
         }
 
         private void OnDestroy()
         {
             DestroyGuide();
             ClearBeam();
+            EndSpecial();
         }
 
         private void OnGUI()

@@ -766,4 +766,10 @@ MonoBehaviour:
   m_attackLength: 14
   m_attackWidth: 3.2
   m_effectDuration: 1
+  m_useStageLength: 1
+  m_stageOvershoot: 2
+  m_fallbackStageLength: 60
+  m_invincibleExtra: 0.35
+  m_rainbowSpeed: 0.5
+  m_rainbowEmission: 1.5
   m_logSpecial: 1

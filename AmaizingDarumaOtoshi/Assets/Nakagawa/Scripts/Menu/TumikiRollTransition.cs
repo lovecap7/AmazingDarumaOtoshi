@@ -41,13 +41,26 @@ public class TumikiRollTransition : ISceneTransition
     };
 
     // ---- 調整できる値（大きさは円柱の直径 = 1 とした単位） ----
-    public float diameterPerScreen = 0.7f;   // 円柱の直径（画面の縦幅に対する割合）
+    public float diameterPerScreen = 0.35f;  // 円柱の直径（画面の縦幅に対する割合）
     public float thickness = 0.5f;           // 厚み（直径に対する割合。ゲームの積み木と同じ 0.5）
     public float yaw = 25f;                  // 横の厚みが見えるように回す角度
     public float spacingX = 0.5f;            // 横の間隔（直径に対する割合）
-    public float spacingY = 0.4f;            // 段の間隔
-    public float jitter = 0.07f;             // 並びのばらつき
-    public float speed = 3f;                 // 転がる速さ（画面の縦幅 / 秒）
+    // 転がる速さ（画面の縦幅 / 秒）。入ってくるときと抜けるときは速く、全面が埋まっている間は遅く
+    public float speedFast = 2.5f;
+    public float speedSlow = 0.5f;
+    public float speedEase = 0.4f;           // 速さを切り替える時間（秒。easeInCubic）
+    public float minHold = 0.35f;            // 埋まってから抜け始めるまでの最短の時間（遅くなったのが見えるように）
+    // 段の色（上から）。段の数はこの色の数で、画面の縦幅をちょうど等分して並べる
+    public Color[] rowColors =
+    {
+        new Color(0.91f, 0.26f, 0.24f),   // 赤
+        new Color(0.97f, 0.56f, 0.18f),   // 橙
+        new Color(0.98f, 0.83f, 0.22f),   // 黄
+        new Color(0.40f, 0.76f, 0.30f),   // 緑
+        new Color(0.26f, 0.62f, 0.90f),   // 青
+        new Color(0.25f, 0.32f, 0.70f),   // 藍
+        new Color(0.58f, 0.36f, 0.76f),   // 紫
+    };
 
     static readonly Vector3 StageOrigin = new Vector3(0f, -20000f, 0f);
 
@@ -65,12 +78,32 @@ public class TumikiRollTransition : ISceneTransition
     {
         public Transform root, pattern;
         public float ox, oy;   // 先頭からの位置（進む向きで）、高さ
+        public int row;        // 段（下から 0）
     }
+    float rowDepth;            // 段ごとの奥行きの間隔（下の段ほど手前）
     readonly List<Disc> discs = new List<Disc>();
 
     enum State { Idle, Covering, Holding, Revealing }
     State state;
     float front, coverEnd, bandLength, halfW, halfH;
+    float startFront;
+    float clock, holdStart;                                   // 演出の中の時計（秒）、埋まった時刻
+    float easeFrom, easeTo, easeStart, currentSpeed;           // 速さの切り替え（画面の縦幅 / 秒）
+
+    // 今の速さから to へ切り替え始める
+    void StartEase(float to)
+    {
+        easeFrom = currentSpeed;
+        easeTo = to;
+        easeStart = clock;
+    }
+
+    // easeInCubic で切り替えた今の速さ
+    float SpeedNow()
+    {
+        float t = Mathf.Clamp01((clock - easeStart) / Mathf.Max(0.01f, speedEase));
+        return Mathf.Lerp(easeFrom, easeTo, t * t * t);
+    }
 
     public void Build(RectTransform root)
     {
@@ -129,6 +162,10 @@ public class TumikiRollTransition : ISceneTransition
         Layout();
         stage.SetActive(true);
         image.enabled = true;
+        clock = 0f;
+        currentSpeed = speedFast;
+        easeFrom = easeTo = speedFast;   // 入ってくるときは速く
+        easeStart = 0f;
         state = State.Covering;
         Tick(0f);
         while (state == State.Covering) yield return null;
@@ -136,6 +173,9 @@ public class TumikiRollTransition : ISceneTransition
 
     public IEnumerator Reveal()
     {
+        // 遅くなったのが見えるまでは埋めたまま待ってから、速くして抜ける
+        while (state == State.Holding && clock - holdStart < minHold) yield return null;
+        StartEase(speedFast);
         state = State.Revealing;
         while (state == State.Revealing) yield return null;
         image.enabled = false;
@@ -159,17 +199,14 @@ public class TumikiRollTransition : ISceneTransition
         cam.orthographicSize = halfH;
         if (bodyMeshes == null) BuildMeshes();
 
-        // 段（下から上へ）× 列（先頭から後ろへ）。隣の段は半分ずらす
-        int rows = Mathf.CeilToInt(halfH * 2f / spacingY) + 2;
+        // 段（色の数。画面の縦幅を等分）× 列（先頭から後ろへ、等間隔）。ばらつき無しで縦横にそろえる
+        int rows = Mathf.Max(1, bodyMeshes.Length);
+        float spacingY = halfH * 2f / rows;
         int cols = Mathf.CeilToInt((halfW * 2f + 3f) / spacingX) + 1;
         bandLength = cols * spacingX;
+        rowDepth = bandLength * 2f + 5f;
         int need = rows * cols;
         while (discs.Count < need) discs.Add(MakeDisc(discs.Count));
-
-        // 重なり順（奥行き）はばらばらに
-        var order = new List<int>();
-        for (int i = 0; i < need; i++) order.Add(i);
-        for (int i = need - 1; i > 0; i--) { int j = Random.Range(0, i + 1); (order[i], order[j]) = (order[j], order[i]); }
 
         for (int i = 0; i < discs.Count; i++)
         {
@@ -177,20 +214,21 @@ public class TumikiRollTransition : ISceneTransition
             bool used = i < need;
             d.root.gameObject.SetActive(used);
             if (!used) continue;
-            int row = i / cols, col = i % cols;
-            d.ox = -(col * spacingX + (row % 2) * spacingX * 0.5f) + Random.Range(-jitter, jitter);
-            d.oy = -halfH - spacingY * 0.5f + row * spacingY + Random.Range(-jitter, jitter);
-            d.root.localPosition = new Vector3(0f, d.oy, order[i] * 1f);
+            int row = i / cols, col = i % cols;   // row は下から
+            d.row = row;
+            d.ox = -col * spacingX;
+            d.oy = -halfH + (row + 0.5f) * spacingY;
+            d.root.localPosition = new Vector3(0f, d.oy, Depth(d));
             d.root.localRotation = Quaternion.Euler(0f, yaw * dir, 0f);
-            int c = Random.Range(0, bodyMeshes.Length);
+            int c = rows - 1 - row;   // 色は上から
             d.root.GetComponent<MeshFilter>().sharedMesh = bodyMeshes[c];
             d.pattern.GetComponent<MeshFilter>().sharedMesh = patternMeshes[c];
-            d.pattern.localRotation = Quaternion.Euler(0f, 0f, Random.Range(0f, 360f));
+            d.pattern.localRotation = Quaternion.identity;
         }
-        cam.farClipPlane = need + 20f;
+        cam.farClipPlane = rows * rowDepth + 20f;
 
         // 先頭は画面の外（入ってくる側）から。先頭が反対側の外まで来たら埋まっている
-        front = -halfW - 0.8f;
+        front = startFront = -halfW - 0.8f;
         coverEnd = halfW + 0.95f;
     }
 
@@ -221,9 +259,12 @@ public class TumikiRollTransition : ISceneTransition
     void Tick(float dt)
     {
         if (state == State.Idle) return;
-        float v = speed * halfH * 2f;
-        front += v * dt;
+        clock += dt;
+        currentSpeed = SpeedNow();
+        front += currentSpeed * halfH * 2f * dt;
 
+        // 模様の角度（先頭の列 = front の位置での回り方）。入ってくる前の先頭（front = -halfW - 0.8）で 0°
+        float patternAngle = -(front - startFront) * 2f * Mathf.Rad2Deg * dir;
         bool allGone = true;
         foreach (var d in discs)
         {
@@ -232,20 +273,53 @@ public class TumikiRollTransition : ISceneTransition
             // 埋まっている間（読み込み中）は、抜けた円柱を後ろへ回して、いつまでも埋めておく
             if (state == State.Holding && x > halfW + 1.2f) { d.ox -= bandLength; x -= bandLength; }
             if (x - 0.7f <= halfW) allGone = false;
-            var p = d.root.localPosition;
-            d.root.localPosition = new Vector3(x * dir, p.y, p.z);
-            // 転がる：進んだ距離 ÷ 半径 だけ回る（右へ進むときは時計回り）
-            d.pattern.localRotation = Quaternion.Euler(0f, 0f, -x * 2f * Mathf.Rad2Deg * dir);
+            d.root.localPosition = new Vector3(x * dir, d.oy, Depth(d));
+            // 転がる：進んだ距離 ÷ 半径 だけ回る（右へ進むときは時計回り）。
+            // 模様の向きは全部そろえる（どれも先頭の列と同じ回り方。位置で角度を変えない）
+            d.pattern.localRotation = Quaternion.Euler(0f, 0f, patternAngle);
         }
 
-        if (state == State.Covering && front >= coverEnd) state = State.Holding;
+        if (state == State.Covering && front >= coverEnd)
+        {
+            // 全面が埋まった：遅くする
+            state = State.Holding;
+            holdStart = clock;
+            StartEase(speedSlow);
+        }
         else if (state == State.Revealing && allGone) state = State.Idle;
     }
+
+    // 重なり順：下の段ほど手前、同じ段では先頭ほど手前（隣どうしが食い込まない間隔をあける）
+    float Depth(Disc d) => d.row * rowDepth + (-d.ox) * 2f;
 
     class Runner : MonoBehaviour
     {
         public TumikiRollTransition owner;
+        bool fogWas;
         void Update() { if (owner != null) owner.Tick(Mathf.Min(Time.unscaledDeltaTime, 0.05f)); }
+
+        // シーンのフォグがこのカメラ（円柱）にかかって白っぽくならないように、描く間だけ切る
+        void OnEnable()
+        {
+            UnityEngine.Rendering.RenderPipelineManager.beginCameraRendering += FogOff;
+            UnityEngine.Rendering.RenderPipelineManager.endCameraRendering += FogBack;
+        }
+        void OnDisable()
+        {
+            UnityEngine.Rendering.RenderPipelineManager.beginCameraRendering -= FogOff;
+            UnityEngine.Rendering.RenderPipelineManager.endCameraRendering -= FogBack;
+        }
+        void FogOff(UnityEngine.Rendering.ScriptableRenderContext ctx, Camera c)
+        {
+            if (owner == null || c != owner.cam) return;
+            fogWas = RenderSettings.fog;
+            RenderSettings.fog = false;
+        }
+        void FogBack(UnityEngine.Rendering.ScriptableRenderContext ctx, Camera c)
+        {
+            if (owner == null || c != owner.cam) return;
+            RenderSettings.fog = fogWas;
+        }
     }
 
     // ---------------- 円柱のメッシュ ----------------
@@ -254,7 +328,7 @@ public class TumikiRollTransition : ISceneTransition
 
     void BuildMeshes()
     {
-        var palette = ToyKit.Palette;
+        var palette = rowColors != null && rowColors.Length > 0 ? rowColors : ToyKit.Palette;
         bodyMeshes = new Mesh[palette.Length];
         patternMeshes = new Mesh[palette.Length];
         for (int i = 0; i < palette.Length; i++)

@@ -33,6 +33,11 @@ namespace Yurube
         Material m_spokeMaterial;
         Material m_hammerSilhouetteMaterial;
         Material m_concentrationMaterial;
+        Material m_energyHammerMaterial;
+        Vector3 m_cameraBasePosition;
+        bool m_impactDone;
+        float m_impactPulse;
+        float m_impactFlashUntil;
 
         // 六腕を表す背景ホイール。白い6本の筋とオレンジのハンマー影絵を回す。
         Transform m_spokeWheel;
@@ -51,6 +56,11 @@ namespace Yurube
         [SerializeField] Color m_spokeColor = new Color(1.0f, 1.0f, 1.0f, 0.55f);
         [SerializeField] Color m_hammerSilhouetteColor = new Color(0.62f, 0.30f, 0.10f, 0.95f);
 
+        [Header("腕")]
+        [SerializeField, Min(0.0f)] float m_armAppearStagger = 0.075f;
+        [SerializeField, Min(0.05f)] float m_armAppearTime = 0.24f;
+        [SerializeField, Min(0.0f)] float m_armsImpactTime = 0.72f;
+
         [Header("タイトル")]
         [SerializeField] float m_titleTilt = -4.0f;
         [SerializeField] float m_titleIntroScale = 1.4f;
@@ -63,7 +73,7 @@ namespace Yurube
         GUIStyle m_titleStyle;
         bool m_stylesReady;
 
-        class Arm
+        struct Arm
         {
             public Transform Hand;
             public Transform Cylinder;
@@ -73,6 +83,11 @@ namespace Yurube
             public float Height;
             public float Phase;
             public float Tilt;
+            public float AppearDelay;
+            public float Side;
+            public Vector3 HandBase;
+            public float OrbitSpeed;
+            public float OrbitRadius;
         }
 
         public static void Show(string specialName, DarumaCharacter character)
@@ -118,6 +133,9 @@ namespace Yurube
             m_specialName = specialName;
             m_start = Time.unscaledTime;
             m_active = true;
+            m_impactDone = false;
+            m_impactPulse = 0.0f;
+            m_impactFlashUntil = 0.0f;
 
             BuildStage(character);
         }
@@ -153,11 +171,12 @@ namespace Yurube
             var cameraObject = new GameObject("AodaruCutInCamera");
             cameraObject.transform.SetParent(m_stage.transform, false);
             cameraObject.transform.localPosition = new Vector3(0.0f, 1.72f, -3.10f);
+            m_cameraBasePosition = cameraObject.transform.localPosition;
             m_camera = cameraObject.AddComponent<Camera>();
             m_camera.orthographic = false;
             m_camera.fieldOfView = 52.0f;
             m_camera.clearFlags = CameraClearFlags.SolidColor;
-            m_camera.backgroundColor = new Color(0.010f, 0.025f, 0.070f, 1.0f);
+            m_camera.backgroundColor = new Color(0.040f, 0.100f, 0.220f, 1.0f);
             m_camera.cullingMask = 1 << CutInLayer;
             m_camera.nearClipPlane = 0.05f;
             m_camera.farClipPlane = 40.0f;
@@ -199,6 +218,8 @@ namespace Yurube
             m_spokeMaterial = CreateUnlitMaterial(m_spokeColor, true);
             m_hammerSilhouetteMaterial = CreateUnlitMaterial(m_hammerSilhouetteColor, false);
             m_concentrationMaterial = CreateUnlitMaterial(new Color(1.0f, 1.0f, 1.0f, 0.30f), true);
+            // 通常の木製ハンマーではなく、必殺技用の青いエネルギー体にする
+            m_energyHammerMaterial = CreateUnlitMaterial(new Color(0.40f, 0.92f, 1.65f, 1.0f), true);
         }
 
         Material CreateUnlitMaterial(Color color, bool additive)
@@ -232,6 +253,19 @@ namespace Yurube
             float[] radii = { 1.95f, 2.20f, 1.82f, 2.05f, 2.25f, 1.88f };
             float[] heights = { 1.35f, 1.92f, 2.30f, 1.45f, 1.05f, 1.78f };
             float[] speeds = { 72.0f, 58.0f, 66.0f, 51.0f, 63.0f, 55.0f };
+            float[] sides = { -1.0f, -1.0f, -1.0f, 1.0f, 1.0f, 1.0f };
+            // 6本が重ならない固定スロット。左右3本ずつ、高さを大きく変える。
+            Vector3[] handSlots =
+            {
+                new Vector3(-1.52f, 2.30f, -0.12f),
+                new Vector3(-1.98f, 1.60f, -0.12f),
+                new Vector3(-1.62f, 0.92f, -0.12f),
+                new Vector3(1.58f, 2.32f, -0.12f),
+                new Vector3(2.02f, 1.55f, -0.12f),
+                new Vector3(1.66f, 0.88f, -0.12f),
+            };
+            float[] orbitSpeeds = { 1.7f, -1.5f, 1.9f, -1.8f, 1.6f, -2.0f };
+            float[] orbitRadii = { 0.07f, 0.09f, 0.06f, 0.08f, 0.07f, 0.06f };
 
             for (int i = 0; i < 6; i++)
             {
@@ -241,11 +275,20 @@ namespace Yurube
 
                 if (hammerSource != null)
                 {
-                    var hammer = CloneVisual(hammerSource.gameObject, hand, "CutInHammer");
+                    var hammer = CreateHammerVisual(hammerSource, hand);
                     hammer.transform.localPosition = Vector3.zero;
                     hammer.transform.localRotation = Quaternion.identity;
-                    hammer.transform.localScale = Vector3.one * 0.52f;
-                    m_createdObjects.Add(hammer);
+                    hammer.transform.localScale = Vector3.one * 0.62f;
+                    // 木製の茶色を消し、青いエネルギー体のハンマーにする
+                    foreach (var hammerRenderer in hammer.GetComponentsInChildren<Renderer>(true))
+                    {
+                        if (hammerRenderer == null) continue;
+                        if (m_energyHammerMaterial != null)
+                            hammerRenderer.sharedMaterial = m_energyHammerMaterial;
+                        hammerRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                        hammerRenderer.receiveShadows = false;
+                    }
+                    m_createdObjects.Add(hammer.gameObject);
                 }
 
                 var trailObject = new GameObject("HammerTrail");
@@ -292,7 +335,16 @@ namespace Yurube
                     Height = heights[i],
                     Phase = Random.Range(0.0f, 6.28f),
                     Tilt = Random.Range(-22.0f, 22.0f),
+                    AppearDelay = i * m_armAppearStagger,
+                    Side = sides[i],
+                    HandBase = handSlots[i],
+                    OrbitSpeed = orbitSpeeds[i],
+                    OrbitRadius = orbitRadii[i],
                 });
+
+                // 最初のAnimateまで胴体の中に隠す
+                hand.localScale = Vector3.zero;
+                cylinder.transform.localScale = Vector3.zero;
             }
         }
 
@@ -352,7 +404,7 @@ namespace Yurube
                 pivot.localScale = new Vector3(0.01f, 1.0f, 1.0f);
 
                 CreateQuad("Spoke", pivot, 0.62f, 2.85f, m_spokeWidth, m_spokeMaterial);
-                CreateHammerSilhouette(pivot, 2.85f);
+                // 背景の茶色いハンマー影絵は、青い実ハンマーと紛れるため使用しない
                 m_spokes.Add(pivot);
             }
 
@@ -479,33 +531,70 @@ namespace Yurube
             {
                 var arm = m_arms[i];
                 if (arm.Hand == null) continue;
-                float angle = arm.BaseAngle + arm.Speed * age;
-                float radians = angle * Mathf.Deg2Rad;
-                float radius = arm.Radius + Mathf.Sin(age * 1.7f + arm.Phase) * 0.10f;
-                float y = arm.Height + Mathf.Sin(age * 2.4f + arm.Phase) * 0.12f;
-                Vector3 handPoint = new Vector3(
-                    Mathf.Cos(radians) * radius,
-                    y,
-                    0.15f + Mathf.Sin(age * 1.3f + arm.Phase) * 0.16f);
-
-                arm.Hand.localPosition = handPoint;
-                arm.Hand.localRotation = Quaternion.Euler(
-                    Mathf.Sin(age * 2.0f + arm.Phase) * arm.Tilt,
-                    -angle + 90.0f,
-                    Mathf.Cos(age * 1.8f + arm.Phase) * arm.Tilt);
+                float orbitX = Mathf.Cos(age * arm.OrbitSpeed + arm.Phase) * arm.OrbitRadius;
+                float orbitY = Mathf.Sin(age * arm.OrbitSpeed * 1.2f + arm.Phase) * arm.OrbitRadius;
+                Vector3 targetHand = arm.HandBase + new Vector3(orbitX, orbitY, 0.0f);
 
                 Vector3 shoulderPoint = new Vector3(
                     Mathf.Cos(arm.BaseAngle * Mathf.Deg2Rad) * 0.42f,
                     1.20f + Mathf.Sin(arm.BaseAngle * Mathf.Deg2Rad) * 0.22f,
                     0.05f + i * 0.01f);
+
+                // 胴体から「にょきっ」と生える。EaseOutBackで少し行き過ぎてから収まる
+                float raw = Mathf.Clamp01((age - arm.AppearDelay) / Mathf.Max(0.01f, m_armAppearTime));
+                float grow = EaseOutBack(raw);
+                float visibleGrow = Mathf.Max(0.01f, grow);
+                Vector3 handPoint = Vector3.Lerp(shoulderPoint, targetHand, grow);
+
+                arm.Hand.localPosition = handPoint;
+                arm.Hand.localScale = Vector3.one * Mathf.Clamp(visibleGrow, 0.01f, 1.15f);
+                // ハンマーが真横を向いて「消えた」ように見えないよう、全体的にカメラ側へ向ける。
+                // 奥行きの角度は個体ごとに少し変えて6本の向きの違いを出す。
+                float hammerYaw = 180.0f + (i - 2.5f) * 9.0f
+                    + Mathf.Sin(age * 1.6f + arm.Phase) * 6.0f;
+                arm.Hand.localRotation = Quaternion.Euler(
+                    Mathf.Sin(age * 2.0f + arm.Phase) * arm.Tilt,
+                    hammerYaw,
+                    Mathf.Cos(age * 1.8f + arm.Phase) * arm.Tilt);
+
                 Vector3 direction = handPoint - shoulderPoint;
-                float length = Mathf.Max(0.05f, direction.magnitude);
+                float length = Mathf.Max(0.02f, direction.magnitude);
                 arm.Cylinder.localPosition = (shoulderPoint + handPoint) * 0.5f;
                 arm.Cylinder.localRotation = Quaternion.FromToRotation(Vector3.up, direction.normalized);
                 arm.Cylinder.localScale = new Vector3(0.055f, length * 0.5f, 0.055f);
             }
 
+            // 6本が出揃う瞬間にカメラを揺らし、画面を青白くフラッシュさせる
+            if (!m_impactDone && age >= m_armsImpactTime)
+            {
+                m_impactDone = true;
+                m_impactPulse = 1.0f;
+                m_impactFlashUntil = Time.unscaledTime + 0.16f;
+            }
+            if (m_camera != null)
+            {
+                if (m_impactPulse > 0.0f)
+                {
+                    Vector2 shake = Random.insideUnitCircle * (0.18f * m_impactPulse);
+                    m_camera.transform.localPosition = m_cameraBasePosition
+                        + new Vector3(shake.x, shake.y, Random.Range(-0.08f, 0.08f) * m_impactPulse);
+                    m_impactPulse = Mathf.Max(0.0f, m_impactPulse - Time.unscaledDeltaTime * 5.0f);
+                }
+                else
+                {
+                    m_camera.transform.localPosition = m_cameraBasePosition;
+                }
+            }
+
             AnimateBackground(age);
+        }
+
+        static float EaseOutBack(float t)
+        {
+            t = Mathf.Clamp01(t);
+            const float c1 = 1.70158f;
+            const float c3 = c1 + 1.0f;
+            return 1.0f + c3 * Mathf.Pow(t - 1.0f, 3.0f) + c1 * Mathf.Pow(t - 1.0f, 2.0f);
         }
 
         void CreateTitleStyle()
@@ -539,6 +628,17 @@ namespace Yurube
             GUI.color = Color.white;
             GUI.DrawTexture(new Rect(0.0f, 0.0f, Screen.width, Screen.height),
                 m_renderTexture, ScaleMode.ScaleAndCrop, false);
+
+            // 6本が出揃った瞬間の青白いフラッシュ
+            float impactFlash = m_impactFlashUntil - Time.unscaledTime;
+            if (impactFlash > 0.0f)
+            {
+                GUI.color = new Color(0.62f, 0.88f, 1.0f,
+                    Mathf.Clamp01(impactFlash / 0.16f) * 0.32f);
+                GUI.DrawTexture(new Rect(0.0f, 0.0f, Screen.width, Screen.height),
+                    Texture2D.whiteTexture);
+                GUI.color = Color.white;
+            }
 
             GUI.color = new Color(1.0f, 1.0f, 1.0f, fade);
             float intro = Mathf.Clamp01(age / 0.14f);
@@ -594,6 +694,9 @@ namespace Yurube
             if (m_backdropMaterial != null) Destroy(m_backdropMaterial);
             if (m_armMaterial != null) Destroy(m_armMaterial);
             if (m_trailMaterial != null) Destroy(m_trailMaterial);
+            if (m_spokeMaterial != null) Destroy(m_spokeMaterial);
+            if (m_hammerSilhouetteMaterial != null) Destroy(m_hammerSilhouetteMaterial);
+            if (m_concentrationMaterial != null) Destroy(m_concentrationMaterial);
 
             m_stage = null;
             m_camera = null;
@@ -606,6 +709,8 @@ namespace Yurube
             m_spokeMaterial = null;
             m_hammerSilhouetteMaterial = null;
             m_concentrationMaterial = null;
+            if (m_energyHammerMaterial != null) Destroy(m_energyHammerMaterial);
+            m_energyHammerMaterial = null;
             m_spokeWheel = null;
             m_spokes.Clear();
             for (int i = 0; i < m_backgroundMeshes.Count; i++)
@@ -627,6 +732,31 @@ namespace Yurube
                 if (found != null) return found;
             }
             return null;
+        }
+
+        // ハンマー本体のDarumaHammer(Awakeで所有者を参照する)を複製せず、
+        // 見た目の子オブジェクトだけを複製する。これでAwakeのNullReferenceを防ぐ。
+        Transform CreateHammerVisual(Transform source, Transform parent)
+        {
+            var root = new GameObject("CutInHammer").transform;
+            root.SetParent(parent, false);
+            root.gameObject.layer = CutInLayer;
+            if (source == null) return root;
+
+            for (int i = 0; i < source.childCount; i++)
+            {
+                var child = source.GetChild(i);
+                var clone = Instantiate(child.gameObject, root, false);
+                clone.name = child.name;
+                clone.transform.localPosition = child.localPosition;
+                clone.transform.localRotation = child.localRotation;
+                clone.transform.localScale = child.localScale;
+                foreach (var collider in clone.GetComponentsInChildren<Collider>(true)) Destroy(collider);
+                foreach (var body in clone.GetComponentsInChildren<Rigidbody>(true)) Destroy(body);
+                foreach (var mono in clone.GetComponentsInChildren<MonoBehaviour>(true)) Destroy(mono);
+                SetLayerRecursively(clone);
+            }
+            return root;
         }
 
         GameObject CloneVisual(GameObject source, Transform parent, string name)
@@ -657,17 +787,16 @@ namespace Yurube
             float max = size * 0.5f;
 
             // 同心円・破片・粒子を廃止し、黒〜濃紺の放射ビネットだけにする
-            Color inner = new Color(0.025f, 0.055f, 0.120f);
-            Color outer = new Color(0.003f, 0.008f, 0.025f);
             for (int y = 0; y < size; y++)
             {
                 for (int x = 0; x < size; x++)
                 {
                     float r = Vector2.Distance(new Vector2(x, y), center) / max;
                     float t = Mathf.Clamp01(r);
-                    Color color = Color.Lerp(inner, outer, Mathf.SmoothStep(0.0f, 1.0f, t));
+                    Color color = Color.Lerp(new Color(0.090f, 0.200f, 0.400f),
+                        new Color(0.015f, 0.040f, 0.100f), Mathf.SmoothStep(0.0f, 1.0f, t));
                     float glow = Mathf.Pow(Mathf.Clamp01(1.0f - r), 3.0f);
-                    color += new Color(glow * 0.035f, glow * 0.075f, glow * 0.160f);
+                    color += new Color(glow * 0.10f, glow * 0.20f, glow * 0.38f);
                     pixels[y * size + x] = color;
                 }
             }

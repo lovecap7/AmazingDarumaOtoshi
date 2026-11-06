@@ -24,5 +24,5 @@ MonoBehaviour:
   hammerPower: 3
   hammerSpeed: 3
   hammerReach: 3
-  specialName: "\uFF5E\uFF5E\uFF5E"
-  specialText: "\uFF5E\uFF5E\uFF5E"
+  specialName: "\u30D5\u30A1\u30F3\u30CD\u30EB"
+  specialText: "\u7A4D\u307F\u6728\u3092\u5206\u88C2\u3055\u305B\u3001\u6575\u3092\u8FFD\u5C3E\u3055\u305B\u308B"
