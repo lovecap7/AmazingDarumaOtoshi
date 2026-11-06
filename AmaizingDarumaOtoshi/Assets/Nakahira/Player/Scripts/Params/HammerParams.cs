@@ -56,5 +56,9 @@ namespace Nakahira
         [Min(0.0f)] public float SelfShake = 0.04f;
         [Tooltip("スロー中に弾いた積み木・叩いた相手が震える幅(m)")]
         [Min(0.0f)] public float TargetShake = 0.1f;
+
+        [Header("トレイル(振っている間、ハンマーの頭から出る線)")]
+        [Tooltip("使うトレイルのプレハブ(Assets/Nakahira/Player/Effects/HammerTrail*.prefab)。空ならトレイルを出さない。\n太さ・残る時間・色はプレハブの TrailRenderer で編集する")]
+        public HammerTrail TrailPrefab;
     }
 }
