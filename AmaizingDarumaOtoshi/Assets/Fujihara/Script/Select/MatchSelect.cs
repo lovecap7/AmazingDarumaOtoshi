@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
@@ -358,8 +358,9 @@ public class MatchSelect : MonoBehaviour
         if (phaseFrame != Time.frameCount)
         {
             int n = modeCards.Length;
-            if (MenuInput.LeftRepeat()) { modeIndex = (modeIndex + n - 1) % n; MenuSounds.Cursor(); }
-            else if (MenuInput.RightRepeat()) { modeIndex = (modeIndex + 1) % n; MenuSounds.Cursor(); }
+            // 押しっぱなしのくり返しは端で止まる。押し直したときだけ反対の端へ回る
+            if (MenuInput.LeftRepeat() && MenuInput.StepRepeat(ref modeIndex, n, MenuInput.Dir.Left, -1)) MenuSounds.Cursor();
+            else if (MenuInput.RightRepeat() && MenuInput.StepRepeat(ref modeIndex, n, MenuInput.Dir.Right, 1)) MenuSounds.Cursor();
             else if (MenuInput.Submit() || MenuInput.Start())
             {
                 MenuSounds.Decide();
@@ -405,15 +406,24 @@ public class MatchSelect : MonoBehaviour
         var rules = MatchSetup.Rules;
         if (phaseFrame != Time.frameCount)
         {
-            if (MenuInput.UpRepeat()) { ruleIndex = NextRuleRow(-1); MenuSounds.Cursor(); }
-            else if (MenuInput.DownRepeat()) { ruleIndex = NextRuleRow(1); MenuSounds.Cursor(); }
+            // 押しっぱなしのくり返しは端で止まる。押し直したときだけ反対の端へ回る
+            if (MenuInput.UpRepeat())
+            {
+                int next = NextRuleRow(-1, MenuInput.RepeatStarted(MenuInput.Dir.Up));
+                if (next != ruleIndex) { ruleIndex = next; MenuSounds.Cursor(); }
+            }
+            else if (MenuInput.DownRepeat())
+            {
+                int next = NextRuleRow(1, MenuInput.RepeatStarted(MenuInput.Dir.Down));
+                if (next != ruleIndex) { ruleIndex = next; MenuSounds.Cursor(); }
+            }
             else if (MenuInput.Start()) { MenuSounds.Decide(); GoToCharacterSelect(); return; }
             else if (MenuInput.Cancel()) { MenuSounds.Cancel(); GoToModeSelect(); return; }
             else if (MenuInput.Submit())
             {
                 // A：次の項目へ進む（「キャラクターセレクトへ」の上で押したら決定）
                 if (ruleRows[ruleIndex].kind == RuleKind.Next) { MenuSounds.Decide(); GoToCharacterSelect(); return; }
-                ruleIndex = NextRuleRow(1);
+                ruleIndex = NextRuleRow(1, true);
                 MenuSounds.Cursor();
             }
             else if (MenuInput.LeftRepeat() || MenuInput.RightRepeat())
@@ -473,13 +483,19 @@ public class MatchSelect : MonoBehaviour
     }
 
     // 上下で次に選べる行（説明だけの行は飛ばす）
-    int NextRuleRow(int dir)
+    // wrap = false：端まで来たら止まる（押しっぱなしのくり返し用）。true：反対の端へ回る（押し直したとき用）
+    int NextRuleRow(int dir, bool wrap)
     {
         int n = ruleRows.Count, i = ruleIndex;
-        for (int step = 0; step < n; step++)
+        for (int step = 1; step < n; step++)
         {
-            i = (i + dir + n) % n;
-            if (ruleRows[i].kind != RuleKind.Info) return i;
+            int j = i + dir * step;
+            if (j < 0 || j >= n)
+            {
+                if (!wrap) return ruleIndex;
+                j = (j % n + n) % n;
+            }
+            if (ruleRows[j].kind != RuleKind.Info) return j;
         }
         return ruleIndex;
     }

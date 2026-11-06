@@ -93,8 +93,9 @@ public class AchievementBook : MonoBehaviour
         if (!open || Time.frameCount == openedFrame) return;
 
         int n = rowBgs.Count;
-        if (n > 0 && MenuInput.UpRepeat()) { index = (index + n - 1) % n; MenuSounds.Cursor(); }
-        else if (n > 0 && MenuInput.DownRepeat()) { index = (index + 1) % n; MenuSounds.Cursor(); }
+        // 押しっぱなしのくり返しは端で止まる。押し直したときだけ反対の端へ回る
+        if (n > 0 && MenuInput.UpRepeat() && MenuInput.StepRepeat(ref index, n, MenuInput.Dir.Up, -1)) MenuSounds.Cursor();
+        else if (n > 0 && MenuInput.DownRepeat() && MenuInput.StepRepeat(ref index, n, MenuInput.Dir.Down, 1)) MenuSounds.Cursor();
         else if (MenuInput.Cancel()) { Close(); return; }
         UpdateRows(dt);
     }
