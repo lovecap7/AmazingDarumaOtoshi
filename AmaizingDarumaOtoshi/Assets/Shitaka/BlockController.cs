@@ -1,6 +1,7 @@
 using System;
-using UnityEngine;
 using System.Collections.Generic;
+using Unity.VisualScripting;
+using UnityEngine;
 
 public class BlockController : MonoBehaviour 
 {
@@ -20,7 +21,7 @@ public class BlockController : MonoBehaviour
     public event Action OnFlightEnded;
 
     // テスト用：インスペクターで挙動を選べるようにする
-    public enum BehaviorType { Normal, Iwa,HebiLeft, HebiRight, UnBreak,Homing,Ziguzagu,Grow,Bomb, Magnet,Fade, Boomerang, Gravity, Accelerat, Funnel, Afterimage, Teleport }
+    public enum BehaviorType { Normal, Iwa,HebiLeft, HebiRight, UnBreak,Homing,Ziguzagu,Grow,Bomb, Magnet,Fade, Boomerang, Gravity, Accelerat, Funnel, Afterimage, Teleport, Mirage }
     [SerializeField] BehaviorType behaviorType = BehaviorType.Normal;
     [SerializeField] float hebiTurnSpeed = 60.0f; // テスト用：へびだるの曲がる強さ(度/秒)。大きいほど急カーブになる
     [SerializeField] float homingStartTurnSpeed = 270.0f;  // テスト用：ホーミング発射直後の旋回速度(度/秒)
@@ -72,6 +73,11 @@ public class BlockController : MonoBehaviour
     float teleportGhostExpand = 1.6f; // テスト用：残像が消えるまでに広がる大きさ(積み木の何倍か)
     float teleportTrailSpacing = 1.2f; // テスト用：軌跡の残像の間隔(積み木の幅に対する倍率)
     [SerializeField] Material teleportGhostMaterial;     // テスト用：残像用の半透明マテリアル
+
+    int cloneCount = 2;           // テスト用：作る分身の数
+    float cloneLifetime = 4.0f;   // テスト用：分身が消えるまでの時間(秒)
+    float cloneSpacing = 1.5f;    // テスト用：分身を並べる間隔(積み木の幅に対する倍率)
+    float cloneTint = 0.15f;  // テスト用：分身をどれだけ暗くするか(0で本体と同じ見た目)
 
     public bool isFlying {  get; private set; } // 現在飛行中かどうか trueの場合は攻撃判定が発生する
 
@@ -148,6 +154,7 @@ public class BlockController : MonoBehaviour
             case BehaviorType.Afterimage: return new AfterimageBehavior(this, afterimageDelay, afterimageLifetime, afterimageAlpha, afterimageMaterial);
             case BehaviorType.Teleport:return new TeleportBehavior(this, teleportDistance, teleportMaxUses,0.1f, 1.5f, teleportWindUp, teleportGhostLifetime, 
                                                                    teleportGhostAlpha, teleportGhostMaterial, teleportGhostExpand, teleportTrailSpacing);
+            case BehaviorType.Mirage: return new MirageBehavior(this, cloneCount, cloneLifetime, cloneSpacing, cloneTint);
             case BehaviorType.Normal:
             default: return new NormalBehavior();
         }
