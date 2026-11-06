@@ -30,6 +30,10 @@ namespace Yurube
         [Tooltip("発動・分裂をConsoleに出す(テスト用)")]
         [SerializeField] bool m_logSpecial = true;
 
+        [Header("カットイン")]
+        [Tooltip("画面下部に表示する必殺技名")]
+        [SerializeField] string m_cutInName = "ファンネル";
+
         DarumaCharacter m_character;
         SpecialGauge m_gauge;
 
@@ -68,6 +72,12 @@ namespace Yurube
 
             // 撃つ前の積み木の数 = 分裂する数
             int count = m_character.Stack.Count;
+            var cutInBlocks = new List<TumikiBlock>(count);
+            for (int i = 0; i < count; i++)
+            {
+                var stackBlock = m_character.Stack.Get(i);
+                if (stackBlock != null) cutInBlocks.Add(stackBlock);
+            }
 
             var block = m_character.Stack.RemoveAt(0);
             if (block == null) return false;
@@ -78,6 +88,10 @@ namespace Yurube
             Vector3 position = center + direction * (DarumaCharacter.kBodyRadius + TumikiBlock.kRadius + 0.05f);
             bool embedded = Nakagawa.TumikiPlacement.ResolveEmbed(center, ref position);
             block.transform.position = position;
+
+            // カットインを先に開始し、その間に実際の分裂処理を組み立てる。
+            // timeScale=0中は弾が動かず、カットイン終了後に本来の攻撃が始まる。
+            MidaruCutIn.Show(m_cutInName, m_character, cutInBlocks);
 
             Split(block, Mathf.Max(1, count), position, direction);
             if (embedded) Nakagawa.TumikiPlacement.IgnoreCharactersAfterEmbed(block);

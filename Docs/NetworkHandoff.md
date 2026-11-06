@@ -149,6 +149,8 @@ NetStages を直接開いて試すとき:
 ### 注意
 - Unity のウィンドウが裏にあると、Windows 版ではコンパイルが始まらないことがある（MCP から編集した後はユーザーに Unity をクリックしてもらう）。
 - `DefaultNetworkPrefabs.asset` に NetworkObject のない `DarumaCharacter.prefab` のエントリが紛れ込んだことが2回あった。再生時に「missing a NetworkObject」の警告が出たら外す。
+- **PC 2台でエディター同士だとつながらない（ビルドの exe ならつながる）とき**: ホストにする PC の Windows ファイアウォールで、Unity エディター（例: 「Unity 6000.6.3f1 Editor」）の受信が「パブリック」でブロックになっている（2026-11-06 に確認。ネットワークの種類がパブリックのとき）。
+  exe は別の規則で許可されているのでつながる。「Windows Defender ファイアウォールを介したアプリまたは機能を許可」で Unity エディターの「パブリック」にチェックを入れる（管理者の権限が必要。参加する側の PC は変えなくてよい）。変えられない PC では、ホストは exe で立てる。
 - エディタで再生すると `TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF - Fallback.asset` が変わることがある。コミットに入れずに元に戻す。
 - MCP の撮影（screenshot）のあと、エディタが一時停止したままになることがあった（エラーではない）。止まっていたら再生を続ける。
 - **MCP からビルドすると、その間 Unity と MCP が止まる**。さらに URP の設定・ProjectSettings・TextMesh Pro のフォント・`Assets/Resources/PerformanceTestRun*.json` が変わるので、コミットに入れずに元に戻す。

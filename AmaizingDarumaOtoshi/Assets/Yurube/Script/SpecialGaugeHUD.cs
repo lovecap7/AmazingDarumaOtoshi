@@ -22,7 +22,8 @@ namespace Yurube
             // 必ずカットインが最前面になるようにする。
             if (SpecialCutIn.IsPlaying || IwadaruCutIn.IsPlaying
                 || HebidaruCutIn.IsPlaying || DaruKingCutIn.IsPlaying
-                || AodaruCutIn.IsPlaying) return;
+                || AodaruCutIn.IsPlaying || MidaruCutIn.IsPlaying
+                || KidaruCutIn.IsPlaying) return;
 
             MatchPlayer me = null;
             foreach (var p in DarumaMatch.Current.Players)

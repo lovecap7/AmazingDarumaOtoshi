@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using TMPro;
@@ -20,6 +20,7 @@ using UnityEngine.UI;
 // ・たたかう（battleStyle = KnockTwice のとき）：画面外へ叩き飛ばすと、右から「ローカル」「オンライン」の積み木が
 //   飛んできて山の横に積まれる。選んだ方をもう一度叩き飛ばしてシーンへ。B で2つは飛んでいき、たたかうが戻ってくる
 // ・クレジット：背景をボカしてスタッフロール ・やめる：画面外へ叩き飛ばして終了
+// ・項目の並び・数・名前は items（ItemKind ごとに動きが決まる）。せってい＝サウンド＋ビデオを1枚の看板に、じっせき＝AchievementBook
 // 共通の部品は ToyKit。
 public class MainMenu : MonoBehaviour
 {
@@ -43,29 +44,46 @@ public class MainMenu : MonoBehaviour
     [Tooltip("たたかうの選び方。KnockTwice：叩き飛ばすと「ローカル／オンライン」の積み木が飛んできて、もう一度叩く　Board：看板のボタンで選ぶ")]
     [SerializeField] BattleStyle battleStyle = BattleStyle.KnockTwice;
 
-    [Header("項目（上から。並びは固定：たたかう／サウンド／ビデオ／ずかん（クレジット）／やめる）")]
-    [SerializeField] string[] labels = { "たたかう", "サウンド", "ビデオ", "ずかん", "やめる" };
+    // 項目の種類。並び順・数は items で自由に変えられる（同じ種類を2つ置かない）
+    // Settings：サウンドとビデオを1枚の看板にまとめたもの　Sound／Video：別々の看板（前の形）
+    // Book：キャラのずかん（roster が無ければクレジット）　Achievements：じっせき　Credits：クレジット
+    public enum ItemKind { Battle, Settings, Book, Achievements, Quit, Sound, Video, Credits, None = 99 }
+
+    [Serializable]
+    public class MenuItem
+    {
+        public ItemKind kind;
+        [Tooltip("積み木に書く名前")]
+        public string label;
+        [Tooltip("看板の説明（たたかう・せってい・サウンド・ビデオは看板に操作画面が出るので使わない）")]
+        [TextArea(1, 3)] public string description;
+        [Tooltip("下の帯に出す説明")]
+        [TextArea(1, 3)] public string help;
+        [Tooltip("ハンマーの位置のずらし（再生中に変えてもすぐ反映される。x：右　y：上　z：奥）")]
+        public Vector3 hammerOffset;
+        [Tooltip("看板を操作している間も、看板の見出しに名前を出す")]
+        public bool titleInPanel = true;
+        public MenuItem() { }
+        public MenuItem(ItemKind kind, string label, string description, string help, float hammerY)
+        {
+            this.kind = kind; this.label = label; this.description = description; this.help = help;
+            hammerOffset = new Vector3(0f, hammerY, 0f);
+        }
+    }
+
+    [Header("項目（上から）")]
+    [Tooltip("メニューの積み木（上から）。種類ごとの動きは ItemKind で決まる。看板と積み木は始まったときに作るので、再生中に変えたら再生し直す")]
+    [SerializeField] MenuItem[] items =
+    {
+        new MenuItem(ItemKind.Battle, "たたかう", "だるまを積んで、飛ばして、\n最後の一人を落とせ！",
+                     "だるまを叩き合って、相手の頭を落とせば勝ち！\nローカルかオンラインで遊べます。", -0.4f),
+        new MenuItem(ItemKind.Settings, "せってい", "", "音量と画面の設定を変更します。", -0.3f),
+        new MenuItem(ItemKind.Book, "ずかん", "キャラクターの\n性能を見る", "キャラクターの名前・パッシブ・必殺技が見られます。", -0.2f),
+        new MenuItem(ItemKind.Achievements, "じっせき", "これまでの\nきろくを 見る", "集めた実績が見られます。", -0.1f),
+        new MenuItem(ItemKind.Quit, "やめる", "ゲームをおわります", "ゲームを終了します。", 0f),
+    };
     [Tooltip("ずかんに並べるキャラクター（セレクト画面と同じ SelectRoster）。未設定ならずかんの代わりにクレジットを流す")]
     [SerializeField] SelectRoster roster;
-    [Tooltip("看板の説明（たたかう・サウンド・ビデオは看板に操作画面が出るので使わない）")]
-    [SerializeField] string[] descriptions =
-    {
-        "",
-        "",
-        "",
-        "キャラクターの\nせいのうを 見る",
-        "ゲームをおわります",
-    };
-    [Tooltip("下の帯に出す、項目の説明（上から たたかう／サウンド／ビデオ／ずかん／やめる）")]
-    [TextArea(1, 3)]
-    [SerializeField] string[] helpTexts =
-    {
-        "だるまを叩き合って、相手の頭を落とせば勝ち！　ローカル（この画面でみんなで）かオンラインで遊べます。",
-        "BGM や効果音の音量を調整します。",
-        "画面モード・解像度・垂直同期を変更します。",
-        "キャラクターの名前・パッシブ・必殺技が見られます。",
-        "ゲームを終了します。",
-    };
     [Tooltip("カメラの構図を、下の帯（説明＋操作ガイド）より上の範囲に収める割合。1：構図まるごと帯の上に収める（少し引いて上へ寄せる）　0：帯を気にせず画面いっぱい")]
     [SerializeField, Range(0f, 1f)] float fitAboveBand = 1f;
 
@@ -126,9 +144,14 @@ public class MainMenu : MonoBehaviour
         [Header("ずかん（クレジットの項目で開く）")]
         public CharacterBook.Texts book = new CharacterBook.Texts();
 
+        [Header("じっせき")]
+        public AchievementBook.Texts achievements = new AchievementBook.Texts();
+
         [Header("看板の飾り")]
-        [Tooltip("得点板の色帯の両はしの札（左、右）")]
+        [Tooltip("得点板の色帯の両はしの札（左、右）。showScoreNumbers をオンにしたときだけ出す")]
         public string[] scoreNumbers = { "0", "1" };
+        [Tooltip("得点板の色帯の両はしに番号の札を出す")]
+        public bool showScoreNumbers = false;
         [Tooltip("ノートの右上のメモ")]
         public string notebookMemo = "だるま部　れんしゅうノート";
     }
@@ -155,12 +178,14 @@ public class MainMenu : MonoBehaviour
              "得点板とノートは、映す項目が変わるたびにページがめくれる")]
     [SerializeField] BoardLook boardLook = BoardLook.ScoreBoard;
 
-    [Header("ハンマーの位置のずらし（項目ごと。再生中に変えてもすぐ反映される。x：右　y：上　z：奥）")]
-    [SerializeField] Vector3 hammerOffsetBattle = Vector3.zero;
-    [SerializeField] Vector3 hammerOffsetSound = Vector3.zero;
-    [SerializeField] Vector3 hammerOffsetVideo = Vector3.zero;
-    [SerializeField] Vector3 hammerOffsetCredits = Vector3.zero;
-    [SerializeField] Vector3 hammerOffsetQuit = Vector3.zero;
+    [Header("看板のページめくり（得点板・ノート）")]
+    [Tooltip("めくる時間（秒）。長いほど目にやさしい")]
+    [SerializeField, Range(0.15f, 1.5f)] float flipTime = 0.5f;
+    [Tooltip("めくってからこの秒数のうちにまた中身が変わったら、めくらずに中身だけをふわっと入れ替える（連打・長押しでチカチカしないように）")]
+    [SerializeField, Range(0f, 2f)] float flipCooldown = 0.6f;
+    [Tooltip("めくる紙の曲がりの半径（看板の高さに対する割合）。大きいほど硬い紙に見える（ふつうの紙より少し硬め：0.15）")]
+    [SerializeField, Range(0.05f, 0.3f)] float paperCurl = 0.15f;
+    PaperFlipPage flipPaper;
 
     [Header("カメラ（再生中に変えてもすぐ反映される）")]
     [Tooltip("ふだん：左の山と右の看板")]
@@ -175,7 +200,13 @@ public class MainMenu : MonoBehaviour
     [Tooltip("部屋を斜めから見る角度。カメラを右へ回り込ませて左を向かせ、積み木・看板・ハンマーも一緒に回してカメラの正面に向ける")]
     [SerializeField, Range(-45f, 45f)] float viewYaw = 18f;
 
-    const int Battle = 0, Sound = 1, Video = 2, Credits = 3, Quit = 4;
+    // 項目 i の種類（範囲外は None）
+    ItemKind Kind(int i) => items != null && i >= 0 && i < items.Length && items[i] != null ? items[i].kind : ItemKind.None;
+    MenuItem ItemAt(int i) => items != null && i >= 0 && i < items.Length && items[i] != null ? items[i] : null;
+    int ItemCount => items != null ? items.Length : 0;
+    // 看板に操作画面が出る（叩くと看板の上に乗る）種類
+    static bool IsPanelKind(ItemKind k) => k == ItemKind.Battle || k == ItemKind.Settings || k == ItemKind.Sound || k == ItemKind.Video;
+
     static readonly Vector3 BlockSize = new Vector3(2.6f, 0.72f, 1.1f);
     const float BoardDepth = 0.3f;
     const float CanvasScale = 0.005f;   // 看板の UI：1ピクセル = 5mm
@@ -190,7 +221,7 @@ public class MainMenu : MonoBehaviour
     bool[] dropLanded;
     float headDropAt = -100f;
     bool headDropLanded = true;
-    enum Content { Battle, Sound, Video, Description }
+    enum Content { Battle, Sound, Video, Description, Settings }
 
     Phase phase;
     float sim;
@@ -221,10 +252,12 @@ public class MainMenu : MonoBehaviour
     float boardPunch = -100f;
 
     // ---- 看板のページめくり（得点板・ノート） ----
-    const float FlipTime = 0.34f;
     Transform flipPage;                 // めくれていくページ（上の綴じ目が軸）
     float flipStart = -100f;
+    int flipDir = 1;                    // 1：前のページが後ろへめくれて次が出る（下へ）　-1：後ろからページが戻ってくる（上へ）
+    int navDir = 1;                     // 最後にカーソルを動かした向き（1：下　-1：上）
     int shownKey = -1;                  // いま映している中身（変わったらめくる）
+    CanvasGroup boardContent;           // 看板の中身（ページが戻ってくる間は隠す）
     float boardTop;                     // 看板のいちばん上（板の上端からの高さ。積み木が乗る）
 
     // ---- ハンマー ----
@@ -268,10 +301,11 @@ public class MainMenu : MonoBehaviour
     CanvasGroup titleGroup;
     CreditRoll credits;
     CharacterBook book;
-    CanvasGroup battleGroup, soundGroup, videoGroup, descGroup;
+    AchievementBook achievements;
+    CanvasGroup battleGroup, soundGroup, videoGroup, settingsGroup, descGroup;
     TextMeshProUGUI descText, boardTitle, battleNote;
     Image boardDim;
-    Selectable battleFirst, soundFirst, videoFirst;
+    Selectable battleFirst, soundFirst, videoFirst, settingsFirst;
     bool starting;                  // たたかうでローカル／オンラインを決めた（シーン移動まで操作しない）
     float noteTime = -100f;         // 「じゅんびちゅう」を出した時刻
 
@@ -327,8 +361,8 @@ public class MainMenu : MonoBehaviour
     // 項目 i の横で構えるハンマーの位置（Inspector の「ハンマーの位置のずらし」を足す）
     Vector3 HammerSpot(int i)
     {
-        var offsets = new[] { hammerOffsetBattle, hammerOffsetSound, hammerOffsetVideo, hammerOffsetCredits, hammerOffsetQuit };
-        return ToyKit.HammerPivot(Contact(i), hammerScale) + (i >= 0 && i < offsets.Length ? offsets[i] : Vector3.zero);
+        var it = ItemAt(i);
+        return ToyKit.HammerPivot(Contact(i), hammerScale) + (it != null ? it.hammerOffset : Vector3.zero);
     }
 
     // 降ってくる高さ（0 で着地）
@@ -356,7 +390,7 @@ public class MainMenu : MonoBehaviour
         if (!headDropLanded && sim >= headDropAt + DropFall)
         {
             headDropLanded = true;
-            Emit(fx.sparkle, new Vector3(stackX, labels.Length * BH + ToyKit.HeadR, 0f), Quaternion.Euler(-90f, 0f, 0f), 14);
+            Emit(fx.sparkle, new Vector3(stackX, ItemCount * BH + ToyKit.HeadR, 0f), Quaternion.Euler(-90f, 0f, 0f), 14);
             shake = Mathf.Max(shake, 0.3f);
             MenuSounds.Play(MatchSounds.Instance.BlockHitBlock, 0.9f);
         }
@@ -390,7 +424,7 @@ public class MainMenu : MonoBehaviour
         fx = ToyKit.CreateFx();
 
         // 積み木（上から）。マウスで選べるようにコライダーを付ける
-        int n = labels.Length;
+        int n = ItemCount;
         blocks = new Transform[n];
         blockMats = new Material[n];
         blockColors = new Color[n];
@@ -400,7 +434,7 @@ public class MainMenu : MonoBehaviour
         for (int i = 0; i < n; i++)
         {
             blockColors[i] = colors[i % colors.Length];
-            blocks[i] = ToyKit.CreateBlock(labels[i], blockColors[i], menuMesh, new Vector2(2.3f, 0.6f), BlockSize.z, font, letterMat, out blockMats[i]);
+            blocks[i] = ToyKit.CreateBlock(ItemAt(i) != null ? ItemAt(i).label : "", blockColors[i], menuMesh, new Vector2(2.3f, 0.6f), BlockSize.z, font, letterMat, out blockMats[i]);
             blocks[i].SetParent(space, false);
             blocks[i].gameObject.AddComponent<BoxCollider>().size = BlockSize;
             scaleNow[i] = 1f;
@@ -467,6 +501,14 @@ public class MainMenu : MonoBehaviour
         root.localScale = Vector3.one * CanvasScale;
         root.localPosition = new Vector3(0f, 0f, -BoardDepth * 0.5f - 0.01f);
         DecorateSurface(root);
+        var surface = root;
+
+        // 中身（見出し・操作画面・説明）はまとめて1つに入れる（ページが戻ってくる間だけ隠す）
+        var contentGo = new GameObject("Content", typeof(RectTransform));
+        contentGo.transform.SetParent(surface, false);
+        root = (RectTransform)contentGo.transform;
+        ToyKit.Stretch(root);
+        boardContent = contentGo.AddComponent<CanvasGroup>();
 
         boardTitle = ToyKit.UIText("Title", root, font, "", 64f, ToyKit.Ink);
         ToyKit.Anchor(boardTitle.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -70f), new Vector2(1000f, 100f));
@@ -475,6 +517,7 @@ public class MainMenu : MonoBehaviour
         battleGroup = BuildBattlePanel(root);
         soundGroup = BuildSoundPanel(root);
         videoGroup = BuildVideoPanel(root);
+        settingsGroup = BuildSettingsPanel(root);
 
         var desc = new GameObject("Description", typeof(RectTransform));
         desc.transform.SetParent(root, false);
@@ -485,7 +528,7 @@ public class MainMenu : MonoBehaviour
         ToyKit.Anchor(descText.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, -30f), new Vector2(1100f, 520f));
 
         // プレビュー中に暗くする幕（最前面）
-        boardDim = ToyKit.UIImage("Dim", root, new Color(0.2f, 0.15f, 0.15f, 0.5f), uiSprite).GetComponent<Image>();
+        boardDim = ToyKit.UIImage("Dim", surface, new Color(0.2f, 0.15f, 0.15f, 0.5f), uiSprite).GetComponent<Image>();
         ToyKit.Stretch(boardDim.rectTransform);
     }
 
@@ -609,13 +652,15 @@ public class MainMenu : MonoBehaviour
         boardTop = 0.14f;
     }
 
-    // めくれていくページ：綴じ目（y = hingeY）を軸に、手前から上を越えて後ろへ回る。ふだんは隠しておく
+    // めくれていくページ：綴じ目（y = hingeY）から垂れ下がる紙。下の端を持って真上に持ち上げ、後ろへ送る（PaperFlipPage）。
+    // ふだんは隠しておく。mesh は前の形（硬い板が回る）で使っていたもので、今は使わない
     Transform MakeFlipPage(Mesh mesh, Material mat, float hingeY, float z)
     {
         var hinge = new GameObject("FlipHinge").transform;
         hinge.SetParent(board, false);
         hinge.localPosition = new Vector3(0f, hingeY, z);
-        Part(mesh, "FlipPage", mat, new Vector3(0f, -hingeY, 0f), hinge);
+        flipPaper = PaperFlipPage.Create(hinge, boardSize.x, boardSize.y, hingeY - boardSize.y * 0.5f, mat);
+        flipPaper.curl = paperCurl;
         hinge.gameObject.SetActive(false);
         return hinge;
     }
@@ -629,7 +674,8 @@ public class MainMenu : MonoBehaviour
             band.anchorMin = new Vector2(0f, 1f); band.anchorMax = new Vector2(1f, 1f); band.pivot = new Vector2(0.5f, 1f);
             band.sizeDelta = new Vector2(-40f, 130f);
             band.anchoredPosition = new Vector2(0f, -10f);
-            // 色帯の両はしの、めくり式の番号
+            // 色帯の両はしの、めくり式の番号（showScoreNumbers のときだけ）
+            if (texts.showScoreNumbers)
             foreach (float side in new[] { -1f, 1f })
             {
                 var num = ToyKit.UIRounded("Num", band, new Color(1f, 0.98f, 0.93f), 14f);
@@ -702,7 +748,7 @@ public class MainMenu : MonoBehaviour
     void ChooseBattle(int index)
     {
         bool knockTwice = battleStyle == BattleStyle.KnockTwice;
-        if (knockTwice ? phase != Phase.Choose : phase != Phase.Panel || outIdx != Battle || starting) return;
+        if (knockTwice ? phase != Phase.Choose : phase != Phase.Panel || Kind(outIdx) != ItemKind.Battle || starting) return;
         bool online = index == 1;
         string scene = online ? onlineSceneName : battleSceneName;
         if (string.IsNullOrEmpty(scene) || !Application.CanStreamedLevelBeLoaded(scene))
@@ -868,9 +914,60 @@ public class MainMenu : MonoBehaviour
         Fader.Load(scene);
     }
 
+    bool HasItem(ItemKind k) => items != null && Array.Exists(items, it => it != null && it.kind == k);
+
+    // サウンドだけの看板（項目に Sound があるときだけ中身を作る。同じ設定を2か所に作ると表示がずれるため）
     CanvasGroup BuildSoundPanel(Transform root)
     {
         var group = Group("Sound", root);
+        if (!HasItem(ItemKind.Sound)) return group;
+        var sliders = SoundRows(group.transform, 150f, 150f);
+        Chain(sliders);
+        soundFirst = sliders[0];
+        return group;
+    }
+
+    // ビデオだけの看板（項目に Video があるときだけ）
+    CanvasGroup BuildVideoPanel(Transform root)
+    {
+        var group = Group("Video", root);
+        if (!HasItem(ItemKind.Video)) return group;
+        var sels = VideoRows(group.transform, 150f, 150f);
+        Chain(sels);
+        videoFirst = sels[0];
+        return group;
+    }
+
+    // せってい：サウンド3行とビデオ3行を1枚の看板にまとめる（6行が収まるように少し縮める）
+    const float SettingsScale = 0.8f, SettingsStep = 115f, SettingsCenterY = -65f;
+    CanvasGroup BuildSettingsPanel(Transform root)
+    {
+        var group = Group("Settings", root);
+        if (!HasItem(ItemKind.Settings)) return group;
+        var rows = new GameObject("Rows", typeof(RectTransform)).GetComponent<RectTransform>();
+        rows.SetParent(group.transform, false);
+        ToyKit.Anchor(rows, new Vector2(0.5f, 0.5f), new Vector2(0f, SettingsCenterY), new Vector2(1100f, SettingsStep * 6f));
+        rows.localScale = Vector3.one * SettingsScale;
+
+        var soundHost = new GameObject("SoundRows", typeof(RectTransform)).GetComponent<RectTransform>();
+        soundHost.SetParent(rows, false); ToyKit.Stretch(soundHost);
+        var videoHost = new GameObject("VideoRows", typeof(RectTransform)).GetComponent<RectTransform>();
+        videoHost.SetParent(rows, false); ToyKit.Stretch(videoHost);
+
+        float top = SettingsStep * 2.5f + 15f;   // サウンドとビデオの間を少しあける
+        var sliders = SoundRows(soundHost, top, SettingsStep);
+        var sels = VideoRows(videoHost, -SettingsStep * 0.5f - 15f, SettingsStep);
+        var all = new Selectable[sliders.Length + sels.Length];
+        sliders.CopyTo(all, 0);
+        sels.CopyTo(all, sliders.Length);
+        Chain(all);
+        settingsFirst = all[0];
+        return group;
+    }
+
+    // 音量の3行（parent に SoundSettingsPanel を付ける）。y0：いちばん上の行の高さ　step：行の間隔
+    Slider[] SoundRows(Transform parent, float y0, float step)
+    {
         var colors = new[] { ToyKit.Palette[1], ToyKit.Palette[4], ToyKit.Palette[3] };
         var sliders = new Slider[3];
         var meters = new RectTransform[3];
@@ -878,7 +975,7 @@ public class MainMenu : MonoBehaviour
         for (int i = 0; i < 3; i++)
         {
             var rt = RowAt(texts.soundRows, i);
-            var row = Row(group.transform, 150f - i * 150f, rt.label);
+            var row = Row(parent, y0 - i * step, rt.label);
             rowHelps[row] = rt.help;
 
             // 目盛りの積み木を並べる場所。スライダーの当たり判定も同じ広さ
@@ -903,26 +1000,24 @@ public class MainMenu : MonoBehaviour
             values[i].fontStyle = FontStyles.Bold;
             ToyKit.Anchor(values[i].rectTransform, new Vector2(0.5f, 0.5f), new Vector2(445f, 0f), new Vector2(120f, 100f));
         }
-        Chain(sliders);
-        soundFirst = sliders[0];
-        group.gameObject.AddComponent<SoundSettingsPanel>().Setup(sliders[0], sliders[1], sliders[2], values[0], values[1], values[2]);
+        parent.gameObject.AddComponent<SoundSettingsPanel>().Setup(sliders[0], sliders[1], sliders[2], values[0], values[1], values[2]);
         // 目盛りは SoundSettingsPanel が 0〜10 に設定してから作る
         for (int i = 0; i < 3; i++)
         {
             meters[i].gameObject.AddComponent<VolumeMeter>().Setup(sliders[i], meters[i], colors[i], new Color(0.88f, 0.82f, 0.74f));
             sliders[i].onValueChanged.AddListener(_ => MenuSounds.Cursor());
         }
-        return group;
+        return sliders;
     }
 
-    CanvasGroup BuildVideoPanel(Transform root)
+    // 画面の3行（parent に VideoSettingsPanel を付ける）
+    OptionSelector[] VideoRows(Transform parent, float y0, float step)
     {
-        var group = Group("Video", root);
         var sels = new OptionSelector[3];
         for (int i = 0; i < 3; i++)
         {
             var rt = RowAt(texts.videoRows, i);
-            var row = Row(group.transform, 150f - i * 150f, rt.label);
+            var row = Row(parent, y0 - i * step, rt.label);
             rowHelps[row] = rt.help;
             row.GetComponent<Image>().raycastTarget = true;
             var os = row.AddComponent<OptionSelector>();
@@ -943,10 +1038,8 @@ public class MainMenu : MonoBehaviour
                                                          ToyKit.Palette[1], new Color(0.82f, 0.75f, 0.66f));
             sels[i] = os;
         }
-        Chain(sels);
-        videoFirst = sels[0];
-        group.gameObject.AddComponent<VideoSettingsPanel>().Setup(sels[0], sels[1], sels[2]);
-        return group;
+        parent.gameObject.AddComponent<VideoSettingsPanel>().Setup(sels[0], sels[1], sels[2]);
+        return sels;
     }
 
     CanvasGroup Group(string name, Transform root)
@@ -1034,6 +1127,12 @@ public class MainMenu : MonoBehaviour
         bookGo.transform.SetParent(overlay, false);
         book = bookGo.AddComponent<CharacterBook>();
         book.Setup(font, letterMat, uiSprite, knobSprite, roster, texts.book);
+
+        // じっせき（ずかんと同じように開く。中身はまだ無い）
+        var achGo = new GameObject("Achievements", typeof(RectTransform));
+        achGo.transform.SetParent(overlay, false);
+        achievements = achGo.AddComponent<AchievementBook>();
+        achievements.Setup(font, letterMat, uiSprite, texts.achievements);
 
         BuildHelpBand();
 
@@ -1150,11 +1249,14 @@ public class MainMenu : MonoBehaviour
                 if (rowHelps.TryGetValue(t.gameObject, out var h)) return h;
         }
         int item = (phase == Phase.Panel || phase == Phase.Flying || phase == Phase.Returning) && outIdx >= 0 ? outIdx : cursor;
-        return item >= 0 && item < helpTexts.Length ? helpTexts[item] : "";
+        var it = ItemAt(item);
+        return it != null ? it.help : "";
     }
 
     IEnumerator FadeIn()
     {
+        // シーン遷移の演出（Fader）から来たときは、その演出が明けるので白いフェードは重ねない
+        if (Fader.IsBusy) { fade.color = new Color(1f, 1f, 1f, 0f); yield break; }
         for (float t = 0f; t < 0.8f; t += Time.unscaledDeltaTime)
         {
             fade.color = new Color(1f, 1f, 1f, 1f - t / 0.8f);
@@ -1179,14 +1281,16 @@ public class MainMenu : MonoBehaviour
             case Phase.Browse:
             {
                 int hover = mouse != null && (mouseMoved || click) ? BlockUnderMouse(mouse.position.ReadValue()) : -1;
-                if (hover >= 0 && hover != cursor) { cursor = hover; MenuSounds.Cursor(); }
+                if (hover >= 0 && hover != cursor) { navDir = hover > cursor ? 1 : -1; cursor = hover; MenuSounds.Cursor(); }
 
-                if (MenuInput.Up()) { cursor = (cursor + labels.Length - 1) % labels.Length; MenuSounds.Cursor(); }
-                else if (MenuInput.Down()) { cursor = (cursor + 1) % labels.Length; MenuSounds.Cursor(); }
+                int n = ItemCount;
+                // 押しっぱなしのくり返しは端で止まる。押し直したときだけ反対の端へ回る
+                if (MenuInput.UpRepeat() && MenuInput.StepRepeat(ref cursor, n, MenuInput.Dir.Up, -1)) { navDir = -1; MenuSounds.Cursor(); }
+                else if (MenuInput.DownRepeat() && MenuInput.StepRepeat(ref cursor, n, MenuInput.Dir.Down, 1)) { navDir = 1; MenuSounds.Cursor(); }
                 else if (MenuInput.Submit() || (click && hover >= 0))
                 {
                     // たたかう（KnockTwice）は叩き飛ばした瞬間に撃墜の音を鳴らすので、決定の音は重ねない
-                    if (cursor != Battle || battleStyle != BattleStyle.KnockTwice) MenuSounds.Decide();
+                    if (Kind(cursor) != ItemKind.Battle || battleStyle != BattleStyle.KnockTwice) MenuSounds.Decide();
                     Hit(cursor);
                 }
                 break;
@@ -1206,16 +1310,16 @@ public class MainMenu : MonoBehaviour
             }
 
             case Phase.Credits:
-                if (!credits.IsBusy && !book.IsBusy) phase = Phase.Browse;
+                if (!credits.IsBusy && !book.IsBusy && !achievements.IsBusy) phase = Phase.Browse;
                 break;
 
             case Phase.Choose:
             {
                 if (!ChoicesReady) break;
                 int hover = mouse != null && (mouseMoved || click) ? ChoiceUnderMouse(mouse.position.ReadValue()) : -1;
-                if (hover >= 0 && hover != choiceCursor) { choiceCursor = hover; MenuSounds.Cursor(); }
+                if (hover >= 0 && hover != choiceCursor) { choiceCursor = hover; navDir = choiceCursor == 1 ? 1 : -1; MenuSounds.Cursor(); }
 
-                if (MenuInput.Up() || MenuInput.Down()) { choiceCursor = 1 - choiceCursor; MenuSounds.Cursor(); }
+                if (MenuInput.Up() || MenuInput.Down()) { choiceCursor = 1 - choiceCursor; navDir = choiceCursor == 1 ? 1 : -1; MenuSounds.Cursor(); }
                 else if (MenuInput.Submit() || (click && hover >= 0)) ChooseBattle(choiceCursor);
                 else if (MenuInput.Cancel() || (click && BlockUnderMouse(mouse.position.ReadValue()) >= 0)) StartCoroutine(CancelChoices());
                 break;
@@ -1249,9 +1353,9 @@ public class MainMenu : MonoBehaviour
         post.chroma.intensity.value = 0.4f;
         SlowMo(0.15f, 0.07f);
 
-        switch (index)
+        switch (Kind(index))
         {
-            case Battle when battleStyle == BattleStyle.KnockTwice:
+            case ItemKind.Battle when battleStyle == BattleStyle.KnockTwice:
                 // 画面外へ叩き飛ばし（撃墜の音）、代わりにローカル／オンラインの積み木が飛んでくる
                 MenuSounds.Play(MatchSounds.Instance.KO);
                 outIdx = index;
@@ -1260,15 +1364,16 @@ public class MainMenu : MonoBehaviour
                 StartCoroutine(BringChoices());
                 break;
 
-            case Battle:
-            case Sound:
-            case Video:
+            case ItemKind.Battle:
+            case ItemKind.Settings:
+            case ItemKind.Sound:
+            case ItemKind.Video:
                 outIdx = index;
                 impactTime = sim;
                 phase = Phase.Flying;
                 break;
 
-            case Quit:
+            case ItemKind.Quit:
                 outIdx = index;
                 impactTime = sim;
                 phase = Phase.Leaving;
@@ -1285,13 +1390,23 @@ public class MainMenu : MonoBehaviour
 #endif
                 break;
 
-            case Credits:
+            case ItemKind.Book:
+            case ItemKind.Credits:
+            case ItemKind.Achievements:
+            {
+                var kind = Kind(index);
                 wobbleIdx = index;
                 wobbleTime = sim;
                 yield return new WaitForSecondsRealtime(0.35f);
-                if (book.HasEntries) book.Open();   // キャラのずかん
+                if (kind == ItemKind.Achievements) achievements.Open();     // じっせき
+                else if (kind == ItemKind.Book && book.HasEntries) book.Open();   // キャラのずかん
                 else credits.Play();
                 phase = Phase.Credits;
+                break;
+            }
+
+            default:
+                phase = Phase.Browse;
                 break;
         }
     }
@@ -1483,14 +1598,15 @@ public class MainMenu : MonoBehaviour
         Emit(fx.sparkle, Dock(), Quaternion.Euler(-90f, 0f, 0f), 14);
         shake = Mathf.Max(shake, 0.25f);
 
-        var first = outIdx == Battle ? battleFirst : outIdx == Sound ? soundFirst : videoFirst;
+        var k = Kind(outIdx);
+        var first = k == ItemKind.Battle ? battleFirst : k == ItemKind.Settings ? settingsFirst : k == ItemKind.Sound ? soundFirst : videoFirst;
         if (EventSystem.current != null && first != null) EventSystem.current.SetSelectedGameObject(first.gameObject);
     }
 
     void UpdateHead()
     {
         var f = face;
-        float y = labels.Length * BH + ToyKit.HeadR;
+        float y = ItemCount * BH + ToyKit.HeadR;
         if (outIdx >= 0) y -= BH * DropAmount();
 
         // 看板を操作している間は看板の方を見てニコッ。ときどきまばたき
@@ -1534,7 +1650,7 @@ public class MainMenu : MonoBehaviour
         hammer.localPosition = hammerPos;
         // どの段（ローカル／オンラインも）にいても、一番下（やめる）にいるときと同じ角度で見えるように、
         // カメラから見た方向の違いの分だけ傾ける（上の段ほど、少し上から見下ろした向きに起こす）
-        Vector3 refPos = HammerSpot(labels.Length - 1);
+        Vector3 refPos = HammerSpot(ItemCount - 1);
         var tilt = Quaternion.FromToRotation(refPos - camPos, hammerPos - camPos);
         hammer.localRotation = tilt * Quaternion.Euler(0f, hammerYaw, 0f);
     }
@@ -1544,8 +1660,11 @@ public class MainMenu : MonoBehaviour
         // 何を映すか：操作中はその項目、それ以外はカーソルの項目のプレビュー
         int item = (phase == Phase.Panel || phase == Phase.Flying || phase == Phase.Returning) && outIdx >= 0 ? outIdx : cursor;
         bool choosing = phase == Phase.Choose || phase == Phase.ChoiceLeaving || phase == Phase.ChoiceBack;
-        Content content = item == Battle && battleStyle == BattleStyle.Board ? Content.Battle
-                        : item == Sound ? Content.Sound : item == Video ? Content.Video : Content.Description;
+        var kind = Kind(item);
+        var it = ItemAt(item);
+        Content content = kind == ItemKind.Battle && battleStyle == BattleStyle.Board ? Content.Battle
+                        : kind == ItemKind.Settings ? Content.Settings
+                        : kind == ItemKind.Sound ? Content.Sound : kind == ItemKind.Video ? Content.Video : Content.Description;
         if (content == Content.Description)
         {
             if (choosing)
@@ -1554,17 +1673,20 @@ public class MainMenu : MonoBehaviour
                 string note = sim - noteTime < 2f ? "\n<color=#D94033><size=65%>" + texts.onlineNotReady + "</size></color>" : "";
                 descText.text = At(texts.choiceBoardTexts, choiceCursor) + note;
             }
-            else descText.text = item == Battle ? texts.battleBoardText : At(descriptions, item);
+            else descText.text = kind == ItemKind.Battle ? texts.battleBoardText : it != null ? it.description : "";
         }
-        boardTitle.text = outIdx >= 0 && phase == Phase.Panel ? "" : choosing ? At(texts.choiceLabels, choiceCursor) : At(labels, item);
+        boardTitle.text = outIdx >= 0 && phase == Phase.Panel && (it == null || !it.titleInPanel) ? "" : choosing ? At(texts.choiceLabels, choiceCursor) : it != null ? it.label : "";
 
         Fade(battleGroup, content == Content.Battle, dt);
         Fade(soundGroup, content == Content.Sound, dt);
         Fade(videoGroup, content == Content.Video, dt);
+        Fade(settingsGroup, content == Content.Settings, dt);
         Fade(descGroup, content == Content.Description, dt);
-        battleGroup.interactable = battleGroup.blocksRaycasts = phase == Phase.Panel && outIdx == Battle && !starting;
-        soundGroup.interactable = soundGroup.blocksRaycasts = phase == Phase.Panel && outIdx == Sound;
-        videoGroup.interactable = videoGroup.blocksRaycasts = phase == Phase.Panel && outIdx == Video;
+        var outKind = Kind(outIdx);
+        battleGroup.interactable = battleGroup.blocksRaycasts = phase == Phase.Panel && outKind == ItemKind.Battle && !starting;
+        soundGroup.interactable = soundGroup.blocksRaycasts = phase == Phase.Panel && outKind == ItemKind.Sound;
+        videoGroup.interactable = videoGroup.blocksRaycasts = phase == Phase.Panel && outKind == ItemKind.Video;
+        settingsGroup.interactable = settingsGroup.blocksRaycasts = phase == Phase.Panel && outKind == ItemKind.Settings;
         // 「じゅんびちゅう」は2秒出して消える
         float nt = sim - noteTime;
         battleNote.alpha = nt < 1.6f ? 1f : Mathf.Clamp01(1f - (nt - 1.6f) / 0.4f);
@@ -1575,20 +1697,68 @@ public class MainMenu : MonoBehaviour
         float p = (sim - boardPunch) / 0.35f;
         board.localScale = Vector3.one * (1f + ToyKit.Punch(p, 0.05f));
 
-        // 映す中身が変わったら、前のページが手前から上を越えて後ろへめくれる（得点板・ノート）
-        int key = (int)content * 100 + item * 10 + (choosing ? choiceCursor + 1 : 0);
+        UpdateFlip((int)content * 1000 + item * 10 + (choosing ? choiceCursor + 1 : 0));
+    }
+
+    // 映す中身が変わったらページをめくる（得点板・ノート）。めくる向きはカーソルを動かした向きにそろえる
+    //   下へ（次へ）：いまのページの下の端を持って真上に持ち上げ、後ろへ送る。下から次の中身が出てくる
+    //   上へ（前へ）：後ろに送ってあったページが戻ってきて、下ろして垂れ下がる。下りきってから中身が出る
+    // 目にやさしくするための工夫：
+    //   ・めくるページも看板と同じだけ暗くする（暗い看板の上を明るいページが横切ってチカッとしないように）
+    //   ・ページは向こうへ倒れるほど少し暗くなる（光の当たり方。まぶしい面が大きく動かない）
+    //   ・めくった直後（flipCooldown 以内）にまた変わったときは、めくらずに中身だけをふわっと入れ替える（連打・長押し）
+    //   ・中身はぱっと出さず、短く溶け込ませる
+    float contentFadeStart = -100f;
+    void UpdateFlip(int key)
+    {
         if (key != shownKey)
         {
-            if (shownKey >= 0) flipStart = sim;
+            float since = sim - flipStart;
+            bool recent = since >= 0f && since < flipCooldown;
+            if (shownKey >= 0 && flipPage != null && !recent)
+            {
+                flipStart = sim;
+                flipDir = navDir >= 0 ? 1 : -1;
+            }
+            else if (shownKey >= 0) contentFadeStart = sim;   // めくらずに中身だけ入れ替える
             shownKey = key;
         }
+
+        // 中身の出方：入れ替えたときは短く溶け込ませる
+        float contentAlpha = Mathf.Clamp01((sim - contentFadeStart) / ContentFade);
         if (flipPage != null)
         {
-            float u = (sim - flipStart) / FlipTime;
+            float u = (sim - flipStart) / flipTime;
             bool flipping = u >= 0f && u < 1f;
             flipPage.gameObject.SetActive(flipping);
-            if (flipping) flipPage.localRotation = Quaternion.Euler(Mathf.Lerp(8f, 290f, Mathf.SmoothStep(0f, 1f, u)), 0f, 0f);
+            if (flipping && flipPaper != null)
+            {
+                // 次へ：持ち上げて後ろへ送る　前へ：後ろから戻ってきて、下ろして垂れ下がる
+                float p = flipDir >= 0 ? u : 1f - u;
+                if (flipPaper.curl != paperCurl) flipPaper.curl = paperCurl;
+                flipPaper.SetProgress(p);
+                TintFlipPage(p);
+            }
+            if (u >= 0f)
+            {
+                // 次へ：持ち上がるページの下から中身が溶け込む　前へ：ページが着いてから中身が溶け込む
+                float start = flipDir < 0 ? 1f : 0.15f;
+                contentAlpha = Mathf.Min(contentAlpha, Mathf.Clamp01((u - start) * flipTime / ContentFade));
+            }
         }
+        if (boardContent != null) boardContent.alpha = contentAlpha;
+    }
+
+    const float ContentFade = 0.15f;
+
+    // めくるページの色：看板の暗幕（boardDim）と同じだけ暗くし、めくれていくほど少し暗くする
+    void TintFlipPage(float progress)
+    {
+        Color c = flipPaper.BaseColor * Mathf.Lerp(1f, 0.8f, progress);
+        Color dimColor = new Color(0.2f, 0.15f, 0.15f);
+        c = Color.Lerp(c, dimColor, 0.5f * (1f - panelLit));
+        c.a = 1f;
+        flipPaper.SetColor(c);
     }
 
     // 粒を出す（位置と向きはメニューの空間で）
@@ -1630,7 +1800,7 @@ public class MainMenu : MonoBehaviour
         cam.fieldOfView = 2f * Mathf.Atan(halfW / Mathf.Max(0.1f, cam.aspect)) * Mathf.Rad2Deg;
 
         // クレジット中は全体を大きくボカす
-        bool blurAll = phase == Phase.Credits || credits.IsBusy || book.IsBusy;
+        bool blurAll = phase == Phase.Credits || credits.IsBusy || book.IsBusy || achievements.IsBusy;
         Vector3 subject = focusChoice ? ChoiceSlot(0) : focusBoard ? boardCenter : new Vector3(stackX * 0.4f, 2f, 0.5f);
         float focus = blurAll ? 0.6f : Vector3.Distance(camPos, subject);
         post.dof.focusDistance.value = Mathf.Lerp(post.dof.focusDistance.value, focus, k * 2f);
@@ -1642,19 +1812,21 @@ public class MainMenu : MonoBehaviour
         titleGroup.alpha = 1f - dim;
 
         // 下の帯は、始まりの演出と（流れる）クレジットの間は隠す。ずかんの間は出す
-        bool bookOpen = book.IsBusy;
+        bool achOpen = achievements.IsBusy;
+        bool bookOpen = book.IsBusy || achOpen;
         bool hide = phase == Phase.Intro || credits.IsBusy || phase == Phase.Credits && !bookOpen;
         helpGroup.alpha = Mathf.MoveTowards(helpGroup.alpha, hide ? 0f : 1f, Time.unscaledDeltaTime * 4f);
         var g = texts;
-        helpText.text = bookOpen ? g.book.help : HelpText();
-        if (bookOpen) SetGuides(g.keySelect, g.guideSelect, g.keyBack, g.guideBack);
-        else if (phase == Phase.Panel && outIdx == Battle || phase == Phase.Choose) SetGuides(g.keySelect, g.guideSelect, g.keyDecide, g.guideDecide, g.keyBack, g.guideBack);
+        helpText.text = achOpen ? g.achievements.help : bookOpen ? g.book.help : HelpText();
+        if (achOpen && !achievements.HasEntries) SetGuides(g.keyBack, g.guideBack);
+        else if (bookOpen) SetGuides(g.keySelect, g.guideSelect, g.keyBack, g.guideBack);
+        else if (phase == Phase.Panel && Kind(outIdx) == ItemKind.Battle || phase == Phase.Choose) SetGuides(g.keySelect, g.guideSelect, g.keyDecide, g.guideDecide, g.keyBack, g.guideBack);
         else if (phase == Phase.Panel) SetGuides(g.keySelect, g.guideSelect, g.keyChange, g.guideChange, g.keyBack, g.guideBack);
         else if (!hide) SetGuides(g.keySelect, g.guideSelect, g.keyDecide, g.guideDecide);
     }
 
     // ================= 位置 =================
-    Vector3 Slot(int i) => new Vector3(stackX, (labels.Length - 1 - i) * BH + BH * 0.5f, 0f);
+    Vector3 Slot(int i) => new Vector3(stackX, (ItemCount - 1 - i) * BH + BH * 0.5f, 0f);
 
     // 看板の上（左寄り）に乗る位置（得点板は横棒の上、ノートはリングの上。ノートは傾いているので傾きに沿わせる）
     Vector3 Dock()

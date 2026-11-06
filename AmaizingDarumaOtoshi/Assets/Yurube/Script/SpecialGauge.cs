@@ -20,6 +20,16 @@ namespace Yurube
         public bool IsFull => m_blocks >= m_blocksToFill;
         public float Normalized => Mathf.Clamp01((float)m_blocks / m_blocksToFill);
 
+        // 必殺技を発動してゲージを消費した（実績・演出用。発動した瞬間に1回だけ来る）
+        public static event System.Action<SpecialGauge> Consumed;
+
+        // ドメインの再読み込みをしない設定でも、再生のたびに受け取り手を空にする
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetStatics()
+        {
+            Consumed = null;
+        }
+
         private void Awake()
         {
             m_character = GetComponent<DarumaCharacter>();
@@ -63,6 +73,7 @@ namespace Yurube
         public void Consume()
         {
             m_blocks = 0;
+            Consumed?.Invoke(this);
         }
     }
 }

@@ -14,6 +14,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Nakahira.HammerParams
   SweepDuration: 0.25
   ShotDuration: 0.3
+  HitReachScale: 1.5
+  ReturnAimMode: 0
+  ReturnAimOffset: 0
+  ReturnImmunityTime: 0.5
+  ReturnHitStopGrowth: 1.6
+  ReturnHitStopMax: 2
   ShotSpeed: 30
   SweepLaunchSpeed: 30
   ReturnSpeedRate: 1.25
@@ -22,3 +28,4 @@ MonoBehaviour:
   HitStopTimeScale: 0.1
   SelfShake: 0.04
   TargetShake: 0.1
+  TrailPrefab: {fileID: 1103304370888079927, guid: 5bcf816d7b173214f8cafedde223b2e5, type: 3}

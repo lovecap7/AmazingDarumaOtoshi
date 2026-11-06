@@ -86,6 +86,11 @@ namespace Yurube
         [SerializeField] bool m_skipEliminationCinematic = true;
         [Tooltip("撃破時に通常の破片演出を出す積み木の最大数(残りは即消去)")]
         [SerializeField, Min(0)] int m_maxStackShatter = 2;
+        [Header("無敵表示")]
+        [Tooltip("無敵中の発光色が一周する速さ")]
+        [SerializeField] float m_rainbowSpeed = 0.5f;
+        [Tooltip("無敵中の発光の強さ")]
+        [SerializeField] float m_rainbowEmission = 1.5f;
         [Tooltip("衝撃波リング開始半径(クレーター半径比)")]
         [SerializeField, Range(0.3f, 1.0f)] float m_shockwaveStartRatio = 0.3f;
         [Tooltip("衝撃波リング終了半径(ステージ半径比)")]
@@ -135,6 +140,13 @@ namespace Yurube
         float m_impactFlashUntil;
         float m_impactFlashStrength;
         float m_impactFlashDuration;
+
+        // 無敵表示: きだると同じ発光レインボー。表示固定のLateUpdateと競合しないよう、
+        // RendererのenabledはIwa側で制御し、ここではマテリアルの色だけを変える。
+        Renderer[] m_rainbowRenderers;
+        Material[][] m_originalMaterials;
+        Material[][] m_rainbowMaterials;
+        bool m_rainbowActive;
 
         GameObject m_warning;
         Material m_warningMaterial;
@@ -225,6 +237,8 @@ namespace Yurube
             {
                 if (renderer != null) renderer.enabled = visible;
             }
+
+            if (visible && m_character.IsInvincible) ApplyRainbow();
         }
 
         bool IsLocalHuman()
@@ -269,6 +283,7 @@ namespace Yurube
             float invincibleTime = m_countdown + m_riseTime + 1.4f + m_fallTime + m_impactRecovery + 1.0f;
             m_character.SetInvincible(invincibleTime);
             m_character.MovementOnly = true;
+            BeginRainbow();
             CreateWarning();
 
             if (m_logSpecial)
@@ -949,8 +964,97 @@ namespace Yurube
             m_warningLineMaterial = null;
         }
 
+        // きだると同じ無敵レインボー。必殺技中のRenderer表示固定とは別に、色だけを更新する。
+        void BeginRainbow()
+        {
+            if (m_rainbowActive || m_character == null) return;
+
+            var all = m_character.GetComponentsInChildren<Renderer>(true);
+            var list = new List<Renderer>();
+            foreach (var renderer in all)
+            {
+                if (renderer is MeshRenderer || renderer is SkinnedMeshRenderer)
+                    list.Add(renderer);
+            }
+
+            m_rainbowRenderers = list.ToArray();
+            m_originalMaterials = new Material[m_rainbowRenderers.Length][];
+            m_rainbowMaterials = new Material[m_rainbowRenderers.Length][];
+
+            for (int i = 0; i < m_rainbowRenderers.Length; i++)
+            {
+                var originals = m_rainbowRenderers[i].sharedMaterials;
+                m_originalMaterials[i] = originals;
+
+                var copies = new Material[originals.Length];
+                for (int j = 0; j < originals.Length; j++)
+                {
+                    if (originals[j] == null) continue;
+                    copies[j] = new Material(originals[j]);
+                    copies[j].EnableKeyword("_EMISSION");
+                }
+                m_rainbowMaterials[i] = copies;
+                m_rainbowRenderers[i].sharedMaterials = copies;
+            }
+
+            m_rainbowActive = true;
+            ApplyRainbow();
+        }
+
+        void ApplyRainbow()
+        {
+            if (!m_rainbowActive || m_rainbowMaterials == null) return;
+
+            float hue = Mathf.Repeat(Time.time * m_rainbowSpeed, 1.0f);
+            Color rainbow = Color.HSVToRGB(hue, 0.85f, 1.0f);
+            Color emission = rainbow * Mathf.Max(1.0f, m_rainbowEmission);
+
+            for (int i = 0; i < m_rainbowMaterials.Length; i++)
+            {
+                var materials = m_rainbowMaterials[i];
+                if (materials == null) continue;
+                for (int j = 0; j < materials.Length; j++)
+                {
+                    var material = materials[j];
+                    if (material == null) continue;
+                    if (material.HasProperty("_BaseColor")) material.SetColor("_BaseColor", rainbow);
+                    if (material.HasProperty("_Color")) material.SetColor("_Color", rainbow);
+                    if (material.HasProperty("_EmissionColor")) material.SetColor("_EmissionColor", emission);
+                }
+            }
+        }
+
+        void EndRainbow()
+        {
+            if (!m_rainbowActive) return;
+
+            if (m_rainbowRenderers != null)
+            {
+                for (int i = 0; i < m_rainbowRenderers.Length; i++)
+                {
+                    if (m_rainbowMaterials != null && i < m_rainbowMaterials.Length && m_rainbowMaterials[i] != null)
+                    {
+                        foreach (var material in m_rainbowMaterials[i])
+                        {
+                            if (material != null) Destroy(material);
+                        }
+                    }
+                    if (m_rainbowRenderers[i] == null) continue;
+                    if (m_originalMaterials != null && m_originalMaterials[i] != null)
+                        m_rainbowRenderers[i].sharedMaterials = m_originalMaterials[i];
+                    m_rainbowRenderers[i].enabled = true;
+                }
+            }
+
+            m_rainbowRenderers = null;
+            m_originalMaterials = null;
+            m_rainbowMaterials = null;
+            m_rainbowActive = false;
+        }
+
         void EndSpecial()
         {
+            EndRainbow();
             State previous = m_state;
             m_state = State.Idle;
             m_stateTime = 0.0f;
@@ -984,6 +1088,7 @@ namespace Yurube
 
         void Abort()
         {
+            EndRainbow();
             if (m_state == State.Idle) return;
             m_state = State.Idle;
 

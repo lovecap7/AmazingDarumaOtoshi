@@ -101,6 +101,7 @@ public class NetMatch : NetworkBehaviour
         if (driver == null) driver = m_match.gameObject.AddComponent<NetMatchDriver>();
         driver.IsServer = IsServer;
         m_match.gameObject.SetActive(true);
+        AttachMatchExtras();
 
         if (IsServer)
         {
@@ -122,6 +123,19 @@ public class NetMatch : NetworkBehaviour
 
         m_match.SetNetRules(ToRules(m_rules.Value));
         m_rules.OnValueChanged += OnRulesChanged;
+    }
+
+    // 中川さんの演出(輪郭・ハンマーの火花・復活の出現・開始の演出・王冠)は、シーンを読んだときに表示中の試合へ自動で付く。
+    // この Match は接続するまで非表示なので付かない。表示したあとに、ローカルと同じものを付ける
+    // (王冠・開始の演出は、ネット対戦では自分で止まる設定になっている)
+    void AttachMatchExtras()
+    {
+        var go = m_match.gameObject;
+        if (Nakagawa.PlayerOutlines.AutoAttach && go.GetComponent<Nakagawa.PlayerOutlines>() == null) go.AddComponent<Nakagawa.PlayerOutlines>();
+        if (Nakagawa.HammerHitEffect.AutoAttach && go.GetComponent<Nakagawa.HammerHitEffect>() == null) go.AddComponent<Nakagawa.HammerHitEffect>();
+        if (Nakagawa.RespawnAppearEffect.AutoAttach && go.GetComponent<Nakagawa.RespawnAppearEffect>() == null) go.AddComponent<Nakagawa.RespawnAppearEffect>();
+        if (Nakagawa.StartCountdownCinematic.AutoAttach && go.GetComponent<Nakagawa.StartCountdownCinematic>() == null) go.AddComponent<Nakagawa.StartCountdownCinematic>();
+        if (Nakagawa.MatchCrown.AutoAttach && FindAnyObjectByType<Nakagawa.MatchCrown>() == null) go.AddComponent<Nakagawa.MatchCrown>();
     }
 
     public override void OnNetworkDespawn()

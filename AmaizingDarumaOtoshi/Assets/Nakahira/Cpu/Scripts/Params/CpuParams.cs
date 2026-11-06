@@ -64,8 +64,18 @@ namespace Nakahira
         [Min(0.0f)] public float SwingIntervalMax = 0.6f;
         [Tooltip("相手の薙ぎ払いをジャンプでかわす確率(疲れていないとき。集中度の割合が上がるほど下がる)")]
         [Range(0.0f, 1.0f)] public float DodgeChance = 0.8f;
-        [Tooltip("相手が振り始めてから、かわすジャンプをするまでの遅れ(秒)")]
-        [Min(0.0f)] public float DodgeReaction = 0.05f;
+        [Tooltip("相手が振り始めてから、かわすジャンプをするまでの遅れ(秒)。人が見てから反応できるのは 0.2 秒くらい。" +
+                 "ハンマーが自分の所をもう通り過ぎていたら跳ばない(正面の相手には振り始めから約 0.12 秒で当たるので、人並みの遅れだと端から来た振りしかかわせない)")]
+        [Min(0.0f)] public float DodgeReaction = 0.2f;
+        [Tooltip("読みジャンプ:相手の間合いの中で、相手がこちらを向いていつでも振れるとき、1秒あたりに先に跳ぶ確率(相手の正面にいるほど高い)")]
+        [Min(0.0f)] public float ReadJumpRate = 0.6f;
+        [Tooltip("読みジャンプ:相手の間合いに入った(相手が入ってきた)瞬間に、少し間を置いて跳ぶ確率")]
+        [Range(0.0f, 1.0f)] public float ReadJumpOnEnterChance = 0.5f;
+        [Tooltip("読みジャンプ:間合いに入ってから跳ぶまでの間(秒)の最小・最大")]
+        [Min(0.0f)] public float ReadJumpDelayMin = 0.05f;
+        [Min(0.0f)] public float ReadJumpDelayMax = 0.2f;
+        [Tooltip("読みジャンプ:跳んでから、次に読みで跳べるまでの時間(秒。跳ね続けないように)")]
+        [Min(0.0f)] public float ReadJumpCooldown = 1.0f;
         [Tooltip("かわすジャンプの最中に、相手のハンマーの届かない背中側へ回り込む確率")]
         [Range(0.0f, 1.0f)] public float CircleChance = 0.6f;
         [Tooltip("ジャンプでかわすときに、跳びながら動く確率(外れたら真上に跳ぶ)。殴り合いで回り込まないとき(横へずれる・少し下がる)と、弾のジャンプ避け(進路から横へずれる)で使う")]
