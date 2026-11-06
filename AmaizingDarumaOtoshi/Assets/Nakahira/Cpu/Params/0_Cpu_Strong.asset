@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 183ba240b15e3474fb7fa0958817b77e, type: 3}
-  m_Name: Cpu_Default
+  m_Name: 0_Cpu_Strong
   m_EditorClassIdentifier: Assembly-CSharp::Nakahira.CpuParams
   ThinkInterval: 0.2
   StateStickiness: 0.1
@@ -37,7 +37,12 @@ MonoBehaviour:
   SwingIntervalMin: 0.2
   SwingIntervalMax: 0.6
   DodgeChance: 0.8
-  DodgeReaction: 0.05
+  DodgeReaction: 0.2
+  ReadJumpRate: 0.6
+  ReadJumpOnEnterChance: 0.5
+  ReadJumpDelayMin: 0.05
+  ReadJumpDelayMax: 0.2
+  ReadJumpCooldown: 1
   CircleChance: 0.6
   DodgeMoveChance: 0.8
   StrafeChance: 0.6
@@ -118,3 +123,19 @@ MonoBehaviour:
   RepathInterval: 0.3
   EdgeLookAhead: 0.6
   GroundProbeDepth: 2
+  GhostEscapeWeight: 0.5
+  GhostMinClosingSpeed: 0.8
+  GhostTargetStickiness: 1
+  GhostInvinciblePenalty: 3
+  GhostMaxLeadTime: 1.5
+  GhostWarpCost: 1.2
+  GhostHitMargin: 0.9
+  GhostSwingReactionMin: 0
+  GhostSwingReactionMax: 0
+  GhostEarlySwingChance: 0
+  GhostEarlySwingSlack: 1
+  GhostBatRange: 9
+  GhostBatPenalty: 1.5
+  GhostBatSearch: 10
+  GhostBatAimTolerance: 8
+  GhostBatGiveUpTime: 4

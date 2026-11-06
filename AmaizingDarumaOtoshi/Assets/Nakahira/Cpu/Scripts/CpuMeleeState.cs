@@ -40,6 +40,10 @@ namespace Nakahira
         const float kExposedRetreatMargin = 1.0f;
         // かわすジャンプで下がるときの移動入力の大きさ(少しだけ下がる。着地後すぐ反撃できる距離に残る)
         const float kDodgeBackInput = 0.4f;
+        // 跳んでから、ハンマーの当たる高さより上に上がりきるまでの時間(秒。ジャンプの上がる速さ + 物理の 1 ステップ)
+        const float kJumpClearTime = 0.05f;
+        // 読みジャンプ:相手の正面からこの角度(度)以内なら、一番跳びやすい
+        const float kReadJumpFullAngle = 45.0f;
 
         readonly CpuPickupMotor m_pickup = new CpuPickupMotor();
         readonly CpuPathFollower m_route = new CpuPathFollower();
@@ -66,6 +70,10 @@ namespace Nakahira
         // 回り込まないときに、跳びながら動く向き(横へずれる・少し下がる。m_hasDodgeMove が false なら真上に跳ぶ)
         bool m_hasDodgeMove;
         Vector2 m_dodgeMove;
+        // 読みジャンプ:前のフレームで相手のハンマーの脅威の中にいたか・跳ぶと決めた時刻(なければ負)・次に読みで跳べる時刻
+        bool m_wasThreatened;
+        float m_readJumpTime = -1.0f;
+        float m_readJumpCooldownUntil;
 
         public override string Name => "殴る";
         public override CpuPathFollower Route => m_route;
@@ -91,6 +99,8 @@ namespace Nakahira
             m_lastTargetStack = o != null ? o.StackCount : -1;
             m_dodgeCircle = false;
             m_hasDodgeMove = false;
+            m_wasThreatened = false;
+            m_readJumpTime = -1.0f;
             RollCircling(c);
             m_pickup.Clear();
             m_route.Clear();
@@ -416,22 +426,96 @@ namespace Nakahira
                 }
             }
 
+            // 跳んでいる最中に相手が振った(読みジャンプが当たった):着地したらすぐ反撃する
+            if (startedSwing && (!c.Self.IsGrounded || Time.time - m_dodgeJumpTime < kJustJumpedTime)) m_counterReady = true;
+
+            UpdateReadJump(c, o, ref cmd);
+
             if (m_dodgeTime < 0.0f || Time.time < m_dodgeTime) return;
-            // 相手が振り終わってからでは跳ばない(焦って遅れたジャンプは、かわせなくても跳ぶ)
-            if (Time.time - m_targetSwingStart > kDodgeWindow + c.Params.DodgeReaction + c.Params.PanicDodgeJitter || !c.Self.IsGrounded)
+            // 相手が振り終わってから・ハンマーがもう自分の所を通り過ぎてからでは跳ばない(当たってから跳ぶと間抜けに見える)
+            if (Time.time - m_targetSwingStart > kDodgeWindow + c.Params.DodgeReaction + c.Params.PanicDodgeJitter
+                || !c.Self.IsGrounded || !o.IsSweeping || !CanStillDodge(c, o))
             {
                 m_dodgeTime = -1.0f;
                 return;
             }
-            cmd.Jump = true;
             m_dodgeTime = -1.0f;
-            m_dodgeJumpTime = Time.time;
             m_counterReady = true;
             c.AddLoad(c.Params.AttentionOnDodge);
-            // 跳びながら相手の背中側へ回り込むか。回り込まないなら、跳びながら横へずれる・少し下がることもある
+            Jump(c, o, ref cmd);
+        }
+
+        // かわすジャンプ・読みジャンプ:跳んで、跳びながら相手の背中側へ回り込むか、横へずれる・少し下がる
+        private void Jump(CpuContext c, CpuOpponent o, ref DarumaCommand cmd)
+        {
+            cmd.Jump = true;
+            m_dodgeJumpTime = Time.time;
             m_dodgeCircle = Random.value < c.Params.CircleChance;
             m_hasDodgeMove = !m_dodgeCircle && CpuDodgeMove.Roll(c) && PickDodgeMove(c, o, out m_dodgeMove);
             if (m_hasDodgeMove) cmd.Move = m_dodgeMove;
+        }
+
+        // 相手のハンマーが、まだ自分の所(相手から見た角度)を通っていないか(今跳べば、当たる高さより上に上がりきれるか)
+        private static bool CanStillDodge(CpuContext c, CpuOpponent o)
+        {
+            if (o.Character == null) return true;
+            DarumaHammer hammer = o.Character.Hammer;
+            Vector3 local = o.Character.transform.InverseTransformPoint(c.Position);
+            float bearing = Mathf.Atan2(local.x, local.z) * Mathf.Rad2Deg;
+            float start = hammer.SweepStartYaw;
+            float end = hammer.SweepEndYaw;
+            // ハンマーが届かない角度(背中側)なら、跳ぶ必要がない
+            if (bearing > start || bearing < end) return false;
+            float hitTime = hammer.SweepDuration * (start - bearing) / (start - end);
+            float left = (hitTime - hammer.ActionTime) / o.Character.LocalTimeScale;
+            return left > kJumpClearTime;
+        }
+
+        // 読みジャンプ:相手が間合いにいてこちらを向き、いつでも振れるとき、振られる前に先に跳ぶ(見てからでは間に合わないので)
+        //  ・相手が間合いに入った瞬間は ReadJumpOnEnterChance で、少し間を置いて跳ぶ(入ってすぐ振ってくるのを読む)
+        //  ・間合いにいる間は、1秒あたり ReadJumpRate で跳ぶ(相手の正面にいるほど跳びやすい)
+        //  読みが外れると着地のすきを殴られる(人は「跳ばせてから着地を殴る」で崩せる)
+        private void UpdateReadJump(CpuContext c, CpuOpponent o, ref DarumaCommand cmd)
+        {
+            CpuParams p = c.Params;
+            bool threatened = IsThreatened(c, o, out float facing);
+            bool entered = threatened && !m_wasThreatened;
+            m_wasThreatened = threatened;
+            if (!threatened)
+            {
+                m_readJumpTime = -1.0f;
+                return;
+            }
+            if (cmd.Jump || !c.Self.IsGrounded || Time.time - m_dodgeJumpTime < kJustJumpedTime) return;
+            if (Time.time < m_readJumpCooldownUntil || m_dodgeTime >= 0.0f) return;
+
+            if (entered && Random.value < p.ReadJumpOnEnterChance * c.Alertness)
+            {
+                m_readJumpTime = Time.time + Random.Range(p.ReadJumpDelayMin, Mathf.Max(p.ReadJumpDelayMin, p.ReadJumpDelayMax));
+            }
+            bool scheduled = m_readJumpTime >= 0.0f && Time.time >= m_readJumpTime;
+            bool guess = Random.value < p.ReadJumpRate * facing * c.Alertness * c.DeltaTime;
+            if (!scheduled && !guess) return;
+
+            m_readJumpTime = -1.0f;
+            m_readJumpCooldownUntil = Time.time + p.ReadJumpCooldown;
+            Jump(c, o, ref cmd);
+        }
+
+        // 相手のハンマーがいつ来てもおかしくないか:間合いの中・相手が地上でいつでも振れる・自分が相手のハンマーの届く角度にいる
+        // facing:相手の正面にいるほど 1(届く角度の端で 0)
+        private static bool IsThreatened(CpuContext c, CpuOpponent o, out float facing)
+        {
+            facing = 0.0f;
+            if (o.Character == null || o.IsAirborne || o.Character.Hammer.IsBusy) return false;
+            if (o.FlatDistance > o.SweepHitDistance) return false;
+            DarumaHammer hammer = o.Character.Hammer;
+            Vector3 local = o.Character.transform.InverseTransformPoint(c.Position);
+            float bearing = Mathf.Abs(Mathf.Atan2(local.x, local.z) * Mathf.Rad2Deg);
+            float limit = Mathf.Max(hammer.SweepStartYaw, -hammer.SweepEndYaw);
+            if (bearing > limit) return false;
+            facing = 1.0f - Mathf.Clamp01((bearing - kReadJumpFullAngle) / Mathf.Max(1.0f, limit - kReadJumpFullAngle));
+            return true;
         }
 
         // かわすジャンプで動く向き:相手の横へずれる(左右はその都度選ぶ)か、少し下がる。どちらを先に試すかもその都度選ぶ
