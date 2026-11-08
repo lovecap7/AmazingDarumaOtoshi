@@ -28,6 +28,22 @@ namespace Nakahira
         }
     }
 
+    // ハンマーの薙ぎ払いが終わったときの情報(DarumaHammer.SweepFinished)
+    public readonly struct HammerSweepInfo
+    {
+        public readonly DarumaHammer Hammer;
+        public readonly IDarumaAttacker Owner;
+        // この一振りで当たった対象の数(0 なら空振り)
+        public readonly int HitCount;
+
+        public HammerSweepInfo(DarumaHammer hammer, IDarumaAttacker owner, int hitCount)
+        {
+            Hammer = hammer;
+            Owner = owner;
+            HitCount = hitCount;
+        }
+    }
+
     // ハンマー。このコンポーネントが付いたTransformを回転の支点として振る
     // 子に「前方(+Z)へ伸びる」ハンマーの見た目を置く
     //  ・薙ぎ払い     : 前方を右から左へ水平に振る。ハンマーが対象の位置を通過した瞬間に当たり、その角度へ飛ばす
@@ -82,6 +98,8 @@ namespace Nakahira
 
         // 薙ぎ払いが積み木・キャラクターに当たった(カメラの揺れ・効果音など演出用)
         public static event System.Action<HammerHitInfo> Hit;
+        // 薙ぎ払いが終わった(当たらなかった=空振りの判定用)
+        public static event System.Action<HammerSweepInfo> SweepFinished;
         // 股抜きショットで積み木を打ち出した(演出用。Target は打ち出した積み木、Point は打ち出した位置)
         public static event System.Action<HammerHitInfo> ShotFired;
 
@@ -168,7 +186,12 @@ namespace Nakahira
             if (m_action == Action.Sweep)
             {
                 if (!ViewOnly) DetectSweepHits();
-                if (m_time >= m_params.SweepDuration) m_action = Action.None;
+                if (m_time >= m_params.SweepDuration)
+                {
+                    // 当たった対象が0なら空振り。見た目だけの再生(ネットのクライアント)では数えない
+                    if (!ViewOnly) SweepFinished?.Invoke(new HammerSweepInfo(this, m_owner, m_hitThisSwing.Count));
+                    m_action = Action.None;
+                }
             }
             else if (m_action == Action.Shot)
             {

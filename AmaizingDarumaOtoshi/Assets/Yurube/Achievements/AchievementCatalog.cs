@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Yurube.Achievements
 {
-    // 実績の一覧（最初に入れる21個）。
+    // 実績の一覧（39個）。
     // 実績を増やすときは CreateDefaults() に1行足すだけでよい。判定は AchievementMetric を見て
     // AchievementManager が共通で行うので、ほかのコードを直す必要はない。
     // ID はセーブに残るので、一度出したら変えない（変えると解除済みが消える）。
@@ -53,7 +53,7 @@ namespace Yurube.Achievements
             return null;
         }
 
-        // ---------------- 20個の実績 ----------------
+        // ---------------- 20個の通常実績 ＋ 4個のメタ実績（レアリティ制覇）＋ 1個の最高位 ＋ 1個のシークレット ＋ 追加13個 ----------------
         // 引数：ID、名前、ポエム、カテゴリー、解除条件、条件の種類、目標数、レアリティ
         static List<AchievementDefinition> CreateDefaults()
         {
@@ -94,12 +94,12 @@ namespace Yurube.Achievements
                 new AchievementDefinition("hit_100", "百発百中？",
                     "通算100発命中。はずす気、ありますか？",
                     AchievementCategory.Attack, "累計100回攻撃を命中させる", AchievementMetric.Hit, 100,
-                    AchievementRarity.Gold),
+                    AchievementRarity.Silver),
 
                 new AchievementDefinition("combo_10", "コンボの達人",
                     "1試合で10回命中。もう止まらない。",
                     AchievementCategory.Attack, "1試合中に10回攻撃を命中させる", AchievementMetric.HitInMatch, 10,
-                    AchievementRarity.Gold),
+                    AchievementRarity.Silver),
 
                 new AchievementDefinition("counter_first", "打ち返し入門",
                     "飛んできた積み木を、ハンマーでおかえし。",
@@ -130,7 +130,7 @@ namespace Yurube.Achievements
                 new AchievementDefinition("chain_5", "連鎖マスター",
                     "5個以上の連鎖。見ているだけで気持ちいい。",
                     AchievementCategory.Chain, "5個以上のブロックを連鎖させる", AchievementMetric.ChainBest, 5,
-                    AchievementRarity.Gold),
+                    AchievementRarity.Silver),
 
                 new AchievementDefinition("chain_10", "大連鎖！",
                     "10個以上の大連鎖。もはやお祭り。",
@@ -146,7 +146,7 @@ namespace Yurube.Achievements
                 new AchievementDefinition("stack_10", "天まで届け",
                     "自分の積み木を10個。天まで届け！",
                     AchievementCategory.Stack, "自分のブロックを10個積み上げる", AchievementMetric.StackBest, 10,
-                    AchievementRarity.Gold),
+                    AchievementRarity.Silver),
 
                 new AchievementDefinition("clutch_win", "崖っぷちの勝利",
                     "積み木1個以下で勝利。よくぞ耐えた！",
@@ -164,12 +164,109 @@ namespace Yurube.Achievements
                     AchievementCategory.Challenge, "全キャラクターを最低1回ずつ使用する", AchievementMetric.CharacterUsedDistinct, 1,
                     AchievementRarity.Gold),
 
-                // ---- メタ実績（ほかのすべての実績を解除すると解除される） ----
-                // 目標の数は AchievementManager が「自分以外の実績の数」から自動で決める
-                new AchievementDefinition("all_non_platinum", "やりこみの達人",
-                    "ほかの実績はぜんぶ制覇。最後に残ったのは、この輝き。",
-                    AchievementCategory.Challenge, "「やりこみの達人」以外のすべての実績を解除する", AchievementMetric.AllOtherUnlocked, 1,
+                // ---- レアリティ制覇（メタ実績） ----
+                // 目標の数は AchievementManager が「同じレアリティのほかの実績の数」から自動で決める。
+                // レアリティごとの実績数が増減しても、そのレアリティをすべて解除したかどうかで判定される。
+                new AchievementDefinition("bronze_master", "銅の覇者",
+                    "銅の実績をぜんぶ制覇。最初の一歩を、ぜんぶ踏みしめた。",
+                    AchievementCategory.Challenge, "すべての銅実績を解除する", AchievementMetric.AllRarityUnlocked, 1,
+                    AchievementRarity.Bronze, true),
+
+                new AchievementDefinition("silver_master", "銀の覇者",
+                    "銀の実績をぜんぶ制覇。中級者の肩書き、しっかり手にした。",
+                    AchievementCategory.Challenge, "すべての銀実績を解除する", AchievementMetric.AllRarityUnlocked, 1,
+                    AchievementRarity.Silver, true),
+
+                new AchievementDefinition("gold_master", "黄金の覇者",
+                    "金の実績をぜんぶ制覇。黄金にふさわしい立ち回り、ここに極まれり。",
+                    AchievementCategory.Challenge, "すべての金実績を解除する", AchievementMetric.AllRarityUnlocked, 1,
+                    AchievementRarity.Gold, true),
+
+                new AchievementDefinition("platinum_master", "白金の覇者",
+                    "プラチナの実績をぜんぶ制覇。白銀の輝きは、熟練の証。",
+                    AchievementCategory.Challenge, "すべてのプラチナ実績を解除する", AchievementMetric.AllRarityUnlocked, 1,
+                    AchievementRarity.Platinum, true),
+
+                // ---- 最高位（ほかのすべての実績を解除すると解除される） ----
+                // 目標の数は AchievementManager が「自分以外の実績の数」から自動で決める。
+                // ID は昔のセーブを消さないために変えない（名前だけダイヤモンドの「完全なる制覇」に変更）。
+                new AchievementDefinition("all_non_platinum", "完全なる制覇",
+                    "ほかの実績はぜんぶ制覇。最後に残ったのは、この紫の輝き。",
+                    AchievementCategory.Challenge, "すべての実績を解除する", AchievementMetric.AllOtherUnlocked, 1,
+                    AchievementRarity.Diamond),
+
+                // ---- シークレット実績（未解除の間は名前・条件・レアリティを伏せる） ----
+                new AchievementDefinition("secret_1000_hits", "千本ノック",
+                    "千の一撃。打ち続けた者だけが辿り着く、静かな境地。",
+                    AchievementCategory.Attack, "累計1000回攻撃を命中させる", AchievementMetric.Hit, 1000,
+                    AchievementRarity.Platinum, false, true),
+
+                // ---- 追加13件（2026/11/08 追加実績案） ----
+                // 既存の番号を動かさないよう、必ず末尾に追加する。
+                new AchievementDefinition("first_loss", "転んでも大丈夫",
+                    "初めての敗北。ここからが、本当のだるま落とし。",
+                    AchievementCategory.Match, "初めて試合に敗北する", AchievementMetric.MatchLost, 1,
+                    AchievementRarity.Bronze),
+
+                new AchievementDefinition("passive_first", "個性、発動！",
+                    "キャラの個性が目を覚ました。この子、ただ者じゃない。",
+                    AchievementCategory.Challenge, "初めてキャラクターのパッシブを発動する", AchievementMetric.PassiveActivated, 1,
+                    AchievementRarity.Bronze),
+
+                new AchievementDefinition("stack_variety", "いろいろ積んでみた",
+                    "色とりどりの積み木タワー。バランスも、気持ちも、カラフル。",
+                    AchievementCategory.Stack, "1試合中に3種類以上のブロックを同時に積む", AchievementMetric.BlockTypesInStack, 3,
+                    AchievementRarity.Bronze),
+
+                new AchievementDefinition("counter_5", "返し名人",
+                    "5回の打ち返し。ハンマーさばき、見えてきたね。",
+                    AchievementCategory.Attack, "累計5回カウンター・打ち返しを成功させる", AchievementMetric.Counter, 5,
+                    AchievementRarity.Silver),
+
+                new AchievementDefinition("win_streak_3", "三連勝！",
+                    "3連勝。流れは完全にあなたのもの。",
+                    AchievementCategory.Match, "3試合連続で勝利する", AchievementMetric.WinStreakBest, 3,
+                    AchievementRarity.Silver),
+
+                new AchievementDefinition("rally_3", "ピンポン名人",
+                    "行って、返って、また来た。積み木が行き交う名勝負。",
+                    AchievementCategory.Attack, "同じ積み木を打ち返し合って3回続ける", AchievementMetric.RallyBest, 3,
+                    AchievementRarity.Silver),
+
+                new AchievementDefinition("opportunist", "漁夫の利",
+                    "弱ったところに、すかさず一撃。勝てば官軍！",
+                    AchievementCategory.Attack, "他プレイヤーの攻撃を受けた直後（3秒以内）の相手を撃破する", AchievementMetric.OpportunistKO, 1,
+                    AchievementRarity.Silver),
+
+                new AchievementDefinition("hit_500", "素振り五百回",
+                    "通算500発命中。千の道のりも、半分まで来た。",
+                    AchievementCategory.Attack, "累計500回攻撃を命中させる", AchievementMetric.Hit, 500,
+                    AchievementRarity.Gold),
+
+                new AchievementDefinition("chain_ko", "ドミノ倒し",
+                    "自分の一撃が、連鎖して相手を崩した。狙い通り！",
+                    AchievementCategory.Chain, "連鎖によって相手を撃破する", AchievementMetric.ChainKO, 1,
+                    AchievementRarity.Gold),
+
+                new AchievementDefinition("multi_ko", "一網打尽",
+                    "一撃で二人まとめて。会場が、どっと沸いた。",
+                    AchievementCategory.Chain, "1回の攻撃・連鎖で2人以上を同時に撃破する", AchievementMetric.MultiKOBest, 2,
                     AchievementRarity.Platinum),
+
+                new AchievementDefinition("no_damage_win", "無傷の王者",
+                    "かすり傷ひとつなし。あなたの前に、道はなかった。",
+                    AchievementCategory.Match, "一度も被弾せずに試合に勝利する", AchievementMetric.NoDamageWin, 1,
+                    AchievementRarity.Platinum),
+
+                new AchievementDefinition("secret_whiff", "空振り三振",
+                    "ブンッ、ブンッ。風だけが、あなたに応えてくれた。",
+                    AchievementCategory.Attack, "累計50回ハンマーを空振りする", AchievementMetric.HammerMiss, 50,
+                    AchievementRarity.Silver, false, true),
+
+                new AchievementDefinition("secret_quick_win", "電光石火",
+                    "瞬きの間の決着。観客はまだ席に着いていた。",
+                    AchievementCategory.Match, "試合開始から30秒以内に勝利する", AchievementMetric.QuickWin, 1,
+                    AchievementRarity.Gold, false, true),
             };
             return list;
         }

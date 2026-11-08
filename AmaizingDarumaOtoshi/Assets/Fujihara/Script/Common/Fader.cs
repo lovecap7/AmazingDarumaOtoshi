@@ -33,9 +33,16 @@ public class Fader : MonoBehaviour
     RectTransform root;
     ISceneTransition built;   // root の下に組み立て済みの演出
     bool busy;
+    // 黒い画像で画面を隠している濃さ（0 = 見えている、1 = 真っ暗）
+    float m_blackAlpha;
 
     // フェード中（シーン遷移の途中・遷移後に明るくなるまで）か。開始演出などを明るくなってから始めるのに使う
     public static bool IsBusy => instance != null && instance.busy;
+
+    // 黒い画像で画面を隠している濃さ（0 = 見えている、1 = 真っ暗）。
+    // OnGUI の IMGUI はオーバーレイのキャンバスより手前に描かれるため、
+    // 必殺技ゲージなど OnGUI の UI を黒フェードと一緒に消すのに使う。
+    public static float BlackAlpha => instance != null ? instance.m_blackAlpha : 0.0f;
 
     // シーン遷移の演出。null で黒いフェード。起動時（BeforeSceneLoad）などに入れておく
     public static ISceneTransition Transition
@@ -152,6 +159,7 @@ public class Fader : MonoBehaviour
         if (t != null)
         {
             BlackVisible(false);
+            m_blackAlpha = 0f;   // 黒は使わない（演出が画面を隠す）
             group.alpha = 1f;
             group.blocksRaycasts = true;
             yield return t.Cover();   // 隠す
@@ -217,14 +225,18 @@ public class Fader : MonoBehaviour
     {
         BlackVisible(true);
         group.blocksRaycasts = true;
+        group.alpha = from;
+        m_blackAlpha = from;
 
         for (float t = 0f; t < time; t += Time.unscaledDeltaTime)
         {
             group.alpha = Mathf.Lerp(from, to, t / time);
+            m_blackAlpha = group.alpha;
             yield return null;
         }
 
         group.alpha = to;
+        m_blackAlpha = to;
         group.blocksRaycasts = to > 0f;
     }
 }

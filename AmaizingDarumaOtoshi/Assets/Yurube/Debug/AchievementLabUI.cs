@@ -380,8 +380,20 @@ namespace Yurube.Lab
             GUILayout.Label("レアリティ：", m_label, GUILayout.Width(84f));
             Rect swatch = GUILayoutUtility.GetRect(20f, 20f, GUILayout.Width(20f), GUILayout.Height(20f), GUILayout.ExpandWidth(false));
             GUI.DrawTexture(swatch, AchievementVisuals.Gradient(data.RarityColor), ScaleMode.StretchToFill);
-            GUILayout.Label("（色だけ。ゲーム中もメニューも文字は出さない）", m_small);
+            GUILayout.Label("（色だけ。ダイヤモンドだけ専用アイコン）", m_small);
             GUILayout.EndHorizontal();
+            GUILayout.Label("　" + data.RarityName + "（" + data.RarityEnglishName + "）："
+                            + AchievementRarityInfo.DescriptionOf(data.Rarity)
+                            + (AchievementRarityInfo.IsHighest(data.Rarity) ? "　最高レアリティ" : ""), m_small);
+
+            // ダイヤモンドの専用アイコン（通知と同じ絵）をここでも確かめられる
+            Sprite rarityIcon = AchievementRarityIcons.IconOf(data.Rarity);
+            if (rarityIcon != null)
+            {
+                GUILayout.Label("専用アイコン", m_small, GUILayout.Width(120f));
+                Rect iconRect = GUILayoutUtility.GetRect(96f, 96f, GUILayout.Width(96f), GUILayout.Height(96f), GUILayout.ExpandWidth(false));
+                GUI.DrawTexture(iconRect, rarityIcon.texture, ScaleMode.ScaleToFit, true);
+            }
             GUILayout.Label("解除条件：" + data.ConditionText, m_label);
             GUILayout.Label("ポエム（メニューの「じっせき」で表示）：" + data.Poem, m_label);
             GUILayout.Space(4f);
@@ -475,10 +487,10 @@ namespace Yurube.Lab
                 AchievementEvents.RaiseMatchFinished(true, true);
                 Flash("積み木1個以下での勝利を通知しました");
             }
-            if (GUILayout.Button("引き分け・敗北", m_button))
+            if (GUILayout.Button("引き分け", m_button))
             {
                 AchievementEvents.RaiseMatchFinished(false, false);
-                Flash("勝利なしの試合終了を通知しました");
+                Flash("引き分けを通知しました（連勝は維持されます）");
             }
             GUILayout.EndHorizontal();
 
@@ -507,6 +519,38 @@ namespace Yurube.Lab
 
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("必殺技を発動", m_button)) { AchievementEvents.RaiseSpecial(); Flash("必殺技の発動を通知しました"); }
+            GUILayout.EndHorizontal();
+
+            GUILayout.Space(2f);
+            GUILayout.Label("追加実績のテスト", m_section);
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("敗北（CPU勝利）", m_button))
+            {
+                AchievementEvents.RaiseMatchFinished(false, false);
+                AchievementEvents.RaiseMatchLost();
+                Flash("敗北を通知しました");
+            }
+            if (GUILayout.Button("パッシブ発動", m_button)) { AchievementEvents.RaisePassiveActivated(); Flash("パッシブ発動を通知しました"); }
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("積み木3種類", m_button)) { AchievementEvents.RaiseBlockTypesInStack(3); Flash("積み木3種類を通知しました"); }
+            if (GUILayout.Button("ラリー3", m_button)) { AchievementEvents.RaiseRally(3); Flash("ラリー3を通知しました"); }
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("漁夫の利", m_button)) { AchievementEvents.RaiseOpportunistKO(); Flash("漁夫の利を通知しました"); }
+            if (GUILayout.Button("連鎖撃破", m_button)) { AchievementEvents.RaiseChainKO(); Flash("連鎖撃破を通知しました"); }
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("2人同時撃破", m_button)) { AchievementEvents.RaiseMultiKO(2); Flash("同時撃破2人を通知しました"); }
+            if (GUILayout.Button("無傷勝利", m_button)) { AchievementEvents.RaiseNoDamageWin(); Flash("無傷勝利を通知しました"); }
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("ハンマー空振り", m_button)) { AchievementEvents.RaiseHammerMiss(); Flash("ハンマー空振りを通知しました"); }
+            if (GUILayout.Button("30秒以内勝利", m_button)) { AchievementEvents.RaiseQuickWin(); Flash("30秒以内勝利を通知しました"); }
             GUILayout.EndHorizontal();
 
             GUILayout.Space(2f);

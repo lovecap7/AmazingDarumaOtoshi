@@ -1,5 +1,6 @@
 using Nakahira;
 using UnityEngine;
+using Yurube.Achievements;
 
 namespace Yurube
 {
@@ -29,6 +30,7 @@ namespace Yurube
         HammerParams m_params;
         float m_baseShotSpeed;
         bool m_wasShooting;
+        bool m_reportedPassive;
         readonly Collider[] m_overlaps = new Collider[32];
         static Material s_fallbackEffectMaterial;
 
@@ -49,6 +51,14 @@ namespace Yurube
         private void Update()
         {
             if (m_params == null) return;
+
+            // 赤い積み木が1個でも積まれたら、パッシブが動き出したとみなす
+            if (!m_reportedPassive && m_character != null && m_character.Stack != null
+                && m_character.Stack.CountColor(TumikiColor.Red) > 0)
+            {
+                m_reportedPassive = true;
+                AchievementEvents.RaisePassiveTriggered(m_character);
+            }
 
             // 撃っている間は、撃ち始めた時点の段数で固定する
             if (m_hammer.IsShooting)

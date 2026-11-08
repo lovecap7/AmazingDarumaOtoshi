@@ -1,5 +1,6 @@
 using Nakahira;
 using UnityEngine;
+using Yurube.Achievements;
 
 namespace Yurube
 {
@@ -16,6 +17,7 @@ namespace Yurube
         [SerializeField] bool m_logIwa = true;
 
         DarumaCharacter m_character;
+        bool m_reportedPassive;
         readonly Collider[] m_overlaps = new Collider[32];
 
         private void Awake()
@@ -42,6 +44,11 @@ namespace Yurube
                 if (iwa != null && iwa.ConsumedLaunch) continue;
                 if (iwa == null) iwa = block.gameObject.AddComponent<IwaBlock>();
                 iwa.Begin(m_logIwa);
+                if (!m_reportedPassive)
+                {
+                    m_reportedPassive = true;
+                    AchievementEvents.RaisePassiveTriggered(m_character);
+                }
             }
         }
     }

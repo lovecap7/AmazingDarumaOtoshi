@@ -17,6 +17,11 @@ namespace Yurube
         {
             if (gauge == null || character == null || DarumaMatch.Current == null) return;
 
+            // シーン遷移の黒フェードはキャンバスより手前にあるが、OnGUI はそのさらに手前に描かれる。
+            // そのままだとリザルトへ移る黒画面の上にゲージだけ残ってしまうので、黒の濃さに合わせて一緒に消す。
+            float visibility = 1.0f - Mathf.Clamp01(Fader.BlackAlpha);
+            if (visibility <= 0.0f) return;
+
             // カットイン中はゲージを描かない。
             // IMGUIの描画順やカットインの初回生成フレームに依存せず、
             // 必ずカットインが最前面になるようにする。
@@ -57,10 +62,12 @@ namespace Yurube
             const float panelSpacing = 24.0f;
             const float panelBottom = 120.0f;
             const float width = 300.0f;
-            const float height = 54.0f;
+            // 「READY! [L / Y]」が1行に収まり、文字の上端が切れない高さ
+            const float height = 58.0f;
 
             Matrix4x4 oldMatrix = GUI.matrix;
             Color oldColor = GUI.color;
+            Color WithFade(Color c) => new Color(c.r, c.g, c.b, c.a * visibility);
             float hudScale = Mathf.Max(0.5f, Screen.height / 1080.0f);
             GUI.matrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity,
                 new Vector3(hudScale, hudScale, 1.0f));
@@ -82,30 +89,30 @@ namespace Yurube
                 : playerColor;
 
             // パネル
-            GUI.color = new Color(0.02f, 0.02f, 0.03f, 0.78f);
+            GUI.color = WithFade(new Color(0.02f, 0.02f, 0.03f, 0.78f));
             GUI.DrawTexture(new Rect(x, y, width, height), Texture2D.whiteTexture);
 
             // 満タン時の外側グロー
             if (full)
             {
-                GUI.color = new Color(accent.r, accent.g, accent.b, 0.18f + 0.22f * pulse);
+                GUI.color = WithFade(new Color(accent.r, accent.g, accent.b, 0.18f + 0.22f * pulse));
                 GUI.DrawTexture(new Rect(x - 4.0f, y - 4.0f, width + 8.0f, height + 8.0f),
                     Texture2D.whiteTexture);
-                GUI.color = new Color(0.02f, 0.02f, 0.03f, 0.9f);
+                GUI.color = WithFade(new Color(0.02f, 0.02f, 0.03f, 0.9f));
                 GUI.DrawTexture(new Rect(x, y, width, height), Texture2D.whiteTexture);
             }
 
             // 枠
-            GUI.color = accent;
+            GUI.color = WithFade(accent);
             GUI.DrawTexture(new Rect(x, y, width, 2.0f), Texture2D.whiteTexture);
             GUI.DrawTexture(new Rect(x, y + height - 2.0f, width, 2.0f), Texture2D.whiteTexture);
             GUI.DrawTexture(new Rect(x, y, 2.0f, height), Texture2D.whiteTexture);
             GUI.DrawTexture(new Rect(x + width - 2.0f, y, 2.0f, height), Texture2D.whiteTexture);
 
             // 名前
-            GUI.color = Color.white;
+            GUI.color = WithFade(Color.white);
             string name = $"P{me.Index + 1} SPECIAL";
-            GUI.Label(new Rect(x + 10.0f, y + 3.0f, 150.0f, 20.0f), name, s_nameStyle);
+            GUI.Label(new Rect(x + 10.0f, y + 3.0f, 125.0f, 24.0f), name, s_nameStyle);
 
             // 状態表示
             string status;
@@ -116,28 +123,29 @@ namespace Yurube
             else
                 status = $"{gauge.Blocks}/{gauge.BlocksToFill}";
 
-            GUI.color = full ? accent : new Color(0.82f, 0.86f, 0.92f);
-            GUI.Label(new Rect(x + 150.0f, y + 3.0f, width - 160.0f, 20.0f), status,
+            // 名前と重ならないよう、右側いっぱい(右端は x + 290)に広く取る
+            GUI.color = WithFade(full ? accent : new Color(0.82f, 0.86f, 0.92f));
+            GUI.Label(new Rect(x + 135.0f, y + 1.0f, 155.0f, 28.0f), status,
                 full ? s_readyStyle : s_statusStyle);
 
             // ゲージ背景
-            var bar = new Rect(x + 10.0f, y + 29.0f, width - 20.0f, 14.0f);
-            GUI.color = new Color(0.0f, 0.0f, 0.0f, 0.75f);
+            var bar = new Rect(x + 10.0f, y + 32.0f, width - 20.0f, 16.0f);
+            GUI.color = WithFade(new Color(0.0f, 0.0f, 0.0f, 0.75f));
             GUI.DrawTexture(bar, Texture2D.whiteTexture);
 
             // ゲージ本体
             float fillWidth = bar.width * gauge.Normalized;
             if (fillWidth > 0.0f)
             {
-                GUI.color = full
+                GUI.color = WithFade(full
                     ? Color.Lerp(new Color(1.0f, 0.78f, 0.20f), Color.white, pulse)
-                    : playerColor;
+                    : playerColor);
                 GUI.DrawTexture(new Rect(bar.x, bar.y, fillWidth, bar.height),
                     Texture2D.whiteTexture);
             }
 
             // 5分割の目盛り
-            GUI.color = new Color(0.0f, 0.0f, 0.0f, 0.55f);
+            GUI.color = WithFade(new Color(0.0f, 0.0f, 0.0f, 0.55f));
             for (int i = 1; i < 5; i++)
             {
                 float tickX = bar.x + bar.width * (i / 5.0f);
@@ -148,7 +156,7 @@ namespace Yurube
             if (full)
             {
                 float shine = Mathf.Repeat(Time.unscaledTime * 0.9f, 1.0f);
-                GUI.color = new Color(1.0f, 1.0f, 1.0f, 0.28f);
+                GUI.color = WithFade(new Color(1.0f, 1.0f, 1.0f, 0.28f));
                 GUI.DrawTexture(new Rect(bar.x + bar.width * shine - 12.0f, bar.y, 24.0f, bar.height),
                     Texture2D.whiteTexture);
             }

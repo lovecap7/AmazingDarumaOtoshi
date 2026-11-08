@@ -1,5 +1,6 @@
 using Nakahira;
 using UnityEngine;
+using Yurube.Achievements;
 
 namespace Yurube
 {
@@ -22,6 +23,7 @@ namespace Yurube
         DarumaHammer m_hammer;
         int m_lastCount;
         bool m_pendingShot;
+        bool m_reportedPassive;
 
         private void Awake()
         {
@@ -67,6 +69,11 @@ namespace Yurube
             var zigzag = block.GetComponent<TumikiZigzag>();
             if (zigzag == null) zigzag = block.gameObject.AddComponent<TumikiZigzag>();
             zigzag.Begin(m_character, m_interval, m_turnSpeed);
+            if (!m_reportedPassive)
+            {
+                m_reportedPassive = true;
+                AchievementEvents.RaisePassiveTriggered(m_character);
+            }
 
             if (m_logSnake) Debug.Log("[へびだる] ショットの積み木を蛇行させる", this);
         }

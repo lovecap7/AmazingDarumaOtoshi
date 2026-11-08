@@ -14,8 +14,8 @@ namespace Yurube
         [Header("弾")]
         [Tooltip("必殺技の積み木の速さ(m/s)")]
         [SerializeField] float m_speed = 20.0f;
-        [Tooltip("残像ビームが残る時間(秒)")]
-        [SerializeField] float m_trailDuration = 1.2f;
+        [Tooltip("残像ビームが残る時間(秒)。弾が止まった後もこの時間までレーザーが残る")]
+        [SerializeField] float m_trailDuration = 15.0f;
         [Tooltip("通常の射撃エフェクトの速さの下限")]
         [SerializeField] float m_effectMinSpeed = 30.0f;
         [Tooltip("通常の射撃エフェクトの速さの上限")]

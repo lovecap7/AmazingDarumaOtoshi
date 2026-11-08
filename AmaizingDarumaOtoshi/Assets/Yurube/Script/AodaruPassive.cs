@@ -1,5 +1,6 @@
 using Nakahira;
 using UnityEngine;
+using Yurube.Achievements;
 
 namespace Yurube
 {
@@ -28,6 +29,7 @@ namespace Yurube
         DarumaCharacter m_character;
         int m_lastBlue = -1;
         float m_lastLoggedSpeed = -1.0f;
+        bool m_reportedPassive;
 
         private void Awake()
         {
@@ -64,10 +66,17 @@ namespace Yurube
             // ここで掛けると復帰時に溜まって爆発する。動ける状態のときだけ掛ける。
             if (m_character == null || !m_character.CanBeAffected) return;
 
+            int blue = CountBlue();
+            if (!m_reportedPassive && blue > 0)
+            {
+                m_reportedPassive = true;
+                AchievementEvents.RaisePassiveTriggered(m_character);
+            }
+
             float current = m_character.MoveSpeed;
             if (current <= 0.0f) return;
 
-            float scale = TargetSpeed(CountBlue()) / current;
+            float scale = TargetSpeed(blue) / current;
             if (scale <= 1.0001f) return;
             m_character.RequestSpeedScale(scale);
         }

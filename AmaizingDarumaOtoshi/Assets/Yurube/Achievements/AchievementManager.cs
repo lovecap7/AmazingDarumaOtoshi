@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using UnityEngine;
 
 namespace Yurube.Achievements
@@ -25,6 +26,8 @@ namespace Yurube.Achievements
         static bool s_ready;
         // メタ実績の数え直し中か（解除→数え直し→解除…の繰り返しを防ぐ）
         static bool s_refreshingMeta;
+        // いまの連勝数（敗北で0。引き分けでは維持）
+        static int s_winStreak;
 
         // 実績を解除した（通知・メニューの更新用）
         public static event Action<AchievementData> Unlocked;
@@ -79,6 +82,7 @@ namespace Yurube.Achievements
             s_storageKey = NormalStorageKey;
             s_ready = false;
             s_refreshingMeta = false;
+            s_winStreak = 0;
             Unlocked = null;
             Changed = null;
         }
@@ -100,6 +104,16 @@ namespace Yurube.Achievements
             AchievementEvents.Stack += count => Report(AchievementMetric.StackBest, count);
             AchievementEvents.Special += () => Report(AchievementMetric.SpecialActivated, 1);
             AchievementEvents.CharacterUsed += ReportCharacterUsed;
+            AchievementEvents.MatchLost += OnMatchLost;
+            AchievementEvents.PassiveActivated += () => Report(AchievementMetric.PassiveActivated, 1);
+            AchievementEvents.BlockTypesInStack += count => Report(AchievementMetric.BlockTypesInStack, count);
+            AchievementEvents.Rally += count => Report(AchievementMetric.RallyBest, count);
+            AchievementEvents.OpportunistKO += () => Report(AchievementMetric.OpportunistKO, 1);
+            AchievementEvents.ChainKO += () => Report(AchievementMetric.ChainKO, 1);
+            AchievementEvents.MultiKO += count => Report(AchievementMetric.MultiKOBest, count);
+            AchievementEvents.NoDamageWin += () => Report(AchievementMetric.NoDamageWin, 1);
+            AchievementEvents.HammerMiss += () => Report(AchievementMetric.HammerMiss, 1);
+            AchievementEvents.QuickWin += () => Report(AchievementMetric.QuickWin, 1);
             Load();
         }
 
@@ -121,13 +135,15 @@ namespace Yurube.Achievements
         {
             s_all.Clear();
             var ids = new HashSet<string>();
+            int number = 0;
             foreach (var definition in AchievementCatalog.Definitions)
             {
+                number++;
                 if (!ids.Add(definition.id))
                 {
                     Debug.LogError("[Achievement] 実績IDが重複しています: " + definition.id);
                 }
-                s_all.Add(new AchievementData(definition));
+                s_all.Add(new AchievementData(definition, number));
             }
             ApplyDynamicTargets();
         }
@@ -190,7 +206,12 @@ namespace Yurube.Achievements
         }
 
         static bool IsBest(AchievementMetric metric) =>
-            metric == AchievementMetric.ChainBest || metric == AchievementMetric.StackBest;
+            metric == AchievementMetric.ChainBest
+            || metric == AchievementMetric.StackBest
+            || metric == AchievementMetric.BlockTypesInStack
+            || metric == AchievementMetric.WinStreakBest
+            || metric == AchievementMetric.RallyBest
+            || metric == AchievementMetric.MultiKOBest;
 
         static int CountOf(AchievementMetric metric)
         {
@@ -215,13 +236,18 @@ namespace Yurube.Achievements
         {
             foreach (var data in s_all)
             {
+                // メタ実績（ほかの実績から決まるもの）は RefreshMetaAchievements で数える
+                if (IsMetaMetric(data.Definition.metric)) continue;
                 data.Progress = Mathf.Min(CountOf(data.Definition.metric), Mathf.Max(1, data.Target));
             }
             RefreshMetaAchievements();
             Changed?.Invoke();
         }
 
-        // 「ほかのすべてを解除」のような、ほかの実績の状態から決まる実績を数え直す。
+        static bool IsMetaMetric(AchievementMetric metric) =>
+            metric == AchievementMetric.AllOtherUnlocked || metric == AchievementMetric.AllRarityUnlocked;
+
+        // 「ほかのすべてを解除」「同じレアリティをすべて解除」のような、ほかの実績の状態から決まる実績を数え直す。
         // 解除済みの場合は進捗を満タンで見せる（条件を満たして解除されたため）
         static void RefreshMetaAchievements()
         {
@@ -229,24 +255,62 @@ namespace Yurube.Achievements
             s_refreshingMeta = true;
             try
             {
-                // 自分（同じ条件の実績）以外の、すべての実績の数
-                int target = 0, count = 0;
-                foreach (var data in s_all)
+                // レアリティ制覇が解除されると「完全なる制覇」の条件も満たす、のように連鎖するので、
+                // 新しく解除される実績がなくなるまで繰り返す。
+                bool unlockedAny = true;
+                while (unlockedAny)
                 {
-                    if (data.Definition.metric == AchievementMetric.AllOtherUnlocked) continue;
-                    target++;
-                    if (data.IsUnlocked) count++;
-                }
+                    unlockedAny = false;
 
-                s_counters[AchievementMetric.AllOtherUnlocked] = count;
-                foreach (var data in s_all)
-                {
-                    if (data.Definition.metric != AchievementMetric.AllOtherUnlocked) continue;
-                    data.Definition.target = Mathf.Max(1, target);
-                    data.Progress = data.IsUnlocked
-                        ? data.Definition.target
-                        : Mathf.Min(count, data.Definition.target);
-                    if (!data.IsUnlocked && target > 0 && count >= target) Unlock(data);
+                    // 自分（同じ条件の実績）以外の、すべての実績の数
+                    int allTarget = 0, allCount = 0;
+                    foreach (var data in s_all)
+                    {
+                        if (data.Definition.metric == AchievementMetric.AllOtherUnlocked) continue;
+                        allTarget++;
+                        if (data.IsUnlocked) allCount++;
+                    }
+
+                    s_counters[AchievementMetric.AllOtherUnlocked] = allCount;
+                    foreach (var data in s_all)
+                    {
+                        if (data.Definition.metric != AchievementMetric.AllOtherUnlocked) continue;
+                        data.Definition.target = Mathf.Max(1, allTarget);
+                        data.Progress = data.IsUnlocked
+                            ? data.Definition.target
+                            : Mathf.Min(allCount, data.Definition.target);
+                        if (!data.IsUnlocked && allTarget > 0 && allCount >= allTarget)
+                        {
+                            Unlock(data);
+                            unlockedAny = true;
+                        }
+                    }
+
+                    // レアリティ制覇：自分と同じレアリティの、自分以外の実績を数える。
+                    // 実績の数が増減しても、そのレアリティの実績をすべて解除したかで判定できる。
+                    foreach (var meta in s_all)
+                    {
+                        if (meta.Definition.metric != AchievementMetric.AllRarityUnlocked) continue;
+                        int target = 0, count = 0;
+                        foreach (var other in s_all)
+                        {
+                            if (other == meta) continue;
+                            if (other.Definition.rarity != meta.Definition.rarity) continue;
+                            if (other.Definition.metric == AchievementMetric.AllRarityUnlocked) continue;
+                            target++;
+                            if (other.IsUnlocked) count++;
+                        }
+
+                        meta.Definition.target = Mathf.Max(1, target);
+                        meta.Progress = meta.IsUnlocked
+                            ? meta.Definition.target
+                            : Mathf.Min(count, meta.Definition.target);
+                        if (!meta.IsUnlocked && target > 0 && count >= target)
+                        {
+                            Unlock(meta);
+                            unlockedAny = true;
+                        }
+                    }
                 }
             }
             finally
@@ -259,7 +323,7 @@ namespace Yurube.Achievements
         {
             if (data.IsUnlocked) return;
             data.IsUnlocked = true;
-            data.UnlockedAt = DateTime.Now;
+            data.UnlockedAt = DateTime.UtcNow;
             Save();
             Debug.Log("[Achievement] 解除: " + data.Id + " " + data.Name);
             Unlocked?.Invoke(data);
@@ -292,6 +356,19 @@ namespace Yurube.Achievements
             if (!won) return;
             Report(AchievementMetric.MatchWon, 1);
             if (lowStackWin) Report(AchievementMetric.WinWithLowStack, 1);
+            // 連勝は「人間側が勝った試合」で伸びる。引き分けでは維持し、敗北は OnMatchLost で0に戻す
+            s_winStreak++;
+            Report(AchievementMetric.WinStreakBest, s_winStreak);
+            Save();
+        }
+
+        static void OnMatchLost()
+        {
+            Initialize();
+            if (s_winStreak == 0) return;
+            s_winStreak = 0;
+            Save();
+            Changed?.Invoke();
         }
 
         //========================================
@@ -305,6 +382,7 @@ namespace Yurube.Achievements
             public List<string> unlockedAt = new List<string>();
             public List<string> counters = new List<string>();
             public List<string> characters = new List<string>();
+            public int winStreak;
         }
 
         public static void Save()
@@ -325,6 +403,7 @@ namespace Yurube.Achievements
             {
                 blob.characters.Add(id);
             }
+            blob.winStreak = s_winStreak;
             PlayerPrefs.SetString(s_storageKey, JsonUtility.ToJson(blob));
             PlayerPrefs.Save();
             Changed?.Invoke();
@@ -340,6 +419,7 @@ namespace Yurube.Achievements
                 var blob = JsonUtility.FromJson<SaveBlob>(json);
                 if (blob != null)
                 {
+                    s_winStreak = Mathf.Max(0, blob.winStreak);
                     if (blob.counters != null)
                     {
                         foreach (var line in blob.counters)
@@ -367,7 +447,8 @@ namespace Yurube.Achievements
                             var data = FindInList(id);
                             if (data == null) continue;
                             data.IsUnlocked = true;
-                            data.UnlockedAt = DateTime.Now;
+                            // 日時が無い古いセーブは「不明」のまま。読み込み時刻で埋めない
+                            data.UnlockedAt = DateTime.MinValue;
                         }
                     }
                     if (blob.unlockedAt != null)
@@ -377,7 +458,11 @@ namespace Yurube.Achievements
                         for (int i = 0; i < n; i++)
                         {
                             var data = FindInList(blob.unlocked[i]);
-                            if (data != null && DateTime.TryParse(blob.unlockedAt[i], out var time)) data.UnlockedAt = time;
+                            if (data != null && DateTime.TryParse(blob.unlockedAt[i], CultureInfo.InvariantCulture,
+                                                                  DateTimeStyles.RoundtripKind, out var time))
+                            {
+                                data.UnlockedAt = time;
+                            }
                         }
                     }
                 }
@@ -398,6 +483,7 @@ namespace Yurube.Achievements
         {
             s_counters.Clear();
             s_usedCharacters.Clear();
+            s_winStreak = 0;
             foreach (var data in s_all)
             {
                 data.Progress = 0;
@@ -444,6 +530,7 @@ namespace Yurube.Achievements
             Initialize();
             s_counters.Clear();
             s_usedCharacters.Clear();
+            s_winStreak = 0;
             RefreshAll();
             Save();
         }
@@ -471,6 +558,7 @@ namespace Yurube.Achievements
                 {
                     s_counters.Clear();
                     s_usedCharacters.Clear();
+                    s_winStreak = 0;
                 }
                 RefreshAll();
                 Save();
@@ -491,10 +579,12 @@ namespace Yurube.Achievements
             {
                 blob.counters?.Clear();
                 blob.characters?.Clear();
+                blob.winStreak = 0;
             }
             bool empty = (blob.unlocked == null || blob.unlocked.Count == 0)
                       && (blob.counters == null || blob.counters.Count == 0)
-                      && (blob.characters == null || blob.characters.Count == 0);
+                      && (blob.characters == null || blob.characters.Count == 0)
+                      && blob.winStreak == 0;
             if (empty) PlayerPrefs.DeleteKey(key);
             else PlayerPrefs.SetString(key, JsonUtility.ToJson(blob));
             PlayerPrefs.Save();
@@ -520,7 +610,7 @@ namespace Yurube.Achievements
             foreach (var data in s_all)
             {
                 blob.unlocked.Add(data.Id);
-                blob.unlockedAt.Add(DateTime.Now.ToString("o"));
+                blob.unlockedAt.Add(DateTime.UtcNow.ToString("o"));
                 int target = Mathf.Max(1, data.Target);
 
                 var metric = data.Definition.metric;
@@ -590,6 +680,8 @@ namespace Yurube.Achievements
             {
                 s_counters[metric] = progress;
             }
+            // 連勝は「現在の連勝数」も合わせる（このあと勝利したときに続きから数えられるように）
+            if (metric == AchievementMetric.WinStreakBest) s_winStreak = progress;
             // 同じ条件を共有する実績（試合数など）もまとめて表示を合わせる
             RefreshAll();
             // 直接書き換えでは解除しない（解除は「解除する」ボタンで、ふつうの解除を通す）

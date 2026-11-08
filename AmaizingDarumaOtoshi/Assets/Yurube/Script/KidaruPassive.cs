@@ -1,5 +1,6 @@
 using Nakahira;
 using UnityEngine;
+using Yurube.Achievements;
 
 namespace Yurube
 {
@@ -18,6 +19,7 @@ namespace Yurube
         DarumaCharacter m_character;
         int m_lastYellow;
         bool m_adding;
+        bool m_reportedPassive;
 
         private void Awake()
         {
@@ -69,6 +71,11 @@ namespace Yurube
             m_lastYellow = CountYellow();
 
             if (m_logExtra) Debug.Log($"[きだる] 黄色を積んだので1個追加 (合計 {stack.Count}段)");
+            if (!m_reportedPassive)
+            {
+                m_reportedPassive = true;
+                AchievementEvents.RaisePassiveTriggered(m_character);
+            }
         }
 
         int CountYellow()

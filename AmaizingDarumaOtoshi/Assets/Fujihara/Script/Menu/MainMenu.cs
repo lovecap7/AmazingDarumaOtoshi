@@ -1819,6 +1819,11 @@ public class MainMenu : MonoBehaviour
         var g = texts;
         helpText.text = achOpen ? g.achievements.help : bookOpen ? g.book.help : HelpText();
         if (achOpen && !achievements.HasEntries) SetGuides(g.keyBack, g.guideBack);
+        else if (achOpen)
+        {
+            if (achievements.IsDetailOpen) SetGuides(g.keyBack, "とじる");
+            else SetGuides("↑↓", "えらぶ", "A", "くわしく", g.keyBack, g.guideBack);
+        }
         else if (bookOpen) SetGuides(g.keySelect, g.guideSelect, g.keyBack, g.guideBack);
         else if (phase == Phase.Panel && Kind(outIdx) == ItemKind.Battle || phase == Phase.Choose) SetGuides(g.keySelect, g.guideSelect, g.keyDecide, g.guideDecide, g.keyBack, g.guideBack);
         else if (phase == Phase.Panel) SetGuides(g.keySelect, g.guideSelect, g.keyChange, g.guideChange, g.keyBack, g.guideBack);

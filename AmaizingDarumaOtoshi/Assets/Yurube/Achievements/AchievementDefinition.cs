@@ -29,7 +29,21 @@ namespace Yurube.Achievements
         WinWithLowStack,      // 積み木1個以下での勝利（累計）
         SpecialActivated,     // 必殺技を発動した回数（累計）
         CharacterUsedDistinct,// 使ったことのあるキャラクターの種類数
-        AllOtherUnlocked, // ほかのすべての実績を解除した数（メタ実績用。目標は自動で決まる）
+        AllOtherUnlocked,     // ほかのすべての実績を解除した数（メタ実績用。目標は自動で決まる）
+        AllRarityUnlocked,    // 同じレアリティの実績をすべて解除した数（メタ実績用。目標は自動で決まる）
+
+        // ---- 追加実績用（セーブの数値が変わらないよう、必ず末尾に足す） ----
+        MatchLost,            // 敗北した回数（累計。引き分けは含めない）
+        PassiveActivated,     // パッシブが初めて発動した回数（1回きり）
+        BlockTypesInStack,    // 1つの山に同時に積まれている積み木の種類数（最大値）
+        WinStreakBest,        // 連勝数の最高記録（敗北で現在値は0に戻る）
+        RallyBest,            // 同じ積み木を打ち返した最大ラリー数
+        OpportunistKO,        // 他の人に傷つけられた相手を撃破した回数（累計）
+        ChainKO,              // 連鎖によって相手を撃破した回数（累計）
+        MultiKOBest,          // 1回の攻撃・連鎖で同時に撃破した最大人数
+        NoDamageWin,          // 一度も被弾せずに勝利した回数（累計）
+        HammerMiss,           // ハンマーを空振りした回数（累計）
+        QuickWin,             // 試合開始から一定時間以内に勝利した回数（累計）
     }
 
     // 実績1つ分の「決まった内容」。進捗や解除状態は AchievementData が持つ。
@@ -54,11 +68,17 @@ namespace Yurube.Achievements
         [Tooltip("解除条件の種類")]
         public AchievementMetric metric;
 
-        [Tooltip("解除に必要な数。CharacterUsedDistinct は 0 にすると全キャラクター数になる")]
+        [Tooltip("解除に必要な数。CharacterUsedDistinct とメタ実績（AllOtherUnlocked / AllRarityUnlocked）は自動で決まる")]
         [Min(1)] public int target = 1;
 
-        [Tooltip("レアリティ（銅・銀・金・プラチナ）。表示だけに使う")]
+        [Tooltip("レアリティ（銅・銀・金・プラチナ・ダイヤモンド）。表示だけに使う")]
         public AchievementRarity rarity = AchievementRarity.Bronze;
+
+        [Tooltip("通常のレアリティ別集計に含めない「特別実績」（レアリティ制覇など）")]
+        public bool special;
+
+        [Tooltip("非公開実績。未解除の間は名前・説明・条件・アイコンを隠す")]
+        public bool secret;
 
         [Tooltip("通知・一覧に出すアイコン（未設定ならカテゴリーの色で代用）")]
         public Sprite icon;
@@ -67,7 +87,8 @@ namespace Yurube.Achievements
 
         public AchievementDefinition(string id, string name, string poem, AchievementCategory category,
                                      string condition, AchievementMetric metric, int target,
-                                     AchievementRarity rarity = AchievementRarity.Bronze)
+                                     AchievementRarity rarity = AchievementRarity.Bronze,
+                                     bool special = false, bool secret = false)
         {
             this.id = id;
             this.name = name;
@@ -77,6 +98,8 @@ namespace Yurube.Achievements
             this.metric = metric;
             this.target = target;
             this.rarity = rarity;
+            this.special = special;
+            this.secret = secret;
         }
 
         public string CategoryName => AchievementCatalog.CategoryName(category);

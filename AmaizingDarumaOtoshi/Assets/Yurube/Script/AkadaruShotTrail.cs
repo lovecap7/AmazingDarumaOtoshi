@@ -29,8 +29,8 @@ namespace Yurube
         [SerializeField] float m_specialGlowWidth = 4.0f;
         [Tooltip("レーザーの中心(白い芯)の太さ")]
         [SerializeField] float m_specialCoreWidth = 1.0f;
-        [Tooltip("必殺技レーザーの残光の長さ(秒)")]
-        [SerializeField] float m_specialTime = 2.0f;
+        [Tooltip("必殺技レーザーの残光の長さ(秒)。長いほど古いレーザーが長く残る")]
+        [SerializeField] float m_specialTime = 4.0f;
         [Tooltip("必殺技中の火の粉の量(個/秒)")]
         [SerializeField] float m_specialCometRate = 600.0f;
         [Tooltip("必殺技中の火の粉の大きさ")]
@@ -39,6 +39,10 @@ namespace Yurube
         [SerializeField] float m_specialLight = 48.0f;
         [Tooltip("必殺技中の光の届く距離")]
         [SerializeField] float m_specialLightRange = 12.0f;
+        [Tooltip("弾が止まった後も、その場にビーム(残像)を残す")]
+        [SerializeField] bool m_specialFreeze = true;
+        [Tooltip("時間切れでビームを消すとき、徐々に消えるまでの時間(秒)")]
+        [SerializeField] float m_specialFadeOut = 1.2f;
 
         TumikiBlock m_block;
         TrailRenderer m_trail;
@@ -48,6 +52,21 @@ namespace Yurube
         TrailRenderer m_specialGlow;
         TrailRenderer m_specialCore;
         bool m_special;
+        // 必殺技のビームをその場に凍結している(弾が止まった後も残す)
+        bool m_specialHold;
+        // 必殺技のビームを徐々に消している最中
+        bool m_fadingOut;
+        float m_fadeOutDuration;
+        float m_fadeOutElapsed;
+        Color m_fadeMainStart;
+        Color m_fadeMainEnd;
+        Color m_fadeGlowStart;
+        Color m_fadeGlowEnd;
+        Color m_fadeCoreStart;
+        Color m_fadeCoreEnd;
+        float m_fadeMainWidth;
+        float m_fadeGlowWidth;
+        float m_fadeCoreWidth;
         // 積み木が元々持っている煙・炎のエフェクト(あかだるの弾の間だけ消す)
         ParticleSystem[] m_blockEffects;
         float m_minSpeed = 10.0f;
@@ -165,8 +184,26 @@ namespace Yurube
         private void Update()
         {
             if (m_block == null || m_trail == null) return;
+
+            // 徐々に消している最中
+            if (m_fadingOut)
+            {
+                UpdateFadeOut();
+                return;
+            }
+
+            // 凍結中はトレイルの形をそのまま保つ(位置も太さも変えない)
+            if (m_specialHold) return;
+
             if (m_block.CurrentState != TumikiBlock.State.Flying)
             {
+                // 必殺技のビームは、弾が止まった後もその場に残す
+                if (m_special && m_specialFreeze)
+                {
+                    FreezeSpecialBeam();
+                    return;
+                }
+
                 // 落ちたら元の煙・炎を戻す(次に誰が投げても普通の積み木に戻る)
                 StopEffect(true);
                 return;
@@ -324,6 +361,8 @@ namespace Yurube
             // 必殺技(トロン)はさらに太く・白く・激しく
             if (m_special)
             {
+                // 当たり判定に使う本体のトレイルも、見た目と同じ長さにそろえる
+                m_trail.time = m_specialTime;
                 if (m_specialGlow != null)
                 {
                     m_specialGlow.time = m_specialTime;
@@ -382,13 +421,138 @@ namespace Yurube
             return true;
         }
 
+        // 弾が止まった位置でビームを凍結する。
+        // TrailRenderer の点は寿命(time)で消えてしまうので、time を大きくして形を保つ。
+        // 積み木が消える(=必殺技の時間切れ)まで、この状態でレーザーと当たり判定が残る。
+        private void FreezeSpecialBeam()
+        {
+            m_specialHold = true;
+
+            // 弾はもう止まっているので、積み木本来の煙・炎は戻す
+            RestoreBlockEffects();
+
+            FreezeTrail(m_trail);
+            FreezeTrail(m_specialGlow);
+            FreezeTrail(m_specialCore);
+
+            if (m_comet != null)
+            {
+                var emission = m_comet.emission;
+                emission.rateOverTime = 0.0f;
+                m_comet.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+            }
+            if (m_light != null) m_light.enabled = false;
+        }
+
+        private static void FreezeTrail(TrailRenderer trail)
+        {
+            if (trail == null) return;
+            trail.emitting = false;
+            // 点が寿命で消えないようにする(形を凍結する)
+            trail.time = 3600.0f;
+        }
+
+        // 凍結したビームを短い時間で消す(点が残り続けないようにする)
+        private static void QuickFade(TrailRenderer trail)
+        {
+            if (trail == null) return;
+            trail.emitting = false;
+            trail.time = 0.2f;
+        }
+
+        // 必殺技のビームを、形を保ったまま徐々に消す(時間切れ用)。
+        // 消え終わるまでの秒数を返す(呼び出し側が同じタイミングで積み木を片付ける)
+        public float FadeOutSpecial()
+        {
+            if (m_trail == null) return 0.0f;
+            if (m_fadingOut) return Mathf.Max(0.0f, m_fadeOutDuration - m_fadeOutElapsed);
+
+            m_fadingOut = true;
+            m_fadeOutDuration = Mathf.Max(0.05f, m_specialFadeOut);
+            m_fadeOutElapsed = 0.0f;
+
+            // 新しい点は出さない
+            m_trail.emitting = false;
+            if (m_specialGlow != null) m_specialGlow.emitting = false;
+            if (m_specialCore != null) m_specialCore.emitting = false;
+
+            // いまの色・太さを覚えておき、そこから薄く・細くしていく
+            m_fadeMainStart = m_trail.startColor;
+            m_fadeMainEnd = m_trail.endColor;
+            m_fadeMainWidth = m_trail.startWidth;
+            if (m_specialGlow != null)
+            {
+                m_fadeGlowStart = m_specialGlow.startColor;
+                m_fadeGlowEnd = m_specialGlow.endColor;
+                m_fadeGlowWidth = m_specialGlow.startWidth;
+            }
+            if (m_specialCore != null)
+            {
+                m_fadeCoreStart = m_specialCore.startColor;
+                m_fadeCoreEnd = m_specialCore.endColor;
+                m_fadeCoreWidth = m_specialCore.startWidth;
+            }
+
+            return m_fadeOutDuration;
+        }
+
+        private void UpdateFadeOut()
+        {
+            m_fadeOutElapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(m_fadeOutElapsed / m_fadeOutDuration);
+            float keep = 1.0f - t;
+
+            FadeTrail(m_trail, m_fadeMainStart, m_fadeMainEnd, m_fadeMainWidth, keep);
+            FadeTrail(m_specialGlow, m_fadeGlowStart, m_fadeGlowEnd, m_fadeGlowWidth, keep);
+            FadeTrail(m_specialCore, m_fadeCoreStart, m_fadeCoreEnd, m_fadeCoreWidth, keep);
+
+            if (t < 1.0f) return;
+
+            // 消し終わったら片付ける
+            m_fadingOut = false;
+            m_specialHold = false;
+            m_special = false;
+            enabled = false;
+
+            if (m_trail != null)
+            {
+                Destroy(m_trail.gameObject);
+                m_trail = null;
+            }
+            ClearSpecialOverlay(false);
+        }
+
+        // 色のアルファと太さをまとめて薄くする
+        private static void FadeTrail(TrailRenderer trail, Color start, Color end, float width, float keep)
+        {
+            if (trail == null) return;
+            start.a *= keep;
+            end.a *= keep;
+            trail.startColor = start;
+            trail.endColor = end;
+            trail.startWidth = width * keep;
+        }
+
         private void StopEffect(bool restoreBlockEffects)
         {
             ConsumedLaunch = false;
             enabled = false;
+
+            bool held = m_specialHold;
+            bool fading = m_fadingOut;
+            m_specialHold = false;
             m_special = false;
+            m_fadingOut = false;
 
             if (restoreBlockEffects) RestoreBlockEffects();
+
+            // 凍結中・徐々に消している途中に積み木が消えた場合は、残りを素早く消す
+            if (held || fading)
+            {
+                QuickFade(m_trail);
+                QuickFade(m_specialGlow);
+                QuickFade(m_specialCore);
+            }
 
             ClearSpecialOverlay(true);
 
@@ -402,7 +566,8 @@ namespace Yurube
             }
             if (m_light != null) m_light.enabled = false;
 
-            Destroy(m_trail.gameObject, Mathf.Max(m_trail.time, 0.4f) + 0.3f);
+            float fade = (held || fading) ? 0.5f : Mathf.Max(m_trail.time, 0.4f) + 0.3f;
+            Destroy(m_trail.gameObject, fade);
             m_comet = null;
             m_light = null;
         }

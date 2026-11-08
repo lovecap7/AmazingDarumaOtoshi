@@ -1,5 +1,6 @@
 using Nakahira;
 using UnityEngine;
+using Yurube.Achievements;
 
 namespace Yurube
 {
@@ -20,6 +21,7 @@ namespace Yurube
         [SerializeField] bool m_logHoming = true;
 
         DarumaCharacter m_character;
+        bool m_reportedPassive;
         readonly Collider[] m_overlaps = new Collider[32];
 
         private void Awake()
@@ -51,6 +53,11 @@ namespace Yurube
                 if (homing != null && homing.ConsumedLaunch) continue;
                 if (homing == null) homing = block.gameObject.AddComponent<TumikiHoming>();
                 homing.Begin(m_character, m_turnSpeed, m_guidanceDuration, m_logHoming);
+                if (!m_reportedPassive)
+                {
+                    m_reportedPassive = true;
+                    AchievementEvents.RaisePassiveTriggered(m_character);
+                }
             }
         }
     }

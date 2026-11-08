@@ -765,7 +765,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Yurube.AkadaruSpecial
   m_speed: 40
-  m_trailDuration: 10
+  m_trailDuration: 15
   m_effectMinSpeed: 130
   m_effectMaxSpeed: 260
   m_ownerGrace: 0.6

@@ -9,8 +9,8 @@ namespace Yurube
     // 短い判定ボックスを何個も並べる。エフェクトが消えたら判定も消える。
     public class TronProjectile : MonoBehaviour
     {
-        const int MaxSegments = 24;
-        const float MaxSegmentLength = 3.0f;
+        const int MaxSegments = 64;
+        const float MaxSegmentLength = 4.0f;
         const float CornerAngle = 12.0f;
 
         class Segment
@@ -24,7 +24,7 @@ namespace Yurube
         AkadaruShotTrail m_shotTrail;
         GameObject m_triggerRoot;
         Segment[] m_segments;
-        readonly Vector3[] m_positions = new Vector3[2048];
+        readonly Vector3[] m_positions = new Vector3[8192];
         readonly List<Vector3> m_anchors = new List<Vector3>(MaxSegments + 2);
         readonly Dictionary<DarumaCharacter, float> m_lastHitTimes = new Dictionary<DarumaCharacter, float>();
         float m_duration = 1.2f;
@@ -33,6 +33,8 @@ namespace Yurube
         float m_hitInterval = 0.4f;
         bool m_finished;
         bool m_log;
+        // 時間切れでビームを消している残り時間(秒)。-1で「消している最中ではない」
+        float m_fadeOutRemaining = -1.0f;
 
         private void Awake()
         {
@@ -258,8 +260,52 @@ namespace Yurube
             if (m_triggerRoot != null) Destroy(m_triggerRoot);
             m_triggerRoot = null;
 
-            if (m_block != null) Destroy(m_block.gameObject);
-            else Destroy(gameObject);
+            // ここで一瞬で消さず、ビームを徐々に消してから積み木を片付ける
+            if (m_shotTrail == null) m_shotTrail = GetComponent<AkadaruShotTrail>();
+            m_fadeOutRemaining = m_shotTrail != null ? m_shotTrail.FadeOutSpecial() : 0.0f;
+            if (m_fadeOutRemaining <= 0.0f)
+            {
+                m_fadeOutRemaining = -1.0f;
+                Finish();
+            }
+        }
+
+        // ビームが消え終わるのを待ってから積み木を片付ける
+        private void Update()
+        {
+            if (m_fadeOutRemaining < 0.0f) return;
+
+            m_fadeOutRemaining -= Time.deltaTime;
+            if (m_fadeOutRemaining > 0.0f) return;
+
+            m_fadeOutRemaining = -1.0f;
+            Finish();
+        }
+
+        // 積み木を崩して消す(通常の積み木と同じ破片演出になる)
+        void Finish()
+        {
+            if (m_block == null)
+            {
+                Destroy(gameObject);
+                return;
+            }
+
+            // 誰かのタワーに積み直されていたら、先にスタックから外す
+            var stack = m_block.GetComponentInParent<DarumaStack>();
+            if (stack != null)
+            {
+                for (int i = 0; i < stack.Count; i++)
+                {
+                    if (stack.Get(i) == m_block)
+                    {
+                        stack.RemoveAt(i);
+                        break;
+                    }
+                }
+            }
+
+            m_block.Break(Vector3.zero, 0.0f, 0.0f);
         }
 
         private void OnDestroy()

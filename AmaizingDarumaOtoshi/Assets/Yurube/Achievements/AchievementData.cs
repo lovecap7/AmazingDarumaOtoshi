@@ -7,12 +7,15 @@ namespace Yurube.Achievements
     // 進捗・解除済みか・解除した日時を持つ。AchievementManager だけが書き換える。
     public class AchievementData
     {
-        public AchievementData(AchievementDefinition definition)
+        public AchievementData(AchievementDefinition definition, int number)
         {
             Definition = definition;
+            Number = number;
         }
 
         public readonly AchievementDefinition Definition;
+        // 一覧の「実績番号」（カタログの並び順。1始まり）
+        public int Number { get; }
 
         // いまの進捗（目標まで。目標を超えた分は目標で止める）
         public int Progress { get; internal set; }
@@ -34,6 +37,13 @@ namespace Yurube.Achievements
         public string RarityName => AchievementRarityInfo.NameOf(Definition.rarity);
         public string RarityEnglishName => AchievementRarityInfo.EnglishNameOf(Definition.rarity);
         public Color RarityColor => AchievementRarityInfo.ColorOf(Definition.rarity);
+        // 特別実績か（レアリティ別の集計には入れない）
+        public bool IsSpecial => Definition.special;
+        // 非公開実績か（未解除の間は中身を隠す）
+        public bool IsSecret => Definition.secret;
+        // 画面に出すレアリティ名・色。特別実績は「特別」として扱う
+        public string DisplayRarityName => IsSpecial ? AchievementRarityInfo.SpecialName : RarityName;
+        public Color DisplayRarityColor => IsSpecial ? AchievementRarityInfo.SpecialColor : RarityColor;
         public Sprite Icon => Definition.icon;
         // 解除に必要な数（CharacterUsedDistinct は全キャラクター数に置き換わることがある）
         public int Target => Definition.target;
@@ -44,7 +54,7 @@ namespace Yurube.Achievements
         public string ProgressText => HasProgress ? Progress + " / " + Target : IsUnlocked ? "達成" : "未達成";
 
         public string UnlockedText => IsUnlocked && UnlockedAt > DateTime.MinValue
-            ? UnlockedAt.ToString("yyyy/MM/dd HH:mm")
+            ? (UnlockedAt.Kind == DateTimeKind.Utc ? UnlockedAt.ToLocalTime() : UnlockedAt).ToString("yyyy/MM/dd HH:mm")
             : "";
     }
 }

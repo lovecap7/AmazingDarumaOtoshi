@@ -186,7 +186,15 @@ namespace Yurube.Achievements
             m_caption.text = "実績解除！";
             m_caption.color = ToyKit.Ink;
 
-            Sprite sprite = data.Icon != null ? data.Icon : (settings != null ? settings.DefaultIcon : null);
+            // アイコン。実績ごとの画像 → レアリティ専用の画像（トロフィー／ダイヤ／特別）→ 設定の既定画像 → 色の板
+            Sprite sprite = data.Icon;
+            if (sprite == null)
+            {
+                sprite = data.IsSpecial
+                    ? AchievementRarityIcons.SpecialIcon()
+                    : AchievementRarityIcons.IconOf(data.Rarity);
+            }
+            if (sprite == null && settings != null) sprite = settings.DefaultIcon;
             if (sprite != null)
             {
                 m_icon.sprite = sprite;
@@ -202,6 +210,8 @@ namespace Yurube.Achievements
                 m_icon.preserveAspect = false;
                 m_icon.color = Color.white;
                 m_iconText.text = data.CategoryName;
+                // レアリティの板が明るい色のときは、白い文字だと読めないのでインク色にする
+                m_iconText.color = data.RarityColor.grayscale > 0.45f ? ToyKit.Ink : Color.white;
             }
 
             m_name.text = data.Name;

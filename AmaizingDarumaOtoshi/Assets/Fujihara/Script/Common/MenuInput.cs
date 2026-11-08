@@ -197,4 +197,33 @@ public static class MenuInput
         var m = Mouse.current;
         return m != null && m.leftButton.wasPressedThisFrame;
     }
+
+    // 実績一覧の並び替え（Q/E または LB/RB）
+    public static bool SortPrev()
+    {
+        var k = Keyboard.current;
+        if (k != null && k.qKey.wasPressedThisFrame) return true;
+        foreach (var g in Gamepad.all)
+            if (g.leftShoulder.wasPressedThisFrame) return true;
+        return false;
+    }
+
+    public static bool SortNext()
+    {
+        var k = Keyboard.current;
+        if (k != null && k.eKey.wasPressedThisFrame) return true;
+        foreach (var g in Gamepad.all)
+            if (g.rightShoulder.wasPressedThisFrame) return true;
+        return false;
+    }
+
+    // 実績一覧の昇順／降順（X または Y 上ボタン）
+    public static bool ToggleSortDirection()
+    {
+        var k = Keyboard.current;
+        if (k != null && (k.xKey.wasPressedThisFrame || k.cKey.wasPressedThisFrame)) return true;
+        foreach (var g in Gamepad.all)
+            if (g.buttonNorth.wasPressedThisFrame) return true;
+        return false;
+    }
 }

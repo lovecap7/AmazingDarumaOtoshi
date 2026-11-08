@@ -1,5 +1,6 @@
 using Nakahira;
 using UnityEngine;
+using Yurube.Achievements;
 
 namespace Yurube
 {
@@ -15,6 +16,7 @@ namespace Yurube
         [SerializeField] bool m_logLimit = true;
 
         DarumaCharacter m_character;
+        bool m_reportedPassive;
 
         private void Awake()
         {
@@ -59,6 +61,11 @@ namespace Yurube
 
             if (trimmed && m_logLimit)
                 Debug.Log($"[だるきんぐ] 積み木は{m_maxStack}段まで。超えた分を落とした", this);
+            if (trimmed && !m_reportedPassive)
+            {
+                m_reportedPassive = true;
+                AchievementEvents.RaisePassiveTriggered(m_character);
+            }
         }
     }
 }
