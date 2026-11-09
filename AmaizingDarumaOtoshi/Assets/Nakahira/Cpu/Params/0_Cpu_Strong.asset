@@ -122,6 +122,12 @@ MonoBehaviour:
   HazardMargin: 0.5
   MeteorMargin: 1
   SwordMargin: 1
+  BlackoutCounterChance: 0.6
+  BlackoutCounterDelay: 0.3
+  BlackoutNearMargin: 2
+  ArmsLeadTime: 0.3
+  ArmsPanicStack: 1
+  ArmsPanicLoad: 0.8
   JumpDistanceError: 0.1
   AimError: 0.1
   RepathInterval: 0.3

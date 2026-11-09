@@ -32,6 +32,8 @@ namespace Yurube
         public bool ConsumedLaunch { get; private set; }
         // 今ホーミング中か
         public bool IsHoming => enabled && !m_finished;
+        // 撃った人(CPU の暗転返しで、ファンネルを撃ったみだるを知るための読み取り用。中平追加。動きには関係しない)
+        public DarumaCharacter Shooter => m_shooter;
 
         private void Awake()
         {

@@ -63,12 +63,35 @@ namespace Nakahira
         // 必殺技のゲージが満タンか・撃った回数(デバッグ表示・テスト用)
         public bool SpecialReady => m_special.IsReady;
         public int SpecialCount => m_special.ActivatedCount;
+        // あおだるの暗転返しをした回数(テスト用)
+        public int BlackoutCounterCount => m_special.BlackoutCounterCount;
         // 集中度(認識の疲れ)の割合(デバッグ表示用)
         public float LoadRatio => m_params != null ? m_context.LoadRatio : 0.0f;
+
+        // 暗転返しの判断に使う「その相手と戦っている最中か」(毎フレーム作らないように持っておく)
+        System.Func<MatchPlayer, bool> m_isEngagedWith;
 
         private void Awake()
         {
             m_states = new CpuState[] { m_collect, m_flee, m_melee, m_shot, m_approach, m_wait };
+            m_isEngagedWith = IsEngagedWith;
+        }
+
+        // その相手と戦っている最中か(殴っている・逃げている・撃っている・攻めに行っている)
+        private bool IsEngagedWith(MatchPlayer player)
+        {
+            if (player == null || m_current == null) return false;
+            if (m_current == m_melee) return m_melee.Target == player;
+            if (m_current == m_shot) return m_shot.Target == player;
+            if (m_current == m_approach) return m_approach.Target == player;
+            if (m_current == m_flee)
+            {
+                foreach (var pursuer in m_flee.Pursuers)
+                {
+                    if (pursuer == player) return true;
+                }
+            }
+            return false;
         }
 
         public DarumaCommand ReadCommand()
@@ -121,8 +144,8 @@ namespace Nakahira
             bool becameZero = m_lastStackCount >= 1 && stack == 0;
             m_lastStackCount = stack;
 
-            // 必殺技:ゲージが満タンで、キャラごとの発動条件を満たしたら撃つ(CpuSpecial)
-            m_special.Apply(m_context);
+            // 必殺技:ゲージが満タンで、キャラごとの発動条件を満たしたら撃つ(CpuSpecial。あおだるの暗転返しもここ)
+            m_special.Apply(m_context, m_isEngagedWith);
 
             m_stateTime += dt;
             m_thinkTimer -= dt;

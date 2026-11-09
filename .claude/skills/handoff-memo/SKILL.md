@@ -9,7 +9,7 @@ description: 中平（Nakahira）専用。今の作業の進み具合を Context
 
 ## 手順
 
-1. `AmaizingDarumaOtoshi/Assets/Nakahira/引き継ぎメモ.md` を全部読む。
+1. `Contexts/引き継ぎメモ.md` を全部読む。
 2. 今の状態を調べる（推測で書かない）。
    - この会話でしたこと・決まったこと・分かったこと。
    - `git log --oneline -15` と `git status` で、前回の更新から増えた変更。
