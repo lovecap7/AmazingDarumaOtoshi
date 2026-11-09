@@ -112,9 +112,11 @@ namespace Nakahira
 
         // 道が危険な相手から clearance(m)より離れたところだけを通るか(積み木を取りに行って、逃げることにならないように)
         // 今すでに clearance より近くにいる相手からは、今より近づかなければよい
+        // 危ない場所(隕石の予告円・ビーム・エクスカリバー)を通る道も危険とみなす(行き先が中にある道も)
         public static bool AvoidsThreats(CpuContext c, NavMeshPath path, float clearance)
         {
             int count = path.GetCornersNonAlloc(s_corners);
+            if (!AvoidsHazards(c, count)) return false;
             foreach (var o in c.Perception.Opponents)
             {
                 if (!IsThreat(c, o)) continue;
@@ -123,6 +125,23 @@ namespace Nakahira
                 {
                     if (FlatDistanceToSegment(o.Position, s_corners[i - 1], s_corners[i]) < limit) return false;
                 }
+            }
+            return true;
+        }
+
+        // 道が危ない場所を通らないか(path は求めたばかりの道)
+        public static bool AvoidsHazards(CpuContext c, NavMeshPath path)
+        {
+            return AvoidsHazards(c, path.GetCornersNonAlloc(s_corners));
+        }
+
+        // s_corners の count 個の曲がり角を結ぶ道が、危ない場所を通らないか
+        private static bool AvoidsHazards(CpuContext c, int count)
+        {
+            if (!c.Hazards.Any) return true;
+            for (int i = 1; i < count; i++)
+            {
+                if (c.Hazards.SegmentCrosses(s_corners[i - 1], s_corners[i])) return false;
             }
             return true;
         }

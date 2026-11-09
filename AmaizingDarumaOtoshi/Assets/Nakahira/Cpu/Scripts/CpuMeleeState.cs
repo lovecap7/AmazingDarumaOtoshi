@@ -313,6 +313,7 @@ namespace Nakahira
                 if (o.PathDistance > c.Params.MeleeEnterDistance) continue;
                 if (o.StackDiff <= -c.Params.FleeStackGap) continue;
                 if (IsExposed(c, o)) continue;   // 首だけのときは、背を向けている相手だけ
+                if (InHazard(c, o)) continue;    // 危ない場所の中・向こう側の相手には行かない
                 float score = CpuAttackTarget.Score(c, o, o.PathDistance);
                 if (o.Player == m_target) score += c.Params.StateStickiness;
                 if (score > bestScore)
@@ -330,9 +331,18 @@ namespace Nakahira
             CpuParams p = c.Params;
             if (o.StackDiff <= -p.FleeStackGap) return false;                 // 不利になった(逃げる)
             if (o.PathDistance > p.MeleeChaseDistance) return false;          // 離れた
+            if (InHazard(c, o)) return false;                                 // 危ない場所の中・向こう側へ行った
             // 首だけで振り向かれた:相手の間合いの外まで離れたら終わる
             if (IsExposed(c, o) && o.FlatDistance > o.SweepHitDistance + kExposedRetreatMargin) return false;
             return m_chaseTime <= p.MeleeChaseTime;                           // 追っても間合いに入れない
+        }
+
+        // 相手が危ない場所(隕石の予告円・毒沼・ビーム・エクスカリバー)の中にいる、または相手との間をビームなどが横切っている
+        // (毒沼はへびだるについて動くので、へびだるとは殴り合わず、沼の外から撃つ)
+        private static bool InHazard(CpuContext c, CpuOpponent o)
+        {
+            if (!c.Hazards.Any) return false;
+            return c.Hazards.IsInside(o.Position) || c.Hazards.SegmentCrosses(c.Position, o.Position);
         }
 
         // 自分が首だけ(0 段。一撃でやられる)で、相手がこちらを向いている(相手のハンマーが届く角度にいる)

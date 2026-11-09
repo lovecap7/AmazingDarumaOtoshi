@@ -118,6 +118,10 @@ MonoBehaviour:
   ReflexReaction: 0.22
   ReflexTimingError: 0.08
   ReflexHorizon: 1
+  HazardReaction: 0.8
+  HazardMargin: 0.5
+  MeteorMargin: 1
+  SwordMargin: 1
   JumpDistanceError: 0.3
   AimError: 0.35
   RepathInterval: 0.3

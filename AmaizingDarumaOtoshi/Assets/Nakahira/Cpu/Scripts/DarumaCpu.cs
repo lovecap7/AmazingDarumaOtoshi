@@ -32,6 +32,7 @@ namespace Nakahira
         readonly CpuReflex m_reflex = new CpuReflex();
         readonly CpuRide m_ride = new CpuRide();
         readonly CpuGhost m_ghost = new CpuGhost();
+        readonly CpuHazardGuard m_hazardGuard = new CpuHazardGuard();
         // 前のフレームで動かしていた幽霊(幽霊になり直したら考え直す)
         DarumaGhost m_lastGhost;
         CpuState[] m_states;
@@ -56,6 +57,8 @@ namespace Nakahira
         public CpuReflex.Action ReflexAction => m_reflex.Current;
         // 今の移動床の乗り降り(デバッグ表示用)
         public CpuRide.Action RideAction => m_ride.Current;
+        // 今の危ない場所からの動き(デバッグ表示用)
+        public CpuHazardGuard.Action HazardAction => m_hazardGuard.Current;
         // 集中度(認識の疲れ)の割合(デバッグ表示用)
         public float LoadRatio => m_params != null ? m_context.LoadRatio : 0.0f;
 
@@ -99,10 +102,13 @@ namespace Nakahira
                 m_lastStackCount = self.Stack.Count;
                 m_context.ResetLoad();
                 m_reflex.Reset();
+                m_hazardGuard.Reset();
+                m_context.Hazards.Clear();
             }
 
             m_context.DecayLoad();
             m_context.Perception.Update(m_context);
+            m_context.Hazards.Update(m_context);
 
             int stack = self.Stack.Count;
             // 攻撃を受けた(自分の股抜きショットで減った分は除く):焦って疲れる
@@ -132,6 +138,8 @@ namespace Nakahira
 
             // 移動床の乗り降り:乗り場で待つ・乗っている間は移動を置き換える
             m_ride.Apply(m_context, m_current != null ? m_current.Route : null, ref cmd);
+            // 危ない場所(隕石の予告円・ビーム・エクスカリバー)から出る・入らない(乗り降り中は隕石から出るだけ)
+            m_hazardGuard.Apply(m_context, m_ride.Current != CpuRide.Action.None, ref cmd);
             // 縁で踏ん張る:風などで縁の外へ流されていたら押し返す(移動床の乗り降り中は除く)
             if (m_ride.Current == CpuRide.Action.None) CpuEdgeGuard.Apply(m_context, ref cmd);
 
@@ -193,6 +201,7 @@ namespace Nakahira
             if (m_lastGhost != null) m_ghost.DrawGizmos(m_lastGhost);
             if (m_current == null || m_lastSelf == null) return;
             m_current.DrawGizmos(m_context);
+            m_context.Hazards.DrawGizmos();
             CpuMovingFloors.DrawGizmos();
             CpuWarpGates.DrawGizmos();
         }

@@ -171,6 +171,28 @@ namespace Yurube
             ? Mathf.Max(0.0f, m_countdown - m_stateTime)
             : 0.0f;
 
+        // ---- CPU が予告円を避けるための読み取り用(中平追加。動きには関係しない) ----
+        // 発動したキャラクター(隕石はこのキャラクターには当たらない)
+        public DarumaCharacter Caster => m_character;
+        // 予告円が出ていて、これから隕石が落ちるか(カウントダウン〜落下中)
+        public bool IsThreatening => m_state == State.Countdown || m_state == State.Rising
+            || m_state == State.CutIn || m_state == State.Falling;
+        // 隕石が落ちるまでの残り時間の見込み(秒。カットインで止まっている時間は含まない)
+        public float TimeToImpact
+        {
+            get
+            {
+                switch (m_state)
+                {
+                    case State.Countdown: return Mathf.Max(0.0f, m_countdown - m_stateTime) + m_riseTime + m_fallTime;
+                    case State.Rising: return Mathf.Max(0.0f, m_riseTime - m_stateTime) + m_fallTime;
+                    case State.CutIn: return m_fallTime;
+                    case State.Falling: return Mathf.Max(0.0f, m_fallTime - m_stateTime);
+                    default: return 0.0f;
+                }
+            }
+        }
+
         private void Awake()
         {
             m_character = GetComponent<DarumaCharacter>();
