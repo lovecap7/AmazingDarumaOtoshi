@@ -117,7 +117,14 @@ public class NetMatch : NetworkBehaviour
 
             NetworkManager.OnClientConnectedCallback += OnClientConnected;
             NetworkManager.OnClientDisconnectCallback += OnClientDisconnected;
-            foreach (var id in NetworkManager.ConnectedClientsIds) OnClientConnected(id);
+            if (NetworkManager.SceneManager != null) NetworkManager.SceneManager.OnLoadComplete += OnClientLoaded;
+            // つながったままこのシーンへ移ってきたとき(接続画面・リザルトから)、ほかの人はまだシーンを読んでいる途中。
+            // いま1人分(NetPlayer)を出すと、その人の端末では読み込み中の前のシーンと一緒に消えて操作できなくなる。
+            // なので自分(ホスト)の分だけすぐ出し、ほかの人は読み終えたとき(OnClientLoaded)に出す
+            foreach (var id in NetworkManager.ConnectedClientsIds)
+            {
+                if (id == NetworkManager.LocalClientId) OnClientConnected(id);
+            }
             return;
         }
 
@@ -145,6 +152,7 @@ public class NetMatch : NetworkBehaviour
         {
             NetworkManager.OnClientConnectedCallback -= OnClientConnected;
             NetworkManager.OnClientDisconnectCallback -= OnClientDisconnected;
+            if (NetworkManager.SceneManager != null) NetworkManager.SceneManager.OnLoadComplete -= OnClientLoaded;
         }
         m_players.Clear();
         if (m_match == null) return;
@@ -205,6 +213,14 @@ public class NetMatch : NetworkBehaviour
         player.Index = FreeIndex();
         m_players[clientId] = player;
         obj.SpawnAsPlayerObject(clientId, true);
+    }
+
+    // ほかの人がこのシーンを読み終えた(接続画面・リザルトから一緒に移ってきたとき)
+    void OnClientLoaded(ulong clientId, string sceneName, UnityEngine.SceneManagement.LoadSceneMode mode)
+    {
+        if (sceneName != gameObject.scene.name) return;
+        if (!NetworkManager.ConnectedClients.ContainsKey(clientId)) return;
+        OnClientConnected(clientId);
     }
 
     // 1人分(NetPlayer)は NGO が消し、そのとき NetMatchPlayer が試合から外す

@@ -67,6 +67,14 @@ namespace Yurube
 
         public event Action Finished;
 
+        // ---- CPU が毒沼を避けるための読み取り用(中平追加。動きには関係しない) ----
+        // 沼を出したキャラクター(この人にはデバフが掛からない)
+        public DarumaCharacter Owner => m_owner;
+        // 当たり判定の半径(m)。中心は transform.position
+        public float Radius => m_radius;
+        // デバフを掛けている最中か(消えかけ・消えたあとは false)
+        public bool IsEffective => !m_finished && !m_fading;
+
         public void Initialize(DarumaCharacter owner, float radius, float duration, float fadeDuration,
             float debuffDuration, float slowMultiplier, float tickInterval,
             bool followCaster, Vector3 centerOffset)

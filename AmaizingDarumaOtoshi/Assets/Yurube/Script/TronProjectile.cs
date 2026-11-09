@@ -41,6 +41,26 @@ namespace Yurube
             m_block = GetComponent<TumikiBlock>();
         }
 
+        // ---- CPU がビームを避けるための読み取り用(中平追加。動きには関係しない) ----
+        // 必殺技を出したキャラクター
+        public DarumaCharacter Owner => m_owner;
+        // 当たり判定が残っているか
+        public bool IsHitActive => !m_finished;
+
+        // 今有効な当たり判定の箱を、線分(両端 a・b)と太さ(箱の幅 = 高さ)として results に足す
+        public void GetHitSegments(List<(Vector3 a, Vector3 b, float width)> results)
+        {
+            if (m_finished || m_segments == null) return;
+            foreach (var segment in m_segments)
+            {
+                if (segment == null || segment.box == null || !segment.box.enabled) continue;
+                if (segment.gameObject == null || !segment.gameObject.activeInHierarchy) continue;
+                Transform t = segment.gameObject.transform;
+                Vector3 half = t.forward * (segment.box.size.z * 0.5f);
+                results.Add((t.position - half, t.position + half, segment.box.size.x));
+            }
+        }
+
         public void Begin(DarumaCharacter owner, float duration, float ownerGrace, float hitInterval, bool log)
         {
             m_owner = owner;

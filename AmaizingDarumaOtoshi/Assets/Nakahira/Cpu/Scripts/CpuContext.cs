@@ -11,6 +11,8 @@ namespace Nakahira
         public MatchPlayer Player { get; private set; }
         public CpuParams Params { get; private set; }
         public CpuPerception Perception { get; } = new CpuPerception();
+        // 気づいている危ない場所(隕石の予告円・ビーム・エクスカリバー)
+        public CpuHazards Hazards { get; } = new CpuHazards();
         public float DeltaTime { get; private set; }
 
         public int StackCount => Self.Stack.Count;

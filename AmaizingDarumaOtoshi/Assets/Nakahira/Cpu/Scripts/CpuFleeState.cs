@@ -263,6 +263,8 @@ namespace Nakahira
             score = 0.0f;
             valid = true;
             if (!CpuNavMesh.TryFindPath(c.Position, point, kArriveDistance, m_queryPath, out float length)) return false;
+            // 危ない場所(隕石の予告円・ビーム・エクスカリバー)を通る・中にある逃げ先には逃げない
+            if (!CpuBlockSearch.AvoidsHazards(c, m_queryPath)) return false;
             float nearest = float.MaxValue;
             foreach (var player in m_pursuers)
             {

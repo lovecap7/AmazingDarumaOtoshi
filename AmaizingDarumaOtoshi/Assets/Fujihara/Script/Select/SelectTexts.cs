@@ -71,6 +71,13 @@ public class SelectTexts
     public string ok = "OK!";
     public string ready = "じゅんびOK！";
     public string readySub = "Start でステージセレクトへ";
+    [Tooltip("上の切り替えボタン（いまのモードを出す）")]
+    public string battleSolo = "個人戦";
+    public string battleTeam = "チーム戦";
+    [Tooltip("チーム戦で、全員が同じチームのとき")]
+    [TextArea(2, 4)] public string needOtherTeam = "ちがうチームの あいてが ひつようです！\n<size=60%>枠の旗を押すとチームが変わります</size>";
+    [Tooltip("チーム戦のとき、下のヒントのうしろに足す")]
+    public string hintTeam = "　旗：チームを変える";
     [TextArea(2, 4)] public string needMore = "あいて（CPU か ほかのプレイヤー）を くわえてね！\n<size=60%>枠の右上のボタンで CPU にできます</size>";
 
     [Header("ステージセレクト")]

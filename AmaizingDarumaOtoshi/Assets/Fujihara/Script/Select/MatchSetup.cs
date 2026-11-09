@@ -28,6 +28,9 @@ public static class MatchSetup
         public string deviceName;
         public CharacterData character;
         public int cpuNumber;           // CPU が複数いるときの番号（1〜）。CPU が1人だけなら 0
+        // チーム戦のチーム（0 = 赤、1 = 青、2 = 緑、3 = 黄）。個人戦なら -1
+        // 同じチームどうしかは MatchSetup.SameTeam(a, b) で調べる（個人戦では自分以外みんな敵）
+        public int team = -1;
 
         public InputDevice Device => isCpu ? null : InputSystem.GetDeviceById(deviceId);
         public string PlayerLabel => (playerIndex + 1) + "P";
@@ -57,6 +60,9 @@ public static class MatchSetup
         public int headPoints = 1;              // 相手の顔を飛ばした
         public int selfOutPoints = -1;          // 相手なしでやられた（自分から場外に落ちた など）
 
+        // チーム戦（キャラクターセレクトの上のボタンで切り替える）。チームは Entry.team
+        public bool teams;
+
         public bool Ghost => mode == MatchMode.Ghost;
         // 試合の時間制限（秒）。0 = なし
         public float TimeLimit => mode == MatchMode.Time ? timeLength : mode == MatchMode.Stock ? stockTimeLimit : ghostTimeLimit;
@@ -80,6 +86,30 @@ public static class MatchSetup
 
     public static Entry ForPlayer(int playerIndex) => players.Find(e => e.playerIndex == playerIndex);
 
+    // チームの名前と色（0 = 赤、1 = 青、2 = 緑、3 = 黄）
+    public const int TeamCount = 4;
+    public static readonly string[] TeamNames = { "赤", "青", "緑", "黄" };
+    public static readonly Color[] TeamColors =
+    {
+        new Color(0.93f, 0.27f, 0.25f),
+        new Color(0.22f, 0.55f, 0.95f),
+        new Color(0.30f, 0.74f, 0.35f),
+        new Color(0.98f, 0.76f, 0.12f),
+    };
+
+    // チーム戦か（チームが決まっているのはチーム戦のときだけ）
+    public static bool IsTeamBattle => Rules.teams;
+
+    // 2人が同じチームか（個人戦なら、同じ人のときだけ true）
+    public static bool SameTeam(int playerIndexA, int playerIndexB)
+    {
+        if (playerIndexA == playerIndexB) return true;
+        if (!IsTeamBattle) return false;
+        var a = ForPlayer(playerIndexA);
+        var b = ForPlayer(playerIndexB);
+        return a != null && b != null && a.team >= 0 && a.team == b.team;
+    }
+
     public static void Clear()
     {
         players.Clear();
@@ -92,7 +122,9 @@ public static class MatchSetup
         var sb = new StringBuilder();
         foreach (var e in players)
             sb.Append(e.DisplayLabel).Append(' ').Append(e.character != null ? e.character.displayName : "(なし)")
-              .Append(" (").Append(e.isCpu ? "Lv" + e.cpuLevel : e.deviceName).Append(")  ");
+              .Append(" (").Append(e.isCpu ? "Lv" + e.cpuLevel : e.deviceName)
+              .Append(e.team >= 0 ? " " + TeamNames[e.team % TeamCount] + "チーム" : "").Append(")  ");
+        sb.Append(Rules.teams ? "チーム戦  " : "個人戦  ");
         sb.Append("ステージ：").Append(Stage != null ? Stage.displayName : "(なし)");
         sb.Append("  モード：").Append(Rules.ModeName);
         if (Rules.mode == MatchMode.Stock) sb.Append(" ").Append(Rules.stocks).Append("ストック");

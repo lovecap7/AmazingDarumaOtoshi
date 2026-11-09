@@ -150,7 +150,13 @@ NetStages を直接開いて試すとき:
 - Unity のウィンドウが裏にあると、Windows 版ではコンパイルが始まらないことがある（MCP から編集した後はユーザーに Unity をクリックしてもらう）。
 - `DefaultNetworkPrefabs.asset` に NetworkObject のない `DarumaCharacter.prefab` のエントリが紛れ込んだことが2回あった。再生時に「missing a NetworkObject」の警告が出たら外す。
 - **PC 2台でエディター同士だとつながらない（ビルドの exe ならつながる）とき**: ホストにする PC の Windows ファイアウォールで、Unity エディター（例: 「Unity 6000.6.3f1 Editor」）の受信が「パブリック」でブロックになっている（2026-11-06 に確認。ネットワークの種類がパブリックのとき）。
-  exe は別の規則で許可されているのでつながる。「Windows Defender ファイアウォールを介したアプリまたは機能を許可」で Unity エディターの「パブリック」にチェックを入れる（管理者の権限が必要。参加する側の PC は変えなくてよい）。変えられない PC では、ホストは exe で立てる。
+  exe は別の規則で許可されているのでつながる。ブロックの規則は許可より優先される。
+  「アプリまたは機能を許可」の画面のチェックは、許可かブロックかを見分けられない（チェックが入っていてもブロックのことがある）。
+  直し方（管理者の権限が必要。2026-11-09 に PC 2台のエディター同士でつながるのを確認）:
+  1. 「セキュリティが強化された Windows Defender ファイアウォール」→「受信の規則」で、赤い丸（ブロック）の「Unity 6000.6.3f1 Editor」を無効にする（今のネットワークの種類のもの）。
+  2. 許可の規則を追加する。管理者の PowerShell で
+     `New-NetFirewallRule -DisplayName "Unity 6000.6.3f1 Editor (Allow Public)" -Direction Inbound -Program "C:\Program Files\Unity\Hub\Editor\6000.6.3f1\Editor\Unity.exe" -Action Allow -Profile Public,Private`
+  ホストにする PC ごとに必要（参加するだけの PC は変えなくてよい）。変えられない PC では、ホストは exe で立てる。
 - エディタで再生すると `TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF - Fallback.asset` が変わることがある。コミットに入れずに元に戻す。
 - MCP の撮影（screenshot）のあと、エディタが一時停止したままになることがあった（エラーではない）。止まっていたら再生を続ける。
 - **MCP からビルドすると、その間 Unity と MCP が止まる**。さらに URP の設定・ProjectSettings・TextMesh Pro のフォント・`Assets/Resources/PerformanceTestRun*.json` が変わるので、コミットに入れずに元に戻す。

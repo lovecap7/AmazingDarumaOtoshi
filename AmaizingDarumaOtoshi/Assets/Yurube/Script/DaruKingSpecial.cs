@@ -106,6 +106,22 @@ namespace Yurube
             ? Mathf.Max(0.0f, m_chargeDuration - m_stateTime)
             : 0.0f;
 
+        // ---- CPU がエクスカリバーを避けるための読み取り用(中平追加。動きには関係しない) ----
+        // 発動したキャラクター(この人には当たらない)
+        public DarumaCharacter Caster => m_character;
+        // 攻撃の予定の線が出ていて、これから斬るか(詠唱中〜カットイン中)
+        public bool IsThreatening => m_state == State.Charging || m_state == State.CutIn;
+        // 攻撃判定の太さ(m)
+        public float AttackWidth => m_attackWidth;
+        // 攻撃の予定の線(詠唱中は今の向き、確定後は確定した向き)
+        public void GetAttackLine(out Vector3 start, out Vector3 end)
+        {
+            Vector3 origin = m_state == State.Charging ? m_character.transform.position : m_attackOrigin;
+            Vector3 direction = m_state == State.Charging ? HorizontalForward() : m_attackDirection;
+            start = origin;
+            end = origin + direction * m_resolvedLength;
+        }
+
         private void Awake()
         {
             m_character = GetComponent<DarumaCharacter>();
@@ -120,7 +136,8 @@ namespace Yurube
 
             if (m_state == State.Idle)
             {
-                if (SpecialInput.WasPressed(m_character)) TryActivate();
+                // CPUのだるきんぐが、人間のキー入力で必殺技を出さないようにする(ほかのキャラと同じ)
+                if (IsLocalHuman() && SpecialInput.WasPressed(m_character)) TryActivate();
                 return;
             }
 
@@ -165,11 +182,11 @@ namespace Yurube
             ApplyRainbow();
         }
 
+        // ラボのボタンや CPU からも呼べる。発動できたら true(CPU の詠唱は時間で自動完了する)
         public bool TryActivate()
         {
             if (m_state != State.Idle) return false;
             if (m_character == null || m_gauge == null || !m_gauge.IsFull) return false;
-            if (!IsLocalHuman()) return false;
 
             m_gauge.Consume();
             m_state = State.Charging;

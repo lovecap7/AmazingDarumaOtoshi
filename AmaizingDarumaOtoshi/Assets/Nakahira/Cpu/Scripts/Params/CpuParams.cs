@@ -240,6 +240,16 @@ namespace Nakahira
         [Tooltip("この時間(秒)先までに当たる弾に反応する")]
         [Min(0.1f)] public float ReflexHorizon = 1.0f;
 
+        [Header("危ない場所(隕石の予告円・毒沼・ビーム・エクスカリバー。出る・入らない)")]
+        [Tooltip("危ない場所が出てから気づくまでの遅れ(秒)")]
+        [Min(0.0f)] public float HazardReaction = 0.3f;
+        [Tooltip("危ない場所の縁から離れておく距離(m。体の半径に足す)")]
+        [Min(0.0f)] public float HazardMargin = 0.5f;
+        [Tooltip("隕石の予告円はさらにこの距離(m)離れる(落ちるまでは、いわだるについて動くので)")]
+        [Min(0.0f)] public float MeteorMargin = 1.0f;
+        [Tooltip("エクスカリバーの予定の線はさらにこの距離(m)離れる(詠唱中はだるきんぐの向きで動くので)")]
+        [Min(0.0f)] public float SwordMargin = 1.0f;
+
         [Header("積む:ジャンプ")]
         [Tooltip("ジャンプする距離の誤差(割合)。大きいほど跳ぶのが早すぎたり遅すぎたりする")]
         [Range(0.0f, 1.0f)] public float JumpDistanceError = 0.1f;
