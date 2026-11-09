@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Nakahira;
 using TMPro;
 using UnityEngine;
@@ -114,7 +114,7 @@ public class MatchDebugView : MonoBehaviour
         m_canvas = ToyKit.CreateOverlayCanvas("MatchDebugUI", 20);
 
         var hint = ToyKit.UIText("Hint", m_canvas, m_font,
-            "Select：キャラクターセレクトにもどる", 24f, Color.white);
+            "Select：キャラクターセレクトに戻る", 24f, Color.white);
         hint.fontSharedMaterial = m_letterMat;
         ToyKit.Anchor(hint.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, 24f), new Vector2(1800f, 40f));
 

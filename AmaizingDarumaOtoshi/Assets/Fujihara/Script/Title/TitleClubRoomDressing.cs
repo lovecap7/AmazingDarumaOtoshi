@@ -39,6 +39,12 @@ public class TitleClubRoomDressing : MonoBehaviour
     [SerializeField] Material[] swingerBlockMaterials;
     [Tooltip("走り込みの部員の積み木（下・上）。入れるとこちらを優先する（和柄の積み木など）")]
     [SerializeField] Material[] runnerBlockMaterials;
+    [Tooltip("素振りの部員の頭（だるまのモデル）。空なら TitleScreen の顔と同じ（TitleScreen が無いシーンではスマイル）")]
+    [SerializeField] GameObject swingerHeadModel;
+    [Tooltip("走り込みの部員の頭（だるまのモデル。黄だるなど）。空なら TitleScreen の顔と同じ（TitleScreen が無いシーンではスマイル）")]
+    [SerializeField] GameObject runnerHeadModel;
+    [Tooltip("TitleScreen が無いシーン（セレクトなど）で、部員の頭のモデルの高さ（タイトルの顔と同じ 0.85）")]
+    [SerializeField] float memberHeadModelHeight = 0.85f;
 
     const float BackZ = 26f, SideX = 26f, Height = 24f;
     const float WinLeft = -11f, WinRight = 23f, WinBottom = 5f, WinTop = 17f;
@@ -560,7 +566,8 @@ public class TitleClubRoomDressing : MonoBehaviour
     // paletteA：下の積み木の色（ToyKit.Palette の番号）。上の積み木は bodyB（白）
     // タイトル（TitleScreen）に頭・積み木のモデルが入っていれば、部員もそのモデルにする
     // blockMats：入っていれば下・上の積み木のマテリアルとして優先して使う
-    Member CreateMember(Vector3 pos, float yaw, int paletteA, Color bodyB, float hammerScale, Material[] blockMats = null)
+    // headModel：入っていれば、TitleScreen の顔の代わりにこのだるまを頭にする
+    Member CreateMember(Vector3 pos, float yaw, int paletteA, Color bodyB, float hammerScale, Material[] blockMats = null, GameObject headModel = null)
     {
         float s = memberScale;
         var m = new Member { basePos = pos };
@@ -595,7 +602,8 @@ public class TitleClubRoomDressing : MonoBehaviour
         m.head.localScale = Vector3.one * s;
         m.head.localPosition = new Vector3(0f, bh * 2f + ToyKit.HeadR * s, 0f);
         m.head.localRotation = Quaternion.Euler(0f, 180f, 0f);   // 顔（-Z）を体の前（+Z）へ
-        if (title != null && title.HasHeadModel) title.AttachHeadModel(m.head);
+        if (title != null && (title.HasHeadModel || headModel != null)) title.AttachHeadModel(m.head, headModel);
+        else if (title == null && headModel != null) ToyKit.AttachHeadModel(m.head, headModel, memberHeadModelHeight, 180f);
         // 手の位置にハンマーの根元（体の右側）
         m.hammerPivot = new GameObject("HammerPivot").transform;
         m.hammerPivot.SetParent(m.root, false);
@@ -610,9 +618,9 @@ public class TitleClubRoomDressing : MonoBehaviour
     {
         float yard = roomOffset.y + YardY;   // 校庭の地面の高さ
         // 窓の外：素振り（こちらを向いて、横に振る）
-        swinger = CreateMember(new Vector3(-3f, yard, BackZ + 10f), 180f, 0, new Color(0.95f, 0.95f, 0.92f), 0.8f, swingerBlockMaterials);
+        swinger = CreateMember(new Vector3(-3f, yard, BackZ + 10f), 180f, 0, new Color(0.95f, 0.95f, 0.92f), 0.8f, swingerBlockMaterials, swingerHeadModel);
         // さらに奥：走り込み（左右に往復）
-        runner = CreateMember(new Vector3(0f, yard, BackZ + 22f), 90f, 4, new Color(0.95f, 0.95f, 0.92f), 0.6f, runnerBlockMaterials);
+        runner = CreateMember(new Vector3(0f, yard, BackZ + 22f), 90f, 4, new Color(0.95f, 0.95f, 0.92f), 0.6f, runnerBlockMaterials, runnerHeadModel);
         runner.hammer.gameObject.SetActive(false);
     }
 

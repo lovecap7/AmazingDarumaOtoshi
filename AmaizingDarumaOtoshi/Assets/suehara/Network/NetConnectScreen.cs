@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.NetworkInformation;
@@ -498,11 +498,11 @@ public class NetConnectScreen : MonoBehaviour
     {
         switch (m_screen)
         {
-            case Screen.Choose: return "←→：えらぶ　A / Start：決定　B：メニューへ";
+            case Screen.Choose: return "←→：選ぶ　A / Start：決定　B：メニューへ";
             case Screen.Host: return "A / Start：はじめる　B：へやを とじる";
             default:
                 return m_joinState == JoinState.Input
-                    ? "キーボード：へやばんごう か IP アドレスを入れる(Ctrl + V で はりつけ)　Enter / A：つなぐ　Esc / B：もどる"
+                    ? "キーボード：へやばんごう か IP アドレスを入れる(Ctrl + V で はりつけ)　Enter / A：つなぐ　Esc / B：戻る"
                     : "B：やめる";
         }
     }

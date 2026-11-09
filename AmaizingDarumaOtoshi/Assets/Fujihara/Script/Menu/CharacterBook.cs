@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -155,7 +155,7 @@ public class CharacterBook : MonoBehaviour
     void Show(int i)
     {
         var c = characters[i];
-        portrait.color = c.color;
+        portrait.color = c.IconColor;
         portraitImage.sprite = c.portrait;
         portraitImage.enabled = c.portrait != null;
         portraitLetter.text = c.portrait != null ? "" : Initial(c.displayName);
@@ -226,7 +226,7 @@ public class CharacterBook : MonoBehaviour
             bg.GetComponent<Image>().pixelsPerUnitMultiplier = 0.4f;
             var ol = bg.gameObject.AddComponent<Outline>(); ol.effectColor = ToyKit.Ink; ol.effectDistance = new Vector2(2f, -2f);
 
-            var icon = ToyKit.UIImage("Icon", holder, c.color, uiSprite);
+            var icon = ToyKit.UIImage("Icon", holder, c.IconColor, uiSprite);
             ToyKit.Anchor(icon, new Vector2(0f, 0.5f), new Vector2(44f, 0f), new Vector2(60f, 60f));
             if (c.portrait != null)
             {

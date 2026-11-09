@@ -79,6 +79,7 @@ public static class ResultData
         public MatchPlayer.PlayerState state;   // 試合が終わったときの状態（生存 / 幽霊 / 復活待ち / 脱落）
         public int stocks = -1;         // 残りストック（ストックモード以外は -1）
         public int score;               // 点数（タイムモード）
+        public int team = -1;           // チーム(0 赤〜3 黄)。個人戦は -1
     }
 
     public static readonly List<Entry> Ranking = new List<Entry>();   // 1位から順
@@ -86,9 +87,13 @@ public static class ResultData
     public static bool TimeUp { get; private set; }
     public static MatchSetup.MatchMode Mode { get; private set; }
     public static bool HasResult => Ranking.Count > 0;
+    public static bool IsTeamBattle { get; private set; }
+    public static int WinnerTeam { get; private set; } = -1;   // 勝ったチーム。個人戦と引き分けは -1
 
     public static void Capture(DarumaMatch.MatchResult result, MatchSetup.MatchMode mode)
     {
+        IsTeamBattle = result.IsTeamBattle;
+        WinnerTeam = result.WinnerTeam;
         Ranking.Clear();
         IsDraw = result.IsDraw;
         TimeUp = result.Reason == DarumaMatch.FinishReason.TimeUp;
@@ -108,6 +113,7 @@ public static class ResultData
                 state = p.State,
                 stocks = p.Stocks,
                 score = p.Score,
+                team = p.Entry.team,
             };
             var stack = p.Stack;
             if (stack != null)
@@ -116,5 +122,10 @@ public static class ResultData
         }
     }
 
-    public static void Clear() => Ranking.Clear();
+    public static void Clear()
+    {
+        Ranking.Clear();
+        IsTeamBattle = false;
+        WinnerTeam = -1;
+    }
 }

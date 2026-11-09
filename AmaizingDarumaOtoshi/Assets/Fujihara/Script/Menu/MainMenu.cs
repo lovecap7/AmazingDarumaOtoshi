@@ -133,13 +133,13 @@ public class MainMenu : MonoBehaviour
 
         [Header("右下の操作ガイド（キーの字と説明）")]
         public string keySelect = "上下";
-        public string guideSelect = "えらぶ";
+        public string guideSelect = "選ぶ";
         public string keyChange = "左右";
-        public string guideChange = "かえる";
+        public string guideChange = "変える";
         public string keyDecide = "A";
-        public string guideDecide = "けってい";
+        public string guideDecide = "決定";
         public string keyBack = "B";
-        public string guideBack = "もどる";
+        public string guideBack = "戻る";
 
         [Header("ずかん（クレジットの項目で開く）")]
         public CharacterBook.Texts book = new CharacterBook.Texts();
@@ -165,6 +165,19 @@ public class MainMenu : MonoBehaviour
     [TextArea(5, 20)]
     [SerializeField] string creditsText =
         "<size=150%>アメイジング だるま落とし</size>\n\n\n<size=110%>プログラム</size>\nFujihara\nInoue\nShitaka\nNakahira\n\n\n<size=110%>フォント</size>\nYuji Syuku (SIL Open Font License)\n\n\n\n<size=120%>Thank you for playing!</size>";
+
+    [Header("モデル（タイトルと同じものを入れる）")]
+    [Tooltip("山のてっぺんに乗る頭（だるまのモデル。足元が原点）。空なら黄色いスマイル")]
+    [SerializeField] GameObject headModel;
+    [SerializeField] float headModelHeight = 0.85f;
+    [Tooltip("頭のモデルの向き（Y 軸まわり）。顔がカメラを向くように合わせる")]
+    [SerializeField] float headModelYaw = 180f;
+    [Tooltip("項目（たたかう など）とローカル／オンラインの積み木のメッシュ。空なら角の丸い箱")]
+    [SerializeField] Mesh blockModelMesh;
+    [Tooltip("積み木のマテリアル。ToyKit.Palette と同じ順（赤・橙・黄・緑・青・紫）")]
+    [SerializeField] Material[] blockModelMaterials;
+    [Tooltip("積み木をモデルにしたときの文字の幅（正面からはみ出さないように少し狭める）")]
+    [SerializeField] float blockModelTextWidth = 1.85f;
 
     [Header("大きさ・配置")]
     [SerializeField] float stackX = -2.9f;
@@ -435,6 +448,7 @@ public class MainMenu : MonoBehaviour
         {
             blockColors[i] = colors[i % colors.Length];
             blocks[i] = ToyKit.CreateBlock(ItemAt(i) != null ? ItemAt(i).label : "", blockColors[i], menuMesh, new Vector2(2.3f, 0.6f), BlockSize.z, font, letterMat, out blockMats[i]);
+            if (UseBlockModel(blocks[i], ref blockMats[i], i % colors.Length)) blockColors[i] = Color.white;   // 色はテクスチャにあるので、暗くするときは白を基準にする
             blocks[i].SetParent(space, false);
             blocks[i].gameObject.AddComponent<BoxCollider>().size = BlockSize;
             scaleNow[i] = 1f;
@@ -451,6 +465,7 @@ public class MainMenu : MonoBehaviour
         for (int i = 0; i < 2; i++)
         {
             choiceBlocks[i] = ToyKit.CreateBlock(At(texts.choiceLabels, i), choiceColors[i], menuMesh, new Vector2(2.3f, 0.6f), BlockSize.z, font, letterMat, out choiceMats[i]);
+            UseBlockModel(choiceBlocks[i], ref choiceMats[i], i == 0 ? 0 : 5);
             choiceBlocks[i].SetParent(space, false);
             choiceBlocks[i].gameObject.AddComponent<BoxCollider>().size = BlockSize;
             choiceBlocks[i].gameObject.SetActive(false);
@@ -458,6 +473,7 @@ public class MainMenu : MonoBehaviour
         }
 
         face = ToyKit.CreateHead();
+        ToyKit.AttachHeadModel(face.root, headModel, headModelHeight, headModelYaw);   // 空ならスマイルのまま
         face.root.SetParent(space, false);
         hammer = ToyKit.CreateHammer();
         hammer.SetParent(space, false);
@@ -465,6 +481,16 @@ public class MainMenu : MonoBehaviour
 
         BuildBoard();
         BuildOverlay();
+    }
+
+    // 積み木の本体をタイトルと同じモデルにする（横長の楕円の円柱。大きさは今の積み木と同じ）。差し替えたら true
+    bool UseBlockModel(Transform block, ref Material mat, int paletteIndex)
+    {
+        if (blockModelMesh == null || blockModelMaterials == null || blockModelMaterials.Length == 0) return false;
+        var src = blockModelMaterials[paletteIndex % blockModelMaterials.Length];
+        if (src == null) return false;
+        mat = ToyKit.UseBlockModel(block, mat, blockModelMesh, src, BlockSize, blockModelTextWidth);
+        return true;
     }
 
     // 右の看板（世界の中に立つ物。表面に設定画面の UI を貼る）。どの見た目でも、表の面は z = -BoardDepth / 2
@@ -1819,7 +1845,7 @@ public class MainMenu : MonoBehaviour
         var g = texts;
         helpText.text = achOpen ? g.achievements.help : bookOpen ? g.book.help : HelpText();
         if (achOpen && !achievements.HasEntries) SetGuides(g.keyBack, g.guideBack);
-        else if (achOpen) SetGuides(g.keySelect, "えらぶ", "左右", "しぼる", "L/R", "ならべる", "Y", "ぎゃく", g.keyBack, g.guideBack);
+        else if (achOpen) SetGuides(g.keySelect, "選ぶ", "左右", "絞る", "L/R", achievements.SortLabel, "Y", achievements.DirectionLabel, g.keyBack, g.guideBack);
         else if (bookOpen) SetGuides(g.keySelect, g.guideSelect, g.keyBack, g.guideBack);
         else if (phase == Phase.Panel && Kind(outIdx) == ItemKind.Battle || phase == Phase.Choose) SetGuides(g.keySelect, g.guideSelect, g.keyDecide, g.guideDecide, g.keyBack, g.guideBack);
         else if (phase == Phase.Panel) SetGuides(g.keySelect, g.guideSelect, g.keyChange, g.guideChange, g.keyBack, g.guideBack);
