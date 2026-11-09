@@ -187,6 +187,9 @@ MonoBehaviour:
   runnerBlockMaterials:
   - {fileID: 2100000, guid: 92219c187a262a54e9ba4d161c76f85f, type: 2}
   - {fileID: 2100000, guid: 0fcc4cff7aa9ac34198faf340a106fc7, type: 2}
+  swingerHeadModel: {fileID: 0}
+  runnerHeadModel: {fileID: 919132149155446097, guid: ae96fe206af4e254d804c31ea000ce4f, type: 3}
+  memberHeadModelHeight: 0.85
 --- !u!114 &687044622
 MonoBehaviour:
   m_ObjectHideFlags: 0

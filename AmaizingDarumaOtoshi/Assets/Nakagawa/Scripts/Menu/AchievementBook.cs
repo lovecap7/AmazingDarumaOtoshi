@@ -21,7 +21,7 @@ public class AchievementBook : MonoBehaviour
         [Tooltip("シークレット実績の名前の代わりに出す字")]
         public string locked = "？？？";
         [Tooltip("じっせきを開いている間、下の帯に出す説明")]
-        [TextArea(1, 3)] public string help = "実績の名前・解除条件・ポエムが見られます。";
+        [TextArea(1, 3)] public string help = "実績の名前・解除条件・一言が見られます。";
     }
 
     // 実績1つ分（AchievementMenuBridge が組み立てる）
@@ -45,9 +45,16 @@ public class AchievementBook : MonoBehaviour
         public int target;
         public bool hasProgress;
 
+        // レアリティのグラデーションの下地と、その上を流れる光の帯
+        public Sprite background;
+        public Sprite shineSprite;
+        public Color edgeColor = new Color(0.2f, 0.15f, 0.12f, 0.55f);
+        public Color borderColor = Color.white;
         // アイコン：レアリティ色の下地に、白いアイコン（トロフィーなど）を重ねる
         public Color color = Color.white;
         public Sprite glyph;
+        // 色つきのアイコン（トロフィー／王冠／ダイヤモンド）。一覧と詳細に出す
+        public Sprite icon;
         // 未取得のときにアイコンの代わりに出す鍵
         public Sprite lockGlyph;
 
@@ -88,16 +95,24 @@ public class AchievementBook : MonoBehaviour
     const float StripH = 150f, StripGap = 16f;
     const float ContentH = StripH + StripGap + CardH;
     const float ListX = -640f, CardX = 280f;
+    // 詳細カードの左の列（アイコン・名前・状態）の中心
+    const float DetailLX = -440f;
     // 画面の上端から中身まで（帯は見出しと同じ高さから始める）、下端は MainMenu の帯のぶん空ける
     const float TopMargin = 30f, BottomMargin = 260f;
 
     // 帯は2段。上段に達成率と絞り込み・並び替え、下段にレアリティ別の取得数
     const float StripRowY = 34f;
-    const float PercentX = 24f, PercentW = 144f, GaugeX = 176f, GaugeW = 200f;
-    const float FilterX = 388f, FilterW = 148f, FilterGap = 10f;
-    const float SortX = 866f, SortW = 160f, DirX = 1036f, DirW = 110f;
-    const float SummaryLabelW = 140f, SummaryGap = 20f, SummaryPitchMax = 172f;
+    // 並び替えのボタンをやめたぶん、達成率のゲージを長くする
+    const float PercentX = 24f, PercentW = 144f, GaugeX = 180f, GaugeW = 576f;
+    const float FilterX = 776f, FilterW = 140f, FilterGap = 10f;
+    const float SummaryLabelW = 165f, SummaryGap = 20f, SummaryPitchMax = 172f;
     const float SummaryAreaW = CardW - (24f + SummaryLabelW + SummaryGap) - 24f;
+
+    // 行の中を斜めに横切る光（選択中はくり返し、ホバーは1回）
+    const float ShineW = 200f, ShineH = 460f, ShineAngle = 35f;
+    const float ShineDuration = 0.65f, ShineInterval = 2.6f, ShineAlpha = 0.22f;
+    const float ShineRise = 18f, ShinePadding = 260f;
+    const float BorderNormal = 1.5f, BorderSelected = 3f;
 
     const string SecretCondition = "条件は非公開です";
     const string PoemHiddenText = "解除すると読めます";
@@ -107,15 +122,11 @@ public class AchievementBook : MonoBehaviour
     // 画面の色は、ずかんの青（Palette[4]）と、カードのクリーム色で統一する
     static readonly Color AccentColor = ToyKit.Palette[4];
     static readonly Color CardColor = new Color(1f, 0.98f, 0.94f, 0.96f);
-    static readonly Color RowColor = new Color(1f, 0.98f, 0.94f, 0.92f);
-    static readonly Color RowHoverColor = Color.Lerp(RowColor, ToyKit.Palette[4], 0.20f);
     static readonly Color PillColor = new Color(1f, 1f, 1f, 0.92f);
     static readonly Color LockedPillColor = new Color(0.65f, 0.65f, 0.68f);
     static readonly Color LockedTileColor = new Color(0.74f, 0.74f, 0.76f);
     // 薄くて読みづらかったので、小さい字も濃いめにする
     static readonly Color Faded = new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.85f);
-    static readonly Color FadedInk = new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.65f);
-    static readonly Color GlyphEdge = new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.85f);
 
     class SummaryView
     {
@@ -123,9 +134,23 @@ public class AchievementBook : MonoBehaviour
         public TextMeshProUGUI label;
     }
 
+    // 一覧の1行（グラデーションの下地・外枠・流れる光）
+    class Row
+    {
+        public RectTransform holder;
+        public Image border;
+        public Color borderBase;
+        public Image focus;
+        public Image shine;
+        public float shineTime, shineWait;
+        public bool shining, wasActive;
+    }
+
     TMP_FontAsset font;
     TMP_FontAsset bodyFont;
     Material letterMat;
+    // フォントの既定のマテリアルは白い縁取り付き。選択中の行では縁を消すために使う
+    Material plainMat;
     Sprite uiSprite;
     Texts texts;
 
@@ -148,16 +173,15 @@ public class AchievementBook : MonoBehaviour
     CanvasGroup group;
     RectTransform content, strip, card, listView, listContent;
     RectTransform scrollTrack, scrollThumb;
-    readonly List<RectTransform> rows = new List<RectTransform>();
-    readonly List<Image> rowBgs = new List<Image>();
+    readonly List<Row> rows = new List<Row>();
 
     // 上の帯
-    TextMeshProUGUI percentText, sortText, dirText, summaryLabel;
+    TextMeshProUGUI percentText, summaryLabel;
     Image gaugeFill;
     readonly TextMeshProUGUI[] filterTexts = new TextMeshProUGUI[3];
     readonly Image[] filterBgs = new Image[3];
     readonly RectTransform[] filterRects = new RectTransform[3];
-    RectTransform sortRect, dirRect, summaryRoot;
+    RectTransform summaryRoot;
     readonly List<SummaryView> summaryViews = new List<SummaryView>();
     readonly List<RaritySummary> visibleSummaries = new List<RaritySummary>();
     float m_summaryPitch = 100f, m_summaryIcon = 26f;
@@ -185,6 +209,9 @@ public class AchievementBook : MonoBehaviour
     // 開いている、またはとじたフレーム（同じボタン入力でメニューが反応しないように）
     public bool IsBusy => open || fade > 0f || closedFrame == Time.frameCount;
     public bool HasEntries => Entries.Count > 0;
+    // 下の操作ガイドに出す、いまの並び順と向き（並び替えのボタンは置かず、ここで見せる）
+    public string SortLabel => SortName(m_sort);
+    public string DirectionLabel => m_ascending ? "昇順" : "降順";
 
     public void Setup(TMP_FontAsset font, Material letterMat, Sprite uiSprite, Texts texts)
     {
@@ -193,6 +220,12 @@ public class AchievementBook : MonoBehaviour
         this.letterMat = letterMat;
         this.uiSprite = uiSprite;
         this.texts = texts ?? new Texts();
+        if (font != null && font.material != null)
+        {
+            plainMat = new Material(font.material);
+            plainMat.SetFloat("_OutlineWidth", 0f);
+            plainMat.DisableKeyword("OUTLINE_ON");
+        }
         group = GetComponent<CanvasGroup>();
         Build();
         Apply();
@@ -295,8 +328,6 @@ public class AchievementBook : MonoBehaviour
             if (Clicked(filterRects[0])) { SetFilter(Filter.All); return; }
             if (Clicked(filterRects[1])) { SetFilter(Filter.Unlocked); return; }
             if (Clicked(filterRects[2])) { SetFilter(Filter.Locked); return; }
-            if (Clicked(sortRect)) { StepSort(1); return; }
-            if (Clicked(dirRect)) { ToggleSortDirection(); return; }
         }
 
         int hover = -1;
@@ -305,7 +336,7 @@ public class AchievementBook : MonoBehaviour
         {
             for (int i = 0; i < rows.Count; i++)
             {
-                if (RectTransformUtility.RectangleContainsScreenPoint(rows[i], screen, null))
+                if (RectTransformUtility.RectangleContainsScreenPoint(rows[i].holder, screen, null))
                 {
                     hover = i;
                     break;
@@ -345,19 +376,31 @@ public class AchievementBook : MonoBehaviour
         content.localScale = Vector3.one * s * (1f + 0.03f * punch * punch);
     }
 
-    // 選んでいる行に色を付けて少し右へ。見えないところにあれば一覧を送る
+    // 選択・ホバーの行を、明るくした外枠と流れる光で示す（下地のグラデーションは変えない）
     void UpdateRows(float dt)
     {
         float k = 1f - Mathf.Exp(-14f * dt);
         for (int i = 0; i < rows.Count; i++)
         {
+            Row r = rows[i];
             bool selected = i == index;
             bool hovered = !selected && i == hoverIndex;
-            Color target = selected ? AccentColor : hovered ? RowHoverColor : RowColor;
-            rowBgs[i].color = Color.Lerp(rowBgs[i].color, target, k);
 
-            Vector2 p = rows[i].anchoredPosition;
-            rows[i].anchoredPosition = new Vector2(Mathf.Lerp(p.x, selected ? 24f : 0f, k), p.y);
+            if (r.border != null)
+            {
+                Color target = selected ? SelectedBorder(r.borderBase)
+                             : hovered ? HoverBorder(r.borderBase)
+                             : r.borderBase;
+                r.border.color = Color.Lerp(r.border.color, target, k);
+            }
+            if (r.focus != null)
+            {
+                Color fc = r.focus.color;
+                fc.a = Mathf.Lerp(fc.a, selected ? 0.95f : 0f, k);
+                r.focus.color = fc;
+            }
+
+            UpdateShine(r, selected, hovered, dt);
         }
 
         // 選んでいる行が見えるように送る
@@ -365,10 +408,60 @@ public class AchievementBook : MonoBehaviour
         if (view <= 1f) view = CardH;
         float rowTop = index * (RowH + RowGap);
         float scroll = listContent.anchoredPosition.y;
-        float target2 = Mathf.Clamp(scroll, rowTop + RowH - view + 10f, rowTop - 10f);
+        float target2 = Mathf.Clamp(scroll, rowTop + RowH - view + 16f, rowTop - 16f);
         target2 = Mathf.Clamp(target2, 0f, Mathf.Max(0f, rows.Count * (RowH + RowGap) - RowGap - view));
         listContent.anchoredPosition = new Vector2(0f, Mathf.Lerp(scroll, target2, k));
         RefreshScrollbar();
+    }
+
+    // 光の帯を左から右へ流す（選択中はくり返し、ホバーは1回）
+    void UpdateShine(Row r, bool selected, bool hovered, float dt)
+    {
+        if (r.shine == null) return;
+
+        bool active = selected || hovered;
+        if (active && !r.wasActive) StartShine(r);
+        else if (!active) r.shining = false;
+        r.wasActive = active;
+
+        if (!r.shining && selected)
+        {
+            r.shineWait -= dt;
+            if (r.shineWait <= 0f) StartShine(r);
+        }
+
+        float targetAlpha = 0f;
+        if (r.shining)
+        {
+            r.shineTime += dt;
+            float t = Mathf.Clamp01(r.shineTime / ShineDuration);
+            if (t >= 1f)
+            {
+                r.shining = false;
+                r.shineTime = 0f;
+                r.shineWait = selected ? ShineInterval : 0f;
+            }
+            else
+            {
+                float e = Mathf.SmoothStep(0f, 1f, t);
+                float half = ListW * 0.5f;
+                r.shine.rectTransform.anchoredPosition = new Vector2(
+                    Mathf.Lerp(-half - ShinePadding, half + ShinePadding, e),
+                    Mathf.Lerp(ShineRise, -ShineRise, e));
+                targetAlpha = ShineAlpha;
+            }
+        }
+
+        Color c = r.shine.color;
+        c.a = Mathf.Lerp(c.a, targetAlpha, 1f - Mathf.Exp(-18f * dt));
+        r.shine.color = c;
+    }
+
+    static void StartShine(Row r)
+    {
+        r.shining = true;
+        r.shineTime = 0f;
+        r.shineWait = 0f;
     }
 
     void RefreshScrollbar()
@@ -385,7 +478,7 @@ public class AchievementBook : MonoBehaviour
         float thumbH = Mathf.Max(24f, trackH * ratio);
         scrollThumb.sizeDelta = new Vector2(4f, thumbH);
         float maxScroll = Mathf.Max(0.01f, contentH - view);
-        float scroll = Mathf.Clamp(-listContent.anchoredPosition.y, 0f, maxScroll);
+        float scroll = Mathf.Clamp(listContent.anchoredPosition.y, 0f, maxScroll);
         float y = -(scroll / maxScroll) * (trackH - thumbH);
         scrollThumb.anchoredPosition = new Vector2(0f, y);
     }
@@ -417,8 +510,8 @@ public class AchievementBook : MonoBehaviour
         percentText.alignment = TextAlignmentOptions.Left;
         Place(percentText.rectTransform, PercentX, StripRowY, PercentW, 56f);
 
-        var gaugeBg = ToyKit.UIRounded("Gauge", strip, new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.16f), 9f);
-        Place(gaugeBg, GaugeX, StripRowY, GaugeW, 18f);
+        var gaugeBg = ToyKit.UIRounded("Gauge", strip, new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.16f), 10f);
+        Place(gaugeBg, GaugeX, StripRowY, GaugeW, 20f);
         var fill = ToyKit.UIImage("Fill", gaugeBg, AccentColor, BarSprite != null ? BarSprite : uiSprite);
         ToyKit.Stretch(fill);
         gaugeFill = fill.GetComponent<Image>();
@@ -441,27 +534,10 @@ public class AchievementBook : MonoBehaviour
             filterTexts[i] = t;
         }
 
-        // 上段：並び替えと、昇順／降順
-        var sortPill = ToyKit.UIRounded("Sort", strip, PillColor, 22f);
-        Place(sortPill, SortX, StripRowY, SortW, 46f);
-        AddPillOutline(sortPill.gameObject);
-        sortRect = sortPill;
-        sortText = ToyKit.UIText("Text", sortPill, BodyFont, "", 20f, Faded);
-        sortText.alignment = TextAlignmentOptions.Center;
-        ToyKit.Stretch(sortText.rectTransform);
-
-        var dirPill = ToyKit.UIRounded("Direction", strip, PillColor, 22f);
-        Place(dirPill, DirX, StripRowY, DirW, 46f);
-        AddPillOutline(dirPill.gameObject);
-        dirRect = dirPill;
-        dirText = ToyKit.UIText("Text", dirPill, BodyFont, "", 20f, Faded);
-        dirText.alignment = TextAlignmentOptions.Center;
-        ToyKit.Stretch(dirText.rectTransform);
-
         // 下段：レアリティ別の取得数（アイコンと「3/9」だけ。文字では書かない）
-        summaryLabel = ToyKit.UIText("SummaryLabel", strip, BodyFont, "レアリティ別", 20f, Faded);
+        summaryLabel = ToyKit.UIText("SummaryLabel", strip, BodyFont, "レアリティ別", 24f, Faded);
         summaryLabel.alignment = TextAlignmentOptions.Left;
-        Place(summaryLabel.rectTransform, 24f, -StripRowY, SummaryLabelW, 30f);
+        Place(summaryLabel.rectTransform, 24f, -StripRowY, SummaryLabelW, 36f);
 
         summaryRoot = new GameObject("Rarity", typeof(RectTransform)).GetComponent<RectTransform>();
         summaryRoot.SetParent(strip, false);
@@ -513,7 +589,7 @@ public class AchievementBook : MonoBehaviour
             ToyKit.Anchor(icon, new Vector2(0f, 0.5f), new Vector2(0f, 0f), new Vector2(m_summaryIcon, m_summaryIcon));
             icon.pivot = new Vector2(0f, 0.5f);
 
-            var label = ToyKit.UIText("Count", root, BodyFont, "", 20f, Faded);
+            var label = ToyKit.UIText("Count", root, BodyFont, "", 24f, Faded);
             label.alignment = TextAlignmentOptions.Left;
             ToyKit.Anchor(label.rectTransform, new Vector2(0f, 0.5f),
                           new Vector2(m_summaryIcon + 10f, 0f), new Vector2(m_summaryPitch - m_summaryIcon - 12f, 30f));
@@ -553,14 +629,11 @@ public class AchievementBook : MonoBehaviour
             }
         }
 
-        if (sortText != null) sortText.text = SortName(m_sort);
-        if (dirText != null) dirText.text = m_ascending ? "昇順 ↑" : "降順 ↓";
-
         // 下段のレアリティ別：数のぶんだけ幅を分けて、全体を真ん中にそろえる
         CollectSummaries();
         int count = visibleSummaries.Count;
         m_summaryPitch = Mathf.Min(SummaryPitchMax, SummaryAreaW / Mathf.Max(1, count));
-        m_summaryIcon = Mathf.Clamp(m_summaryPitch * 0.30f, 26f, 40f);
+        m_summaryIcon = Mathf.Clamp(m_summaryPitch * 0.32f, 28f, 52f);
         EnsureSummaryViews();
 
         // 「レアリティ別」の右の余りに、レアリティのまとまりを真ん中そろえで置く
@@ -595,7 +668,7 @@ public class AchievementBook : MonoBehaviour
             if (view.label != null)
             {
                 view.label.rectTransform.anchoredPosition = new Vector2(m_summaryIcon + 10f, 0f);
-                view.label.rectTransform.sizeDelta = new Vector2(m_summaryPitch - m_summaryIcon - 12f, 30f);
+                view.label.rectTransform.sizeDelta = new Vector2(m_summaryPitch - m_summaryIcon - 12f, 36f);
                 view.label.text = s.unlocked + "/" + s.total;
             }
         }
@@ -775,7 +848,7 @@ public class AchievementBook : MonoBehaviour
 
         // 左：アイコンと名前、取得状況
         var tileRect = ToyKit.UIRounded("Tile", page, Color.white, 26f);
-        ToyKit.Anchor(tileRect, center, new Vector2(-470f, 150f), new Vector2(240f, 240f));
+        ToyKit.Anchor(tileRect, center, new Vector2(DetailLX, 150f), new Vector2(240f, 240f));
         tile = tileRect.GetComponent<Image>();
         var tileOutline = tileRect.gameObject.AddComponent<Outline>();
         tileOutline.effectColor = ToyKit.Ink;
@@ -790,35 +863,35 @@ public class AchievementBook : MonoBehaviour
         glyph.enabled = false;
         // 下地が明るい色でも白いアイコンが沈まないように、こげ茶の縁取りを付ける
         var glyphOutline = glyphRect.gameObject.AddComponent<Outline>();
-        glyphOutline.effectColor = GlyphEdge;
-        glyphOutline.effectDistance = new Vector2(2.5f, -2.5f);
+        glyphOutline.effectColor = new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.55f);
+        glyphOutline.effectDistance = new Vector2(2f, -2f);
 
         nameText = ToyKit.UIText("Name", page, font, "", 50f, ToyKit.Ink);
         nameText.fontStyle = FontStyles.Bold;
         nameText.enableAutoSizing = true;
         nameText.fontSizeMin = 24f;
         nameText.fontSizeMax = 50f;
-        ToyKit.Anchor(nameText.rectTransform, center, new Vector2(-470f, -34f), new Vector2(290f, 66f));
+        ToyKit.Anchor(nameText.rectTransform, center, new Vector2(DetailLX, -34f), new Vector2(280f, 66f));
 
         var statusRect = ToyKit.UIRounded("Status", page, AccentColor, 19f);
-        ToyKit.Anchor(statusRect, center, new Vector2(-470f, -104f), new Vector2(160f, 38f));
+        ToyKit.Anchor(statusRect, center, new Vector2(DetailLX, -104f), new Vector2(150f, 38f));
         statusBg = statusRect.GetComponent<Image>();
         statusText = ToyKit.UIText("Text", statusRect, BodyFont, "", 22f, Color.white);
         statusText.alignment = TextAlignmentOptions.Center;
         ToyKit.Stretch(statusText.rectTransform);
 
         // 獲得日時（薄くて見づらいと言われたので、ほかの小さい字と同じ濃さに）
-        dateText = ToyKit.UIText("Date", page, BodyFont, "", 22f, Faded);
+        dateText = ToyKit.UIText("Date", page, BodyFont, "", 22f, ToyKit.Ink);
         dateText.alignment = TextAlignmentOptions.Center;
-        ToyKit.Anchor(dateText.rectTransform, center, new Vector2(-470f, -150f), new Vector2(300f, 30f));
+        ToyKit.Anchor(dateText.rectTransform, center, new Vector2(DetailLX, -150f), new Vector2(280f, 30f));
 
         // 何回で達成かの進捗（1回きりの実績では出さない）
-        progressLabel = ToyKit.UIText("ProgressLabel", page, BodyFont, "", 22f, Faded);
+        progressLabel = ToyKit.UIText("ProgressLabel", page, BodyFont, "", 22f, ToyKit.Ink);
         progressLabel.alignment = TextAlignmentOptions.Center;
-        ToyKit.Anchor(progressLabel.rectTransform, center, new Vector2(-470f, -206f), new Vector2(300f, 28f));
+        ToyKit.Anchor(progressLabel.rectTransform, center, new Vector2(DetailLX, -206f), new Vector2(280f, 28f));
 
         var progressBg = ToyKit.UIRounded("ProgressBg", page, new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.16f), 8f);
-        ToyKit.Anchor(progressBg, center, new Vector2(-470f, -246f), new Vector2(300f, 16f));
+        ToyKit.Anchor(progressBg, center, new Vector2(DetailLX, -246f), new Vector2(240f, 16f));
         progressBar = progressBg;
         var fillRect = ToyKit.UIImage("Fill", progressBg, AccentColor, BarSprite != null ? BarSprite : uiSprite);
         ToyKit.Stretch(fillRect);
@@ -844,7 +917,7 @@ public class AchievementBook : MonoBehaviour
 
         Divider(page, x0, 24f);
 
-        SectionTitle(page, "ポエム", new Vector2(x0 + 100f, -52f));
+        SectionTitle(page, "一言", new Vector2(x0 + 100f, -52f));
 
         // ポエムは解除条件と同じ見た目（色・大きさ・行間）にそろえる
         poemText = ToyKit.UIText("Poem", page, BodyFont, "", 40f, ToyKit.Ink);
@@ -882,12 +955,17 @@ public class AchievementBook : MonoBehaviour
         line.sizeDelta = new Vector2(CardW * 0.5f - x0 - 30f, 3f);
     }
 
+    static Color SelectedBorder(Color c) => new Color(
+        Mathf.Lerp(c.r, 1f, 0.55f), Mathf.Lerp(c.g, 1f, 0.55f), Mathf.Lerp(c.b, 1f, 0.55f), 1f);
+
+    static Color HoverBorder(Color c) => new Color(
+        Mathf.Lerp(c.r, 1f, 0.30f), Mathf.Lerp(c.g, 1f, 0.30f), Mathf.Lerp(c.b, 1f, 0.30f), 1f);
+
     // 表示中の実績（フィルター・並び替え後）から行を作り直す
     void BuildRows()
     {
         foreach (Transform c in listContent) Destroy(c.gameObject);
         rows.Clear();
-        rowBgs.Clear();
         listContent.anchoredPosition = Vector2.zero;
 
         if (m_view.Count == 0)
@@ -914,44 +992,106 @@ public class AchievementBook : MonoBehaviour
             holder.sizeDelta = new Vector2(ListW, RowH);
             holder.anchoredPosition = new Vector2(0f, -i * (RowH + RowGap));
 
-            var bg = ToyKit.UIImage("Bg", holder, RowColor, uiSprite);
+            // レアリティのグラデーションの下地。外側に細い暗い縁、内側にレアリティ色の外枠
+            var edge = ToyKit.UIImage("Edge", holder, e.edgeColor, uiSprite);
+            ToyKit.Stretch(edge);
+            edge.GetComponent<Image>().pixelsPerUnitMultiplier = 0.4f;
+
+            var border = ToyKit.UIImage("Border", holder, e.borderColor, uiSprite);
+            ToyKit.Stretch(border);
+            border.offsetMin = new Vector2(1.5f, 1.5f);
+            border.offsetMax = new Vector2(-1.5f, -1.5f);
+            border.GetComponent<Image>().pixelsPerUnitMultiplier = 0.4f;
+            var borderImage = border.GetComponent<Image>();
+
+            // 角丸のマスクの中に、上下で明るさの変わるグラデーションを敷く
+            var bg = ToyKit.UIImage("Bg", holder, Color.white, uiSprite);
             ToyKit.Stretch(bg);
             bg.GetComponent<Image>().pixelsPerUnitMultiplier = 0.4f;
-            var ol = bg.gameObject.AddComponent<Outline>();
-            ol.effectColor = ToyKit.Ink;
-            ol.effectDistance = new Vector2(2f, -2f);
+            bg.offsetMin = new Vector2(3.5f, 3.5f);
+            bg.offsetMax = new Vector2(-3.5f, -3.5f);
+            var mask = bg.gameObject.AddComponent<Mask>();
+            mask.showMaskGraphic = false;
 
-            // アイコン：解除済みはレアリティ色の下地、未取得は灰色の下地に鍵
-            var tileRect = ToyKit.UIRounded("Tile", holder, e.unlocked ? e.color : LockedTileColor, 16f);
-            ToyKit.Anchor(tileRect, new Vector2(0f, 0.5f), new Vector2(44f, 0f), new Vector2(60f, 60f));
+            var fill = ToyKit.UIImage("Fill", bg, Color.white, e.background);
+            ToyKit.Stretch(fill);
+            if (e.background != null) fill.GetComponent<Image>().type = Image.Type.Simple;
 
-            Sprite glyphSprite = e.unlocked ? e.glyph : e.lockGlyph;
-            if (glyphSprite != null)
+            // 選択・ホバーで左から右へ流れる光
+            Image shineImage = null;
+            if (e.shineSprite != null)
             {
-                float size = e.unlocked ? 42f : 34f;
-                var glyphRect = ToyKit.UIImage("Glyph", tileRect, Color.white, glyphSprite);
-                var glyphImage = glyphRect.GetComponent<Image>();
-                glyphImage.type = Image.Type.Simple;
-                glyphImage.preserveAspect = true;
-                ToyKit.Anchor(glyphRect, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(size, size));
-                // 下地が明るい色でも白いアイコンが沈まないように、こげ茶の縁取りを付ける
-                var glyphOutline = glyphRect.gameObject.AddComponent<Outline>();
-                glyphOutline.effectColor = GlyphEdge;
-                glyphOutline.effectDistance = new Vector2(1.5f, -1.5f);
+                var shineRect = ToyKit.UIImage("Shine", bg, new Color(1f, 1f, 1f, 0f), e.shineSprite);
+                shineImage = shineRect.GetComponent<Image>();
+                shineImage.type = Image.Type.Simple;
+                shineRect.anchorMin = shineRect.anchorMax = new Vector2(0.5f, 0.5f);
+                shineRect.pivot = new Vector2(0.5f, 0.5f);
+                shineRect.sizeDelta = new Vector2(ShineW, ShineH);
+                shineRect.anchoredPosition = new Vector2(-2000f, 0f);
+                shineRect.localEulerAngles = new Vector3(0f, 0f, ShineAngle);
+            }
+
+            // 選択中の印（左はしの白い帯）
+            var focusRect = ToyKit.UIRounded("Focus", holder, new Color(1f, 1f, 1f, 0f), 3f);
+            focusRect.anchorMin = focusRect.anchorMax = new Vector2(0f, 0.5f);
+            focusRect.pivot = new Vector2(0f, 0.5f);
+            focusRect.anchoredPosition = new Vector2(7f, 0f);
+            focusRect.sizeDelta = new Vector2(6f, RowH - 26f);
+
+            // アイコン：解除済みは色つきのアイコン、未取得は灰色の下地に鍵
+            if (e.unlocked)
+            {
+                Sprite iconSprite = e.icon != null ? e.icon : e.glyph;
+                if (iconSprite != null)
+                {
+                    var iconRect = ToyKit.UIImage("Icon", holder, Color.white, iconSprite);
+                    var iconImage = iconRect.GetComponent<Image>();
+                    iconImage.type = Image.Type.Simple;
+                    iconImage.preserveAspect = true;
+                    // 色つきのアイコンが無いときは、白いシルエットをレアリティ色で染めて出す
+                    if (e.icon == null) iconImage.color = e.color;
+                    ToyKit.Anchor(iconRect, new Vector2(0f, 0.5f), new Vector2(44f, 0f), new Vector2(56f, 56f));
+                    // グラデーションの上でも輪郭が分かるように、こげ茶の縁をうっすら付ける
+                    var iconOutline = iconRect.gameObject.AddComponent<Outline>();
+                    iconOutline.effectColor = new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.55f);
+                    iconOutline.effectDistance = new Vector2(1.5f, -1.5f);
+                }
+            }
+            else
+            {
+                var tileRect = ToyKit.UIRounded("Tile", holder, LockedTileColor, 16f);
+                ToyKit.Anchor(tileRect, new Vector2(0f, 0.5f), new Vector2(44f, 0f), new Vector2(60f, 60f));
+                if (e.lockGlyph != null)
+                {
+                    var lockRect = ToyKit.UIImage("Lock", tileRect,
+                                                  new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.6f), e.lockGlyph);
+                    var lockImage = lockRect.GetComponent<Image>();
+                    lockImage.type = Image.Type.Simple;
+                    lockImage.preserveAspect = true;
+                    ToyKit.Anchor(lockRect, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(34f, 34f));
+                }
             }
 
             // 名前だけ（条件は右のカードに出す）
             string nameText = hidden ? texts.locked : e.name;
-            Color nameColor = e.unlocked ? ToyKit.Ink : FadedInk;
+            Color nameColor = ToyKit.Ink;
             var name = ToyKit.UIText("Name", holder, font, nameText, 40f, nameColor);
+            // フォント既定の白い縁取りは見づらいので、一覧では縁取り無しにする
+            if (plainMat != null) name.fontSharedMaterial = plainMat;
             name.alignment = TextAlignmentOptions.Left;
             name.enableAutoSizing = true;
             name.fontSizeMin = 20f;
             name.fontSizeMax = 40f;
             ToyKit.Anchor(name.rectTransform, new Vector2(0f, 0.5f), new Vector2(276f, 0f), new Vector2(360f, RowH - 10f));
 
-            rows.Add(holder);
-            rowBgs.Add(bg.GetComponent<Image>());
+            rows.Add(new Row
+            {
+                holder = holder,
+                border = borderImage,
+                borderBase = e.borderColor,
+                focus = focusRect.GetComponent<Image>(),
+                shine = shineImage,
+            });
         }
     }
 
@@ -971,6 +1111,7 @@ public class AchievementBook : MonoBehaviour
             progressLabel.gameObject.SetActive(false);
             progressBar.gameObject.SetActive(false);
             glyph.enabled = false;
+            tile.enabled = true;
             tile.color = LockedTileColor;
             return;
         }
@@ -989,12 +1130,25 @@ public class AchievementBook : MonoBehaviour
         conditionText.text = hidden ? SecretCondition : e.condition;
         poemText.text = hidden ? "" : e.unlocked ? e.poem : PoemHiddenText;
 
-        // アイコン（解除済みはレアリティ色＋トロフィー、未取得は灰色＋鍵）
-        tile.color = e.unlocked ? e.color : LockedTileColor;
-        Sprite sprite = e.unlocked ? e.glyph : e.lockGlyph;
-        glyph.sprite = sprite;
-        glyph.enabled = sprite != null;
-        glyph.rectTransform.sizeDelta = e.unlocked ? new Vector2(160f, 160f) : new Vector2(120f, 120f);
+        // アイコン（解除済みは色つきのアイコン、未取得は灰色の下地に鍵）
+        if (e.unlocked && e.icon != null)
+        {
+            tile.enabled = false;   // 子のアイコンを消さないよう、画像だけ消す
+            glyph.sprite = e.icon;
+            glyph.color = Color.white;
+            glyph.enabled = true;
+            glyph.rectTransform.sizeDelta = new Vector2(210f, 210f);
+        }
+        else
+        {
+            tile.enabled = true;
+            tile.color = e.unlocked ? e.color : LockedTileColor;
+            Sprite sprite = e.unlocked ? e.glyph : e.lockGlyph;
+            glyph.sprite = sprite;
+            glyph.enabled = sprite != null;
+            glyph.color = e.unlocked ? Color.white : new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.6f);
+            glyph.rectTransform.sizeDelta = e.unlocked ? new Vector2(170f, 170f) : new Vector2(104f, 104f);
+        }
 
         // 何回で達成かの進捗
         bool showProgress = e.hasProgress && !hidden;

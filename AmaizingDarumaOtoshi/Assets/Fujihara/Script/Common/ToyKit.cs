@@ -197,6 +197,55 @@ public static class ToyKit
         }
     }
 
+    // スマイルの頭（CreateHead の root）をモデル（Blender のだるまなど。足元が原点）に差し替える。
+    // 球と目・口は隠し、モデルの足元を球の下端に合わせる。頭が拡大されていても、頭のローカル座標で height の高さになる
+    public static void AttachHeadModel(Transform headRoot, GameObject model, float height, float yaw)
+    {
+        if (model == null || headRoot == null) return;
+        foreach (Transform c in headRoot) c.gameObject.SetActive(false);
+        var m = Object.Instantiate(model, headRoot, false);
+        m.name = "HeadModel";
+        m.transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
+
+        var renderers = m.GetComponentsInChildren<Renderer>();
+        if (renderers.Length == 0) return;
+        var b = renderers[0].bounds;
+        foreach (var r in renderers) b.Encapsulate(r.bounds);
+        float parentScale = Mathf.Max(headRoot.lossyScale.y, 1e-4f);
+        float sizeY = b.size.y / parentScale;   // 頭のローカル座標での高さ
+        float s = sizeY > 0f ? height / sizeY : 1f;
+        m.transform.localScale = Vector3.one * s;
+        float bottom = (b.min.y - headRoot.position.y) / parentScale * s;
+        m.transform.localPosition = new Vector3(0f, -HeadR - bottom, 0f);
+    }
+
+    // CreateBlock で作った積み木の本体を、モデル（mesh）に差し替える。size の大きさにそろえ、マテリアルは複製する（光らせるため）。
+    // 文字はモデルの正面に付け直す。textWidth > 0 なら文字の枠の幅も変える。新しいマテリアルを返す（差し替えなければ bodyMat のまま）
+    public static Material UseBlockModel(Transform block, Material bodyMat, Mesh mesh, Material src, Vector3 size, float textWidth)
+    {
+        if (mesh == null || src == null) return bodyMat;
+        var body = block.Find("Body");
+        body.GetComponent<MeshFilter>().sharedMesh = mesh;
+        var bounds = mesh.bounds;
+        body.localScale = new Vector3(size.x / bounds.size.x, size.y / bounds.size.y, size.z / bounds.size.z);
+        body.localPosition = -Vector3.Scale(bounds.center, body.localScale);
+
+        var text = block.GetComponentInChildren<TextMeshPro>();
+        if (text != null)
+        {
+            var p = text.transform.localPosition;
+            text.transform.localPosition = new Vector3(p.x, p.y, -size.z * 0.5f - 0.006f);
+            if (textWidth > 0f) text.rectTransform.sizeDelta = new Vector2(textWidth, text.rectTransform.sizeDelta.y);
+        }
+
+        var mat = new Material(src);
+        mat.EnableKeyword("_EMISSION");
+        mat.SetColor("_EmissionColor", Color.black);
+        body.GetComponent<MeshRenderer>().sharedMaterial = mat;
+        if (bodyMat != null) Object.Destroy(bodyMat);
+        return mat;
+    }
+
     // 黄色いスマイルの顔（-Z が正面）
     public static Face CreateHead()
     {

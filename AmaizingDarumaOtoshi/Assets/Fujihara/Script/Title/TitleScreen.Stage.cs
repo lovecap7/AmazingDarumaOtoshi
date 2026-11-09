@@ -1,4 +1,4 @@
-using TMPro;
+﻿using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem.UI;
 using UnityEngine.Rendering.Universal;
@@ -118,24 +118,10 @@ public partial class TitleScreen
 
     // スマイルの頭（ToyKit.CreateHead の root）をモデルに差し替える。球と目・口は隠し、モデルの足元を球の下端に合わせる。
     // 頭が拡大されていても、頭のローカル座標で headModelHeight の高さになる
-    public void AttachHeadModel(Transform headRoot)
+    // modelOverride：headModel の代わりに使うモデル（部員を別のだるまにするときなど）
+    public void AttachHeadModel(Transform headRoot, GameObject modelOverride = null)
     {
-        if (headModel == null || headRoot == null) return;
-        foreach (Transform c in headRoot) c.gameObject.SetActive(false);
-        var model = Instantiate(headModel, headRoot, false);
-        model.name = "HeadModel";
-        model.transform.localRotation = Quaternion.Euler(0f, headModelYaw, 0f);
-
-        var renderers = model.GetComponentsInChildren<Renderer>();
-        if (renderers.Length == 0) return;
-        var b = renderers[0].bounds;
-        foreach (var r in renderers) b.Encapsulate(r.bounds);
-        float parentScale = Mathf.Max(headRoot.lossyScale.y, 1e-4f);
-        float sizeY = b.size.y / parentScale;   // 頭のローカル座標での高さ
-        float s = sizeY > 0f ? headModelHeight / sizeY : 1f;
-        model.transform.localScale = Vector3.one * s;
-        float bottom = (b.min.y - headRoot.position.y) / parentScale * s;
-        model.transform.localPosition = new Vector3(0f, -HeadR - bottom, 0f);
+        ToyKit.AttachHeadModel(headRoot, modelOverride != null ? modelOverride : headModel, headModelHeight, headModelYaw);
     }
 
     // ボタンをモデルにしたときの大きさ（横長の楕円の円柱）と文字の幅
@@ -147,30 +133,7 @@ public partial class TitleScreen
     // 文字はモデルの正面に付け直す。textWidth > 0 なら文字の枠の幅も変える
     void UseBlockModel(Block b, int paletteIndex, Vector3 size, float textWidth)
     {
-        if (blockModelMesh == null || blockModelMaterials == null || blockModelMaterials.Length == 0) return;
-        var src = blockModelMaterials[paletteIndex % blockModelMaterials.Length];
-        if (src == null) return;
-
-        var body = b.t.Find("Body");
-        body.GetComponent<MeshFilter>().sharedMesh = blockModelMesh;
-        var bounds = blockModelMesh.bounds;
-        body.localScale = new Vector3(size.x / bounds.size.x, size.y / bounds.size.y, size.z / bounds.size.z);
-        body.localPosition = -Vector3.Scale(bounds.center, body.localScale);
-
-        var text = b.t.GetComponentInChildren<TextMeshPro>();
-        if (text != null)
-        {
-            var p = text.transform.localPosition;
-            text.transform.localPosition = new Vector3(p.x, p.y, -size.z * 0.5f - 0.006f);
-            if (textWidth > 0f) text.rectTransform.sizeDelta = new Vector2(textWidth, text.rectTransform.sizeDelta.y);
-        }
-
-        var mat = new Material(src);
-        mat.EnableKeyword("_EMISSION");
-        mat.SetColor("_EmissionColor", Color.black);
-        body.GetComponent<MeshRenderer>().sharedMaterial = mat;
-        Destroy(b.mat);
-        b.mat = mat;
+        b.mat = ToyKit.UseBlockModel(b.t, b.mat, blockModelMesh, BlockModelMaterial(paletteIndex), size, textWidth);
     }
 
     Block MakeBlock(string label, Color color, Mesh mesh, Vector2 textBox, float depth)
@@ -215,7 +178,7 @@ public partial class TitleScreen
         skipGroup = skip.gameObject.AddComponent<CanvasGroup>();
         skipGroup.alpha = 0f;
 
-        var hint = UIText("Hint", uiRoot, "上下：えらぶ　A：けってい", 32f, Ink);
+        var hint = UIText("Hint", uiRoot, "上下：選ぶ　A：決定", 32f, Ink);
         Anchor(hint.rectTransform, new Vector2(1f, 0f), new Vector2(-70f, 40f), new Vector2(700f, 50f));
         hint.rectTransform.pivot = new Vector2(1f, 0f);
         hint.alignment = TextAlignmentOptions.Right;

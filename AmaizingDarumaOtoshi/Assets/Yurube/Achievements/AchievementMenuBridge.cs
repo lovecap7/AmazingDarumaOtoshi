@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace Yurube.Achievements
 {
@@ -87,7 +87,18 @@ namespace Yurube.Achievements
                 // 未取得は同じ場所に鍵を出す（AchievementBook 側で灰色の下地に切り替える）
                 entry.color = data.DisplayRarityColor;
                 entry.glyph = AchievementRarityIcons.SilhouetteOf(data.Rarity, data.IsSpecial);
+                entry.icon = AchievementRarityIcons.IconOf(data.Rarity, data.IsSpecial);
                 entry.lockGlyph = AchievementVisuals.LockIcon();
+                // 一覧の行の下地（レアリティのグラデーション）と、流れる光・外枠
+                entry.background = AchievementVisuals.CardGradient(data.Rarity, data.IsUnlocked);
+                entry.shineSprite = AchievementVisuals.CardShine();
+                bool special = data.IsSpecial;
+                entry.edgeColor = special
+                    ? Color.Lerp(AchievementRarityInfo.SpecialColor, ToyKit.Ink, 0.45f)
+                    : AchievementRarityInfo.EdgeOf(data.Rarity, data.IsUnlocked);
+                entry.borderColor = special
+                    ? AchievementRarityInfo.SpecialColor
+                    : AchievementRarityInfo.BorderOf(data.Rarity, data.IsUnlocked);
                 entries.Add(entry);
             }
         }

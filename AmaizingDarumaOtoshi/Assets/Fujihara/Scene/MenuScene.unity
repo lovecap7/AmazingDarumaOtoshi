@@ -1,4 +1,4 @@
-%YAML 1.1
+﻿%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!29 &1
 OcclusionCullingSettings:
@@ -164,6 +164,12 @@ MonoBehaviour:
   drawBoardCircle: 0
   roomOffset: {x: -3, y: -5, z: 0}
   memberScale: 3.2
+  memberWhiteBlockMaterial: {fileID: 0}
+  swingerBlockMaterials: []
+  runnerBlockMaterials: []
+  swingerHeadModel: {fileID: 0}
+  runnerHeadModel: {fileID: 0}
+  memberHeadModelHeight: 0.85
 --- !u!4 &2020951154
 Transform:
   m_ObjectHideFlags: 0
@@ -275,13 +281,13 @@ MonoBehaviour:
     - label: "\u5782\u76F4\u540C\u671F"
       help: "\u30AA\u30F3\u306B\u3059\u308B\u3068\u3001\u753B\u9762\u306E\u3061\u3089\u3064\u304D\uFF08\u30C6\u30A3\u30A2\u30EA\u30F3\u30B0\uFF09\u3092\u6291\u3048\u307E\u3059\u3002"
     keySelect: "\u4E0A\u4E0B"
-    guideSelect: "\u3048\u3089\u3076"
+    guideSelect: "\u9078\u3076"
     keyChange: "\u5DE6\u53F3"
-    guideChange: "\u304B\u3048\u308B"
+    guideChange: "\u5909\u3048\u308B"
     keyDecide: A
-    guideDecide: "\u3051\u3063\u3066\u3044"
+    guideDecide: "\u6C7A\u5B9A"
     keyBack: B
-    guideBack: "\u3082\u3069\u308B"
+    guideBack: "\u623B\u308B"
     book:
       title: "\u305A\u304B\u3093"
       passiveTitle: "\u30D1\u30C3\u30B7\u30D6"
@@ -291,13 +297,25 @@ MonoBehaviour:
     achievements:
       title: "\u3058\u3063\u305B\u304D"
       locked: "\uFF1F\uFF1F\uFF1F"
-      help: "\u5B9F\u7E3E\u306E\u540D\u524D\u30FB\u89E3\u9664\u6761\u4EF6\u30FB\u30DD\u30A8\u30E0\u304C\u898B\u3089\u308C\u307E\u3059\u3002"
+      help: "\u5B9F\u7E3E\u306E\u540D\u524D\u30FB\u89E3\u9664\u6761\u4EF6\u30FB\u4E00\u8A00\u304C\u898B\u3089\u308C\u307E\u3059\u3002"
     scoreNumbers:
     - 0
     - 1
     showScoreNumbers: 0
     notebookMemo: "\u3060\u308B\u307E\u90E8\u3000\u308C\u3093\u3057\u3085\u3046\u30CE\u30FC\u30C8"
   creditsText: "<size=150%>\u30A2\u30E1\u30A4\u30B8\u30F3\u30B0 \u3060\u308B\u307E\u843D\u3068\u3057</size>\n\n\n<size=110%>\u30D7\u30ED\u30B0\u30E9\u30E0\uFF08\u4E94\u5341\u97F3\u9806\uFF09</size>\n\u4E95\u4E0A\n\u5FD7\u9DF9\n\u4E2D\u5DDD\n\u4E2D\u5E73\n\u85E4\u539F\n\n\n<size=110%>\u30D5\u30A9\u30F3\u30C8</size>\nYuji Syuku (SIL Open Font License)\n\n\n\n<size=120%>Thank you for Playing!</size>"
+  headModel: {fileID: 919132149155446097, guid: 41b0a15e37ba3fd43a08624c09d91c2d, type: 3}
+  headModelHeight: 0.85
+  headModelYaw: 180
+  blockModelMesh: {fileID: 8944754907838720677, guid: ba0d32a3acf1aa74ea9439f5714316e9, type: 3}
+  blockModelMaterials:
+  - {fileID: 2100000, guid: 79ab084c4b0c9874aa1682d1cdf6200b, type: 2}
+  - {fileID: 2100000, guid: 419822e64f6ce164bb799a6363c2aa0d, type: 2}
+  - {fileID: 2100000, guid: c80c67b4cf110ec4283bc0423e510b3d, type: 2}
+  - {fileID: 2100000, guid: 025cc94517bc975459a7b9cab953bfae, type: 2}
+  - {fileID: 2100000, guid: 02a492f4e4ac5ff4dbcb47d88726187b, type: 2}
+  - {fileID: 2100000, guid: 61b43301ab32bb54da3a6b9c8c55fc28, type: 2}
+  blockModelTextWidth: 1.85
   stackX: -2.9
   hammerScale: 0.75
   boardCenter: {x: 2.9, y: 2.35, z: 1}

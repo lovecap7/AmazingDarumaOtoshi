@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9bc7d20817a22f54b80f1965aafc188c, type: 3}
+  m_Name: Stage19
+  m_EditorClassIdentifier: Assembly-CSharp::StageData
+  id: Stage19
+  displayName: "\u30D3\u30EA\u30E4\u30FC\u30C9\u53F0"
+  description: "\u30D3\u30EA\u30E4\u30FC\u30C9\u53F0\u306E\u4E0A\u3002\u7DD1\u306E\u30E9\u30B7\u30E3\u306E\u5E8A\u3092\u6728\u67A0\u3068\u30AF\u30C3\u30B7\u30E7\u30F3(\u58C1)\u304C\u56F2\u307F\u3001\u56DB\u9685\u3068\u9577\u3044\u8FBA\u306E\u4E2D\u592E\u306B6\u3064\u306E\u30DD\u30B1\u30C3\u30C8(\u7A74)\u304C\u7A7A\u3044\u3066\u3044\u308B\u3002\u958B\u59CB\u6642\u306F\u624B\u7389\u3068\u30013\u7A2E\u985E\xD72\u500B\u306E\u7684\u7389\u3092\u4E09\u89D2\u306B\u4E26\u3079\u305F\u30E9\u30C3\u30AF\u3002\u3068\u304D\u3069\u304D\u53F0\u306E\u5916\u304B\u3089\u5927\u304D\u306A\u624B\u3068\u30AD\u30E5\u30FC\u304C\u73FE\u308C\u3001\u72D9\u3044\u3092\u5B9A\u3081\u3066\u624B\u7389\u3092\u7684\u7389\u3078\u7A81\u304F\u3002"
+  color: {r: 0.85, g: 0.7, b: 0.95, a: 1}
+  preview: {fileID: 21300000, guid: 2d7a34eaff0ee1445941305f7bea5ed9, type: 3}
+  sceneName: AllStages

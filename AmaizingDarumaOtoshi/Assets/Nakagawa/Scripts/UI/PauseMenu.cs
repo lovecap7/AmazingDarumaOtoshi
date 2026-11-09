@@ -1,4 +1,4 @@
-using Nakahira;
+﻿using Nakahira;
 using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -305,7 +305,7 @@ namespace Nakagawa
                 ToyKit.Stretch(m_itemTexts[i].rectTransform);
             }
 
-            var hint = Text("Hint", m_panel, "↑↓：えらぶ　A：決定　B / Start：再開", 20.0f, new Color(1.0f, 1.0f, 1.0f, 0.7f), m_letterMat);
+            var hint = Text("Hint", m_panel, "↑↓：選ぶ　A：決定　B / Start：再開", 20.0f, new Color(1.0f, 1.0f, 1.0f, 0.7f), m_letterMat);
             ToyKit.Anchor(hint.rectTransform, new Vector2(0.5f, 0.0f), new Vector2(0.0f, 26.0f), new Vector2(580.0f, 30.0f));
 
             // 確認
