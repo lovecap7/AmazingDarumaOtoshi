@@ -6,7 +6,7 @@ namespace Nakahira
     // 試合では MatchPlayer と同じGameObjectに付ける(操作する体は MatchPlayer から取る)。
     // キャラクターに直接付けた場合はそのキャラクターを動かす
     //
-    // 知る(CpuPerception) → 決める(ここ) → 状態(積む・逃げる・殴る・撃つ・攻めに行く・待つ) → とっさの反応(CpuReflex。弾が来たら割り込む)
+    // 知る(CpuPerception) → 必殺技(CpuSpecial。ゲージが満タンなら撃つ) → 決める(ここ) → 状態(積む・逃げる・殴る・撃つ・攻めに行く・待つ) → とっさの反応(CpuReflex。弾が来たら割り込む)
     // → 動きの部品(道をたどる・跳んで拾う)
     // 決める:ThinkInterval ごとに各状態のやりたさを比べ、一番高い状態にする
     //  ・今の状態には StateStickiness を足す(ころころ変えない)
@@ -33,6 +33,7 @@ namespace Nakahira
         readonly CpuRide m_ride = new CpuRide();
         readonly CpuGhost m_ghost = new CpuGhost();
         readonly CpuHazardGuard m_hazardGuard = new CpuHazardGuard();
+        readonly CpuSpecial m_special = new CpuSpecial();
         // 前のフレームで動かしていた幽霊(幽霊になり直したら考え直す)
         DarumaGhost m_lastGhost;
         CpuState[] m_states;
@@ -59,6 +60,9 @@ namespace Nakahira
         public CpuRide.Action RideAction => m_ride.Current;
         // 今の危ない場所からの動き(デバッグ表示用)
         public CpuHazardGuard.Action HazardAction => m_hazardGuard.Current;
+        // 必殺技のゲージが満タンか・撃った回数(デバッグ表示・テスト用)
+        public bool SpecialReady => m_special.IsReady;
+        public int SpecialCount => m_special.ActivatedCount;
         // 集中度(認識の疲れ)の割合(デバッグ表示用)
         public float LoadRatio => m_params != null ? m_context.LoadRatio : 0.0f;
 
@@ -116,6 +120,9 @@ namespace Nakahira
             // 1段 → 0段になった瞬間は、逃げるかどうかをすぐに判断する
             bool becameZero = m_lastStackCount >= 1 && stack == 0;
             m_lastStackCount = stack;
+
+            // 必殺技:ゲージが満タンで、キャラごとの発動条件を満たしたら撃つ(CpuSpecial)
+            m_special.Apply(m_context);
 
             m_stateTime += dt;
             m_thinkTimer -= dt;
