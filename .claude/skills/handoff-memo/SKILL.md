@@ -1,6 +1,6 @@
 ---
 name: handoff-memo
-description: 中平（Nakahira）専用。今の作業の進み具合を AmaizingDarumaOtoshi/Assets/Nakahira/引き継ぎメモ.md に書き込む。「引き継ぎメモを更新して」「進捗を記録して」と言われたときに使う。中平以外のメンバーの作業では使わない。
+description: 中平（Nakahira）専用。今の作業の進み具合を Contexts/引き継ぎメモ.md に書き込む。「引き継ぎメモを更新して」「進捗を記録して」と言われたときに使う。中平以外のメンバーの作業では使わない。
 ---
 
 # 引き継ぎメモの更新（中平専用）
