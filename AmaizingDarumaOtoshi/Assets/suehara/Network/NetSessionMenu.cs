@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using TMPro;
 using Unity.Netcode;
 using UnityEngine;
@@ -487,8 +487,8 @@ public class NetSessionMenu : MonoBehaviour
             m_itemImages[i].rectTransform.localScale = Vector3.one * (on && !m_confirming ? pulse : 1.0f);
         }
         m_menuHint.text = m_items.Count > 0 && IsValue(m_items[m_index])
-            ? "↑↓：えらぶ　←→ / A：かえる　B / Start：とじる"
-            : "↑↓：えらぶ　A：決定　B / Start：とじる";
+            ? "↑↓：選ぶ　←→ / A：変える　B / Start：とじる"
+            : "↑↓：選ぶ　A：決定　B / Start：とじる";
 
         m_confirm.gameObject.SetActive(m_confirming);
         for (int i = 0; i < m_confirmItems.Length; i++)

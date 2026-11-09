@@ -1,4 +1,4 @@
-using TMPro;
+﻿using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem.UI;
 using UnityEngine.Rendering.Universal;
@@ -215,7 +215,7 @@ public partial class TitleScreen
         skipGroup = skip.gameObject.AddComponent<CanvasGroup>();
         skipGroup.alpha = 0f;
 
-        var hint = UIText("Hint", uiRoot, "上下：えらぶ　A：けってい", 32f, Ink);
+        var hint = UIText("Hint", uiRoot, "上下：選ぶ　A：決定", 32f, Ink);
         Anchor(hint.rectTransform, new Vector2(1f, 0f), new Vector2(-70f, 40f), new Vector2(700f, 50f));
         hint.rectTransform.pivot = new Vector2(1f, 0f);
         hint.alignment = TextAlignmentOptions.Right;

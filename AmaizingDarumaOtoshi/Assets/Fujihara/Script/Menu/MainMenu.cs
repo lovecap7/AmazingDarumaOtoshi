@@ -133,13 +133,13 @@ public class MainMenu : MonoBehaviour
 
         [Header("右下の操作ガイド（キーの字と説明）")]
         public string keySelect = "上下";
-        public string guideSelect = "えらぶ";
+        public string guideSelect = "選ぶ";
         public string keyChange = "左右";
-        public string guideChange = "かえる";
+        public string guideChange = "変える";
         public string keyDecide = "A";
-        public string guideDecide = "けってい";
+        public string guideDecide = "決定";
         public string keyBack = "B";
-        public string guideBack = "もどる";
+        public string guideBack = "戻る";
 
         [Header("ずかん（クレジットの項目で開く）")]
         public CharacterBook.Texts book = new CharacterBook.Texts();
@@ -1819,7 +1819,7 @@ public class MainMenu : MonoBehaviour
         var g = texts;
         helpText.text = achOpen ? g.achievements.help : bookOpen ? g.book.help : HelpText();
         if (achOpen && !achievements.HasEntries) SetGuides(g.keyBack, g.guideBack);
-        else if (achOpen) SetGuides(g.keySelect, "えらぶ", "左右", "しぼる", "L/R", "ならべる", "Y", "ぎゃく", g.keyBack, g.guideBack);
+        else if (achOpen) SetGuides(g.keySelect, "選ぶ", "左右", "絞る", "L/R", achievements.SortLabel, "Y", achievements.DirectionLabel, g.keyBack, g.guideBack);
         else if (bookOpen) SetGuides(g.keySelect, g.guideSelect, g.keyBack, g.guideBack);
         else if (phase == Phase.Panel && Kind(outIdx) == ItemKind.Battle || phase == Phase.Choose) SetGuides(g.keySelect, g.guideSelect, g.keyDecide, g.guideDecide, g.keyBack, g.guideBack);
         else if (phase == Phase.Panel) SetGuides(g.keySelect, g.guideSelect, g.keyChange, g.guideChange, g.keyBack, g.guideBack);
