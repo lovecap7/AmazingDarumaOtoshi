@@ -136,7 +136,8 @@ namespace Yurube
 
             if (m_state == State.Idle)
             {
-                if (SpecialInput.WasPressed(m_character)) TryActivate();
+                // CPUのだるきんぐが、人間のキー入力で必殺技を出さないようにする(ほかのキャラと同じ)
+                if (IsLocalHuman() && SpecialInput.WasPressed(m_character)) TryActivate();
                 return;
             }
 
@@ -181,11 +182,11 @@ namespace Yurube
             ApplyRainbow();
         }
 
+        // ラボのボタンや CPU からも呼べる。発動できたら true(CPU の詠唱は時間で自動完了する)
         public bool TryActivate()
         {
             if (m_state != State.Idle) return false;
             if (m_character == null || m_gauge == null || !m_gauge.IsFull) return false;
-            if (!IsLocalHuman()) return false;
 
             m_gauge.Consume();
             m_state = State.Charging;

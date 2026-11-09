@@ -63,7 +63,8 @@ namespace Yurube
 
             if (m_state == State.Idle)
             {
-                if (SpecialInput.WasPressed(m_character)) TryActivate();
+                // CPUのへびだるが、人間のキー入力で必殺技を出さないようにする(ほかのキャラと同じ)
+                if (IsLocalHuman() && SpecialInput.WasPressed(m_character)) TryActivate();
                 return;
             }
 
@@ -74,11 +75,11 @@ namespace Yurube
             }
         }
 
+        // ラボのボタンや CPU からも呼べる。発動できたら true
         public bool TryActivate()
         {
             if (m_state != State.Idle || m_swamp != null) return false;
             if (m_character == null || m_gauge == null || !m_gauge.IsFull) return false;
-            if (!IsLocalHuman()) return false;
 
             int blocks = m_character.Stack != null ? m_character.Stack.Count : 0;
             m_snapshotBlocks = Mathf.Clamp(blocks, 1, m_maxBlocks);
