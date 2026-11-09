@@ -52,7 +52,9 @@ namespace Nakahira
         public class MatchResult
         {
             public FinishReason Reason;
-            public MatchPlayer Winner;                  // null = 引き分け
+            public MatchPlayer Winner;                  // null = 引き分け。チーム戦では、勝ったチームの代表(順位が一番上の人)
+            public int WinnerTeam = -1;                 // 勝ったチーム(0 赤 / 1 青 / 2 緑 / 3 黄)。個人戦と引き分けは -1
+            public bool IsTeamBattle;                   // チーム戦の結果か
             public List<MatchPlayer> Ranking = new List<MatchPlayer>();   // 1位から順(同じ順位の人もいる。Rank を見る)
             public bool IsDraw => Winner == null;
         }
@@ -206,6 +208,12 @@ namespace Nakahira
         // ネット対戦用(suehara)
         INetMatchDriver m_net;
         bool m_netStarted;
+
+        // 味方に当てないか。オフにすると、味方にも当たる(スマブラの「チームアタック」)
+        public bool m_friendlyFire = false;
+
+        // 試合に出た体(キャラクター・幽霊)が誰のものか。体が消えたあとも、飛んでいる積み木の持ち主から調べられるよう残す
+        readonly Dictionary<EntityId, MatchPlayer> m_bodyOwners = new Dictionary<EntityId, MatchPlayer>();
 
         private void Awake()
         {
@@ -519,6 +527,7 @@ namespace Nakahira
             if (invincible) c.SetInvincible(IsConfigured ? m_settings.respawnInvincibleTime : m_reviveInvincibleTime);
 
             m_owners[c] = p;
+            m_bodyOwners[c.GetEntityId()] = p;
             c.Eliminated += OnMatchCharacterEliminated;
             c.DealtDamage += OnDealtDamage;
             int last = 0;
@@ -776,6 +785,7 @@ namespace Nakahira
             if (GhostPrefab == null) { p.SetOut(p.OutOrder); return; }
             if (m_stageArea != null) pos = m_stageArea.Clamp(pos, 0.5f);
             var ghost = Instantiate(GhostPrefab, pos, Quaternion.identity);
+            m_bodyOwners[ghost.GetEntityId()] = p;
             // ネット対戦用(suehara): 全員に配る
             m_net?.OnBodySpawned(ghost.gameObject);
             ghost.Init(m_stageArea);
@@ -811,14 +821,15 @@ namespace Nakahira
         // まだ戦っている人数(ゴースト:生存者、ストック:脱落していない人)
         int CountLeft()
         {
-            int left = 0;
+            var units = new HashSet<int>();
             foreach (var p in m_players)
             {
-                // 幽霊から復活する途中(出現演出中)の人は生存者として数える
                 bool inGame = Mode == MatchSetup.MatchMode.Ghost ? p.IsAlive || IsAppearing(p) : p.State != MatchPlayer.PlayerState.Out;
-                if (inGame) left++;
+                if (!inGame) continue;
+                // チーム戦ではチーム、個人戦では本人を1つと数える
+                units.Add(Rules.teams && p.Entry.team >= 0 ? 1000 + p.Entry.team : p.Index);
             }
-            return left;
+            return units.Count;
         }
 
         void Finish(FinishReason reason)
@@ -831,16 +842,28 @@ namespace Nakahira
             foreach (var p in m_players) p.StopControl();
             Time.timeScale = 0f;   // その場で止める(セレクトへ戻るときに戻す)
 
-            var result = new MatchResult { Reason = reason };
+            var result = new MatchResult { Reason = reason, IsTeamBattle = Rules.teams };
             result.Ranking.AddRange(m_players);
-            result.Ranking.Sort((a, b) => RankKey(b).CompareTo(RankKey(a)));
+            result.Ranking.Sort((a, b) =>
+            {
+                int c = RankKey(b).CompareTo(RankKey(a));
+                if (c != 0) return c;
+                c = UnitOf(a).CompareTo(UnitOf(b));   // 同順位のときは、同じチームが並ぶようにする
+                return c != 0 ? c : a.Index.CompareTo(b.Index);
+            });
             for (int i = 0; i < result.Ranking.Count; i++)
             {
                 var p = result.Ranking[i];
                 p.Rank = i > 0 && RankKey(p) == RankKey(result.Ranking[i - 1]) ? result.Ranking[i - 1].Rank : i + 1;
             }
-            // 1位が1人だけなら勝者、2人以上なら引き分け
-            if (result.Ranking.Count > 0 && (result.Ranking.Count == 1 || result.Ranking[1].Rank != 1)) result.Winner = result.Ranking[0];
+
+            // 1位の人が全員同じ単位(個人戦なら1人、チーム戦なら同じチーム)なら勝ち。別の単位が混ざっていれば引き分け
+            var top = result.Ranking.FindAll(p => p.Rank == 1);
+            if (top.Count > 0 && top.TrueForAll(p => UnitOf(p) == UnitOf(top[0])))
+            {
+                result.Winner = top[0];
+                if (Rules.teams && top[0].Entry.team >= 0) result.WinnerTeam = top[0].Entry.team;
+            }
 
             Result = result;
             m_finishTime = Time.unscaledTime;
@@ -848,22 +871,57 @@ namespace Nakahira
             Finished?.Invoke(result);
         }
 
-        // 順位の比べ方(大きいほど上)
+        // 順位を競う単位。チーム戦ではチーム、個人戦では本人
+        int UnitOf(MatchPlayer p) => Rules.teams && p.Entry.team >= 0 ? 1000 + p.Entry.team : p.Index;
+
+        // 同じ単位の人(個人戦では本人だけ。チーム戦では自分とチームメイト)
+        IEnumerable<MatchPlayer> MembersOf(MatchPlayer p)
+        {
+            int unit = UnitOf(p);
+            foreach (var q in m_players) if (UnitOf(q) == unit) yield return q;
+        }
+
+        // 順位の比べ方(大きいほど上)。チーム戦では、同じチームの人は同じ値になる
         double RankKey(MatchPlayer p)
         {
             bool timeUp = m_timeUpFinish;
             switch (Mode)
             {
                 case MatchSetup.MatchMode.Time:
-                    return p.Score;
+                    {
+                        // チームの点数の合計
+                        int sum = 0;
+                        foreach (var q in MembersOf(p)) sum += q.Score;
+                        return sum;
+                    }
                 case MatchSetup.MatchMode.Stock:
-                    // 残っている人が上(時間切れならストックが多い順。同じストックなら積み木が多い順)。脱落した人は後に脱落した人ほど上
-                    if (p.State != MatchPlayer.PlayerState.Out) return 1000 + (timeUp ? p.Stocks * 100 + p.StackCount : 0);
-                    return p.OutOrder;
+                    {
+                        // チームの誰か1人でも残っていれば、そのチームは残っている
+                        bool anyLeft = false;
+                        int stocks = 0, blocks = 0, lastOut = 0;
+                        foreach (var q in MembersOf(p))
+                        {
+                            if (q.State != MatchPlayer.PlayerState.Out) anyLeft = true;
+                            stocks += Mathf.Max(0, q.Stocks);
+                            blocks += q.StackCount;
+                            lastOut = Mathf.Max(lastOut, q.OutOrder);
+                        }
+                        if (anyLeft) return 1000 + (timeUp ? stocks * 100 + blocks : 0);
+                        return lastOut;   // 全員脱落したチームは、最後の1人が脱落した順
+                    }
                 default:
-                    // 生き残っている人が上(時間切れなら積み木が多い順)。幽霊は後にやられた人ほど上
-                    if (p.IsAlive || IsAppearing(p)) return 1000 + (timeUp ? p.StackCount : 0);
-                    return p.OutOrder;
+                    {
+                        bool anyAlive = false;
+                        int blocks = 0, lastOut = 0;
+                        foreach (var q in MembersOf(p))
+                        {
+                            if (q.IsAlive || IsAppearing(q)) anyAlive = true;
+                            blocks += q.StackCount;
+                            lastOut = Mathf.Max(lastOut, q.OutOrder);
+                        }
+                        if (anyAlive) return 1000 + (timeUp ? blocks : 0);
+                        return lastOut;
+                    }
             }
         }
 
@@ -1132,6 +1190,23 @@ namespace Nakahira
                 if (nearest > bestScore) { bestScore = nearest; best = point.position; }
             }
             return best;
+        }
+
+        // 体(キャラクター・幽霊)の持ち主。分からなければ null
+        public MatchPlayer PlayerOf(IDarumaAttacker body)
+        {
+            if (body is UnityEngine.Object o && m_bodyOwners.TryGetValue(o.GetEntityId(), out var p)) return p;
+            return null;
+        }
+
+        // 攻撃する側と、される側が味方か(チーム戦で、別の人で、同じチーム)
+        public bool IsFriendly(IDarumaAttacker attacker, DarumaCharacter victim)
+        {
+            if (m_friendlyFire || !Rules.teams) return false;
+            var a = PlayerOf(attacker);
+            var v = PlayerOf(victim);
+            // MatchSetup.SameTeam は同じ人どうしでも true を返すので、別の人であることも確かめる
+            return a != null && v != null && a != v && MatchSetup.SameTeam(a.Index, v.Index);
         }
 
         //========================================
