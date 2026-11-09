@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
@@ -1353,12 +1353,12 @@ public class MatchSelect : MonoBehaviour
 
             if (p.heldBy != null) SetPortrait(ui, null, texts.chooseCharacter, new Color(0.92f, 0.9f, 0.88f), "");
             else if (p.randomCharacter) SetPortrait(ui, null, texts.randomCharacter, RandomColor, texts.randomLetter);
-            else if (p.character != null) SetPortrait(ui, p.character.portrait, p.character.displayName, p.character.color, Initial(p.character.displayName));
+            else if (p.character != null) SetPortrait(ui, p.character.portrait, p.character.displayName, p.character.IconColor, Initial(p.character.displayName));
             else
             {
                 // まだ選んでいない：カーソルが乗っているキャラを薄く見せる
                 var hover = !cpu && phase == Phase.Character ? TileAt(charTiles, p.cursor) : null;
-                if (hover != null && !hover.random) SetPortrait(ui, hover.character.portrait, hover.character.displayName, hover.character.color * 0.75f, Initial(hover.character.displayName));
+                if (hover != null && !hover.random) SetPortrait(ui, hover.character.portrait, hover.character.displayName, hover.character.IconColor * 0.75f, Initial(hover.character.displayName));
                 else SetPortrait(ui, null, texts.chooseCharacter, new Color(0.92f, 0.9f, 0.88f), "");
             }
         }
@@ -1392,7 +1392,7 @@ public class MatchSelect : MonoBehaviour
             if (p.IsCpu)
             {
                 // CPU は投票しないので、キャラを出す
-                if (p.character != null) SetChipIcon(chip, p.character.portrait, p.character.color, Initial(p.character.displayName), true);
+                if (p.character != null) SetChipIcon(chip, p.character.portrait, p.character.IconColor, Initial(p.character.displayName), true);
                 else SetChipIcon(chip, null, RandomColor, texts.randomLetter, true);
                 chip.ok.gameObject.SetActive(false);
                 shown = p.character;
@@ -1654,7 +1654,7 @@ public class MatchSelect : MonoBehaviour
         {
             bool random = i == characters.Count;
             var c = random ? null : characters[i];
-            var tile = MakeTile(charRoot, grid[i].pos, grid[i].size, random ? RandomColor : c.color,
+            var tile = MakeTile(charRoot, grid[i].pos, grid[i].size, random ? RandomColor : c.IconColor,
                                 random ? null : c.portrait, random ? texts.randomCharacter : c.displayName, random ? texts.randomLetter : Initial(c.displayName));
             tile.character = c;
             tile.random = random;

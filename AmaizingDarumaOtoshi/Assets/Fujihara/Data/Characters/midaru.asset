@@ -15,7 +15,8 @@ MonoBehaviour:
   id: midaru
   displayName: "\u307F\u3060\u308B"
   color: {r: 0.25, g: 0.8, b: 0.3, a: 1}
-  portrait: {fileID: 0}
+  portrait: {fileID: -1556079471358704375, guid: de4a5424307f06943857776f3ee4dde4, type: 3}
+  model: {fileID: 919132149155446097, guid: 8ffa11aff654fe340a68bc391effdc01, type: 3}
   prefab: {fileID: 9069936943766670842, guid: f955d31825f341a9adbec0ee941a91f7, type: 3}
   passiveColor: 2
   passiveCount: 0

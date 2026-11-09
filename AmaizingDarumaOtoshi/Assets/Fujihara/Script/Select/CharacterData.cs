@@ -14,6 +14,12 @@ public class CharacterData : ScriptableObject
     public Color color = Color.white;
     [Tooltip("セレクト画面のアイコン。画像の Texture Type を「Sprite (2D and UI)」にしてここへドラッグ（未設定なら色と頭文字で仮表示）")]
     public Sprite portrait;
+    [Tooltip("キャラの3Dモデル（Blender で作っただるま。足元が原点）。メニュー「Fujihara > キャラの顔写真を撮る」で、このモデルを撮って portrait に入れる")]
+    public GameObject model;
+
+    // セレクト画面・ずかんのアイコンの背景。どのキャラも灰色（だるまの色が映えるように。color は使わない）
+    public static readonly Color IconBackground = new Color(0.66f, 0.66f, 0.68f);
+    public Color IconColor => IconBackground;
     [Tooltip("ゲーム本編で生成するプレハブ（未設定でも可）")]
     public GameObject prefab;
 
