@@ -20,7 +20,6 @@ namespace Yurube
         Color m_accent = new Color(0.22f, 0.58f, 1.0f, 1.0f);
         float m_start;
         bool m_active;
-        float m_previousTimeScale = 1.0f;
 
         GameObject m_stage;
         Camera m_camera;
@@ -122,8 +121,8 @@ namespace Yurube
         {
             if (!m_active)
             {
-                m_previousTimeScale = Time.timeScale;
-                Time.timeScale = 0.0f;
+                // 時間を止める(ほかの演出と重なっても正しく戻るように共通の仕組みを使う。中平変更)
+                Nakahira.TimeStop.Begin(this, 0.0f);
             }
             else
             {
@@ -157,7 +156,7 @@ namespace Yurube
             if (!m_active) return;
             m_active = false;
             CleanupStage();
-            Time.timeScale = m_previousTimeScale;
+            Nakahira.TimeStop.End(this);
         }
 
         void BuildStage(DarumaCharacter character)
