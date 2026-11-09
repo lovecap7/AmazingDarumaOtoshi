@@ -34,6 +34,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 2cb0409ffcf6e504fb420b0cdcde7c20, type: 2}
   - {fileID: 11400000, guid: 19b0c9bfe8ef4e942a7893f1a4f6da62, type: 2}
   - {fileID: 11400000, guid: 919c874964dd1c64ea2a467e6c945d7f, type: 2}
+  - {fileID: 11400000, guid: da63029ecaf718644af6dadd63fde1c7, type: 2}
   stagePreviews:
   - id: Stage18
     model: {fileID: 5187593053337264563, guid: 52dad18d6cb709c45b4f2551af9fcfba, type: 3}
@@ -85,3 +86,8 @@ MonoBehaviour:
     target: {x: 0, y: 0, z: -0.6000004}
     distance: 35.75
     pitch: 52.000004
+  - id: Stage20
+    model: {fileID: 5855472955940212428, guid: 0938b0309be459d4983fb599fd0cf58b, type: 3}
+    target: {x: 0, y: 0, z: -0.80000687}
+    distance: 42.249992
+    pitch: 56.00001

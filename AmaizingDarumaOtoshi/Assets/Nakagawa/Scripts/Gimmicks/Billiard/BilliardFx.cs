@@ -1,11 +1,11 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 namespace Nakagawa
 {
     // ビリヤード台(Stage19)の演出で共通に使う物
     //  ・効果音(玉どうしが当たる「カコン」、ポケットに落ちる「ゴトン」)。GimmickSound と同じく実行中に波形から作る
-    //  ・ギミックの名前などを浮かび上がらせる文字(BilliardPopupText)
+    //  ・ギミックの名前などの文章を画面に出す(StageMessageUI に任せる)
     //  ・カメラを揺らす(CameraShake があれば)
     public static class BilliardFx
     {
@@ -79,78 +79,11 @@ namespace Nakagawa
             if (s_shake != null) s_shake.Shake(new CameraShake.ShakeSettings(amplitude, duration));
         }
 
-        // position の上に文字を浮かび上がらせる(ポンと出て、上へ浮かびながら消える)
+        // ギミックの名前などの文章を、画面の上の方に大きく出す(StageMessageUI)
+        // position は以前の名残(その場に出していた位置)。今は使わない
         public static void Popup(Vector3 position, string text, Color color, float size = 1.0f, float duration = 1.6f)
         {
-            if (string.IsNullOrEmpty(text)) return;
-            var go = new GameObject("BilliardPopup");
-            go.transform.position = position;
-            go.AddComponent<BilliardPopupText>().Setup(text, color, size, duration);
-        }
-    }
-
-    // 浮かび上がる文字(BilliardFx.Popup で作る)。常にカメラの方を向く
-    public class BilliardPopupText : MonoBehaviour
-    {
-        TextMesh m_text, m_shadow;
-        Transform m_root;
-        Color m_color;
-        float m_duration = 1.6f;
-        float m_size = 1.0f;
-        float m_time;
-        Vector3 m_base;
-
-        public void Setup(string text, Color color, float size, float duration)
-        {
-            m_color = color;
-            m_duration = Mathf.Max(0.2f, duration);
-            m_size = size;
-            m_base = transform.position;
-            m_root = new GameObject("Text").transform;
-            m_root.SetParent(transform, false);
-            Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            m_shadow = CreateText("Shadow", text, font, new Color(0, 0, 0, 0.6f), new Vector3(0.06f, -0.06f, 0.02f));
-            m_text = CreateText("Main", text, font, color, Vector3.zero);
-            Update();
-        }
-
-        TextMesh CreateText(string name, string text, Font font, Color color, Vector3 offset)
-        {
-            var go = new GameObject(name);
-            go.transform.SetParent(m_root, false);
-            go.transform.localPosition = offset;
-            var tm = go.AddComponent<TextMesh>();
-            tm.text = text;
-            tm.font = font;
-            tm.fontSize = 64;
-            tm.characterSize = 0.06f;
-            tm.anchor = TextAnchor.MiddleCenter;
-            tm.alignment = TextAlignment.Center;
-            tm.fontStyle = FontStyle.Bold;
-            tm.color = color;
-            var r = go.GetComponent<MeshRenderer>();
-            r.sharedMaterial = font.material;
-            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            r.receiveShadows = false;
-            return tm;
-        }
-
-        private void Update()
-        {
-            if (m_root == null) return;
-            m_time += Time.deltaTime;
-            float t = Mathf.Clamp01(m_time / m_duration);
-            // ポンと大きく出てから少し縮む
-            float pop = t < 0.12f ? Mathf.Lerp(0.0f, 1.3f, t / 0.12f) : Mathf.Lerp(1.3f, 1.0f, Mathf.Clamp01((t - 0.12f) / 0.15f));
-            m_root.localScale = Vector3.one * (pop * m_size);
-            float rise = 1.0f - (1.0f - t) * (1.0f - t);
-            transform.position = m_base + Vector3.up * (1.2f * rise);
-            var cam = Camera.main;
-            if (cam != null) m_root.rotation = cam.transform.rotation;
-            float alpha = t < 0.7f ? 1.0f : 1.0f - (t - 0.7f) / 0.3f;
-            m_text.color = GimmickPalette.WithAlpha(m_color, m_color.a * alpha);
-            m_shadow.color = new Color(0, 0, 0, 0.6f * alpha);
-            if (m_time >= m_duration) Destroy(gameObject);
+            StageMessageUI.Show(text, color, size, duration);
         }
     }
 }
