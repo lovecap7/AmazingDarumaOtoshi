@@ -49,8 +49,20 @@ public class MatchSelect : MonoBehaviour
     [SerializeField, Range(1, 20)] int stageColumns = 7;
     [Tooltip("オン：全員が投票して抽選で決める（オンライン用）。オフ：1P だけがえらび、左に動かせるプレビューが出る（ローカル）")]
     [SerializeField] bool stageVote = false;
-    [Tooltip("ステージセレクト（ローカル）で、右側に横に並べるステージの数（n 列）。行の数はステージの数から決まり、入りきるように1つずつの大きさが変わる（おまかせも1マス）")]
+
+    [Header("ステージセレクトの並べ方")]
+    [Tooltip("並べるステージ（この順に並ぶ）。空なら SelectRoster のステージ（中川さんの StageSelectList から「Fujihara > ステージ一覧を更新」で作る一覧）を全部")]
+    [SerializeField] List<StageData> stageList = new List<StageData>();
+    [Tooltip("並べるステージの最大の数（0 なら全部）。一覧の上から順にこの数まで")]
+    [SerializeField, Min(0)] int maxStages = 0;
+    [Tooltip("最後に「おまかせ」（決めるとランダムなステージ）のマスを出す")]
+    [SerializeField] bool showRandomStage = true;
+    [Tooltip("ローカル：右側に横に並べるマスの数（列）")]
     [SerializeField, Range(1, 10)] int localStageColumns = 4;
+    [Tooltip("ローカル：縦に並べるマスの数（行）。0 ならマスの数から自動。足りないときは自動で増える")]
+    [SerializeField, Range(0, 10)] int localStageRows = 0;
+    [Tooltip("1マスの 横：縦 の比率（例 14:9）。入りきるように大きさは自動で変わる")]
+    [SerializeField] Vector2 stageTileAspect = new Vector2(14f, 9f);
 
     [Tooltip("画面に出す文字（▶ で開く）。見出し・ボタン・ボタンの説明は始まったときに作るので、再生中に変えたら再生し直す")]
     [SerializeField] SelectTexts texts = new SelectTexts();
@@ -165,6 +177,8 @@ public class MatchSelect : MonoBehaviour
 
     class Panel
     {
+        public RectTransform flag;          // チーム戦の旗（押すと 赤 → 青 → 緑 → 黄 とチームが変わる）
+        public Image flagCloth;
         public Image bg, portrait, portraitImage, typeButton;
         public TextMeshProUGUI label, name, device, join, ok, portraitLetter, typeText, level;
         public RectTransform levelRow, minus, plus;
@@ -240,15 +254,62 @@ public class MatchSelect : MonoBehaviour
     RawImage previewImage;
     TextMeshProUGUI previewLetter, previewName;
 
+    List<StageData> stages;   // ステージセレクトに並べるステージ（おまかせは含まない）
+
+    // ---- 個人戦／チーム戦（スマブラ風。キャラクターセレクトの上のボタンで切り替え、チームは枠の旗で 赤→青→緑→黄） ----
+    // チームは枠（番号）ごとに持つ。抜けて入り直しても、その枠のチームのまま
+    int[] slotTeams;
+    RectTransform battleButton;
+    Image battleButtonBg;
+    TextMeshProUGUI battleButtonText;
+    bool Teams => MatchSetup.Rules.teams;
+
+    // チーム戦で、参加者（CPU 含む）が何チームに分かれているか
+    int TeamsInPlay()
+    {
+        var used = new HashSet<int>();
+        foreach (var p in slots) if (p != null) used.Add(slotTeams[p.index]);
+        return used.Count;
+    }
+
+    // 人数は足りているが、チーム戦で全員が同じチーム
+    bool NeedOtherTeam() => Teams && ParticipantCount() >= minParticipants && TeamsInPlay() < 2;
+
+    void ToggleBattleMode()
+    {
+        MatchSetup.Rules.teams = !MatchSetup.Rules.teams;
+        MenuSounds.Decide();
+        battleButton.localScale = Vector3.one * 1.15f;
+        foreach (var ui in panels) ui.flag.localScale = Vector3.one * 1.3f;
+    }
+
+    // 旗を押した：赤 → 青 → 緑 → 黄 → 赤 …
+    void CycleTeam(int i)
+    {
+        slotTeams[i] = (slotTeams[i] + 1) % MatchSetup.TeamCount;
+        MenuSounds.Cursor();
+        panels[i].flag.localScale = Vector3.one * 1.3f;
+    }
+
     void Start()
     {
-        if (roster == null || roster.characters.Count == 0 || roster.stages.Count == 0)
+        if (roster != null)
+        {
+            // 並べるステージ：stageList（空なら全ステージ）から、空欄を除いて maxStages まで
+            stages = (stageList != null && stageList.Count > 0 ? stageList : roster.stages).FindAll(s => s != null);
+            if (maxStages > 0 && stages.Count > maxStages) stages.RemoveRange(maxStages, stages.Count - maxStages);
+        }
+        if (roster == null || roster.characters.Count == 0 || stages == null || stages.Count == 0)
         {
             Debug.LogError("MatchSelect：roster（SelectRoster）が未設定か、キャラ・ステージが空です", this);
             enabled = false;
             return;
         }
         slots = new Player[maxPlayers];
+        slotTeams = new int[maxPlayers];
+        for (int i = 0; i < maxPlayers; i++) slotTeams[i] = i % MatchSetup.TeamCount;   // 最初は 1P 赤、2P 青、3P 緑、4P 黄
+        // 試合から戻ってきたときは、前の試合のチームのまま
+        foreach (var e in MatchSetup.Players) if (e.team >= 0 && e.playerIndex < maxPlayers) slotTeams[e.playerIndex] = e.team;
         letterMat = ToyKit.LetterMaterial(font);
         popMat = ToyKit.PopMaterial(letterMat);
 
@@ -334,7 +395,7 @@ public class MatchSelect : MonoBehaviour
 
         hint.text = phase == Phase.Mode ? texts.hintMode
             : phase == Phase.Rule ? texts.hintRule
-            : phase == Phase.Character ? texts.hintCharacter
+            : phase == Phase.Character ? texts.hintCharacter + (Teams ? texts.hintTeam : "")
             : phase == Phase.Stage && !stageVote ? SelectTexts.F(texts.hintStageLocal, Chooser() != null ? Chooser().Label : "1P")
             : phase == Phase.Stage ? texts.hintStageVote
             : "";
@@ -591,7 +652,10 @@ public class MatchSelect : MonoBehaviour
         readyGroup.alpha = readyAmount;
 
         // 全員選んだのに人数が足りない（1人だけ）ときは、相手を足すよう案内する
-        bool needMore = !ready && EveryoneChose() && ParticipantCount() < minParticipants;
+        // チーム戦で全員が同じチームのときは、ちがうチームを作るよう案内する
+        bool needTeam = !ready && EveryoneChose() && NeedOtherTeam();
+        bool needMore = !ready && EveryoneChose() && ParticipantCount() < minParticipants || needTeam;
+        needMoreText.text = needTeam ? texts.needOtherTeam : texts.needMore;
         needMoreText.alpha = Mathf.MoveTowards(needMoreText.alpha, needMore ? 1f : 0f, dt * 5f);
         needMoreText.rectTransform.localScale = Vector3.one * (1f + 0.03f * Mathf.Sin(Time.unscaledTime * 4f));
     }
@@ -609,10 +673,20 @@ public class MatchSelect : MonoBehaviour
             return;
         }
 
+        // 上の「個人戦／チーム戦」ボタン（だれでも切り替えられる）
+        if (Hit(battleButton, p.cursor)) { ToggleBattleMode(); return; }
+
         for (int i = 0; i < panels.Length; i++)
         {
             var ui = panels[i];
             if (Hit(ui.typeButton.rectTransform, p.cursor)) { ToggleSlot(p, i); return; }
+            // チーム戦の旗：自分の枠と CPU の枠はだれでも変えられる。ほかのプレイヤーの枠は旗が揺れるだけ
+            if (Teams && slots[i] != null && Hit(ui.flag, p.cursor))
+            {
+                if (slots[i] == p || slots[i].IsCpu) CycleTeam(i);
+                else { MenuSounds.Cancel(); StartCoroutine(Wobble(ui.flag)); }
+                return;
+            }
             var cpu = slots[i];
             if (cpu != null && cpu.IsCpu && ui.levelRow.gameObject.activeSelf)
             {
@@ -703,6 +777,17 @@ public class MatchSelect : MonoBehaviour
         r.anchoredPosition = basePos;
     }
 
+    // 旗を左右に揺らす（ほかの人の旗は変えられない）
+    static IEnumerator Wobble(RectTransform r)
+    {
+        for (float t = 0f; t < 0.3f; t += Time.unscaledDeltaTime)
+        {
+            r.localRotation = Quaternion.Euler(0f, 0f, Mathf.Sin(t * 60f) * 15f * (1f - t / 0.3f));
+            yield return null;
+        }
+        r.localRotation = Quaternion.identity;
+    }
+
     Player AddHuman(int i, InputDevice device)
     {
         var p = new Player { index = i, device = device, joinFrame = Time.frameCount };
@@ -763,7 +848,8 @@ public class MatchSelect : MonoBehaviour
     }
 
     // 次へ進めるか：参加者全員がキャラを決めていて、プレイヤーと参加者（CPU 含む）の人数が足りている
-    bool AllChoseCharacter() => EveryoneChose() && ParticipantCount() >= minParticipants;
+    // チーム戦では、2チーム以上に分かれていることも必要
+    bool AllChoseCharacter() => EveryoneChose() && ParticipantCount() >= minParticipants && !NeedOtherTeam();
 
     // 参加しているプレイヤーと CPU が全員キャラを決めたか（人数が足りているかは見ない）
     bool EveryoneChose()
@@ -899,7 +985,7 @@ public class MatchSelect : MonoBehaviour
     {
         phase = Phase.Lottery;
         MenuSounds.Decide();
-        var stage = tile.random ? roster.stages[Random.Range(0, roster.stages.Count)] : tile.stage;
+        var stage = tile.random ? stages[Random.Range(0, stages.Count)] : tile.stage;
         if (tile.random)
         {
             // おまかせは、決めたステージをプレビューにめくって見せる
@@ -1028,7 +1114,7 @@ public class MatchSelect : MonoBehaviour
         foreach (var p in Humans())
         {
             voters.Add(p);
-            votes.Add(p.randomStage ? roster.stages[Random.Range(0, roster.stages.Count)] : p.stage);
+            votes.Add(p.randomStage ? stages[Random.Range(0, stages.Count)] : p.stage);
         }
 
         // 投票した人が1人だけ、または全員が同じステージ（おまかせ以外）に投票したときは、抽選するまでもないので演出を飛ばして決める
@@ -1188,6 +1274,7 @@ public class MatchSelect : MonoBehaviour
                 deviceName = p.IsCpu ? "CPU" : p.device.displayName,
                 character = character,
                 cpuNumber = p.IsCpu ? CpuNumber(p) : 0,
+                team = Teams ? slotTeams[p.index] : -1,
             });
         }
         MatchSetup.Set(entries, stage);
@@ -1227,6 +1314,12 @@ public class MatchSelect : MonoBehaviour
 
     void UpdatePanels()
     {
+        // 上の切り替えボタン：個人戦は白地、チーム戦はオレンジ
+        battleButtonText.text = Teams ? texts.battleTeam : texts.battleSolo;
+        battleButtonText.color = Teams ? Color.white : ToyKit.Ink;
+        battleButtonBg.color = Teams ? ToyKit.Palette[1] : Color.white;
+        battleButton.localScale = Vector3.Lerp(battleButton.localScale, Vector3.one, 1f - Mathf.Exp(-14f * Time.unscaledDeltaTime));
+
         for (int i = 0; i < panels.Length; i++)
         {
             var ui = panels[i];
@@ -1234,7 +1327,14 @@ public class MatchSelect : MonoBehaviour
             bool used = p != null;
             bool cpu = used && p.IsCpu;
 
-            ui.bg.color = !used ? new Color(0.86f, 0.84f, 0.83f, 0.85f) : cpu ? new Color(0.8f, 0.8f, 0.82f) : Color.Lerp(PlayerColors[i % PlayerColors.Length], Color.white, 0.55f);
+            // チーム戦では、枠の色がチームの色になる（CPU も）
+            var teamColor = MatchSetup.TeamColors[slotTeams[i] % MatchSetup.TeamCount];
+            ui.bg.color = !used ? new Color(0.86f, 0.84f, 0.83f, 0.85f)
+                        : Teams ? Color.Lerp(teamColor, Color.white, cpu ? 0.7f : 0.55f)
+                        : cpu ? new Color(0.8f, 0.8f, 0.82f) : Color.Lerp(PlayerColors[i % PlayerColors.Length], Color.white, 0.55f);
+            ui.flag.gameObject.SetActive(used && Teams);
+            ui.flagCloth.color = teamColor;
+            ui.flag.localScale = Vector3.Lerp(ui.flag.localScale, Vector3.one, 1f - Mathf.Exp(-14f * Time.unscaledDeltaTime));
             ui.label.text = used ? NameOf(p) : (i + 1) + "P";
             ui.label.color = !used ? new Color(0.6f, 0.58f, 0.57f) : cpu ? CpuColor : PlayerColors[i % PlayerColors.Length];
             ui.typeText.text = !used ? texts.typeNone : cpu ? texts.typeCpu : texts.typePlayer;
@@ -1535,6 +1635,17 @@ public class MatchSelect : MonoBehaviour
         ruleSummary.rectTransform.pivot = new Vector2(1f, 1f);
         ToyKit.Anchor(ruleSummary.rectTransform, new Vector2(1f, 1f), new Vector2(-50f, -60f), new Vector2(900f, 50f));
 
+        // 個人戦／チーム戦の切り替えボタン（上の真ん中。カーソルで押す）
+        battleButton = ToyKit.UIImage("BattleMode", charRoot, Color.white, uiSprite);
+        battleButton.GetComponent<Image>().pixelsPerUnitMultiplier = 0.4f;
+        ToyKit.Anchor(battleButton, new Vector2(0.5f, 1f), new Vector2(-100f, -85f), new Vector2(250f, 74f));
+        var bbo = battleButton.gameObject.AddComponent<Outline>(); bbo.effectColor = ToyKit.Ink; bbo.effectDistance = new Vector2(3f, -3f);
+        battleButtonBg = battleButton.GetComponent<Image>();
+        battleButtonText = ToyKit.UIText("Text", battleButton, font, "", 40f, Color.white);
+        battleButtonText.fontSharedMaterial = letterMat;
+        battleButtonText.enableAutoSizing = true; battleButtonText.fontSizeMin = 20f; battleButtonText.fontSizeMax = 40f;
+        ToyKit.Stretch(battleButtonText.rectTransform);
+
         // 報酬キャラクター（だるきんぐ）は、実績を全部解除するまで一覧に出さない
         var characters = Yurube.Achievements.AchievementRewards.AvailableCharacters(roster.characters);
         int count = characters.Count + 1;   // 最後にランダム
@@ -1578,14 +1689,16 @@ public class MatchSelect : MonoBehaviour
         Header(stageRoot, texts.stageHeader, ToyKit.Palette[4]);
 
         // 投票（オンライン用）は画面いっぱいに並べる。ローカルは右半分に並べ、左半分をプレビューにする
-        int sc = roster.stages.Count + 1;   // 最後におまかせ
+        int sc = stages.Count + (showRandomStage ? 1 : 0);   // 最後におまかせ
+        // マスの大きさの上限は 横：縦 の比率から（横 280 か 380 を基準に、縦を比率で決める）
+        float aspect = stageTileAspect.x > 0f && stageTileAspect.y > 0f ? stageTileAspect.y / stageTileAspect.x : 9f / 14f;
         var sgrid = stageVote
-            ? GridLayout(sc, stageColumns, new Vector2(1760f, 470f), new Vector2(380f, 240f), 18f, 345f)
-            : GridLayout(sc, localStageColumns, new Vector2(900f, 790f), new Vector2(280f, 180f), 14f, 350f);
+            ? GridLayout(sc, stageColumns, new Vector2(1760f, 470f), new Vector2(380f, 380f * aspect), 18f, 345f)
+            : GridLayout(sc, localStageColumns, new Vector2(900f, 790f), new Vector2(280f, 280f * aspect), 14f, 350f, localStageRows);
         for (int i = 0; i < sc; i++)
         {
-            bool random = i == roster.stages.Count;
-            var st = random ? null : roster.stages[i];
+            bool random = i == stages.Count;
+            var st = random ? null : stages[i];
             var pos = sgrid[i].pos + (stageVote ? Vector2.zero : new Vector2(480f, 0f));
             var tile = MakeTile(stageRoot, pos, sgrid[i].size, random ? RandomColor : st.color,
                                 random ? null : st.preview, random ? texts.randomStage : st.displayName, random ? texts.randomLetter : Initial(st.displayName));
@@ -1783,10 +1896,13 @@ public class MatchSelect : MonoBehaviour
     struct Cell { public Vector2 pos, size; }
 
     // 数に合わせてマスの大きさと並びを決める（入りきらなければ小さくする）
-    static Cell[] GridLayout(int count, int maxCols, Vector2 area, Vector2 maxSize, float gap, float top)
+    // fixedRows > 0 のときは「maxCols 列 × fixedRows 行」のマス目の大きさで並べる（マスが足りなければ行を増やす）
+    static Cell[] GridLayout(int count, int maxCols, Vector2 area, Vector2 maxSize, float gap, float top, int fixedRows = 0)
     {
-        int cols = Mathf.Max(1, Mathf.Min(count, maxCols));
-        int rows = Mathf.CeilToInt(count / (float)cols);
+        int cols = fixedRows > 0 ? Mathf.Max(1, maxCols) : Mathf.Max(1, Mathf.Min(count, maxCols));
+        int rows = Mathf.Max(fixedRows, Mathf.CeilToInt(count / (float)cols));
+        if (fixedRows > 0 && rows > fixedRows)
+            Debug.LogWarning($"MatchSelect：ステージのマス {count} 個が {cols}×{fixedRows} に入りきらないので、{rows} 行にしました");
         float scale = Mathf.Min(1f,
             (area.x - gap * (cols - 1)) / (cols * maxSize.x),
             (area.y - gap * (rows - 1)) / (rows * maxSize.y));
@@ -1857,6 +1973,20 @@ public class MatchSelect : MonoBehaviour
         ToyKit.Anchor(tb, new Vector2(1f, 1f), new Vector2(-95f, -38f), new Vector2(170f, 56f));
         var tbo = tb.gameObject.AddComponent<Outline>(); tbo.effectColor = ToyKit.Ink; tbo.effectDistance = new Vector2(2f, -2f);
         ui.typeButton = tb.GetComponent<Image>();
+
+        // チーム戦の旗（名前と切り替えボタンの間。チーム戦のときだけ出す）：白い竿に、チームの色の三角の旗
+        ui.flag = new GameObject("Flag", typeof(RectTransform)).GetComponent<RectTransform>();
+        ui.flag.SetParent(r, false);
+        ToyKit.Anchor(ui.flag, new Vector2(0f, 1f), new Vector2(200f, -42f), new Vector2(64f, 64f));
+        var hitArea = ToyKit.UIImage("Hit", ui.flag, Color.clear);   // 押せる広さ
+        ToyKit.Stretch(hitArea);
+        var pole = ToyKit.UIImage("Pole", ui.flag, new Color(0.95f, 0.93f, 0.88f));
+        ToyKit.Anchor(pole, new Vector2(0.5f, 0.5f), new Vector2(-20f, 0f), new Vector2(7f, 60f));
+        var po = pole.gameObject.AddComponent<Outline>(); po.effectColor = ToyKit.Ink; po.effectDistance = new Vector2(2f, -2f);
+        var cloth = ToyKit.UIImage("Cloth", ui.flag, Color.white, uiSprite);
+        ToyKit.Anchor(cloth, new Vector2(0.5f, 0.5f), new Vector2(8f, 12f), new Vector2(50f, 34f));
+        var co = cloth.gameObject.AddComponent<Outline>(); co.effectColor = ToyKit.Ink; co.effectDistance = new Vector2(2f, -2f);
+        ui.flagCloth = cloth.GetComponent<Image>();
         ui.typeText = ToyKit.UIText("Text", tb, font, texts.typeNone, 30f, Color.white);
         ui.typeText.fontSharedMaterial = letterMat;
         ToyKit.Stretch(ui.typeText.rectTransform);
