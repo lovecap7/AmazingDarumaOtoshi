@@ -23,6 +23,9 @@ public class CharacterData : ScriptableObject
     [Tooltip("ゲーム本編で生成するプレハブ（未設定でも可）")]
     public GameObject prefab;
 
+    [Tooltip("使いやすさ（★の数）。キャラクターセレクトの枠に出る")]
+    [Range(1, 5)] public int ease = 3;
+
     [Header("パッシブ（ずかんでは「[赤][赤][赤] → 効果」の形で出る）")]
     [Tooltip("条件になる積み木の色")]
     public Nakahira.TumikiColor passiveColor = Nakahira.TumikiColor.Red;

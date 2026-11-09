@@ -18,6 +18,7 @@ MonoBehaviour:
   portrait: {fileID: -2190313487155973415, guid: 910c73a3d3661a44db2db636bf9d76a9, type: 3}
   model: {fileID: 919132149155446097, guid: 2271b020b8b4af540a13a215db67ad1d, type: 3}
   prefab: {fileID: 9069936943766670842, guid: 0b621a201e7b452a8af717bbafbb1b47, type: 3}
+  ease: 3
   passiveColor: 1
   passiveCount: 3
   passiveName: "\uFF5E\uFF5E\uFF5E"

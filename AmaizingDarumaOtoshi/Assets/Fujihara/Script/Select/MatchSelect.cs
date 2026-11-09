@@ -181,6 +181,8 @@ public class MatchSelect : MonoBehaviour
         public Image flagCloth;
         public Image bg, portrait, portraitImage, typeButton;
         public TextMeshProUGUI label, name, device, join, ok, portraitLetter, typeText, level;
+        public Image[] easeStars;           // 使いやすさの★（フォントに★が無いので画像で描く）
+        public TextMeshProUGUI easeUnknown; // ランダム・まだ選んでいないときの「？」
         public RectTransform levelRow, minus, plus;
     }
 
@@ -316,8 +318,10 @@ public class MatchSelect : MonoBehaviour
         // 試合から戻ってきたときは、ルールはそのままでキャラクターセレクトから始める（スマブラと同じ）
         bool fromMatch = MatchSetup.Players.Count > 0;
         Opened?.Invoke(fromMatch);
+        // 前の試合の参加者（何Pか・CPU とそのレベル）は覚えておいて、枠に戻す（キャラは選び直し）
+        var lastPlayers = new List<MatchSetup.Entry>(MatchSetup.Players);
 
-        // 毎回まっさらな状態から選び直す（前回の試合の選択は引き継がない。ルールだけは引き継ぐ）
+        // キャラ・ステージは毎回選び直す（ルールと参加者の枠は引き継ぐ）
         MatchSetup.Clear();
         var rules = MatchSetup.Rules;
         rules.knockPoints = knockPoints;
@@ -328,6 +332,7 @@ public class MatchSelect : MonoBehaviour
 
         BuildBackground();
         BuildUI();
+        RestorePlayers(lastPlayers);
         var start = NextStartScreen;
         NextStartScreen = StartScreen.Auto;
         if (start == StartScreen.Auto) start = fromMatch ? StartScreen.Character : StartScreen.Mode;
@@ -336,6 +341,20 @@ public class MatchSelect : MonoBehaviour
         else GoToModeSelect();
         SnapScreens();
         InputSystem.onDeviceChange += OnDeviceChange;
+    }
+
+    // 試合から戻ってきたとき、前の試合と同じ枠に同じコントローラー・CPU を入れ直す
+    // （コントローラーが抜かれていたら、その枠は空けておく）
+    void RestorePlayers(List<MatchSetup.Entry> last)
+    {
+        foreach (var e in last)
+        {
+            if (e == null || e.playerIndex < 0 || e.playerIndex >= slots.Length || slots[e.playerIndex] != null) continue;
+            if (e.isCpu) { AddCpu(e.playerIndex, e.cpuLevel); continue; }
+            var device = e.Device;
+            if (device == null || !device.added || FindPlayer(device) != null) continue;
+            AddHuman(e.playerIndex, device);
+        }
     }
 
     void OnDestroy()
@@ -1349,19 +1368,77 @@ public class MatchSelect : MonoBehaviour
             if (!used) continue;
 
             if (cpu) ui.level.text = SelectTexts.F(texts.cpuLevel, p.cpuLevel);
-            else ui.device.text = p.device.displayName + " #" + p.device.deviceId;   // 同じ種類のコントローラーでも見分けられるように
 
+            CharacterData shown = null;   // 使いやすさを出すキャラ（選んだキャラ、まだならカーソルが乗っているキャラ）
             if (p.heldBy != null) SetPortrait(ui, null, texts.chooseCharacter, new Color(0.92f, 0.9f, 0.88f), "");
             else if (p.randomCharacter) SetPortrait(ui, null, texts.randomCharacter, RandomColor, texts.randomLetter);
-            else if (p.character != null) SetPortrait(ui, p.character.portrait, p.character.displayName, p.character.IconColor, Initial(p.character.displayName));
+            else if (p.character != null) { shown = p.character; SetPortrait(ui, p.character.portrait, p.character.displayName, p.character.IconColor, Initial(p.character.displayName)); }
             else
             {
                 // まだ選んでいない：カーソルが乗っているキャラを薄く見せる
                 var hover = !cpu && phase == Phase.Character ? TileAt(charTiles, p.cursor) : null;
-                if (hover != null && !hover.random) SetPortrait(ui, hover.character.portrait, hover.character.displayName, hover.character.IconColor * 0.75f, Initial(hover.character.displayName));
+                if (hover != null && !hover.random) { shown = hover.character; SetPortrait(ui, hover.character.portrait, hover.character.displayName, hover.character.IconColor * 0.75f, Initial(hover.character.displayName)); }
                 else SetPortrait(ui, null, texts.chooseCharacter, new Color(0.92f, 0.9f, 0.88f), "");
             }
+
+            // 使いやすさ（コントローラー名の代わり）：「使いやすさ」の下に★を中央ぞろえで
+            if (!cpu)
+            {
+                ui.device.text = texts.easeLabel;
+                int n = shown != null ? Mathf.Clamp(shown.ease, 1, ui.easeStars.Length) : 0;
+                // ★を数だけ、中央ぞろえで並べる
+                for (int k = 0; k < ui.easeStars.Length; k++)
+                {
+                    ui.easeStars[k].gameObject.SetActive(k < n);
+                    ui.easeStars[k].rectTransform.anchoredPosition = new Vector2((k - (n - 1) * 0.5f) * EaseStarStep, 0f);
+                }
+                ui.easeUnknown.text = shown == null ? texts.easeUnknown : "";
+            }
         }
+    }
+
+    // ★の画像（5つの角の星。最初に使うときに作る）
+    const float EaseStarStep = 34f;
+    static Sprite starSprite;
+    static Sprite StarSprite
+    {
+        get
+        {
+            if (starSprite != null) return starSprite;
+            const int size = 64;
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false) { name = "Star", wrapMode = TextureWrapMode.Clamp };
+            var pts = new Vector2[10];
+            for (int i = 0; i < 10; i++)
+            {
+                float a = Mathf.PI * 0.5f + i * Mathf.PI / 5f;
+                float rad = (i % 2 == 0 ? 0.48f : 0.2f) * size;
+                pts[i] = new Vector2(size * 0.5f + Mathf.Cos(a) * rad, size * 0.47f + Mathf.Sin(a) * rad);
+            }
+            var px = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    // 4x4 のサンプルでふちをなめらかに
+                    int hit = 0;
+                    for (int sy = 0; sy < 4; sy++)
+                        for (int sx = 0; sx < 4; sx++)
+                            if (InPolygon(pts, new Vector2(x + (sx + 0.5f) / 4f, y + (sy + 0.5f) / 4f))) hit++;
+                    px[y * size + x] = new Color32(255, 255, 255, (byte)(hit * 255 / 16));
+                }
+            tex.SetPixels32(px);
+            tex.Apply();
+            starSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f));
+            return starSprite;
+        }
+    }
+
+    static bool InPolygon(Vector2[] poly, Vector2 p)
+    {
+        bool inside = false;
+        for (int i = 0, j = poly.Length - 1; i < poly.Length; j = i++)
+            if ((poly[i].y > p.y) != (poly[j].y > p.y) && p.x < (poly[j].x - poly[i].x) * (p.y - poly[i].y) / (poly[j].y - poly[i].y) + poly[i].x)
+                inside = !inside;
+        return inside;
     }
 
     static void SetPortrait(Panel ui, Sprite sprite, string name, Color color, string letter)
@@ -1657,6 +1734,13 @@ public class MatchSelect : MonoBehaviour
             var tile = MakeTile(charRoot, grid[i].pos, grid[i].size, random ? RandomColor : c.IconColor,
                                 random ? null : c.portrait, random ? texts.randomCharacter : c.displayName, random ? texts.randomLetter : Initial(c.displayName));
             tile.character = c;
+            // キャラの顔は大きめに：名前の帯のすぐ上から、マスのふちぎりぎりまで使う
+            var face = tile.rect.Find("Image") as RectTransform;
+            if (face != null)
+            {
+                face.offsetMin = new Vector2(3f, grid[i].size.y * 0.2f);
+                face.offsetMax = new Vector2(-3f, -3f);
+            }
             tile.random = random;
             charTiles.Add(tile);
         }
@@ -2003,9 +2087,23 @@ public class MatchSelect : MonoBehaviour
         ui.name = ToyKit.UIText("Name", r, font, "", 44f, ToyKit.Ink);
         ui.name.enableAutoSizing = true; ui.name.fontSizeMin = 18f; ui.name.fontSizeMax = 44f;
         ToyKit.Anchor(ui.name.rectTransform, new Vector2(1f, 0.5f), new Vector2(-w * 0.28f, -10f), new Vector2(w * 0.5f, 70f));
-        ui.device = ToyKit.UIText("Device", r, font, "", 22f, new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.7f));
-        ui.device.enableAutoSizing = true; ui.device.fontSizeMin = 12f; ui.device.fontSizeMax = 22f;
-        ToyKit.Anchor(ui.device.rectTransform, new Vector2(1f, 0.5f), new Vector2(-w * 0.28f, -70f), new Vector2(w * 0.5f, 40f));
+        // 使いやすさ（上に「使いやすさ」、下に★を中央ぞろえ）。プレイヤーの枠だけ（CPU は同じ場所に強さ）
+        ui.device = ToyKit.UIText("Ease", r, font, "", 24f, ToyKit.Ink);
+        ToyKit.Anchor(ui.device.rectTransform, new Vector2(1f, 0.5f), new Vector2(-w * 0.28f, -58f), new Vector2(w * 0.5f, 32f));
+        var starRow = new GameObject("Stars", typeof(RectTransform)).GetComponent<RectTransform>();
+        starRow.SetParent(ui.device.rectTransform, false);
+        ToyKit.Anchor(starRow, new Vector2(0.5f, 0f), new Vector2(0f, -22f), new Vector2(w * 0.5f, 34f));
+        ui.easeStars = new Image[5];
+        for (int k = 0; k < ui.easeStars.Length; k++)
+        {
+            var st = ToyKit.UIImage("Star" + k, starRow, new Color(0.96f, 0.68f, 0.1f), StarSprite);
+            ToyKit.Anchor(st, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(32f, 32f));
+            st.GetComponent<Image>().type = Image.Type.Simple;
+            var so = st.gameObject.AddComponent<Outline>(); so.effectColor = ToyKit.Ink; so.effectDistance = new Vector2(1.5f, -1.5f);
+            ui.easeStars[k] = st.GetComponent<Image>();
+        }
+        ui.easeUnknown = ToyKit.UIText("Unknown", starRow, font, "", 30f, ToyKit.Ink);
+        ToyKit.Stretch(ui.easeUnknown.rectTransform);
 
         // CPU の強さ（－ Lv3 ＋）
         ui.levelRow = new GameObject("Level", typeof(RectTransform)).GetComponent<RectTransform>();

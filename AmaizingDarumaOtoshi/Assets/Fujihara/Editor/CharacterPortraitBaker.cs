@@ -13,7 +13,7 @@ public static class CharacterPortraitBaker
     const string OutFolder = "Assets/Fujihara/Data/Portraits";
     const int Size = 512;
     // モデルの顔は +Z 側を向いているので、カメラは +Z 側から少し見下ろして撮る
-    const float Pitch = 8f, Fov = 30f, Margin = 0.82f;
+    const float Pitch = 8f, Fov = 30f, Margin = 1.35f;
 
     [MenuItem("Fujihara/キャラの顔写真を撮る")]
     public static void BakeAll()
@@ -68,7 +68,8 @@ public static class CharacterPortraitBaker
             cam.fieldOfView = Fov;
             cam.nearClipPlane = 0.01f;
             cam.farClipPlane = 100f;
-            float radius = b.extents.magnitude * Margin;
+            // 幅と高さの大きい方が、写真いっぱい（Margin の分だけ余白）に入るように
+            float radius = Mathf.Max(b.extents.x, b.extents.y) * Margin;
             float dist = radius / Mathf.Sin(Fov * 0.5f * Mathf.Deg2Rad);
             var rot = Quaternion.Euler(Pitch, 180f, 0f);   // +Z 側から -Z を向く
             cam.transform.SetPositionAndRotation(b.center - rot * Vector3.forward * dist, rot);

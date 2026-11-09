@@ -59,6 +59,10 @@ public class SelectTexts
     [Tooltip("ランダム・おまかせ・画像の無いところに出す字")]
     public string randomLetter = "？";
     public string chooseCharacter = "えらんでね";
+    [Tooltip("枠に出す、キャラの使いやすさの見出し（下に★が並ぶ。★の数は CharacterData の ease）")]
+    public string easeLabel = "使いやすさ";
+    [Tooltip("ランダム・まだ選んでいないときに★の代わりに出す字")]
+    public string easeUnknown = "？";
     public string join = "A / Start で参加";
     public string typeNone = "なし";
     public string typeCpu = "CPU";
