@@ -1,16 +1,19 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
-// メニューの「じっせき」。ずかん（CharacterBook）と同じように開いて見るだけの画面。
-// B / Esc / 右クリック：とじる　上下：えらぶ　マウス：ホバー／クリックでえらぶ
-// 行の下地はレアリティのグラデーション。ホバー・選択は外枠と光彩で示し、下地の色は変えない。
+// メニューの「じっせき」。ずかん（CharacterBook）と同じ形にそろえた、開いて見るだけの画面。
+//   左上：見出し　上の帯：達成率・取得状況・並び替え・レアリティ別の取得数
+//   左：実績の一覧（レアリティ色のアイコンと実績名だけ）　右：選んでいる実績の詳細カード
+// 条件やポエムは右のカードにまとめる（一覧の行には出さない）。
+// 上下：えらぶ　←→：しぼる　Q/E：ならべる　X：昇順・降順　B/Esc/右クリック：とじる　マウス：クリックでえらぶ
 [RequireComponent(typeof(CanvasGroup))]
 public class AchievementBook : MonoBehaviour
 {
+    // 画面に出す文字（MainMenu の Inspector の Texts → Achievements で書き換えられる）
     [System.Serializable]
     public class Texts
     {
@@ -18,24 +21,22 @@ public class AchievementBook : MonoBehaviour
         [Tooltip("シークレット実績の名前の代わりに出す字")]
         public string locked = "？？？";
         [Tooltip("じっせきを開いている間、下の帯に出す説明")]
-        [TextArea(1, 3)] public string help = "これまでに集めた実績が見られます。";
+        [TextArea(1, 3)] public string help = "実績の名前・解除条件・ポエムが見られます。";
     }
 
-    // 実績1つ分
+    // 実績1つ分（AchievementMenuBridge が組み立てる）
     public class Entry
     {
         public string name;
         public string description;
         public bool unlocked;
 
-        // 一覧・詳細で使う情報
+        // 詳細・並び替え用
         public string id;
         public int number;
         public bool secret;
         public bool special;
         public int rarityRank;
-        public string rarityLabel;
-        public Color displayRarityColor = Color.white;
         public DateTime unlockedAt;
         public string obtainedText;
         public string poem;
@@ -44,25 +45,11 @@ public class AchievementBook : MonoBehaviour
         public int target;
         public bool hasProgress;
 
-        // カードの下地（レアリティの斜めグラデーション）。未設定なら rarityColor で代用
-        public Sprite background;
-        // 外側に出す光彩の画像（白いアルファだけの画像。色は glowColor で付ける）
-        public Sprite glowSprite;
-        // 斜めライティングの光の帯（白いアルファだけの画像）
-        public Sprite shineSprite;
-        // 未解除のときに出す鍵アイコン
-        public Sprite lockSprite;
-        // 外側の細い暗い縁・明るい外枠・光彩の色。レアリティ情報（AchievementRarityInfo）から渡す
-        public Color edgeColor = new Color(0.2f, 0.15f, 0.12f, 0.55f);
-        public Color borderColor = Color.white;
-        public Color glowColor = Color.white;
-
-        // （予備）レアリティの代表色と帯。background が無いときの下地に使う
-        public Color rarityColor = Color.white;
-        public Sprite raritySprite;
-        // レアリティ専用のアイコン（全レアリティ＋特別）と、未取得用のシルエット
-        public Sprite icon;
-        public Sprite lockedIcon;
+        // アイコン：レアリティ色の下地に、白いアイコン（トロフィーなど）を重ねる
+        public Color color = Color.white;
+        public Sprite glyph;
+        // 未取得のときにアイコンの代わりに出す鍵
+        public Sprite lockGlyph;
 
         public Entry(string name, string description, bool unlocked) { this.name = name; this.description = description; this.unlocked = unlocked; }
     }
@@ -95,51 +82,44 @@ public class AchievementBook : MonoBehaviour
     enum Filter { All, Unlocked, Locked }
     enum SortMode { Acquired, Rarity, Number, Name }
 
-    const float CardW = 1700f, CardH = 640f, RowH = 78f, RowGap = 8f;
-    const float TopSpace = 150f, BottomSpace = 250f;   // 見出しの高さ、MainMenu の下の帯の高さ
-    const float DashboardH = 180f, ListTop = 210f;
-    // 外枠の太さ。選択中は 3px まで太くする（縁の外側の 1px と合わせて最大 4px）
-    const float EdgeInset = 1f;
-    const float BorderNormal = 1.5f, BorderHover = 2.5f, BorderSelected = 3f;
+    // 寸法は、ずかん（CharacterBook）とそろえる
+    const float ListW = 500f, RowH = 76f, RowGap = 10f;
+    const float CardW = 1240f, CardH = 620f;
+    const float StripH = 150f, StripGap = 16f;
+    const float ContentH = StripH + StripGap + CardH;
+    const float ListX = -640f, CardX = 280f;
+    // 画面の上端から中身まで（帯は見出しと同じ高さから始める）、下端は MainMenu の帯のぶん空ける
+    const float TopMargin = 30f, BottomMargin = 260f;
 
-    // 斜めライティング。選択中は一定間隔で繰り返し、ホバーだけなら1回で止める
-    const float ShineWidth = 200f, ShineHeight = 460f, ShineAngle = 35f;
-    const float ShineDuration = 0.65f, ShineInterval = 2.6f, ShineAlpha = 0.20f;
-    const float ShineRise = 18f, ShinePadding = 260f;
+    // 帯は2段。上段に達成率と絞り込み・並び替え、下段にレアリティ別の取得数
+    const float StripRowY = 34f;
+    const float PercentX = 24f, PercentW = 144f, GaugeX = 176f, GaugeW = 200f;
+    const float FilterX = 388f, FilterW = 148f, FilterGap = 10f;
+    const float SortX = 866f, SortW = 160f, DirX = 1036f, DirW = 110f;
+    const float SummaryLabelW = 140f, SummaryGap = 20f, SummaryPitchMax = 172f;
+    const float SummaryAreaW = CardW - (24f + SummaryLabelW + SummaryGap) - 24f;
 
-    const string SecretText = "シークレット実績";
     const string SecretCondition = "条件は非公開です";
+    const string PoemHiddenText = "解除すると読めます";
     const string EmptyText = "条件に合う実績がありません";
-    const string DetailTitle = "実績詳細";
     const string LockedDateText = "—";
 
-    // 画面のクロームは緑で統一。文字が乗る部分は白文字が読める濃さにする
-    static readonly Color AccentColor = new Color(0.18f, 0.50f, 0.31f);
-    static readonly Color ProgressColor = AccentColor;
+    // 画面の色は、ずかんの青（Palette[4]）と、カードのクリーム色で統一する
+    static readonly Color AccentColor = ToyKit.Palette[4];
+    static readonly Color CardColor = new Color(1f, 0.98f, 0.94f, 0.96f);
+    static readonly Color RowColor = new Color(1f, 0.98f, 0.94f, 0.92f);
+    static readonly Color RowHoverColor = Color.Lerp(RowColor, ToyKit.Palette[4], 0.20f);
+    static readonly Color PillColor = new Color(1f, 1f, 1f, 0.92f);
     static readonly Color LockedPillColor = new Color(0.65f, 0.65f, 0.68f);
-    static readonly Color GotPillColor = AccentColor;
-    static readonly Color PillColor = new Color(1f, 1f, 1f, 0.55f);
-    static readonly Color DividerColor = new Color(0f, 0f, 0f, 0.12f);
-
-    // 1行分の見た目。下地の色は変えず、外枠・光彩・フォーカス線だけを動かす
-    class Row
-    {
-        public RectTransform holder;
-        public RectTransform bg;
-        public Image glow;
-        public Image border;
-        public Image focus;
-        public Image shine;
-        public float shineTime;
-        public float shineWait;
-        public bool shining;
-        public bool wasActive;
-        public Color borderBase;
-    }
+    static readonly Color LockedTileColor = new Color(0.74f, 0.74f, 0.76f);
+    // 薄くて読みづらかったので、小さい字も濃いめにする
+    static readonly Color Faded = new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.85f);
+    static readonly Color FadedInk = new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.65f);
+    static readonly Color GlyphEdge = new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.85f);
 
     class SummaryView
     {
-        public Image swatch;
+        public Image icon;
         public TextMeshProUGUI label;
     }
 
@@ -151,7 +131,7 @@ public class AchievementBook : MonoBehaviour
 
     static TMP_FontAsset s_bodyFont;
 
-    // 見出しは手書き風の font、本文は読みやすい本文フォント。無ければ font で代用する
+    // 見出し・名前は手書き風の font、小さい字と本文は読みやすい本文フォント。無ければ font で代用する
     TMP_FontAsset BodyFont => bodyFont != null ? bodyFont : font;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -166,41 +146,38 @@ public class AchievementBook : MonoBehaviour
     }
 
     CanvasGroup group;
-    RectTransform card, listContent, listView;
+    RectTransform content, strip, card, listView, listContent;
     RectTransform scrollTrack, scrollThumb;
-    readonly List<Row> rows = new List<Row>();
+    readonly List<RectTransform> rows = new List<RectTransform>();
+    readonly List<Image> rowBgs = new List<Image>();
 
-    // 収集ダッシュボード
-    RectTransform dashboard, dashboardRight;
-    Image progressFill;
-    TextMeshProUGUI percentText, countText, sortText, directionText;
+    // 上の帯
+    TextMeshProUGUI percentText, sortText, dirText, summaryLabel;
+    Image gaugeFill;
     readonly TextMeshProUGUI[] filterTexts = new TextMeshProUGUI[3];
     readonly Image[] filterBgs = new Image[3];
-    readonly Image[] filterUnderlines = new Image[3];
     readonly RectTransform[] filterRects = new RectTransform[3];
-    RectTransform sortRect, directionRect;
+    RectTransform sortRect, dirRect, summaryRoot;
     readonly List<SummaryView> summaryViews = new List<SummaryView>();
+    readonly List<RaritySummary> visibleSummaries = new List<RaritySummary>();
+    float m_summaryPitch = 100f, m_summaryIcon = 26f;
+
+    // 右の詳細カード
+    Image tile, glyph;
+    Image statusBg;
+    TextMeshProUGUI nameText, statusText, dateText, numberText;
+    TextMeshProUGUI conditionText, poemText, progressLabel;
+    RectTransform progressBar;
+    Image progressFill;
+
     Filter m_filter = Filter.All;
     SortMode m_sort = SortMode.Acquired;
     bool m_ascending = true;
     readonly List<Entry> m_view = new List<Entry>();
 
-    // 実績詳細
-    RectTransform detailRoot, detailPanel, detailProgress;
-    CanvasGroup detailGroup;
-    Outline detailOutline;
-    Image detailIconBg, detailIcon, detailRarityBg, detailStatusBg;
-    Image detailLockBg, detailLock;
-    Image detailProgressFill;
-    TextMeshProUGUI detailName, detailIconText, detailRarityText, detailStatusText;
-    TextMeshProUGUI detailCondition, detailPoem, detailDate, detailNumber;
-    TextMeshProUGUI detailProgressLabel, detailProgressRemain;
-    bool detailOpen;
-    Entry detailEntry;
-
-    int index;
+    int index, shownIndex = -1;
     int hoverIndex = -1;
-    bool pointerMode;   // 直近の操作がマウスか（キーボード／コントローラーのフォーカス表示を切り替える）
+    bool pointerMode;   // 直近の操作がマウスか（キーボード操作でホバー表示を消す）
     bool open;
     float fade, punch;
     int openedFrame = -1, closedFrame = -1;
@@ -208,8 +185,6 @@ public class AchievementBook : MonoBehaviour
     // 開いている、またはとじたフレーム（同じボタン入力でメニューが反応しないように）
     public bool IsBusy => open || fade > 0f || closedFrame == Time.frameCount;
     public bool HasEntries => Entries.Count > 0;
-    // 右下の操作ガイドを「とじる」だけに切り替えるため、MainMenu から参照する
-    public bool IsDetailOpen => detailOpen;
 
     public void Setup(TMP_FontAsset font, Material letterMat, Sprite uiSprite, Texts texts)
     {
@@ -229,15 +204,13 @@ public class AchievementBook : MonoBehaviour
         open = true;
         openedFrame = Time.frameCount;
         index = 0;
+        shownIndex = -1;
         hoverIndex = -1;
         pointerMode = false;
         punch = 1f;
         m_filter = Filter.All;
         m_sort = SortMode.Acquired;
         m_ascending = true;
-        detailOpen = false;
-        detailEntry = null;
-        if (detailGroup != null) detailGroup.alpha = 0f;
         RebuildView();
         MenuSounds.Decide();
     }
@@ -246,7 +219,6 @@ public class AchievementBook : MonoBehaviour
     {
         open = false;
         hoverIndex = -1;
-        detailOpen = false;
         closedFrame = Time.frameCount;
         MenuSounds.Cancel();
     }
@@ -259,14 +231,7 @@ public class AchievementBook : MonoBehaviour
         Apply();
         punch = Mathf.MoveTowards(punch, 0f, dt / 0.25f);
         Layout();
-        UpdateDetailFade(dt);
         if (!open || Time.frameCount == openedFrame) return;
-
-        if (detailOpen)
-        {
-            if (MenuInput.Cancel() || MenuInput.Submit() || MenuInput.AnyClick()) CloseDetail();
-            return;
-        }
 
         // 取得状況・並び替え（キーボード／コントローラー）
         bool viewChanged = false;
@@ -291,7 +256,7 @@ public class AchievementBook : MonoBehaviour
 
         if (navigated)
         {
-            // キーボード・コントローラーに切り替えたら、マウスのホバーは消してフォーカス線を出す
+            // キーボード・コントローラーに切り替えたら、マウスのホバーは消す
             pointerMode = false;
             hoverIndex = -1;
         }
@@ -300,19 +265,16 @@ public class AchievementBook : MonoBehaviour
             Close();
             return;
         }
-        else if (MenuInput.Submit())
-        {
-            if (n > 0) OpenDetail(m_view[Mathf.Clamp(index, 0, m_view.Count - 1)]);
-        }
         else
         {
             HandlePointer();
         }
 
+        if (index != shownIndex) { shownIndex = index; RefreshDetail(); }
         UpdateRows(dt);
     }
 
-    // マウスのホバーとクリック。入力の主導権がマウスに移ったときだけフォーカス線を消す
+    // マウスのホバーとクリック
     void HandlePointer()
     {
         var mouse = Mouse.current;
@@ -329,12 +291,12 @@ public class AchievementBook : MonoBehaviour
 
         if (pointerMode && click)
         {
-            // ダッシュボードの操作を先に見る
+            // 帯の操作を先に見る
             if (Clicked(filterRects[0])) { SetFilter(Filter.All); return; }
             if (Clicked(filterRects[1])) { SetFilter(Filter.Unlocked); return; }
             if (Clicked(filterRects[2])) { SetFilter(Filter.Locked); return; }
             if (Clicked(sortRect)) { StepSort(1); return; }
-            if (Clicked(directionRect)) { ToggleSortDirection(); return; }
+            if (Clicked(dirRect)) { ToggleSortDirection(); return; }
         }
 
         int hover = -1;
@@ -343,7 +305,7 @@ public class AchievementBook : MonoBehaviour
         {
             for (int i = 0; i < rows.Count; i++)
             {
-                if (RectTransformUtility.RectangleContainsScreenPoint(rows[i].holder, screen, null))
+                if (RectTransformUtility.RectangleContainsScreenPoint(rows[i], screen, null))
                 {
                     hover = i;
                     break;
@@ -353,8 +315,7 @@ public class AchievementBook : MonoBehaviour
 
         if (pointerMode && click && hover >= 0)
         {
-            index = hover;
-            OpenDetail(m_view[hover]);
+            if (hover != index) { index = hover; MenuSounds.Cursor(); }
             hoverIndex = hover;
             return;
         }
@@ -374,324 +335,209 @@ public class AchievementBook : MonoBehaviour
         group.interactable = false;
     }
 
-    // 見出しの下から、下の帯の上までに収まるようにカードを縮めて置く
+    // 見出しの下から、下の帯の上までに収まるように、帯・一覧・カードをまとめて縮めて置く
     void Layout()
     {
         float h = ((RectTransform)transform).rect.height;
-        float top = h * 0.5f - TopSpace - 10f, bottom = -h * 0.5f + BottomSpace + 10f;
-        float s = Mathf.Min(1f, (top - bottom) / CardH);
-        card.anchoredPosition = new Vector2(0f, (top + bottom) * 0.5f);
-        card.localScale = Vector3.one * s * (1f + 0.03f * punch * punch);
+        float top = h * 0.5f - TopMargin, bottom = -h * 0.5f + BottomMargin;
+        float s = Mathf.Min(1f, (top - bottom) / ContentH);
+        content.anchoredPosition = new Vector2(0f, (top + bottom) * 0.5f);
+        content.localScale = Vector3.one * s * (1f + 0.03f * punch * punch);
     }
 
+    // 選んでいる行に色を付けて少し右へ。見えないところにあれば一覧を送る
     void UpdateRows(float dt)
     {
         float k = 1f - Mathf.Exp(-14f * dt);
         for (int i = 0; i < rows.Count; i++)
         {
-            Row r = rows[i];
             bool selected = i == index;
             bool hovered = !selected && i == hoverIndex;
+            Color target = selected ? AccentColor : hovered ? RowHoverColor : RowColor;
+            rowBgs[i].color = Color.Lerp(rowBgs[i].color, target, k);
 
-            // 下地（bg / fill）の色は一切変えない。外枠の明るさ・太さ・光彩だけを動かす
-            Color targetBorder = selected ? SelectedBorder(r.borderBase)
-                : hovered ? HoverBorder(r.borderBase)
-                : r.borderBase;
-            r.border.color = Color.Lerp(r.border.color, targetBorder, k);
-
-            if (r.glow != null)
-            {
-                float glow = selected ? 0.45f : hovered ? 0.18f : 0f;
-                Color glowColor = r.glow.color;
-                glowColor.a = Mathf.Lerp(glowColor.a, glow, k);
-                r.glow.color = glowColor;
-            }
-
-            float borderWidth = selected ? BorderSelected : hovered ? BorderHover : BorderNormal;
-            float inset = EdgeInset + borderWidth;
-            r.bg.offsetMin = Vector2.Lerp(r.bg.offsetMin, new Vector2(inset, inset), k);
-            r.bg.offsetMax = Vector2.Lerp(r.bg.offsetMax, new Vector2(-inset, -inset), k);
-
-            float focus = selected && !pointerMode ? 1f : 0f;
-            Color focusColor = r.focus.color;
-            focusColor.a = Mathf.Lerp(focusColor.a, focus, k);
-            r.focus.color = focusColor;
-
-            // 選択・ホバー中だけ、カード内を斜めの光の帯が横切る
-            UpdateShine(r, selected, hovered, dt);
+            Vector2 p = rows[i].anchoredPosition;
+            rows[i].anchoredPosition = new Vector2(Mathf.Lerp(p.x, selected ? 24f : 0f, k), p.y);
         }
 
         // 選んでいる行が見えるように送る
         float view = listView != null ? listView.rect.height : 0f;
-        if (view <= 1f) view = CardH - ListTop - 30f;
+        if (view <= 1f) view = CardH;
         float rowTop = index * (RowH + RowGap);
         float scroll = listContent.anchoredPosition.y;
-        float target = Mathf.Clamp(scroll, rowTop + RowH - view, rowTop);
-        target = Mathf.Clamp(target, 0f, Mathf.Max(0f, rows.Count * (RowH + RowGap) - RowGap - view));
-        listContent.anchoredPosition = new Vector2(0f, Mathf.Lerp(scroll, target, k));
+        float target2 = Mathf.Clamp(scroll, rowTop + RowH - view + 10f, rowTop - 10f);
+        target2 = Mathf.Clamp(target2, 0f, Mathf.Max(0f, rows.Count * (RowH + RowGap) - RowGap - view));
+        listContent.anchoredPosition = new Vector2(0f, Mathf.Lerp(scroll, target2, k));
         RefreshScrollbar();
     }
 
     void RefreshScrollbar()
     {
         if (scrollTrack == null || scrollThumb == null) return;
-        float content = listContent.rect.height;
+        float contentH = listContent.rect.height;
         float view = listView != null ? listView.rect.height : 1f;
-        bool show = content > view + 1f;
+        bool show = contentH > view + 1f;
         scrollTrack.gameObject.SetActive(show);
         if (!show) return;
 
-        float ratio = Mathf.Clamp01(view / content);
+        float ratio = Mathf.Clamp01(view / contentH);
         float trackH = scrollTrack.rect.height;
         float thumbH = Mathf.Max(24f, trackH * ratio);
         scrollThumb.sizeDelta = new Vector2(4f, thumbH);
-        float maxScroll = Mathf.Max(0.01f, content - view);
+        float maxScroll = Mathf.Max(0.01f, contentH - view);
         float scroll = Mathf.Clamp(-listContent.anchoredPosition.y, 0f, maxScroll);
         float y = -(scroll / maxScroll) * (trackH - thumbH);
         scrollThumb.anchoredPosition = new Vector2(0f, y);
     }
 
-    // 斜めライティング。選択中は一定間隔で繰り返し、ホバーだけなら1回で止める。
-    // 帯は Bg のマスクの中だけに描かれるので、カードの外へはみ出さない。
-    void UpdateShine(Row r, bool selected, bool hovered, float dt)
+    // ---------------- 上の帯 ----------------
+    // 帯の中の部品は、帯の左はしからの距離で置く（y は帯の中心から）
+    static void Place(RectTransform r, float x, float y, float w, float h)
     {
-        if (r.shine == null) return;
-
-        bool active = selected || hovered;
-        if (active && !r.wasActive) StartShine(r);
-        else if (!active) r.shining = false;
-        r.wasActive = active;
-
-        if (!r.shining && selected)
-        {
-            r.shineWait -= dt;
-            if (r.shineWait <= 0f) StartShine(r);
-        }
-
-        float targetAlpha = 0f;
-        if (r.shining)
-        {
-            r.shineTime += dt;
-            float t = Mathf.Clamp01(r.shineTime / ShineDuration);
-            if (t >= 1f)
-            {
-                r.shining = false;
-                r.shineTime = 0f;
-                // 選択中だけ次の光まで間隔をあける。ホバーだけならここで終わり
-                r.shineWait = selected ? ShineInterval : 0f;
-            }
-            else
-            {
-                float e = Mathf.SmoothStep(0f, 1f, t);
-                float half = (CardW - 60f) * 0.5f;   // 行の横幅（List の左右 30px を除いた分）
-                r.shine.rectTransform.anchoredPosition = new Vector2(
-                    Mathf.Lerp(-half - ShinePadding, half + ShinePadding, e),
-                    Mathf.Lerp(ShineRise, -ShineRise, e));
-                targetAlpha = ShineAlpha;
-            }
-        }
-
-        // 消えるときは滑らかに。帯の外側はカードのマスクで切られている
-        Color c = r.shine.color;
-        c.a = Mathf.Lerp(c.a, targetAlpha, 1f - Mathf.Exp(-18f * dt));
-        r.shine.color = c;
+        r.anchorMin = r.anchorMax = new Vector2(0f, 0.5f);
+        r.pivot = new Vector2(0f, 0.5f);
+        r.anchoredPosition = new Vector2(x, y);
+        r.sizeDelta = new Vector2(w, h);
     }
 
-    static void StartShine(Row r)
+    void BuildStrip()
     {
-        r.shining = true;
-        r.shineTime = 0f;
-        r.shineWait = 0f;
-    }
+        strip = ToyKit.UIRounded("Strip", content, CardColor, 26f);
+        strip.anchorMin = strip.anchorMax = new Vector2(0.5f, 1f);
+        strip.pivot = new Vector2(0.5f, 1f);
+        strip.anchoredPosition = new Vector2(CardX, 0f);
+        strip.sizeDelta = new Vector2(CardW, StripH);
+        var stripOutline = strip.gameObject.AddComponent<Outline>();
+        stripOutline.effectColor = ToyKit.Ink;
+        stripOutline.effectDistance = new Vector2(2f, -2f);
 
-    // ---------------- 収集ダッシュボード ----------------
-    void BuildDashboard()
-    {
-        dashboard = new GameObject("Dashboard", typeof(RectTransform)).GetComponent<RectTransform>();
-        dashboard.SetParent(card, false);
-        dashboard.anchorMin = dashboard.anchorMax = new Vector2(0.5f, 1f);
-        dashboard.pivot = new Vector2(0.5f, 1f);
-        dashboard.anchoredPosition = new Vector2(0f, -20f);
-        dashboard.sizeDelta = new Vector2(CardW - 60f, DashboardH);
-
-        // 左：達成率・フィルター・並び替え
-        var left = new GameObject("Left", typeof(RectTransform)).GetComponent<RectTransform>();
-        left.SetParent(dashboard, false);
-        left.anchorMin = left.anchorMax = new Vector2(0f, 1f);
-        left.pivot = new Vector2(0f, 1f);
-        left.sizeDelta = new Vector2(800f, DashboardH);
-
-        var title = ToyKit.UIText("Title", left, BodyFont, "実績コンプリート", 22f,
-                                  new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.7f));
-        title.alignment = TextAlignmentOptions.Left;
-        title.rectTransform.pivot = new Vector2(0f, 1f);
-        ToyKit.Anchor(title.rectTransform, new Vector2(0f, 1f), new Vector2(0f, -2f), new Vector2(600f, 30f));
-
-        percentText = ToyKit.UIText("Percent", left, BodyFont, "0%", 52f, ProgressColor);
+        // 上段：達成率とゲージ
+        percentText = ToyKit.UIText("Percent", strip, BodyFont, "0%", 46f, AccentColor);
         percentText.fontStyle = FontStyles.Bold;
-        percentText.alignment = TextAlignmentOptions.Right;
-        percentText.rectTransform.pivot = new Vector2(1f, 1f);
-        ToyKit.Anchor(percentText.rectTransform, new Vector2(1f, 1f), new Vector2(0f, -2f), new Vector2(300f, 62f));
+        percentText.alignment = TextAlignmentOptions.Left;
+        Place(percentText.rectTransform, PercentX, StripRowY, PercentW, 56f);
 
-        var barBg = ToyKit.UIRounded("ProgressBg", left, new Color(0.90f, 0.90f, 0.90f, 0.8f), 9f);
-        barBg.anchorMin = barBg.anchorMax = new Vector2(0.5f, 1f);
-        barBg.pivot = new Vector2(0.5f, 1f);
-        barBg.anchoredPosition = new Vector2(0f, -66f);
-        barBg.sizeDelta = new Vector2(800f, 18f);
-        var fill = ToyKit.UIImage("ProgressFill", barBg, ProgressColor, BarSprite != null ? BarSprite : uiSprite);
+        var gaugeBg = ToyKit.UIRounded("Gauge", strip, new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.16f), 9f);
+        Place(gaugeBg, GaugeX, StripRowY, GaugeW, 18f);
+        var fill = ToyKit.UIImage("Fill", gaugeBg, AccentColor, BarSprite != null ? BarSprite : uiSprite);
         ToyKit.Stretch(fill);
-        progressFill = fill.GetComponent<Image>();
-        progressFill.type = Image.Type.Sliced;
-        progressFill.pixelsPerUnitMultiplier = 1f;
-        progressFill.enabled = false;
+        gaugeFill = fill.GetComponent<Image>();
+        gaugeFill.type = Image.Type.Sliced;
+        gaugeFill.pixelsPerUnitMultiplier = 1f;
+        gaugeFill.enabled = false;
 
-        countText = ToyKit.UIText("Count", left, BodyFont, "", 20f,
-                                  new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.7f));
-        countText.alignment = TextAlignmentOptions.Left;
-        countText.rectTransform.pivot = new Vector2(0f, 1f);
-        ToyKit.Anchor(countText.rectTransform, new Vector2(0f, 1f), new Vector2(0f, -88f), new Vector2(600f, 24f));
-
-        var filterLabel = ToyKit.UIText("FilterLabel", left, BodyFont, "取得状況", 22f, ToyKit.Ink);
-        filterLabel.fontStyle = FontStyles.Bold;
-        filterLabel.alignment = TextAlignmentOptions.Left;
-        filterLabel.rectTransform.pivot = new Vector2(0f, 1f);
-        ToyKit.Anchor(filterLabel.rectTransform, new Vector2(0f, 1f), new Vector2(0f, -112f), new Vector2(110f, 28f));
-        var filterKeyBg = ToyKit.UIRounded("FilterKeyBg", left, new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.10f), 6f);
-        filterKeyBg.anchorMin = filterKeyBg.anchorMax = new Vector2(0f, 1f);
-        filterKeyBg.pivot = new Vector2(0f, 1f);
-        filterKeyBg.anchoredPosition = new Vector2(110f, -112f);
-        filterKeyBg.sizeDelta = new Vector2(44f, 24f);
-        var filterKey = ToyKit.UIText("FilterKey", filterKeyBg, BodyFont, "←→", 16f,
-                                      new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.8f));
-        filterKey.alignment = TextAlignmentOptions.Center;
-        ToyKit.Stretch(filterKey.rectTransform);
-
+        // 上段：取得状況（すべて／取得済み／未取得）。押せることが分かるように縁を付ける
         string[] labels = { "すべて", "取得済み", "未取得" };
         for (int i = 0; i < 3; i++)
         {
-            var pill = ToyKit.UIRounded("Filter" + i, left, PillColor, 16f);
-            pill.anchorMin = pill.anchorMax = new Vector2(0f, 1f);
-            pill.pivot = new Vector2(0f, 1f);
-            pill.anchoredPosition = new Vector2(160f + i * 170f, -108f);
-            pill.sizeDelta = new Vector2(150f, 32f);
+            var pill = ToyKit.UIRounded("Filter" + i, strip, PillColor, 22f);
+            Place(pill, FilterX + i * (FilterW + FilterGap), StripRowY, FilterW, 46f);
+            AddPillOutline(pill.gameObject);
             filterRects[i] = pill;
             filterBgs[i] = pill.GetComponent<Image>();
-            var t = ToyKit.UIText("Text", pill, BodyFont, labels[i], 19f, ToyKit.Ink);
+            var t = ToyKit.UIText("Text", pill, BodyFont, labels[i], 20f, Faded);
             t.alignment = TextAlignmentOptions.Center;
             ToyKit.Stretch(t.rectTransform);
             filterTexts[i] = t;
-
-            var under = ToyKit.UIRounded("Underline", pill, Color.white, 1.5f);
-            under.anchorMin = under.anchorMax = new Vector2(0.5f, 0f);
-            under.pivot = new Vector2(0.5f, 0f);
-            under.anchoredPosition = new Vector2(0f, 3f);
-            under.sizeDelta = new Vector2(100f, 3f);
-            filterUnderlines[i] = under.GetComponent<Image>();
         }
 
-        var sortLabel = ToyKit.UIText("SortLabel", left, BodyFont, "並び替え", 22f, ToyKit.Ink);
-        sortLabel.fontStyle = FontStyles.Bold;
-        sortLabel.alignment = TextAlignmentOptions.Left;
-        sortLabel.rectTransform.pivot = new Vector2(0f, 1f);
-        ToyKit.Anchor(sortLabel.rectTransform, new Vector2(0f, 1f), new Vector2(0f, -144f), new Vector2(110f, 28f));
-
-        var sortPill = ToyKit.UIRounded("Sort", left, PillColor, 16f);
-        sortPill.anchorMin = sortPill.anchorMax = new Vector2(0f, 1f);
-        sortPill.pivot = new Vector2(0f, 1f);
-        sortPill.anchoredPosition = new Vector2(160f, -140f);
-        sortPill.sizeDelta = new Vector2(230f, 32f);
+        // 上段：並び替えと、昇順／降順
+        var sortPill = ToyKit.UIRounded("Sort", strip, PillColor, 22f);
+        Place(sortPill, SortX, StripRowY, SortW, 46f);
+        AddPillOutline(sortPill.gameObject);
         sortRect = sortPill;
-        sortText = ToyKit.UIText("Text", sortPill, BodyFont, "", 20f, ToyKit.Ink);
-        sortText.alignment = TextAlignmentOptions.Left;
-        sortText.rectTransform.pivot = new Vector2(0f, 0.5f);
-        ToyKit.Anchor(sortText.rectTransform, new Vector2(0f, 0.5f), new Vector2(14f, 0f), new Vector2(160f, 32f));
-        var sortKeyBg = ToyKit.UIRounded("KeyBg", sortPill, new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.09f), 5f);
-        sortKeyBg.anchorMin = sortKeyBg.anchorMax = new Vector2(1f, 0.5f);
-        sortKeyBg.pivot = new Vector2(1f, 0.5f);
-        sortKeyBg.anchoredPosition = new Vector2(-8f, 0f);
-        sortKeyBg.sizeDelta = new Vector2(42f, 22f);
-        var sortKey = ToyKit.UIText("Key", sortKeyBg, BodyFont, "L/R", 16f,
-                                    new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.8f));
-        sortKey.alignment = TextAlignmentOptions.Center;
-        ToyKit.Stretch(sortKey.rectTransform);
+        sortText = ToyKit.UIText("Text", sortPill, BodyFont, "", 20f, Faded);
+        sortText.alignment = TextAlignmentOptions.Center;
+        ToyKit.Stretch(sortText.rectTransform);
 
-        var dirPill = ToyKit.UIRounded("Direction", left, PillColor, 16f);
-        dirPill.anchorMin = dirPill.anchorMax = new Vector2(0f, 1f);
-        dirPill.pivot = new Vector2(0f, 1f);
-        dirPill.anchoredPosition = new Vector2(404f, -140f);
-        dirPill.sizeDelta = new Vector2(130f, 32f);
-        directionRect = dirPill;
-        directionText = ToyKit.UIText("Text", dirPill, BodyFont, "", 20f, ToyKit.Ink);
-        directionText.alignment = TextAlignmentOptions.Left;
-        directionText.rectTransform.pivot = new Vector2(0f, 0.5f);
-        ToyKit.Anchor(directionText.rectTransform, new Vector2(0f, 0.5f), new Vector2(12f, 0f), new Vector2(80f, 32f));
-        var dirKeyBg = ToyKit.UIRounded("KeyBg", dirPill, new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.09f), 5f);
-        dirKeyBg.anchorMin = dirKeyBg.anchorMax = new Vector2(1f, 0.5f);
-        dirKeyBg.pivot = new Vector2(1f, 0.5f);
-        dirKeyBg.anchoredPosition = new Vector2(-8f, 0f);
-        dirKeyBg.sizeDelta = new Vector2(24f, 22f);
-        var dirKey = ToyKit.UIText("Key", dirKeyBg, BodyFont, "Y", 16f,
-                                   new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.8f));
-        dirKey.alignment = TextAlignmentOptions.Center;
-        ToyKit.Stretch(dirKey.rectTransform);
+        var dirPill = ToyKit.UIRounded("Direction", strip, PillColor, 22f);
+        Place(dirPill, DirX, StripRowY, DirW, 46f);
+        AddPillOutline(dirPill.gameObject);
+        dirRect = dirPill;
+        dirText = ToyKit.UIText("Text", dirPill, BodyFont, "", 20f, Faded);
+        dirText.alignment = TextAlignmentOptions.Center;
+        ToyKit.Stretch(dirText.rectTransform);
 
-        // 右：レアリティ別の集計
-        dashboardRight = new GameObject("Right", typeof(RectTransform)).GetComponent<RectTransform>();
-        dashboardRight.SetParent(dashboard, false);
-        dashboardRight.anchorMin = dashboardRight.anchorMax = new Vector2(1f, 1f);
-        dashboardRight.pivot = new Vector2(1f, 1f);
-        dashboardRight.sizeDelta = new Vector2(800f, DashboardH);
+        // 下段：レアリティ別の取得数（アイコンと「3/9」だけ。文字では書かない）
+        summaryLabel = ToyKit.UIText("SummaryLabel", strip, BodyFont, "レアリティ別", 20f, Faded);
+        summaryLabel.alignment = TextAlignmentOptions.Left;
+        Place(summaryLabel.rectTransform, 24f, -StripRowY, SummaryLabelW, 30f);
+
+        summaryRoot = new GameObject("Rarity", typeof(RectTransform)).GetComponent<RectTransform>();
+        summaryRoot.SetParent(strip, false);
+        summaryRoot.anchorMin = summaryRoot.anchorMax = new Vector2(0f, 0.5f);
+        summaryRoot.pivot = new Vector2(0f, 0.5f);
+        summaryRoot.anchoredPosition = new Vector2(24f + SummaryLabelW + SummaryGap, -StripRowY);
+        summaryRoot.sizeDelta = new Vector2(0f, 56f);
+    }
+
+    // 帯のボタン（ピル）に、押せることが分かる細い縁を付ける
+    static void AddPillOutline(GameObject go)
+    {
+        var ol = go.AddComponent<Outline>();
+        ol.effectColor = new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.8f);
+        ol.effectDistance = new Vector2(2f, -2f);
+    }
+
+    // 帯に出すレアリティ（実績が1つ以上あるものだけ）
+    void CollectSummaries()
+    {
+        visibleSummaries.Clear();
+        foreach (var s in Summaries)
+        {
+            if (s == null || s.total <= 0) continue;
+            visibleSummaries.Add(s);
+        }
     }
 
     void EnsureSummaryViews()
     {
-        if (summaryViews.Count == Summaries.Count) return;
-        foreach (var s in summaryViews) if (s.label != null) Destroy(s.label.transform.parent.gameObject);
+        if (summaryViews.Count == visibleSummaries.Count) return;
+        foreach (var v in summaryViews)
+            if (v.icon != null) Destroy(v.icon.transform.parent.gameObject);
         summaryViews.Clear();
-        for (int i = 0; i < Summaries.Count; i++)
+
+        for (int i = 0; i < visibleSummaries.Count; i++)
         {
             var root = new GameObject("Summary" + i, typeof(RectTransform)).GetComponent<RectTransform>();
-            root.SetParent(dashboardRight, false);
-            root.anchorMin = root.anchorMax = new Vector2(0f, 1f);
-            root.pivot = new Vector2(0f, 1f);
-            root.anchoredPosition = new Vector2(40f + (i % 3) * 240f, -4f - (i / 3) * 52f);
-            root.sizeDelta = new Vector2(220f, 48f);
+            root.SetParent(summaryRoot, false);
+            root.anchorMin = root.anchorMax = new Vector2(0f, 0.5f);
+            root.pivot = new Vector2(0f, 0.5f);
+            root.anchoredPosition = new Vector2(i * m_summaryPitch, 0f);
+            root.sizeDelta = new Vector2(m_summaryPitch - 6f, 56f);
 
-            var swatch = ToyKit.UIRounded("Swatch", root, Color.white, 5f);
-            swatch.anchorMin = swatch.anchorMax = new Vector2(0f, 1f);
-            swatch.pivot = new Vector2(0f, 1f);
-            swatch.anchoredPosition = new Vector2(0f, -2f);
-            swatch.sizeDelta = new Vector2(44f, 44f);
+            var icon = ToyKit.UIImage("Icon", root, Color.white, visibleSummaries[i].icon);
+            var iconImage = icon.GetComponent<Image>();
+            iconImage.type = Image.Type.Simple;
+            iconImage.preserveAspect = true;
+            ToyKit.Anchor(icon, new Vector2(0f, 0.5f), new Vector2(0f, 0f), new Vector2(m_summaryIcon, m_summaryIcon));
+            icon.pivot = new Vector2(0f, 0.5f);
 
-            var label = ToyKit.UIText("Label", root, BodyFont, "", 30f, ToyKit.Ink);
+            var label = ToyKit.UIText("Count", root, BodyFont, "", 20f, Faded);
             label.alignment = TextAlignmentOptions.Left;
-            label.rectTransform.pivot = new Vector2(0f, 1f);
-            ToyKit.Anchor(label.rectTransform, new Vector2(0f, 1f), new Vector2(54f, 0f), new Vector2(166f, 44f));
+            ToyKit.Anchor(label.rectTransform, new Vector2(0f, 0.5f),
+                          new Vector2(m_summaryIcon + 10f, 0f), new Vector2(m_summaryPitch - m_summaryIcon - 12f, 30f));
+            label.rectTransform.pivot = new Vector2(0f, 0.5f);
 
-            summaryViews.Add(new SummaryView { swatch = swatch.GetComponent<Image>(), label = label });
+            summaryViews.Add(new SummaryView { icon = iconImage, label = label });
         }
     }
 
     void RefreshDashboard()
     {
-        int total = 0, unlocked = 0;
-        foreach (var s in Summaries)
-        {
-            total += s.total;
-            unlocked += s.unlocked;
-        }
+        int total = Entries.Count, unlocked = 0;
+        foreach (var e in Entries) if (e.unlocked) unlocked++;
         float rate = total > 0 ? (float)unlocked / total : 0f;
         if (percentText != null) percentText.text = Mathf.RoundToInt(rate * 100f) + "%";
-        if (countText != null) countText.text = unlocked + " / " + total + " 解除済み";
-        if (progressFill != null)
+        if (gaugeFill != null)
         {
             // 9スライスの角丸を保ったまま、幅だけを達成率に合わせる
-            var rt = progressFill.rectTransform;
+            var rt = gaugeFill.rectTransform;
             rt.anchorMin = new Vector2(0f, 0f);
-            rt.anchorMax = new Vector2(rate, 1f);
+            rt.anchorMax = new Vector2(Mathf.Max(0.001f, rate), 1f);
             rt.offsetMin = Vector2.zero;
             rt.offsetMax = Vector2.zero;
-            progressFill.enabled = rate > 0.001f;
+            gaugeFill.enabled = rate > 0.001f;
         }
 
         string[] texts = { "すべて " + total, "取得済み " + unlocked, "未取得 " + (total - unlocked) };
@@ -702,37 +548,55 @@ public class AchievementBook : MonoBehaviour
             if (filterTexts[i] != null)
             {
                 filterTexts[i].text = texts[i];
-                filterTexts[i].color = on ? Color.white : new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.55f);
+                filterTexts[i].color = on ? Color.white : Faded;
                 filterTexts[i].fontStyle = on ? FontStyles.Bold : FontStyles.Normal;
-            }
-            if (filterUnderlines[i] != null)
-            {
-                filterUnderlines[i].color = on ? new Color(1f, 1f, 1f, 0.95f) : new Color(1f, 1f, 1f, 0f);
             }
         }
 
-        if (sortText != null) sortText.text = SortName(m_sort) + " ▼";
-        if (directionText != null) directionText.text = m_ascending ? "昇順 ↑" : "降順 ↓";
+        if (sortText != null) sortText.text = SortName(m_sort);
+        if (dirText != null) dirText.text = m_ascending ? "昇順 ↑" : "降順 ↓";
 
+        // 下段のレアリティ別：数のぶんだけ幅を分けて、全体を真ん中にそろえる
+        CollectSummaries();
+        int count = visibleSummaries.Count;
+        m_summaryPitch = Mathf.Min(SummaryPitchMax, SummaryAreaW / Mathf.Max(1, count));
+        m_summaryIcon = Mathf.Clamp(m_summaryPitch * 0.30f, 26f, 40f);
         EnsureSummaryViews();
-        for (int i = 0; i < summaryViews.Count && i < Summaries.Count; i++)
+
+        // 「レアリティ別」の右の余りに、レアリティのまとまりを真ん中そろえで置く
+        float blockW = count * m_summaryPitch;
+        float areaX = 24f + SummaryLabelW + SummaryGap;
+        float startX = areaX + Mathf.Max(0f, (SummaryAreaW - blockW) * 0.5f);
+        if (summaryLabel != null) summaryLabel.gameObject.SetActive(count > 0);
+        if (summaryRoot != null)
         {
-            var s = Summaries[i];
-            if (summaryViews[i].label != null) summaryViews[i].label.text = s.unlocked + "/" + s.total;
-            var swatch = summaryViews[i].swatch;
-            if (swatch != null)
+            summaryRoot.anchoredPosition = new Vector2(startX, -StripRowY);
+            summaryRoot.sizeDelta = new Vector2(blockW, 56f);
+        }
+
+        for (int i = 0; i < summaryViews.Count && i < visibleSummaries.Count; i++)
+        {
+            var s = visibleSummaries[i];
+            var view = summaryViews[i];
+            if (view.icon != null)
             {
-                if (s.icon != null)
+                var root = view.icon.transform.parent as RectTransform;
+                if (root != null)
                 {
-                    swatch.sprite = s.icon;
-                    swatch.type = Image.Type.Simple;
-                    swatch.preserveAspect = true;
-                    swatch.color = Color.white;
+                    root.anchoredPosition = new Vector2(i * m_summaryPitch, 0f);
+                    root.sizeDelta = new Vector2(m_summaryPitch - 6f, 56f);
                 }
-                else
-                {
-                    swatch.color = s.color;
-                }
+                view.icon.rectTransform.anchoredPosition = new Vector2(0f, 0f);
+                view.icon.rectTransform.sizeDelta = new Vector2(m_summaryIcon, m_summaryIcon);
+                view.icon.sprite = s.icon;
+                view.icon.enabled = true;
+                view.icon.color = s.icon != null ? Color.white : s.color;
+            }
+            if (view.label != null)
+            {
+                view.label.rectTransform.anchoredPosition = new Vector2(m_summaryIcon + 10f, 0f);
+                view.label.rectTransform.sizeDelta = new Vector2(m_summaryPitch - m_summaryIcon - 12f, 30f);
+                view.label.text = s.unlocked + "/" + s.total;
             }
         }
     }
@@ -741,8 +605,8 @@ public class AchievementBook : MonoBehaviour
     {
         switch (sort)
         {
-            case SortMode.Rarity: return "レアリティ順";
-            case SortMode.Number: return "実績番号順";
+            case SortMode.Rarity: return "レアリティ";
+            case SortMode.Number: return "番号順";
             case SortMode.Name: return "名前順";
             default: return "獲得順";
         }
@@ -750,7 +614,7 @@ public class AchievementBook : MonoBehaviour
 
     void StepFilter(int delta)
     {
-        int count = 3;
+        const int count = 3;
         SetFilter((Filter)(((int)m_filter + delta + count) % count));
     }
 
@@ -764,7 +628,7 @@ public class AchievementBook : MonoBehaviour
 
     void StepSort(int delta)
     {
-        int count = 4;
+        const int count = 4;
         m_sort = (SortMode)(((int)m_sort + delta + count) % count);
         RebuildView();
         MenuSounds.Cursor();
@@ -793,6 +657,8 @@ public class AchievementBook : MonoBehaviour
         if (m_view.Count == 0) index = 0;
         BuildRows();
         RefreshDashboard();
+        shownIndex = index;
+        RefreshDetail();
     }
 
     int CompareEntries(Entry a, Entry b)
@@ -820,362 +686,6 @@ public class AchievementBook : MonoBehaviour
         return m_ascending ? cmp : -cmp;
     }
 
-    // ---------------- 実績詳細 ----------------
-    void BuildDetail()
-    {
-        detailRoot = new GameObject("DetailRoot", typeof(RectTransform)).GetComponent<RectTransform>();
-        detailRoot.SetParent(card, false);
-        ToyKit.Stretch(detailRoot);
-        detailGroup = detailRoot.gameObject.AddComponent<CanvasGroup>();
-        detailGroup.alpha = 0f;
-        detailGroup.blocksRaycasts = false;
-        detailGroup.interactable = false;
-
-        var dim = ToyKit.UIImage("Dim", detailRoot, new Color(0.04f, 0.03f, 0.04f, 0.55f));
-        ToyKit.Stretch(dim);
-
-        detailPanel = ToyKit.UIRounded("Detail", detailRoot, new Color(1f, 0.98f, 0.94f, 1f), 26f);
-        detailPanel.anchorMin = detailPanel.anchorMax = new Vector2(0.5f, 0.5f);
-        detailPanel.anchoredPosition = Vector2.zero;
-        detailPanel.sizeDelta = new Vector2(1100f, 440f);
-        var panelOutline = detailPanel.gameObject.AddComponent<Outline>();
-        panelOutline.effectColor = ToyKit.Ink;
-        panelOutline.effectDistance = new Vector2(3f, -3f);
-        detailOutline = panelOutline;
-
-        var title = ToyKit.UIText("Title", detailPanel, font, DetailTitle, 34f, ToyKit.Ink);
-        if (letterMat != null) title.fontSharedMaterial = letterMat;
-        title.fontStyle = FontStyles.Bold;
-        title.alignment = TextAlignmentOptions.Left;
-        title.rectTransform.pivot = new Vector2(0f, 1f);
-        ToyKit.Anchor(title.rectTransform, new Vector2(0f, 1f), new Vector2(40f, -24f), new Vector2(500f, 44f));
-
-        // レアリティの札
-        var rarityBg = ToyKit.UIRounded("Rarity", detailPanel, Color.white, 14f);
-        rarityBg.anchorMin = rarityBg.anchorMax = new Vector2(1f, 1f);
-        rarityBg.pivot = new Vector2(1f, 1f);
-        rarityBg.anchoredPosition = new Vector2(-30f, -20f);
-        rarityBg.sizeDelta = new Vector2(100f, 34f);
-        detailRarityBg = rarityBg.GetComponent<Image>();
-        detailRarityText = ToyKit.UIText("Text", rarityBg, BodyFont, "", 20f, Color.white);
-        detailRarityText.alignment = TextAlignmentOptions.Center;
-        detailRarityText.enableAutoSizing = true;
-        detailRarityText.fontSizeMin = 12f;
-        detailRarityText.fontSizeMax = 20f;
-        ToyKit.Stretch(detailRarityText.rectTransform);
-
-        // アイコン
-        var iconBg = ToyKit.UIRounded("IconBg", detailPanel, Color.white, 22f);
-        iconBg.anchorMin = iconBg.anchorMax = new Vector2(0f, 1f);
-        iconBg.pivot = new Vector2(0f, 1f);
-        iconBg.anchoredPosition = new Vector2(40f, -82f);
-        iconBg.sizeDelta = new Vector2(140f, 140f);
-        detailIconBg = iconBg.GetComponent<Image>();
-
-        var icon = ToyKit.UIImage("Icon", iconBg, Color.white);
-        ToyKit.Stretch(icon);
-        icon.offsetMin = new Vector2(18f, 18f);
-        icon.offsetMax = new Vector2(-18f, -18f);
-        detailIcon = icon.GetComponent<Image>();
-        detailIcon.type = Image.Type.Simple;
-        detailIcon.preserveAspect = true;
-        detailIcon.enabled = false;
-
-        detailIconText = ToyKit.UIText("IconText", iconBg, BodyFont, "", 30f, Color.white);
-        detailIconText.fontStyle = FontStyles.Bold;
-        detailIconText.alignment = TextAlignmentOptions.Center;
-        detailIconText.enableAutoSizing = true;
-        detailIconText.fontSizeMin = 18f;
-        detailIconText.fontSizeMax = 34f;
-        ToyKit.Stretch(detailIconText.rectTransform);
-
-        // 未取得のシルエットに重ねる小さな鍵
-        var lockBg = ToyKit.UIRounded("LockBg", iconBg, new Color(ToyKit.Horizon.r, ToyKit.Horizon.g, ToyKit.Horizon.b, 0.95f), 20f);
-        lockBg.anchorMin = lockBg.anchorMax = new Vector2(1f, 0f);
-        lockBg.pivot = new Vector2(1f, 0f);
-        lockBg.anchoredPosition = new Vector2(8f, 8f);
-        lockBg.sizeDelta = new Vector2(54f, 54f);
-        detailLockBg = lockBg.GetComponent<Image>();
-        var lockIcon = ToyKit.UIImage("Lock", lockBg, new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.9f));
-        detailLock = lockIcon.GetComponent<Image>();
-        detailLock.type = Image.Type.Simple;
-        detailLock.preserveAspect = true;
-        ToyKit.Stretch(lockIcon);
-        lockIcon.offsetMin = new Vector2(10f, 10f);
-        lockIcon.offsetMax = new Vector2(-10f, -10f);
-        detailLockBg.gameObject.SetActive(false);
-        detailLock.enabled = false;
-
-        detailName = ToyKit.UIText("Name", detailPanel, BodyFont, "", 38f, ToyKit.Ink);
-        detailName.fontStyle = FontStyles.Bold;
-        detailName.alignment = TextAlignmentOptions.Left;
-        detailName.rectTransform.pivot = new Vector2(0f, 1f);
-        ToyKit.Anchor(detailName.rectTransform, new Vector2(0f, 1f), new Vector2(210f, -82f), new Vector2(800f, 52f));
-
-        var statusBg = ToyKit.UIRounded("Status", detailPanel, GotPillColor, 14f);
-        statusBg.anchorMin = statusBg.anchorMax = new Vector2(0f, 1f);
-        statusBg.pivot = new Vector2(0f, 1f);
-        statusBg.anchoredPosition = new Vector2(210f, -136f);
-        statusBg.sizeDelta = new Vector2(130f, 30f);
-        detailStatusBg = statusBg.GetComponent<Image>();
-        detailStatusText = ToyKit.UIText("Text", statusBg, BodyFont, "", 20f, Color.white);
-        detailStatusText.alignment = TextAlignmentOptions.Center;
-        ToyKit.Stretch(detailStatusText.rectTransform);
-
-        detailCondition = ToyKit.UIText("Condition", detailPanel, BodyFont, "", 24f, ToyKit.Ink);
-        detailCondition.alignment = TextAlignmentOptions.Left;
-        detailCondition.textWrappingMode = TextWrappingModes.Normal;
-        detailCondition.enableAutoSizing = true;
-        detailCondition.fontSizeMin = 18f;
-        detailCondition.fontSizeMax = 24f;
-        detailCondition.rectTransform.pivot = new Vector2(0f, 1f);
-        ToyKit.Anchor(detailCondition.rectTransform, new Vector2(0f, 1f), new Vector2(210f, -170f), new Vector2(840f, 38f));
-
-        detailPoem = ToyKit.UIText("Poem", detailPanel, BodyFont, "", 21f,
-                                   new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.65f));
-        detailPoem.alignment = TextAlignmentOptions.Left;
-        detailPoem.textWrappingMode = TextWrappingModes.Normal;
-        detailPoem.rectTransform.pivot = new Vector2(0f, 1f);
-        ToyKit.Anchor(detailPoem.rectTransform, new Vector2(0f, 1f), new Vector2(210f, -210f), new Vector2(840f, 24f));
-
-        // 複数回条件のときの進捗（あと何回で達成か）
-        detailProgress = new GameObject("Progress", typeof(RectTransform)).GetComponent<RectTransform>();
-        detailProgress.SetParent(detailPanel, false);
-        detailProgress.anchorMin = detailProgress.anchorMax = new Vector2(0f, 1f);
-        detailProgress.pivot = new Vector2(0f, 1f);
-        detailProgress.anchoredPosition = new Vector2(210f, -238f);
-        detailProgress.sizeDelta = new Vector2(840f, 58f);
-
-        detailProgressLabel = ToyKit.UIText("Label", detailProgress, BodyFont, "", 20f, ToyKit.Ink);
-        detailProgressLabel.alignment = TextAlignmentOptions.Left;
-        detailProgressLabel.rectTransform.pivot = new Vector2(0f, 1f);
-        ToyKit.Anchor(detailProgressLabel.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 0f), new Vector2(400f, 24f));
-        detailProgressRemain = ToyKit.UIText("Remain", detailProgress, BodyFont, "", 20f,
-                                             new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.7f));
-        detailProgressRemain.alignment = TextAlignmentOptions.Right;
-        detailProgressRemain.rectTransform.pivot = new Vector2(1f, 1f);
-        ToyKit.Anchor(detailProgressRemain.rectTransform, new Vector2(1f, 1f), new Vector2(0f, 0f), new Vector2(400f, 24f));
-
-        var progressBg = ToyKit.UIRounded("ProgressBg", detailProgress, new Color(0.90f, 0.90f, 0.90f, 0.8f), 8f);
-        progressBg.anchorMin = progressBg.anchorMax = new Vector2(0f, 1f);
-        progressBg.pivot = new Vector2(0f, 1f);
-        progressBg.anchoredPosition = new Vector2(0f, -30f);
-        progressBg.sizeDelta = new Vector2(500f, 16f);
-        var progressFill = ToyKit.UIImage("ProgressFill", progressBg, AccentColor, BarSprite != null ? BarSprite : uiSprite);
-        ToyKit.Stretch(progressFill);
-        detailProgressFill = progressFill.GetComponent<Image>();
-        detailProgressFill.type = Image.Type.Sliced;
-        detailProgressFill.pixelsPerUnitMultiplier = 1f;
-        detailProgressFill.enabled = false;
-        detailProgress.gameObject.SetActive(false);
-
-        var line = ToyKit.UIImage("Line", detailPanel, DividerColor);
-        line.anchorMin = line.anchorMax = new Vector2(0f, 1f);
-        line.pivot = new Vector2(0f, 1f);
-        line.anchoredPosition = new Vector2(40f, -300f);
-        line.sizeDelta = new Vector2(1020f, 2f);
-
-        var dateLabel = ToyKit.UIText("DateLabel", detailPanel, BodyFont, "獲得日時", 20f,
-                                      new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.65f));
-        dateLabel.alignment = TextAlignmentOptions.Left;
-        dateLabel.rectTransform.pivot = new Vector2(0f, 1f);
-        ToyKit.Anchor(dateLabel.rectTransform, new Vector2(0f, 1f), new Vector2(40f, -322f), new Vector2(300f, 26f));
-        detailDate = ToyKit.UIText("Date", detailPanel, BodyFont, "", 21f, ToyKit.Ink);
-        detailDate.alignment = TextAlignmentOptions.Right;
-        detailDate.rectTransform.pivot = new Vector2(1f, 1f);
-        ToyKit.Anchor(detailDate.rectTransform, new Vector2(1f, 1f), new Vector2(-40f, -322f), new Vector2(600f, 26f));
-
-        var numberLabel = ToyKit.UIText("NumberLabel", detailPanel, BodyFont, "実績番号", 20f,
-                                        new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.65f));
-        numberLabel.alignment = TextAlignmentOptions.Left;
-        numberLabel.rectTransform.pivot = new Vector2(0f, 1f);
-        ToyKit.Anchor(numberLabel.rectTransform, new Vector2(0f, 1f), new Vector2(40f, -356f), new Vector2(300f, 26f));
-        detailNumber = ToyKit.UIText("Number", detailPanel, BodyFont, "", 21f, ToyKit.Ink);
-        detailNumber.alignment = TextAlignmentOptions.Right;
-        detailNumber.rectTransform.pivot = new Vector2(1f, 1f);
-        ToyKit.Anchor(detailNumber.rectTransform, new Vector2(1f, 1f), new Vector2(-40f, -356f), new Vector2(600f, 26f));
-    }
-
-    void OpenDetail(Entry e)
-    {
-        if (e == null) return;
-        detailEntry = e;
-        detailOpen = true;
-        RefreshDetail();
-        MenuSounds.Decide();
-    }
-
-    void CloseDetail()
-    {
-        detailOpen = false;
-        detailEntry = null;
-        MenuSounds.Cancel();
-    }
-
-    void UpdateDetailFade(float dt)
-    {
-        if (detailGroup == null) return;
-        detailGroup.alpha = Mathf.MoveTowards(detailGroup.alpha, detailOpen ? 1f : 0f, dt / 0.16f);
-        detailGroup.blocksRaycasts = false;
-        detailGroup.interactable = false;
-    }
-
-    void RefreshDetail()
-    {
-        Entry e = detailEntry;
-        if (e == null) return;
-
-        bool hidden = e.secret && !e.unlocked;
-        detailName.text = hidden ? texts.locked : e.name;
-        detailRarityText.text = hidden ? "？？？" : e.rarityLabel;
-        detailRarityBg.color = hidden ? LockedPillColor : e.displayRarityColor;
-        detailRarityText.color = ContrastColor(detailRarityBg.color);
-
-        detailStatusText.text = e.unlocked ? "取得済み" : "未取得";
-        detailStatusBg.color = e.unlocked ? GotPillColor : LockedPillColor;
-        detailStatusText.color = e.unlocked ? Color.white : ToyKit.Ink;
-        if (detailOutline != null) detailOutline.effectColor = e.special ? e.borderColor : ToyKit.Ink;
-
-        detailDate.text = e.unlocked && !string.IsNullOrEmpty(e.obtainedText) ? e.obtainedText : LockedDateText;
-        detailNumber.text = "No." + e.number.ToString("D3");
-        detailCondition.text = hidden ? SecretCondition : "条件：" + e.condition;
-        detailPoem.text = hidden || !e.unlocked ? "" : e.poem;
-
-        bool showProgress = e.hasProgress && !hidden;
-        detailProgress.gameObject.SetActive(showProgress);
-        if (showProgress)
-        {
-            int target = Mathf.Max(1, e.target);
-            int progress = Mathf.Clamp(e.progress, 0, target);
-            detailProgressLabel.text = "進捗 " + progress + " / " + target;
-            detailProgressRemain.text = "あと" + (target - progress) + "回";
-            float ratio = (float)progress / target;
-            var rt = detailProgressFill.rectTransform;
-            rt.anchorMin = new Vector2(0f, 0f);
-            rt.anchorMax = new Vector2(ratio, 1f);
-            rt.offsetMin = Vector2.zero;
-            rt.offsetMax = Vector2.zero;
-            detailProgressFill.enabled = ratio > 0.001f;
-        }
-
-        // アイコン
-        detailIconText.gameObject.SetActive(false);
-        detailIcon.sprite = null;
-        detailIcon.enabled = false;
-        detailIcon.rectTransform.offsetMin = new Vector2(18f, 18f);
-        detailIcon.rectTransform.offsetMax = new Vector2(-18f, -18f);
-        detailLockBg.gameObject.SetActive(false);
-        detailLock.enabled = false;
-
-        if (hidden)
-        {
-            detailIconBg.color = new Color(0.78f, 0.78f, 0.80f, 1f);
-            if (e.lockSprite != null)
-            {
-                detailIcon.sprite = e.lockSprite;
-                detailIcon.enabled = true;
-                detailIcon.color = new Color(0.45f, 0.45f, 0.48f, 1f);
-            }
-        }
-        else if (!e.unlocked)
-        {
-            if (e.lockedIcon != null)
-            {
-                detailIconBg.color = new Color(0.93f, 0.92f, 0.90f, 1f);
-                detailIcon.sprite = e.lockedIcon;
-                detailIcon.enabled = true;
-                detailIcon.color = new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.55f);
-                detailIcon.rectTransform.offsetMin = new Vector2(8f, 8f);
-                detailIcon.rectTransform.offsetMax = new Vector2(-8f, -8f);
-                if (e.lockSprite != null)
-                {
-                    detailLock.sprite = e.lockSprite;
-                    detailLock.enabled = true;
-                    detailLockBg.gameObject.SetActive(true);
-                }
-            }
-            else if (e.lockSprite != null)
-            {
-                detailIconBg.color = Color.Lerp(e.rarityColor, Color.gray, 0.35f);
-                detailIcon.sprite = e.lockSprite;
-                detailIcon.enabled = true;
-                detailIcon.color = new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.8f);
-            }
-        }
-        else if (e.icon != null)
-        {
-            detailIconBg.color = new Color(1f, 1f, 1f, 0f);
-            detailIcon.sprite = e.icon;
-            detailIcon.enabled = true;
-            detailIcon.color = Color.white;
-            detailIcon.rectTransform.offsetMin = new Vector2(2f, 2f);
-            detailIcon.rectTransform.offsetMax = new Vector2(-2f, -2f);
-        }
-        else
-        {
-            detailIconBg.color = e.displayRarityColor;
-            detailIconText.gameObject.SetActive(true);
-            detailIconText.text = e.rarityLabel;
-            detailIconText.color = ContrastColor(e.displayRarityColor);
-        }
-    }
-
-    static Color ContrastColor(Color bg) => bg.grayscale > 0.55f ? ToyKit.Ink : Color.white;
-
-    static Color SelectedBorder(Color c) => new Color(
-        Mathf.Lerp(c.r, 1f, 0.55f), Mathf.Lerp(c.g, 1f, 0.55f), Mathf.Lerp(c.b, 1f, 0.55f), 1f);
-
-    static Color HoverBorder(Color c) => new Color(
-        Mathf.Lerp(c.r, 1f, 0.30f), Mathf.Lerp(c.g, 1f, 0.30f), Mathf.Lerp(c.b, 1f, 0.30f), 1f);
-
-    static Color WithAlpha(Color c, float a) => new Color(c.r, c.g, c.b, a);
-
-    // 下地が暗い側でも文字が読めるように、白い影をうっすら付ける
-    // 特別実績用の内側の細い枠（4本のバー）
-    void AddInnerFrame(RectTransform holder, Color color, float thickness, float inset)
-    {
-        var top = ToyKit.UIImage("FrameTop", holder, color, uiSprite);
-        top.anchorMin = new Vector2(0f, 1f); top.anchorMax = new Vector2(1f, 1f);
-        top.pivot = new Vector2(0.5f, 1f);
-        top.offsetMin = new Vector2(inset, -inset - thickness);
-        top.offsetMax = new Vector2(-inset, -inset);
-
-        var bottom = ToyKit.UIImage("FrameBottom", holder, color, uiSprite);
-        bottom.anchorMin = new Vector2(0f, 0f); bottom.anchorMax = new Vector2(1f, 0f);
-        bottom.pivot = new Vector2(0.5f, 0f);
-        bottom.offsetMin = new Vector2(inset, inset);
-        bottom.offsetMax = new Vector2(-inset, inset + thickness);
-
-        var left = ToyKit.UIImage("FrameLeft", holder, color, uiSprite);
-        left.anchorMin = new Vector2(0f, 0f); left.anchorMax = new Vector2(0f, 1f);
-        left.pivot = new Vector2(0f, 0.5f);
-        left.offsetMin = new Vector2(inset, inset);
-        left.offsetMax = new Vector2(inset + thickness, -inset);
-
-        var right = ToyKit.UIImage("FrameRight", holder, color, uiSprite);
-        right.anchorMin = new Vector2(1f, 0f); right.anchorMax = new Vector2(1f, 1f);
-        right.pivot = new Vector2(1f, 0.5f);
-        right.offsetMin = new Vector2(-inset - thickness, inset);
-        right.offsetMax = new Vector2(-inset, -inset);
-    }
-
-    static void AddTextShadow(TMP_Text text)
-    {
-        var shadow = text.gameObject.AddComponent<Shadow>();
-        shadow.effectColor = new Color(1f, 1f, 1f, 0.38f);
-        shadow.effectDistance = new Vector2(1.5f, -1.5f);
-        shadow.useGraphicAlpha = true;
-    }
-
-    // 暗いレアリティ帯でも本文が沈まないよう、細いクリーム色の縁取りを足す
-    static void AddTextOutline(TMP_Text text)
-    {
-        var outline = text.gameObject.AddComponent<Outline>();
-        outline.effectColor = new Color(1f, 0.97f, 0.92f, 0.55f);
-        outline.effectDistance = new Vector2(1.5f, -1.5f);
-        outline.useGraphicAlpha = true;
-    }
-
     // ---------------- 組み立て ----------------
     void Build()
     {
@@ -1186,29 +696,35 @@ public class AchievementBook : MonoBehaviour
         var dim = ToyKit.UIImage("Dim", root, new Color(ToyKit.Horizon.r, ToyKit.Horizon.g, ToyKit.Horizon.b, 0.55f));
         ToyKit.Stretch(dim);
 
-        // 見出し（左上。ずかんと同じ形）
+        // 見出し（ずかんと同じ形）
         var bar = ToyKit.UIImage("HeaderBar", root, AccentColor, uiSprite);
         bar.anchorMin = bar.anchorMax = bar.pivot = new Vector2(0f, 1f);
         bar.anchoredPosition = new Vector2(-30f, -30f);
         bar.sizeDelta = new Vector2(560f, 110f);
-        var ht = ToyKit.UIText("Header", bar, font, texts.title, 66f, Color.white);
-        if (letterMat != null) ht.fontSharedMaterial = letterMat;
-        ht.alignment = TextAlignmentOptions.Left;
-        ToyKit.Anchor(ht.rectTransform, new Vector2(0f, 0.5f), new Vector2(300f, 0f), new Vector2(500f, 110f));
+        var header = ToyKit.UIText("Header", bar, font, texts.title, 66f, Color.white);
+        if (letterMat != null) header.fontSharedMaterial = letterMat;
+        header.alignment = TextAlignmentOptions.Left;
+        ToyKit.Anchor(header.rectTransform, new Vector2(0f, 0.5f), new Vector2(300f, 0f), new Vector2(500f, 110f));
 
-        // 実績を並べるカード
-        card = ToyKit.UIImage("Card", root, new Color(1f, 0.98f, 0.94f, 0.96f), uiSprite);
-        card.GetComponent<Image>().pixelsPerUnitMultiplier = 0.4f;
-        ToyKit.Anchor(card, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(CardW, CardH));
-        var ol = card.gameObject.AddComponent<Outline>(); ol.effectColor = ToyKit.Ink; ol.effectDistance = new Vector2(3f, -3f);
+        // 帯・一覧・カードはまとめて縮められるように、1つの入れ物に置く
+        content = new GameObject("Content", typeof(RectTransform)).GetComponent<RectTransform>();
+        content.SetParent(root, false);
+        content.anchorMin = content.anchorMax = content.pivot = new Vector2(0.5f, 0.5f);
+        content.sizeDelta = new Vector2(1920f, ContentH);
 
-        BuildDashboard();
+        BuildStrip();
+        BuildList();
+        BuildCard();
+    }
 
+    void BuildList()
+    {
         listView = new GameObject("List", typeof(RectTransform)).GetComponent<RectTransform>();
-        listView.SetParent(card, false);
-        ToyKit.Stretch(listView);
-        listView.offsetMin = new Vector2(30f, 30f);
-        listView.offsetMax = new Vector2(-30f, -ListTop);
+        listView.SetParent(content, false);
+        listView.anchorMin = listView.anchorMax = new Vector2(0.5f, 1f);
+        listView.pivot = new Vector2(0.5f, 1f);
+        listView.anchoredPosition = new Vector2(ListX, -(StripH + StripGap));
+        listView.sizeDelta = new Vector2(ListW + 40f, CardH);
         listView.gameObject.AddComponent<RectMask2D>();
 
         listContent = new GameObject("Content", typeof(RectTransform)).GetComponent<RectTransform>();
@@ -1218,22 +734,152 @@ public class AchievementBook : MonoBehaviour
         listContent.pivot = new Vector2(0.5f, 1f);
         listContent.anchoredPosition = Vector2.zero;
 
-        // 右端のスクロール位置表示（一覧の外側のカード余白に置く）
-        var track = ToyKit.UIRounded("ScrollTrack", card, new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.16f), 2f);
+        // 一覧の右の余白に、スクロール位置を細く出す
+        var track = ToyKit.UIRounded("ScrollTrack", listView, new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.14f), 2f);
         track.anchorMin = track.anchorMax = new Vector2(1f, 0.5f);
         track.pivot = new Vector2(1f, 0.5f);
-        track.anchoredPosition = new Vector2(-14f, -90f);
-        track.sizeDelta = new Vector2(4f, CardH - ListTop - 30f);
+        track.anchoredPosition = new Vector2(-10f, 0f);
+        track.sizeDelta = new Vector2(4f, CardH - 20f);
         scrollTrack = track;
 
-        var thumb = ToyKit.UIRounded("Thumb", track, new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.55f), 2f);
+        var thumb = ToyKit.UIRounded("Thumb", track, new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.5f), 2f);
         thumb.anchorMin = thumb.anchorMax = new Vector2(0.5f, 1f);
         thumb.pivot = new Vector2(0.5f, 1f);
         thumb.sizeDelta = new Vector2(4f, 80f);
         thumb.anchoredPosition = Vector2.zero;
         scrollThumb = thumb;
+    }
 
-        BuildDetail();
+    void BuildCard()
+    {
+        card = ToyKit.UIImage("Card", content, CardColor, uiSprite);
+        card.GetComponent<Image>().pixelsPerUnitMultiplier = 0.4f;
+        card.anchorMin = card.anchorMax = new Vector2(0.5f, 1f);
+        card.pivot = new Vector2(0.5f, 1f);
+        card.anchoredPosition = new Vector2(CardX, -(StripH + StripGap));
+        card.sizeDelta = new Vector2(CardW, CardH);
+        var ol = card.gameObject.AddComponent<Outline>();
+        ol.effectColor = ToyKit.Ink;
+        ol.effectDistance = new Vector2(3f, -3f);
+
+        var page = new GameObject("Detail", typeof(RectTransform)).GetComponent<RectTransform>();
+        page.SetParent(card, false);
+        ToyKit.Stretch(page);
+        var center = new Vector2(0.5f, 0.5f);
+
+        // 実績番号（カードの右上に小さく）
+        numberText = ToyKit.UIText("Number", page, BodyFont, "", 22f, Faded);
+        numberText.alignment = TextAlignmentOptions.Right;
+        ToyKit.Anchor(numberText.rectTransform, new Vector2(1f, 1f), new Vector2(-40f, -28f), new Vector2(300f, 32f));
+        numberText.rectTransform.pivot = new Vector2(1f, 1f);
+
+        // 左：アイコンと名前、取得状況
+        var tileRect = ToyKit.UIRounded("Tile", page, Color.white, 26f);
+        ToyKit.Anchor(tileRect, center, new Vector2(-470f, 150f), new Vector2(240f, 240f));
+        tile = tileRect.GetComponent<Image>();
+        var tileOutline = tileRect.gameObject.AddComponent<Outline>();
+        tileOutline.effectColor = ToyKit.Ink;
+        tileOutline.effectDistance = new Vector2(3f, -3f);
+
+        var glyphRect = ToyKit.UIImage("Glyph", tileRect, Color.white, null);
+        glyphRect.anchorMin = glyphRect.anchorMax = center;
+        glyphRect.sizeDelta = new Vector2(160f, 160f);
+        glyph = glyphRect.GetComponent<Image>();
+        glyph.type = Image.Type.Simple;
+        glyph.preserveAspect = true;
+        glyph.enabled = false;
+        // 下地が明るい色でも白いアイコンが沈まないように、こげ茶の縁取りを付ける
+        var glyphOutline = glyphRect.gameObject.AddComponent<Outline>();
+        glyphOutline.effectColor = GlyphEdge;
+        glyphOutline.effectDistance = new Vector2(2.5f, -2.5f);
+
+        nameText = ToyKit.UIText("Name", page, font, "", 50f, ToyKit.Ink);
+        nameText.fontStyle = FontStyles.Bold;
+        nameText.enableAutoSizing = true;
+        nameText.fontSizeMin = 24f;
+        nameText.fontSizeMax = 50f;
+        ToyKit.Anchor(nameText.rectTransform, center, new Vector2(-470f, -34f), new Vector2(290f, 66f));
+
+        var statusRect = ToyKit.UIRounded("Status", page, AccentColor, 19f);
+        ToyKit.Anchor(statusRect, center, new Vector2(-470f, -104f), new Vector2(160f, 38f));
+        statusBg = statusRect.GetComponent<Image>();
+        statusText = ToyKit.UIText("Text", statusRect, BodyFont, "", 22f, Color.white);
+        statusText.alignment = TextAlignmentOptions.Center;
+        ToyKit.Stretch(statusText.rectTransform);
+
+        // 獲得日時（薄くて見づらいと言われたので、ほかの小さい字と同じ濃さに）
+        dateText = ToyKit.UIText("Date", page, BodyFont, "", 22f, Faded);
+        dateText.alignment = TextAlignmentOptions.Center;
+        ToyKit.Anchor(dateText.rectTransform, center, new Vector2(-470f, -150f), new Vector2(300f, 30f));
+
+        // 何回で達成かの進捗（1回きりの実績では出さない）
+        progressLabel = ToyKit.UIText("ProgressLabel", page, BodyFont, "", 22f, Faded);
+        progressLabel.alignment = TextAlignmentOptions.Center;
+        ToyKit.Anchor(progressLabel.rectTransform, center, new Vector2(-470f, -206f), new Vector2(300f, 28f));
+
+        var progressBg = ToyKit.UIRounded("ProgressBg", page, new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.16f), 8f);
+        ToyKit.Anchor(progressBg, center, new Vector2(-470f, -246f), new Vector2(300f, 16f));
+        progressBar = progressBg;
+        var fillRect = ToyKit.UIImage("Fill", progressBg, AccentColor, BarSprite != null ? BarSprite : uiSprite);
+        ToyKit.Stretch(fillRect);
+        progressFill = fillRect.GetComponent<Image>();
+        progressFill.type = Image.Type.Sliced;
+        progressFill.pixelsPerUnitMultiplier = 1f;
+        progressFill.enabled = false;
+
+        // 右：解除条件とポエム（ずかんのパッシブ・必殺技と同じ並び）
+        const float x0 = -290f;
+        SectionTitle(page, "解除条件", new Vector2(x0 + 100f, 232f));
+
+        conditionText = ToyKit.UIText("Condition", page, BodyFont, "", 40f, ToyKit.Ink);
+        conditionText.alignment = TextAlignmentOptions.TopLeft;
+        conditionText.textWrappingMode = TextWrappingModes.Normal;
+        conditionText.enableAutoSizing = true;
+        conditionText.fontSizeMin = 22f;
+        conditionText.fontSizeMax = 40f;
+        conditionText.rectTransform.anchorMin = conditionText.rectTransform.anchorMax = center;
+        conditionText.rectTransform.pivot = new Vector2(0f, 1f);
+        conditionText.rectTransform.anchoredPosition = new Vector2(x0 + 10f, 196f);
+        conditionText.rectTransform.sizeDelta = new Vector2(880f, 160f);
+
+        Divider(page, x0, 24f);
+
+        SectionTitle(page, "ポエム", new Vector2(x0 + 100f, -52f));
+
+        // ポエムは解除条件と同じ見た目（色・大きさ・行間）にそろえる
+        poemText = ToyKit.UIText("Poem", page, BodyFont, "", 40f, ToyKit.Ink);
+        poemText.alignment = TextAlignmentOptions.TopLeft;
+        poemText.textWrappingMode = TextWrappingModes.Normal;
+        poemText.enableAutoSizing = true;
+        poemText.fontSizeMin = 22f;
+        poemText.fontSizeMax = 40f;
+        poemText.rectTransform.anchorMin = poemText.rectTransform.anchorMax = center;
+        poemText.rectTransform.pivot = new Vector2(0f, 1f);
+        poemText.rectTransform.anchoredPosition = new Vector2(x0 + 10f, -88f);
+        poemText.rectTransform.sizeDelta = new Vector2(880f, 180f);
+    }
+
+    // 項目名の札（ずかんのパッシブ／必殺技と同じ、橙の札）
+    void SectionTitle(Transform parent, string text, Vector2 pos)
+    {
+        var chip = ToyKit.UIRounded("Section_" + text, parent, ToyKit.Palette[1], 22f);
+        ToyKit.Anchor(chip, new Vector2(0.5f, 0.5f), pos, new Vector2(200f, 50f));
+        var t = ToyKit.UIText("Text", chip, font, text, 32f, Color.white);
+        t.fontStyle = FontStyles.Bold;
+        t.enableAutoSizing = true;
+        t.fontSizeMin = 16f;
+        t.fontSizeMax = 32f;
+        ToyKit.Stretch(t.rectTransform);
+    }
+
+    // 区切りの線
+    void Divider(Transform parent, float x0, float y)
+    {
+        var line = ToyKit.UIImage("Divider", parent, new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.18f));
+        line.anchorMin = line.anchorMax = new Vector2(0.5f, 0.5f);
+        line.pivot = new Vector2(0f, 0.5f);
+        line.anchoredPosition = new Vector2(x0, y);
+        line.sizeDelta = new Vector2(CardW * 0.5f - x0 - 30f, 3f);
     }
 
     // 表示中の実績（フィルター・並び替え後）から行を作り直す
@@ -1241,15 +887,16 @@ public class AchievementBook : MonoBehaviour
     {
         foreach (Transform c in listContent) Destroy(c.gameObject);
         rows.Clear();
+        rowBgs.Clear();
         listContent.anchoredPosition = Vector2.zero;
 
         if (m_view.Count == 0)
         {
             listContent.sizeDelta = new Vector2(0f, 120f);
-            var empty = ToyKit.UIText("Empty", listContent, BodyFont, EmptyText, 28f,
-                                      new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.55f));
+            var empty = ToyKit.UIText("Empty", listContent, BodyFont, EmptyText, 26f, Faded);
             empty.alignment = TextAlignmentOptions.Center;
-            ToyKit.Anchor(empty.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -60f), new Vector2(1000f, 60f));
+            ToyKit.Anchor(empty.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -12f), new Vector2(ListW, 60f));
+            empty.rectTransform.pivot = new Vector2(0.5f, 1f);
             return;
         }
 
@@ -1258,155 +905,112 @@ public class AchievementBook : MonoBehaviour
         for (int i = 0; i < m_view.Count; i++)
         {
             Entry e = m_view[i];
-            bool selected = i == index;
             bool hidden = e.secret && !e.unlocked;
 
             var holder = new GameObject("Row" + i, typeof(RectTransform)).GetComponent<RectTransform>();
             holder.SetParent(listContent, false);
-            holder.anchorMin = new Vector2(0f, 1f); holder.anchorMax = new Vector2(1f, 1f);
-            holder.pivot = new Vector2(0.5f, 1f);
-            holder.sizeDelta = new Vector2(0f, RowH);
+            holder.anchorMin = holder.anchorMax = new Vector2(0f, 1f);
+            holder.pivot = new Vector2(0f, 1f);
+            holder.sizeDelta = new Vector2(ListW, RowH);
             holder.anchoredPosition = new Vector2(0f, -i * (RowH + RowGap));
 
-            var row = new Row { holder = holder, borderBase = e.borderColor };
-
-            // 外側の光彩（カードの外側だけに薄く出す。下地の色は変えない）
-            float initialGlow = selected ? 0.45f : 0f;
-            if (e.glowSprite != null)
-            {
-                var glow = ToyKit.UIImage("Glow", holder, WithAlpha(e.glowColor, initialGlow), e.glowSprite);
-                var glowImage = glow.GetComponent<Image>();
-                glowImage.type = Image.Type.Simple;
-                ToyKit.Stretch(glow);
-                glow.offsetMin = new Vector2(-8f, -7f);
-                glow.offsetMax = new Vector2(8f, 7f);
-                row.glow = glowImage;
-            }
-
-            // 外側の細い暗い縁。カードの下地と明るい外枠を分ける
-            var edge = ToyKit.UIImage("Edge", holder, e.edgeColor, uiSprite);
-            ToyKit.Stretch(edge);
-            edge.GetComponent<Image>().pixelsPerUnitMultiplier = 0.4f;
-
-            // 明るい外枠。選択中は太く・明るくする
-            var border = ToyKit.UIImage("Border", holder, e.borderColor, uiSprite);
-            ToyKit.Stretch(border);
-            border.offsetMin = new Vector2(EdgeInset, EdgeInset);
-            border.offsetMax = new Vector2(-EdgeInset, -EdgeInset);
-            border.GetComponent<Image>().pixelsPerUnitMultiplier = 0.4f;
-            row.border = border.GetComponent<Image>();
-            row.border.color = selected ? SelectedBorder(e.borderColor) : e.borderColor;
-
-            // レアリティのグラデーション。角丸のマスクで切り抜く
-            var bg = ToyKit.UIImage("Bg", holder, Color.white, uiSprite);
+            var bg = ToyKit.UIImage("Bg", holder, RowColor, uiSprite);
             ToyKit.Stretch(bg);
             bg.GetComponent<Image>().pixelsPerUnitMultiplier = 0.4f;
-            var mask = bg.gameObject.AddComponent<Mask>();
-            mask.showMaskGraphic = false;
-            float borderWidth = selected ? BorderSelected : BorderNormal;
-            float inset = EdgeInset + borderWidth;
-            bg.offsetMin = new Vector2(inset, inset);
-            bg.offsetMax = new Vector2(-inset, -inset);
-            row.bg = bg;
+            var ol = bg.gameObject.AddComponent<Outline>();
+            ol.effectColor = ToyKit.Ink;
+            ol.effectDistance = new Vector2(2f, -2f);
 
-            var fill = ToyKit.UIImage("Fill", bg, e.background != null ? Color.white : e.rarityColor, e.background);
-            ToyKit.Stretch(fill);
-            if (e.background != null) fill.GetComponent<Image>().type = Image.Type.Simple;
+            // アイコン：解除済みはレアリティ色の下地、未取得は灰色の下地に鍵
+            var tileRect = ToyKit.UIRounded("Tile", holder, e.unlocked ? e.color : LockedTileColor, 16f);
+            ToyKit.Anchor(tileRect, new Vector2(0f, 0.5f), new Vector2(44f, 0f), new Vector2(60f, 60f));
 
-            // 斜めライティング。カードの角丸マスクの中だけを白い光の帯が横切る
-            if (e.shineSprite != null)
+            Sprite glyphSprite = e.unlocked ? e.glyph : e.lockGlyph;
+            if (glyphSprite != null)
             {
-                var shine = ToyKit.UIImage("Shine", bg, WithAlpha(Color.white, 0f), e.shineSprite);
-                var shineImage = shine.GetComponent<Image>();
-                shineImage.type = Image.Type.Simple;
-                shine.anchorMin = shine.anchorMax = new Vector2(0.5f, 0.5f);
-                shine.pivot = new Vector2(0.5f, 0.5f);
-                shine.sizeDelta = new Vector2(ShineWidth, ShineHeight);
-                shine.anchoredPosition = new Vector2(-2000f, 0f);
-                shine.localEulerAngles = new Vector3(0f, 0f, ShineAngle);
-                row.shine = shineImage;
+                float size = e.unlocked ? 42f : 34f;
+                var glyphRect = ToyKit.UIImage("Glyph", tileRect, Color.white, glyphSprite);
+                var glyphImage = glyphRect.GetComponent<Image>();
+                glyphImage.type = Image.Type.Simple;
+                glyphImage.preserveAspect = true;
+                ToyKit.Anchor(glyphRect, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(size, size));
+                // 下地が明るい色でも白いアイコンが沈まないように、こげ茶の縁取りを付ける
+                var glyphOutline = glyphRect.gameObject.AddComponent<Outline>();
+                glyphOutline.effectColor = GlyphEdge;
+                glyphOutline.effectDistance = new Vector2(1.5f, -1.5f);
             }
 
-            // 特別は専用の二重枠
-            if (e.special)
-            {
-                AddInnerFrame(holder, e.borderColor, 2f, 9f);
-            }
-
-            // キーボード・コントローラー操作のフォーカス表示（選択中の行だけ左に太い線）
-            var focus = ToyKit.UIImage("Focus", holder, ToyKit.Ink, uiSprite);
-            focus.GetComponent<Image>().pixelsPerUnitMultiplier = 0.4f;
-            focus.anchorMin = focus.anchorMax = new Vector2(0f, 0.5f);
-            focus.pivot = new Vector2(0f, 0.5f);
-            focus.sizeDelta = new Vector2(6f, RowH - 16f);
-            focus.anchoredPosition = new Vector2(10f, 0f);
-            var focusOutline = focus.gameObject.AddComponent<Outline>();
-            focusOutline.effectColor = new Color(1f, 1f, 1f, 0.55f);
-            focusOutline.effectDistance = new Vector2(2f, -2f);
-            focusOutline.useGraphicAlpha = true;
-            row.focus = focus.GetComponent<Image>();
-            row.focus.color = new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b,
-                                        selected && !pointerMode ? 1f : 0f);
-
-            // 右端のアイコン。解除済みはレアリティ／特別の専用アイコン、
-            // 未取得は同じ形のシルエット＋鍵、シークレットは鍵だけ。
-            bool showSilhouette = !e.unlocked && !hidden && e.lockedIcon != null;
-            Sprite sideSprite = e.unlocked ? e.icon
-                : showSilhouette ? e.lockedIcon
-                : e.lockSprite;
-            Color sideColor = e.unlocked ? Color.white
-                : showSilhouette ? new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.55f)
-                : new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.72f);
-            if (sideSprite != null)
-            {
-                var icon = ToyKit.UIImage("Icon", holder, sideColor, sideSprite);
-                var iconImage = icon.GetComponent<Image>();
-                iconImage.type = Image.Type.Simple;
-                iconImage.preserveAspect = true;
-                icon.anchorMin = icon.anchorMax = new Vector2(1f, 0.5f);
-                icon.pivot = new Vector2(1f, 0.5f);
-                icon.sizeDelta = new Vector2(60f, 60f);
-                icon.anchoredPosition = new Vector2(-10f, 0f);
-            }
-            if (showSilhouette && e.lockSprite != null)
-            {
-                // シルエットの右下に小さな鍵を重ねる
-                var lockBg = ToyKit.UIRounded("LockBg", holder, new Color(ToyKit.Horizon.r, ToyKit.Horizon.g, ToyKit.Horizon.b, 0.95f), 12f);
-                lockBg.anchorMin = lockBg.anchorMax = new Vector2(1f, 0.5f);
-                lockBg.pivot = new Vector2(1f, 0.5f);
-                lockBg.sizeDelta = new Vector2(26f, 26f);
-                lockBg.anchoredPosition = new Vector2(-8f, -20f);
-                var lockRect = ToyKit.UIImage("Lock", lockBg, new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.9f), e.lockSprite);
-                var lockImage = lockRect.GetComponent<Image>();
-                lockImage.type = Image.Type.Simple;
-                lockImage.preserveAspect = true;
-                ToyKit.Stretch(lockRect);
-                lockRect.offsetMin = new Vector2(5f, 5f);
-                lockRect.offsetMax = new Vector2(-5f, -5f);
-            }
-
-            // 文字。未解除（シークレット以外）も名前と条件を出す
-            string nameText = hidden ? texts.locked : (e.special ? "【特別】" + e.name : e.name);
-            Color nameColor = e.unlocked ? ToyKit.Ink
-                : hidden ? new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.8f)
-                         : new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.9f);
-            var name = ToyKit.UIText("Name", holder, BodyFont, nameText, 38f, nameColor);
-            name.fontStyle = FontStyles.Bold;
+            // 名前だけ（条件は右のカードに出す）
+            string nameText = hidden ? texts.locked : e.name;
+            Color nameColor = e.unlocked ? ToyKit.Ink : FadedInk;
+            var name = ToyKit.UIText("Name", holder, font, nameText, 40f, nameColor);
             name.alignment = TextAlignmentOptions.Left;
-            ToyKit.Anchor(name.rectTransform, new Vector2(0f, 0.5f), new Vector2(30f + 250f, 0f), new Vector2(500f, RowH - 10f));
-            AddTextShadow(name);
-            AddTextOutline(name);
+            name.enableAutoSizing = true;
+            name.fontSizeMin = 20f;
+            name.fontSizeMax = 40f;
+            ToyKit.Anchor(name.rectTransform, new Vector2(0f, 0.5f), new Vector2(276f, 0f), new Vector2(360f, RowH - 10f));
 
-            string descText = hidden ? SecretText : e.description;
-            Color descColor = new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, e.unlocked ? 1f : 0.9f);
-            var desc = ToyKit.UIText("Desc", holder, BodyFont, descText, 28f, descColor);
-            desc.alignment = TextAlignmentOptions.Left;
-            desc.enableAutoSizing = true; desc.fontSizeMin = 24f; desc.fontSizeMax = 28f;
-            ToyKit.Anchor(desc.rectTransform, new Vector2(0f, 0.5f), new Vector2(560f + 500f, 0f), new Vector2(1000f, RowH - 10f));
-            AddTextShadow(desc);
-            AddTextOutline(desc);
+            rows.Add(holder);
+            rowBgs.Add(bg.GetComponent<Image>());
+        }
+    }
 
-            rows.Add(row);
+    // ---------------- 実績詳細 ----------------
+    void RefreshDetail()
+    {
+        Entry e = (index >= 0 && index < m_view.Count) ? m_view[index] : null;
+        if (e == null)
+        {
+            nameText.text = "";
+            numberText.text = "";
+            dateText.text = "";
+            statusText.text = "";
+            statusBg.gameObject.SetActive(false);
+            conditionText.text = "";
+            poemText.text = "";
+            progressLabel.gameObject.SetActive(false);
+            progressBar.gameObject.SetActive(false);
+            glyph.enabled = false;
+            tile.color = LockedTileColor;
+            return;
+        }
+
+        bool hidden = e.secret && !e.unlocked;
+
+        nameText.text = hidden ? texts.locked : e.name;
+        numberText.text = "No." + e.number.ToString("D3");
+
+        statusBg.gameObject.SetActive(true);
+        statusText.text = e.unlocked ? "取得済み" : "未取得";
+        statusBg.color = e.unlocked ? AccentColor : LockedPillColor;
+        statusText.color = e.unlocked ? Color.white : ToyKit.Ink;
+
+        dateText.text = e.unlocked && !string.IsNullOrEmpty(e.obtainedText) ? e.obtainedText : LockedDateText;
+        conditionText.text = hidden ? SecretCondition : e.condition;
+        poemText.text = hidden ? "" : e.unlocked ? e.poem : PoemHiddenText;
+
+        // アイコン（解除済みはレアリティ色＋トロフィー、未取得は灰色＋鍵）
+        tile.color = e.unlocked ? e.color : LockedTileColor;
+        Sprite sprite = e.unlocked ? e.glyph : e.lockGlyph;
+        glyph.sprite = sprite;
+        glyph.enabled = sprite != null;
+        glyph.rectTransform.sizeDelta = e.unlocked ? new Vector2(160f, 160f) : new Vector2(120f, 120f);
+
+        // 何回で達成かの進捗
+        bool showProgress = e.hasProgress && !hidden;
+        progressLabel.gameObject.SetActive(showProgress);
+        progressBar.gameObject.SetActive(showProgress);
+        if (showProgress)
+        {
+            int target = Mathf.Max(1, e.target);
+            int progress = Mathf.Clamp(e.progress, 0, target);
+            progressLabel.text = progress + " / " + target + "（あと" + (target - progress) + "）";
+            var rt = progressFill.rectTransform;
+            rt.anchorMin = new Vector2(0f, 0f);
+            rt.anchorMax = new Vector2(Mathf.Max(0.001f, (float)progress / target), 1f);
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
+            progressFill.enabled = progress > 0;
         }
     }
 }

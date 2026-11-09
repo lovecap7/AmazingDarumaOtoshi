@@ -69,15 +69,13 @@ namespace Yurube.Achievements
 
             foreach (var data in AchievementManager.All)
             {
-                // 一覧には解除条件だけを出す（ポエムは詳細画面で見せる）
+                // 一覧には名前だけを出し、解除条件とポエムは右の詳細カードに出す
                 var entry = new AchievementBook.Entry(data.Name, data.ConditionText, data.IsUnlocked);
                 entry.id = data.Id;
                 entry.number = data.Number;
                 entry.secret = data.IsSecret;
                 entry.special = data.IsSpecial;
                 entry.rarityRank = RarityRank(data);
-                entry.rarityLabel = data.DisplayRarityName;
-                entry.displayRarityColor = data.DisplayRarityColor;
                 entry.unlockedAt = data.UnlockedAt;
                 entry.obtainedText = data.UnlockedText;
                 entry.poem = data.Poem;
@@ -85,28 +83,11 @@ namespace Yurube.Achievements
                 entry.progress = data.Progress;
                 entry.target = data.Target;
                 entry.hasProgress = data.HasProgress;
-                entry.rarityColor = data.RarityColor;
-                entry.raritySprite = AchievementVisuals.Bar(data.RarityColor);
-                // カードの下地・縁・外枠・光彩はレアリティ情報から一括で渡す
-                entry.background = AchievementVisuals.CardGradient(data.Rarity, data.IsUnlocked);
-                entry.glowSprite = AchievementVisuals.CardGlow();
-                entry.shineSprite = AchievementVisuals.CardShine();
-                entry.lockSprite = AchievementVisuals.LockIcon();
-                bool special = data.IsSpecial;
-                entry.edgeColor = special
-                    ? Color.Lerp(AchievementRarityInfo.SpecialColor, ToyKit.Ink, 0.45f)
-                    : AchievementRarityInfo.EdgeOf(data.Rarity, data.IsUnlocked);
-                entry.borderColor = special
-                    ? AchievementRarityInfo.SpecialColor
-                    : AchievementRarityInfo.BorderOf(data.Rarity, data.IsUnlocked);
-                entry.glowColor = special
-                    ? AchievementRarityInfo.SpecialColor
-                    : AchievementRarityInfo.GlowOf(data.Rarity, data.IsUnlocked);
-                // レアリティ／特別の専用アイコン。未取得は同じ形のシルエットにする
-                entry.icon = special
-                    ? AchievementRarityIcons.SpecialIcon()
-                    : AchievementRarityIcons.IconOf(data.Rarity);
-                entry.lockedIcon = AchievementRarityIcons.SilhouetteOf(data.Rarity, special);
+                // アイコン：レアリティ色の下地に、白いアイコン（トロフィー／王冠）を重ねる。
+                // 未取得は同じ場所に鍵を出す（AchievementBook 側で灰色の下地に切り替える）
+                entry.color = data.DisplayRarityColor;
+                entry.glyph = AchievementRarityIcons.SilhouetteOf(data.Rarity, data.IsSpecial);
+                entry.lockGlyph = AchievementVisuals.LockIcon();
                 entries.Add(entry);
             }
         }

@@ -44,6 +44,14 @@ namespace Yurube
         [Tooltip("時間切れでビームを消すとき、徐々に消えるまでの時間(秒)")]
         [SerializeField] float m_specialFadeOut = 1.2f;
 
+        [Header("必殺技レーザーの輪郭(アウトライン)")]
+        [Tooltip("レーザーの輪郭の色。明るい背景でも沈まないよう、ほぼ黒に近い濃い色にする")]
+        [SerializeField] Color m_specialOutlineColor = new Color(0.05f, 0.015f, 0.01f, 1.0f);
+        [Tooltip("輪郭を白い芯(ビームの見えている線)よりどれだけ太くするか(m)")]
+        [SerializeField] float m_specialOutlinePadding = 0.35f;
+        [Tooltip("輪郭の帯の太さ(0〜1)。ビームの線のフチに沿わせる")]
+        [SerializeField, Range(0.0f, 1.0f)] float m_specialOutlineThickness = 0.3f;
+
         TumikiBlock m_block;
         TrailRenderer m_trail;
         ParticleSystem m_comet;
@@ -51,6 +59,10 @@ namespace Yurube
         // 必殺技(トロン)のときだけ足す、太くて白いレーザーの帯
         TrailRenderer m_specialGlow;
         TrailRenderer m_specialCore;
+        // レーザーの輪郭(背景が明るくても形が浮くように、外側に濃い帯を足す)
+        TrailRenderer m_specialOutline;
+        Material m_specialOutlineMaterial;
+        Texture2D m_specialOutlineTexture;
         bool m_special;
         // 必殺技のビームをその場に凍結している(弾が止まった後も残す)
         bool m_specialHold;
@@ -67,6 +79,9 @@ namespace Yurube
         float m_fadeMainWidth;
         float m_fadeGlowWidth;
         float m_fadeCoreWidth;
+        Color m_fadeOutlineStart;
+        Color m_fadeOutlineEnd;
+        float m_fadeOutlineWidth;
         // 積み木が元々持っている煙・炎のエフェクト(あかだるの弾の間だけ消す)
         ParticleSystem[] m_blockEffects;
         float m_minSpeed = 10.0f;
@@ -123,7 +138,7 @@ namespace Yurube
             UpdateEffect();
         }
 
-        // トロン用の「外側グロー」と「白い芯」の2本のトレイル
+        // トロン用の「輪郭」「外側グロー」「白い芯」の3本のトレイル
         private void CreateSpecialOverlay(Material material)
         {
             if (m_specialGlow != null) return;
@@ -132,6 +147,10 @@ namespace Yurube
             var root = new GameObject("TronLaserOverlay");
             root.transform.position = transform.position;
 
+            // 最初に一回り太い「輪郭」を敷き、その上にグローと白い芯を重ねる。
+            // 背景が白くても、濃い輪郭の線でレーザーの形が分かるようにする。
+            m_specialOutline = CreateOutlinePart(root);
+
             m_specialGlow = CreateTrailPart(root, material, m_specialGlowWidth,
                 new Color(1.0f, 0.30f, 0.05f, 0.9f));
 
@@ -139,6 +158,82 @@ namespace Yurube
             coreObject.transform.SetParent(root.transform, false);
             m_specialCore = CreateTrailPart(coreObject, material, m_specialCoreWidth,
                 new Color(1.0f, 0.98f, 0.90f, 1.0f));
+        }
+
+        // レーザーの輪郭。グローより一回り太い帯にして、幅の内側だけ透明にする。
+        // マテリアルの描画順をグローより後ろにすることで、レーザーの外側に濃い縁が残る。
+        private TrailRenderer CreateOutlinePart(GameObject root)
+        {
+            var outlineObject = new GameObject("Outline");
+            outlineObject.transform.SetParent(root.transform, false);
+
+            m_specialOutlineTexture = CreateOutlineTexture(m_specialOutlineThickness);
+            m_specialOutlineMaterial = CreateOutlineMaterial(m_specialOutlineTexture);
+
+            var trail = outlineObject.AddComponent<TrailRenderer>();
+            if (m_specialOutlineMaterial != null) trail.sharedMaterial = m_specialOutlineMaterial;
+            trail.time = m_specialTime;
+            trail.minVertexDistance = 0.05f;
+            trail.autodestruct = false;
+            trail.emitting = true;
+            trail.alignment = LineAlignment.View;
+            trail.textureMode = LineTextureMode.Stretch;
+            trail.numCapVertices = 2;
+            trail.numCornerVertices = 2;
+            trail.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            trail.receiveShadows = false;
+            trail.startWidth = m_specialCoreWidth + m_specialOutlinePadding;
+            trail.endWidth = 0.0f;
+            trail.startColor = new Color(m_specialOutlineColor.r, m_specialOutlineColor.g,
+                m_specialOutlineColor.b, 1.0f);
+            trail.endColor = new Color(m_specialOutlineColor.r, m_specialOutlineColor.g,
+                m_specialOutlineColor.b, 0.0f);
+            return trail;
+        }
+
+        // 輪郭用のマテリアル。加算で光るグローより先に描いて、縁を暗く見せる。
+        private static Material CreateOutlineMaterial(Texture2D texture)
+        {
+            Shader shader = Shader.Find("Sprites/Default");
+            if (shader == null) return null;
+
+            var material = new Material(shader);
+            material.name = "TronLaserOutline";
+            material.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent - 10;
+            if (texture != null)
+            {
+                material.mainTexture = texture;
+                material.SetTexture("_MainTex", texture);
+            }
+            return material;
+        }
+
+        // 輪郭用のテクスチャ。トレイルの幅方向(V)の中央を透明、外側を濃くする。
+        private static Texture2D CreateOutlineTexture(float thickness)
+        {
+            const int height = 64;
+            var texture = new Texture2D(1, height, TextureFormat.RGBA32, false);
+            texture.name = "TronLaserOutlineMask";
+            texture.wrapMode = TextureWrapMode.Clamp;
+            texture.filterMode = FilterMode.Bilinear;
+
+            // 内側をどこまで透明にするか(帯の太さ)
+            float inner = Mathf.Clamp01(1.0f - Mathf.Clamp01(thickness));
+            var pixels = new Color[height];
+            for (int i = 0; i < height; i++)
+            {
+                float v = i / (float)(height - 1);
+                float edge = Mathf.Abs(v - 0.5f) * 2.0f;   // 0 = 中心, 1 = 外側
+                float alpha = Mathf.SmoothStep(0.0f, 1.0f, Mathf.InverseLerp(inner, 1.0f, edge));
+                // 一番外側だけ少し薄くして、硬い板のフチに見えないようにする
+                alpha *= 1.0f - 0.2f * Mathf.SmoothStep(0.0f, 1.0f,
+                    Mathf.InverseLerp(0.9f, 1.0f, edge));
+                pixels[i] = new Color(1.0f, 1.0f, 1.0f, alpha);
+            }
+
+            texture.SetPixels(pixels);
+            texture.Apply(false, true);
+            return texture;
         }
 
         private TrailRenderer CreateTrailPart(GameObject go, Material material, float width, Color color)
@@ -166,11 +261,15 @@ namespace Yurube
         {
             if (m_specialGlow == null) return;
 
+            float delay = 0.0f;
             if (fade)
             {
                 m_specialGlow.emitting = false;
                 if (m_specialCore != null) m_specialCore.emitting = false;
-                Destroy(m_specialGlow.gameObject, m_specialTime + 0.3f);
+                if (m_specialOutline != null) m_specialOutline.emitting = false;
+                // 点が寿命で消えるまで待ってから片付ける
+                delay = m_specialTime + 0.3f;
+                Destroy(m_specialGlow.gameObject, delay);
             }
             else
             {
@@ -179,6 +278,19 @@ namespace Yurube
 
             m_specialGlow = null;
             m_specialCore = null;
+            m_specialOutline = null;
+
+            // 輪郭用に作ったマテリアル・テクスチャも一緒に片付ける
+            if (m_specialOutlineMaterial != null)
+            {
+                Destroy(m_specialOutlineMaterial, delay);
+                m_specialOutlineMaterial = null;
+            }
+            if (m_specialOutlineTexture != null)
+            {
+                Destroy(m_specialOutlineTexture, delay);
+                m_specialOutlineTexture = null;
+            }
         }
 
         private void Update()
@@ -373,6 +485,12 @@ namespace Yurube
                     m_specialCore.time = m_specialTime;
                     m_specialCore.startWidth = m_specialCoreWidth;
                 }
+                // 輪郭はビームの見えている線(白い芯)に沿わせる。グロー(4m)に合わせると太すぎる
+                if (m_specialOutline != null)
+                {
+                    m_specialOutline.time = m_specialTime;
+                    m_specialOutline.startWidth = m_specialCoreWidth + m_specialOutlinePadding;
+                }
                 if (m_comet != null)
                 {
                     var main = m_comet.main;
@@ -434,6 +552,7 @@ namespace Yurube
             FreezeTrail(m_trail);
             FreezeTrail(m_specialGlow);
             FreezeTrail(m_specialCore);
+            FreezeTrail(m_specialOutline);
 
             if (m_comet != null)
             {
@@ -475,6 +594,7 @@ namespace Yurube
             m_trail.emitting = false;
             if (m_specialGlow != null) m_specialGlow.emitting = false;
             if (m_specialCore != null) m_specialCore.emitting = false;
+            if (m_specialOutline != null) m_specialOutline.emitting = false;
 
             // いまの色・太さを覚えておき、そこから薄く・細くしていく
             m_fadeMainStart = m_trail.startColor;
@@ -492,6 +612,12 @@ namespace Yurube
                 m_fadeCoreEnd = m_specialCore.endColor;
                 m_fadeCoreWidth = m_specialCore.startWidth;
             }
+            if (m_specialOutline != null)
+            {
+                m_fadeOutlineStart = m_specialOutline.startColor;
+                m_fadeOutlineEnd = m_specialOutline.endColor;
+                m_fadeOutlineWidth = m_specialOutline.startWidth;
+            }
 
             return m_fadeOutDuration;
         }
@@ -505,6 +631,7 @@ namespace Yurube
             FadeTrail(m_trail, m_fadeMainStart, m_fadeMainEnd, m_fadeMainWidth, keep);
             FadeTrail(m_specialGlow, m_fadeGlowStart, m_fadeGlowEnd, m_fadeGlowWidth, keep);
             FadeTrail(m_specialCore, m_fadeCoreStart, m_fadeCoreEnd, m_fadeCoreWidth, keep);
+            FadeTrail(m_specialOutline, m_fadeOutlineStart, m_fadeOutlineEnd, m_fadeOutlineWidth, keep);
 
             if (t < 1.0f) return;
 
@@ -552,6 +679,7 @@ namespace Yurube
                 QuickFade(m_trail);
                 QuickFade(m_specialGlow);
                 QuickFade(m_specialCore);
+                QuickFade(m_specialOutline);
             }
 
             ClearSpecialOverlay(true);
