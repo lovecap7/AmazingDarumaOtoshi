@@ -91,6 +91,8 @@ public class ResultTowerScreen : MonoBehaviour
     bool isDraw;
     MatchSetup.MatchMode mode;
     bool timeUp;
+    bool isTeam;          // チーム戦の結果か
+    int winnerTeam = -1;  // 勝ったチーム。個人戦と引き分けは -1
 
     // 負けた人も積み木を積むか（タイムは全員。ストック・ゴーストは時間切れのときだけ。最後の1人で決まったときは勝者だけ）
     bool LosersStack => mode == MatchSetup.MatchMode.Time
@@ -147,6 +149,8 @@ public class ResultTowerScreen : MonoBehaviour
         {
             entries.AddRange(ResultData.Ranking);
             isDraw = ResultData.IsDraw;
+            isTeam = ResultData.IsTeamBattle;         
+            winnerTeam = ResultData.WinnerTeam;       
             mode = ResultData.Mode;
             timeUp = ResultData.TimeUp;
             ResultData.Clear();
@@ -224,7 +228,9 @@ public class ResultTowerScreen : MonoBehaviour
     void BuildTowers()
     {
         var tops = entries.FindAll(e => e.rank == 1);
-        if (!isDraw && tops.Count > 1) tops.RemoveRange(1, tops.Count - 1);
+        // 個人戦で勝者が決まっているときだけ、先頭の1人に絞る(チーム戦は勝ったチームの全員を並べる)
+        // if (!isDraw && tops.Count > 1) tops.RemoveRange(1, tops.Count - 1);
+        if (!isDraw && !isTeam && tops.Count > 1) tops.RemoveRange(1, tops.Count - 1);
         for (int i = 0; i < tops.Count; i++)
         {
             float x = (i - (tops.Count - 1) * 0.5f) * towerSpacing;
@@ -382,7 +388,9 @@ public class ResultTowerScreen : MonoBehaviour
     {
         uiRoot = ToyKit.CreateOverlayCanvas("UI", 10);
 
-        string who = isDraw ? "" : towers.Count > 0 ? towers[0].entry.label + " の" : "";
+        // チーム戦のときは、勝ったチームの名前で出す
+        string teamName = isTeam && winnerTeam >= 0 ? MatchSetup.TeamNames[winnerTeam % MatchSetup.TeamCount] + "チーム" : null;
+        string who = isDraw ? "" : teamName != null ? teamName + " の" : towers.Count > 0 ? towers[0].entry.label + " の" : "";
         titleText = ToyKit.UIText("Title", uiRoot, font, isDraw ? "タワーくらべ！" : who + "タワー！", 80f, Color.white);
         titleText.fontSharedMaterial = popMat;
         ToyKit.Anchor(titleText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -110f), new Vector2(1400f, 140f));
@@ -408,7 +416,9 @@ public class ResultTowerScreen : MonoBehaviour
         resultGroup = res.gameObject.AddComponent<CanvasGroup>();
         resultGroup.alpha = 0f;
         var winner = towers.Count > 0 ? towers[0].entry : null;
-        resultText = ToyKit.UIText("Text", res, font, isDraw ? drawText : winner != null ? winner.label + " " + winText : "", 100f, Palette[0]);
+        resultText = ToyKit.UIText("Text", res, font,
+        isDraw ? drawText : teamName != null ? teamName + " " + winText : winner != null ? winner.label + " " + winText : "",
+        100f, Palette[0]);
         resultText.fontSharedMaterial = popMat;
         ToyKit.Anchor(resultText.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 40f), new Vector2(1400f, 140f));
         string name = isDraw || winner == null || winner.character == null ? "" : winner.character.displayName + "　　";
@@ -483,7 +493,14 @@ public class ResultTowerScreen : MonoBehaviour
         float crownY = w.HeadTop - 0.06f + BlockH * 0.35f * CrownScale;
         SetCam(new Vector3(-1.1f, crownY + 0.2f, -4.2f), new Vector3(0f, crownY - 0.1f, 0f), 42f, false);
         yield return Wait(0.45f);   // ため
-        yield return DropCrown(w, crownY);
+
+        // 勝った人全員に王冠をかぶせる(個人戦は1人だけ)。最後の1人を待つ
+        for (int i = 0; i < towers.Count; i++)
+        {
+            float y = towers[i].HeadTop - 0.06f + BlockH * 0.35f * CrownScale;
+            if (i < towers.Count - 1) StartCoroutine(DropCrown(towers[i], y));
+            else yield return DropCrown(towers[i], y);
+        }
         yield return Wait(0.6f);
 
         // ---- 5. 引いて全体を見せる ----

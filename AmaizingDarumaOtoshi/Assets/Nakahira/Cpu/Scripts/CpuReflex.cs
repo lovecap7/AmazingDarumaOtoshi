@@ -189,6 +189,14 @@ namespace Nakahira
             foreach (var block in m_forget) m_decided.Remove(block);
         }
 
+        // 弾がこのまま自分に当たるか、当たるならあと何秒か(とっさの六腕で使う)
+        public static bool PredictHit(CpuContext c, TumikiBlock block, out float timeToHit)
+        {
+            bool hit = TryPredictHit(c, block, out Threat t);
+            timeToHit = t.TIn;
+            return hit;
+        }
+
         // 弾がこのまま(減速しながら直進して)自分に当たるか。自分は今の位置に留まるとみなす
         private static bool TryPredictHit(CpuContext c, TumikiBlock block, out Threat t)
         {

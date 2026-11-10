@@ -47,6 +47,8 @@ namespace Nakahira
 
         Motive m_motive;
         MatchPlayer m_target;
+        // 撃つ相手(乱反射遊びなら null)
+        public MatchPlayer Target => m_target;
         // 撃ったあと横へ動く向き(+1 = 相手を左に見て右へ、-1 = 反対、0 = 止まって撃つ)
         int m_strafeSide;
         // 今の1発を、相手の方へ踏み込みながら狙うか
