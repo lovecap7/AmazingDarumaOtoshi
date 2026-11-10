@@ -13,7 +13,7 @@ namespace Nakagawa
     //  ・的玉がポケットに入ったら、玉の種類(BilliardBall.Type)の番号のギミック(m_gimmicks)を発動し、一定時間後にその玉を復活させる
     //    手玉が入ったら(スクラッチ)、少し後に最初の位置へ戻す
     //  ・開始のカウントダウン中は止まり、試合が終わったら突かない。ネット対戦のクライアントでは何もしない
-    public class BilliardTable : MonoBehaviour
+    public class BilliardTable : MonoBehaviour, INetGimmickState
     {
         [Header("台")]
         [Tooltip("台の中心(床の高さ)。未設定ならこの Transform")]
@@ -157,6 +157,7 @@ namespace Nakagawa
         {
             if (m_needsReset) ResetRack();
             if (GimmickClock.IsNetClient) return;
+            using var relay = GimmickNet.Relay();   // ネット対戦用(suehara)
 
             float dt = IsHeld ? 0.0f : Time.deltaTime;
             UpdatePending(dt);
@@ -442,7 +443,7 @@ namespace Nakagawa
         // 印: 玉の色の輪が縮みながら点滅し、出る直前ほど速く光る
         void UpdateMarker(Pending p)
         {
-            float t = m_respawnWarning > 0.0f ? 1.0f - Mathf.Clamp01(p.Timer / m_respawnWarning) : 1.0f;
+            float t = MarkerProgress(p);
             float rate = Mathf.Lerp(2.0f, 9.0f, t);
             float blink = GimmickPalette.Blink(Time.time, rate);
             float r = p.Ball.Radius;
@@ -455,6 +456,58 @@ namespace Nakagawa
         {
             if (p.Marker != null) Destroy(p.Marker.gameObject);
             p.Marker = null;
+        }
+
+        float MarkerProgress(Pending p) => m_respawnWarning > 0.0f ? 1.0f - Mathf.Clamp01(p.Timer / m_respawnWarning) : 1.0f;
+
+        //========================================
+        // ネット対戦用(suehara): 玉が出てくる場所の印をホストから受け取る(GimmickNet)
+        // 玉・キューはそれぞれが受け取る。クライアントでは m_pending を印を出すためだけに使う
+        //========================================
+
+        public void WriteNetState(GimmickNetState s)
+        {
+            foreach (var b in m_allBalls)
+            {
+                var p = m_pending.Find(x => x.Ball == b);
+                bool marker = p != null && p.Marker != null;
+                s.AddBool(marker);
+                s.AddVec3(marker ? p.Spot : Vector3.zero);
+                s.Add(marker ? MarkerProgress(p) : 0.0f);
+            }
+        }
+
+        public void ReadNetState(GimmickNetState s)
+        {
+            foreach (var b in m_allBalls)
+            {
+                bool marker = s.Bool();
+                Vector3 spot = s.Vec3();
+                float t = s.Float();
+                if (!s.Ok) return;
+
+                var p = m_pending.Find(x => x.Ball == b);
+                if (!marker)
+                {
+                    if (p != null)
+                    {
+                        DestroyMarker(p);
+                        m_pending.Remove(p);
+                    }
+                    continue;
+                }
+                if (p == null)
+                {
+                    p = new Pending { Ball = b };
+                    m_pending.Add(p);
+                }
+                p.Spot = spot;
+                p.HasSpot = true;
+                p.Timer = (1.0f - t) * m_respawnWarning;
+                if (p.Marker == null) CreateMarker(p);
+                p.Marker.position = spot + Vector3.up * 0.03f;
+                UpdateMarker(p);
+            }
         }
 
         //========================================

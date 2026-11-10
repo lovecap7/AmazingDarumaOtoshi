@@ -60,6 +60,9 @@ namespace Nakagawa
         public static void Play(GimmickBurstSettings s, Vector3 position, Quaternion rotation, float scale = 1.0f, Color? tint = null)
         {
             if (s == null || !s.Enabled) return;
+            // ネット対戦用(suehara): クライアントで二重に出さない / ホストで出したものをクライアントにも送る(GimmickNet)
+            if (GimmickNet.Muted) return;
+            if (GimmickNet.Relaying) GimmickNet.BurstSent?.Invoke(s, position, rotation, scale, tint);
             Color k = tint ?? Color.white;
             if (s.Count > 0) PlayParticles(s, position, rotation, scale, k);
             if (s.Shockwave) GimmickShockwave.Create(position, s.ShockwaveColor * k, s.ShockwaveRadius * scale, s.ShockwaveTime);

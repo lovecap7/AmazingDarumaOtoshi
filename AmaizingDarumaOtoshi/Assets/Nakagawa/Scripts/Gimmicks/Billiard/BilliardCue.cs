@@ -13,7 +13,7 @@ namespace Nakagawa
     //  5. 突く      : 一気に突き出し、手玉に当たった瞬間に BilliardTable へ知らせる(火花・チョークの粉・衝撃波・音・揺れ)
     //  6. 下がる    : 少し残心してから、台の外へ戻って消える
     // 開始のカウントダウン中は止まる
-    public class BilliardCue : MonoBehaviour
+    public class BilliardCue : MonoBehaviour, INetGimmickState
     {
         enum Phase { Idle, Enter, Aim, Practice, PullBack, Strike, Follow, Exit }
 
@@ -102,6 +102,11 @@ namespace Nakagawa
         MeshRenderer m_ghostRing;
         float m_guideAlpha;
 
+        // ネット対戦用(suehara): クライアントへ送る見た目(左右の揺れ・先の光・手玉の半径)
+        float m_netYaw, m_netGlow;
+        float m_netRadius = 0.9f;
+        float BallRadius => m_ball != null ? m_ball.Radius : m_netRadius;
+
         // 出ている間(出てくる〜下がりきるまで) true
         public bool IsBusy => m_phase != Phase.Idle;
         // 手玉を突いた(向き、速さ)
@@ -174,6 +179,9 @@ namespace Nakagawa
         private void Update()
         {
             if (m_phase == Phase.Idle) return;
+            // ネット対戦用(suehara): クライアントはホストから受け取った見た目を出すだけ(ReadNetState)
+            if (GimmickClock.IsNetClient) return;
+            using var relay = GimmickNet.Relay();
             float dt = GimmickClock.IsHeld ? 0.0f : Time.deltaTime;
             m_time += dt;
 
@@ -278,6 +286,8 @@ namespace Nakagawa
                 }
             }
 
+            m_netYaw = yawOffset;
+            m_netGlow = glow;
             ApplyPose(yawOffset);
             UpdateGlow(glow);
             UpdateGuide();
@@ -300,7 +310,7 @@ namespace Nakagawa
 
         void ApplyPose(float yawOffset)
         {
-            float r = m_ball != null ? m_ball.Radius : 0.9f;
+            float r = BallRadius;
             Vector3 dir = Quaternion.Euler(0.0f, yawOffset, 0.0f) * m_dir;
             Vector3 away = -dir * m_enterDistance + Vector3.up * m_enterHeight;
             transform.position = m_anchor + away * (1.0f - m_enter);
@@ -347,11 +357,11 @@ namespace Nakagawa
         void UpdateGuide()
         {
             if (m_guideRoot == null) return;
-            bool show = m_guideAlpha > 0.01f && m_ball != null && m_phase != Phase.Idle;
+            bool show = m_guideAlpha > 0.01f && (m_ball != null || GimmickClock.IsNetClient) && m_phase != Phase.Idle;
             m_guideRoot.gameObject.SetActive(show);
             if (!show) return;
 
-            float r = m_ball.Radius;
+            float r = BallRadius;
             m_guideRoot.position = m_anchor + Vector3.up * 0.03f;
             m_guideRoot.rotation = Quaternion.LookRotation(m_dir);
             float length = Vector3.Dot(Flat(m_aimPoint, m_anchor.y) - m_anchor, m_dir);
@@ -378,5 +388,57 @@ namespace Nakagawa
         float Ratio(float length) => length > 0.0f ? Mathf.Clamp01(m_time / length) : 1.0f;
         static float Ease(float t) => t * t * (3.0f - 2.0f * t);
         static Vector3 Flat(Vector3 v, float y) => new Vector3(v.x, y, v.z);
+
+        //========================================
+        // ネット対戦用(suehara): 構え・突く動き・狙いのガイドをホストから受け取る(GimmickNet)
+        //========================================
+
+        public void WriteNetState(GimmickNetState s)
+        {
+            s.AddBool(m_phase != Phase.Idle);
+            s.AddVec3(m_anchor);
+            s.AddVec3(m_dir);
+            s.AddVec3(m_aimPoint);
+            s.Add(m_enter);
+            s.Add(m_offset);
+            s.Add(m_netYaw);
+            s.Add(m_netGlow);
+            s.Add(m_guideAlpha);
+            s.Add(BallRadius);
+        }
+
+        public void ReadNetState(GimmickNetState s)
+        {
+            bool busy = s.Bool();
+            Vector3 anchor = s.Vec3();
+            Vector3 dir = s.Vec3();
+            Vector3 aim = s.Vec3();
+            float enter = s.Float();
+            float offset = s.Float();
+            float yaw = s.Float();
+            float glow = s.Float();
+            float guide = s.Float();
+            float radius = s.Float();
+            if (!s.Ok) return;
+
+            if (!busy)
+            {
+                if (m_phase != Phase.Idle) Hide();
+                return;
+            }
+            if (m_phase == Phase.Idle && m_visualRoot != null) m_visualRoot.SetActive(true);
+            m_phase = Phase.Aim;   // 出ている間ならどれでもよい(クライアントでは動きを進めない)
+            m_anchor = anchor;
+            dir.y = 0.0f;
+            m_dir = dir.sqrMagnitude > 0.0001f ? dir.normalized : Vector3.forward;
+            m_aimPoint = aim;
+            m_enter = enter;
+            m_offset = offset;
+            m_guideAlpha = guide;
+            m_netRadius = radius;
+            ApplyPose(yaw);
+            UpdateGlow(glow);
+            UpdateGuide();
+        }
     }
 }

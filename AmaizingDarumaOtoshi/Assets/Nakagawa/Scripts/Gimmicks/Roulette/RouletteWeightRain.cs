@@ -9,7 +9,7 @@ namespace Nakagawa
     //  ・落ちた所の周りのプレイヤー・積み木を外向きに吹き飛ばす(穴の近くだと落ちる危険)。重りは少し残ってから床に沈んで消える
     //  ・床のない所(奈落)に落ちた重りは、そのまま下へ落ちていく
     // 重りの見た目は m_template(無効にした見本)を複製して使う(当たり判定なし)
-    public class RouletteWeightRain : RoulettePocketEvent
+    public class RouletteWeightRain : RoulettePocketEvent, INetGimmickState
     {
         [SerializeField] GameObject m_template;
         [SerializeField, Min(1)] int m_count = 4;
@@ -91,6 +91,7 @@ namespace Nakagawa
         private void Update()
         {
             if (m_weights.Count == 0 || GimmickClock.IsNetClient) return;
+            using var relay = GimmickNet.Relay();   // ネット対戦用(suehara)
             float dt = GimmickClock.IsHeld ? 0.0f : Time.deltaTime;
             for (int i = m_weights.Count - 1; i >= 0; i--)
             {
@@ -98,11 +99,8 @@ namespace Nakagawa
                 if (!w.Landed && !w.Falling)
                 {
                     w.Timer -= dt;
-                    float total = m_warningTime;
-                    float t = Mathf.Clamp01(1.0f - w.Timer / total);
                     // 影: だんだん濃く大きく
-                    w.Shadow.transform.localScale = Vector3.one * Mathf.Lerp(0.4f, 1.3f, t);
-                    EffectMeshes.SetColor(w.Shadow, new Color(0, 0, 0, Mathf.Lerp(0.15f, 0.7f, t)));
+                    UpdateShadow(w.Shadow, ShadowProgress(w));
                     // 最後の m_fallTime で落ちる
                     float f = Mathf.Clamp01(1.0f - w.Timer / m_fallTime);
                     w.Body.position = w.Point + Vector3.up * (m_height * (1.0f - f * f));
@@ -169,6 +167,76 @@ namespace Nakagawa
             if (w.Body != null) Destroy(w.Body.gameObject);
             if (w.Shadow != null) Destroy(w.Shadow.gameObject);
             m_weights.RemoveAt(i);
+        }
+
+        float ShadowProgress(Weight w) => Mathf.Clamp01(1.0f - w.Timer / Mathf.Max(0.01f, m_warningTime));
+
+        static void UpdateShadow(MeshRenderer shadow, float t)
+        {
+            shadow.transform.localScale = Vector3.one * Mathf.Lerp(0.4f, 1.3f, t);
+            EffectMeshes.SetColor(shadow, new Color(0, 0, 0, Mathf.Lerp(0.15f, 0.7f, t)));
+        }
+
+        //========================================
+        // ネット対戦用(suehara): 重り(位置・向き・大きさ)と影(濃さ)をホストから受け取る。吹き飛ばしのエフェクト・音はホストから届く
+        //========================================
+
+        const int kMaxNetWeights = 16;
+
+        public void WriteNetState(GimmickNetState s)
+        {
+            int n = Mathf.Min(m_weights.Count, kMaxNetWeights);
+            s.AddInt(n);
+            for (int i = 0; i < n; i++)
+            {
+                var w = m_weights[i];
+                s.AddVec3(w.Body != null ? w.Body.position : w.Point);
+                s.AddRot(w.Body != null ? w.Body.rotation : Quaternion.identity);
+                s.Add(w.Body != null ? w.Body.localScale.x / Mathf.Max(0.0001f, w.Scale.x) : 0.0f);
+                s.AddVec3(w.Point);
+                s.Add(w.Shadow != null ? ShadowProgress(w) : -1.0f);
+            }
+        }
+
+        public void ReadNetState(GimmickNetState s)
+        {
+            if (m_template == null) return;
+            int n = Mathf.Clamp(s.Int(), 0, kMaxNetWeights);
+            if (!s.Ok) return;
+            while (m_weights.Count > n) Remove(m_weights.Count - 1);
+            for (int i = 0; i < n; i++)
+            {
+                Vector3 pos = s.Vec3();
+                Quaternion rot = s.Rot();
+                float scale = s.Float();
+                Vector3 point = s.Vec3();
+                float shadow = s.Float();
+                if (!s.Ok) return;
+
+                if (i >= m_weights.Count)
+                {
+                    var body = Instantiate(m_template, transform);
+                    body.SetActive(true);
+                    var nw = new Weight { Body = body.transform };
+                    nw.Scale = nw.Body.localScale;
+                    m_weights.Add(nw);
+                }
+                var w = m_weights[i];
+                w.Point = point;
+                w.Body.SetPositionAndRotation(pos, rot);
+                w.Body.localScale = w.Scale * scale;
+                if (shadow >= 0.0f)
+                {
+                    if (w.Shadow == null) w.Shadow = EffectMeshes.Create("WeightShadow", transform, EffectMeshes.Disc, false);
+                    w.Shadow.transform.position = point + Vector3.up * 0.05f;
+                    UpdateShadow(w.Shadow, shadow);
+                }
+                else if (w.Shadow != null)
+                {
+                    Destroy(w.Shadow.gameObject);
+                    w.Shadow = null;
+                }
+            }
         }
     }
 }

@@ -13,7 +13,7 @@ namespace Nakagawa
     // このTransformの位置が床の上面の中心
     [DefaultExecutionOrder(-10)]
     [RequireComponent(typeof(Rigidbody), typeof(MeshCollider))]
-    public class RouletteWheel : MonoBehaviour, ITumikiReflectFilter
+    public class RouletteWheel : MonoBehaviour, ITumikiReflectFilter, INetGimmickState
     {
         public enum PocketKind { Green, Red, Black }
 
@@ -136,6 +136,7 @@ namespace Nakagawa
         {
             float dt = Time.fixedDeltaTime;
             if (GimmickClock.IsHeld || GimmickClock.IsNetClient) return;
+            using var relay = GimmickNet.Relay();   // ネット対戦用(suehara)
 
             UpdateWarnings(dt);
 
@@ -373,6 +374,52 @@ namespace Nakagawa
         }
 
         static int Mod(int a, int n) => ((a % n) + n) % n;
+
+        //========================================
+        // ネット対戦用(suehara): 回転・ポケットの予告と奈落をホストから受け取る(予告の点滅・奈落の光はクライアントの Update が出す)
+        //========================================
+
+        public void WriteNetState(GimmickNetState s)
+        {
+            // 角度は 360 で折り返すので、間をなめらかにつなげるよう cos・sin で送る
+            float rad = m_angle * Mathf.Deg2Rad;
+            s.Add(Mathf.Cos(rad));
+            s.Add(Mathf.Sin(rad));
+            s.Add(m_speed);
+            for (int i = 0; i < m_pocketCount; i++)
+            {
+                s.AddBool(m_abyss[i]);
+                s.Add(m_warning[i]);
+            }
+        }
+
+        public void ReadNetState(GimmickNetState s)
+        {
+            float cos = s.Float();
+            float sin = s.Float();
+            float speed = s.Float();
+            if (!s.Ok || m_abyss == null) return;
+
+            m_angle = Mathf.Repeat(Mathf.Atan2(sin, cos) * Mathf.Rad2Deg, 360.0f);
+            m_speed = speed;
+            Quaternion rot = m_baseRotation * Quaternion.Euler(0.0f, m_angle, 0.0f);
+            m_rb.rotation = rot;
+            transform.rotation = rot;
+
+            bool changed = false;
+            for (int i = 0; i < m_pocketCount; i++)
+            {
+                bool abyss = s.Bool();
+                float warning = s.Float();
+                if (!s.Ok) return;
+                m_warning[i] = abyss ? 0.0f : Mathf.Max(0.0f, warning);
+                if (m_abyss[i] == abyss) continue;
+                m_abyss[i] = abyss;
+                if (m_pocketVisuals != null && i < m_pocketVisuals.Length && m_pocketVisuals[i] != null) m_pocketVisuals[i].SetActive(!abyss);
+                changed = true;
+            }
+            if (changed) RebuildCollider();
+        }
 
         private void OnDrawGizmosSelected()
         {
