@@ -867,7 +867,10 @@ namespace Nakahira
 
             Result = result;
             m_finishTime = Time.unscaledTime;
-            Debug.Log($"[DarumaMatch] 試合終了({(reason == FinishReason.TimeUp ? "時間切れ" : "最後の1人")}):{(result.Winner != null ? result.Winner.Label + " の勝ち" : "引き分け")}");
+            string winnerText = result.Winner == null ? "引き分け"
+            : result.WinnerTeam >= 0 ? MatchSetup.TeamNames[result.WinnerTeam % MatchSetup.TeamCount] + "チーム の勝ち"
+            : result.Winner.Label + " の勝ち";
+            Debug.Log($"[DarumaMatch] 試合終了({(reason == FinishReason.TimeUp ? "時間切れ" : "最後の1人")}):{winnerText}");
             Finished?.Invoke(result);
         }
 
