@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Yurube.Achievements
@@ -260,7 +260,46 @@ namespace Yurube.Achievements
             return sprite;
         }
 
-        // 進捗バー用の、影も縁もない白い角丸バー。9スライスの角丸を保ったまま幅を変える。
+        // リザルトのきらめき用。白いアルファだけの4方向の星（色は Image.color で付ける）
+        public static Sprite Sparkle()
+        {
+            const string key = "sparkle";
+            if (s_sprites.TryGetValue(key, out var cached) && cached != null) return cached;
+
+            const int size = 64;
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            {
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+                hideFlags = HideFlags.HideAndDontSave,
+            };
+            var pixels = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+            {
+                float dy = Mathf.Abs((y + 0.5f) / size * 2f - 1f);
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = Mathf.Abs((x + 0.5f) / size * 2f - 1f);
+                    // 縦横に伸びる細い十字（星の光）
+                    float cross = Mathf.Min(dx * 9f + dy * 0.7f, dy * 9f + dx * 0.7f);
+                    float a = Mathf.Clamp01(1f - cross);
+                    a *= a;
+                    // 中心のやわらかい光
+                    float core = Mathf.Clamp01(1f - Mathf.Sqrt(dx * dx + dy * dy) * 3.2f);
+                    a = Mathf.Max(a, core * 0.85f);
+                    pixels[y * size + x] = new Color32(255, 255, 255, (byte)Mathf.RoundToInt(a * 255f));
+                }
+            }
+            tex.SetPixels32(pixels);
+            tex.Apply();
+
+            var sprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f);
+            sprite.name = key;
+            s_sprites[key] = sprite;
+            return sprite;
+        }
+
+        // 進行バー用の、影も縁もない白い角丸バー。9スライスの角丸を保ったまま幅を変える。
         public static Sprite BarSprite()
         {
             const string key = "barsprite";

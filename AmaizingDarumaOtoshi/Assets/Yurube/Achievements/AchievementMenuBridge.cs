@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 namespace Yurube.Achievements
 {
@@ -80,6 +80,8 @@ namespace Yurube.Achievements
                 entry.obtainedText = data.UnlockedText;
                 entry.poem = data.Poem;
                 entry.condition = data.ConditionText;
+                // シークレット実績は、しきい値に達するまで伏せ、達したらヒントを1つだけ出す
+                entry.hint = AchievementHints.TextOf(data);
                 entry.progress = data.Progress;
                 entry.target = data.Target;
                 entry.hasProgress = data.HasProgress;
@@ -101,6 +103,9 @@ namespace Yurube.Achievements
                     : AchievementRarityInfo.BorderOf(data.Rarity, data.IsUnlocked);
                 entries.Add(entry);
             }
+
+            // 開いたままの画面も作り直せるように、中身が入れ替わったことを知らせる
+            AchievementBook.EntriesRevision++;
         }
 
         // レアリティ順の並び：銅→銀→金→プラチナ→ダイヤモンド→特別

@@ -196,10 +196,14 @@ namespace Yurube.Achievements
                     AchievementRarity.Diamond),
 
                 // ---- シークレット実績（未解除の間は名前・条件・レアリティを伏せる） ----
+                // 未解除の間はしきい値まで何も出さず、超えたらヒントを1つだけ出す（AchievementHints）。
+                // 引数の後ろ3つ：ヒント、ヒントを出し始める進捗、ヒントを出し始める試合数（0で既定）
                 new AchievementDefinition("secret_1000_hits", "千本ノック",
                     "千の一撃。打ち続けた者だけが辿り着く、静かな境地。",
                     AchievementCategory.Attack, "累計1000回攻撃を命中させる", AchievementMetric.Hit, 1000,
-                    AchievementRarity.Platinum, false, true),
+                    AchievementRarity.Platinum, false, true,
+                    "一撃、また一撃。数えきれないほど当てた先に、何かがある。",
+                    500),
 
                 // ---- 追加13件（2026/11/08 追加実績案） ----
                 // 既存の番号を動かさないよう、必ず末尾に追加する。
@@ -261,12 +265,16 @@ namespace Yurube.Achievements
                 new AchievementDefinition("secret_whiff", "空振り三振",
                     "ブンッ、ブンッ。風だけが、あなたに応えてくれた。",
                     AchievementCategory.Attack, "累計50回ハンマーを空振りする", AchievementMetric.HammerMiss, 50,
-                    AchievementRarity.Silver, false, true),
+                    AchievementRarity.Silver, false, true,
+                    "ハンマーを振っても、何も起きない日がある。それも、たまにはいい。",
+                    25),
 
                 new AchievementDefinition("secret_quick_win", "電光石火",
                     "瞬きの間の決着。観客はまだ席に着いていた。",
                     AchievementCategory.Match, "試合開始から30秒以内に勝利する", AchievementMetric.QuickWin, 1,
-                    AchievementRarity.Gold, false, true),
+                    AchievementRarity.Gold, false, true,
+                    "瞬きしたら、もう終わっている。そんな試合を狙ってみよう。",
+                    0, 30),
             };
             return list;
         }

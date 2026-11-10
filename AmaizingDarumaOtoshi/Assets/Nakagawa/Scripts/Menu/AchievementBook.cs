@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
@@ -45,6 +45,9 @@ public class AchievementBook : MonoBehaviour
         public int target;
         public bool hasProgress;
 
+        // シークレット実績のヒント。しきい値に達したときだけ、条件の代わりに出す
+        public string hint;
+
         // レアリティのグラデーションの下地と、その上を流れる光の帯
         public Sprite background;
         public Sprite shineSprite;
@@ -83,6 +86,8 @@ public class AchievementBook : MonoBehaviour
     // 並べる実績（どこからでも足せる。開いたときに並べ直す）
     public static readonly List<Entry> Entries = new List<Entry>();
     public static readonly List<RaritySummary> Summaries = new List<RaritySummary>();
+    // 中身が入れ替わるたびに増える番号（開いたままでも作り直せるように）
+    public static int EntriesRevision;
     // 進捗バー用のきれいな角丸バー（ブリッジから渡す。無ければ uiSprite で代用）
     public static Sprite BarSprite;
 
@@ -191,6 +196,8 @@ public class AchievementBook : MonoBehaviour
     Image statusBg;
     TextMeshProUGUI nameText, statusText, dateText, numberText;
     TextMeshProUGUI conditionText, poemText, progressLabel;
+    // 「一言」の札（シークレット実績のヒントを出すときは「ヒント」に変える）
+    TextMeshProUGUI poemTitle;
     RectTransform progressBar;
     Image progressFill;
 
@@ -200,6 +207,8 @@ public class AchievementBook : MonoBehaviour
     readonly List<Entry> m_view = new List<Entry>();
 
     int index, shownIndex = -1;
+    // 直近に画面へ取り込んだ EntriesRevision（開いたままの更新を見分ける）
+    int m_entriesRevision = -1;
     int hoverIndex = -1;
     bool pointerMode;   // 直近の操作がマウスか（キーボード操作でホバー表示を消す）
     bool open;
@@ -245,6 +254,7 @@ public class AchievementBook : MonoBehaviour
         m_sort = SortMode.Acquired;
         m_ascending = true;
         RebuildView();
+        m_entriesRevision = EntriesRevision;
         MenuSounds.Decide();
     }
 
@@ -265,6 +275,13 @@ public class AchievementBook : MonoBehaviour
         punch = Mathf.MoveTowards(punch, 0f, dt / 0.25f);
         Layout();
         if (!open || Time.frameCount == openedFrame) return;
+
+        // 開いたまま実績の中身（解除・進捗・ヒント）が変わったら、並べ直して見た目も合わせる
+        if (m_entriesRevision != EntriesRevision)
+        {
+            m_entriesRevision = EntriesRevision;
+            RebuildView();
+        }
 
         // 取得状況・並び替え（キーボード／コントローラー）
         bool viewChanged = false;
@@ -917,7 +934,7 @@ public class AchievementBook : MonoBehaviour
 
         Divider(page, x0, 24f);
 
-        SectionTitle(page, "一言", new Vector2(x0 + 100f, -52f));
+        poemTitle = SectionTitle(page, "一言", new Vector2(x0 + 100f, -52f));
 
         // ポエムは解除条件と同じ見た目（色・大きさ・行間）にそろえる
         poemText = ToyKit.UIText("Poem", page, BodyFont, "", 40f, ToyKit.Ink);
@@ -932,8 +949,8 @@ public class AchievementBook : MonoBehaviour
         poemText.rectTransform.sizeDelta = new Vector2(880f, 180f);
     }
 
-    // 項目名の札（ずかんのパッシブ／必殺技と同じ、橙の札）
-    void SectionTitle(Transform parent, string text, Vector2 pos)
+    // 項目名の札（ずかんのパッシブ／必殺技と同じ、橙の札）。文字をあとから変えられるように文字を返す
+    TextMeshProUGUI SectionTitle(Transform parent, string text, Vector2 pos)
     {
         var chip = ToyKit.UIRounded("Section_" + text, parent, ToyKit.Palette[1], 22f);
         ToyKit.Anchor(chip, new Vector2(0.5f, 0.5f), pos, new Vector2(200f, 50f));
@@ -943,6 +960,7 @@ public class AchievementBook : MonoBehaviour
         t.fontSizeMin = 16f;
         t.fontSizeMax = 32f;
         ToyKit.Stretch(t.rectTransform);
+        return t;
     }
 
     // 区切りの線
@@ -1108,6 +1126,7 @@ public class AchievementBook : MonoBehaviour
             statusBg.gameObject.SetActive(false);
             conditionText.text = "";
             poemText.text = "";
+            poemTitle.text = "一言";
             progressLabel.gameObject.SetActive(false);
             progressBar.gameObject.SetActive(false);
             glyph.enabled = false;
@@ -1128,7 +1147,12 @@ public class AchievementBook : MonoBehaviour
 
         dateText.text = e.unlocked && !string.IsNullOrEmpty(e.obtainedText) ? e.obtainedText : LockedDateText;
         conditionText.text = hidden ? SecretCondition : e.condition;
-        poemText.text = hidden ? "" : e.unlocked ? e.poem : PoemHiddenText;
+
+        // 未解除のシークレット実績は、しきい値に達するまで伏せたまま。
+        // 達したら「一言」の場所にヒントを出す
+        bool showHint = hidden && !string.IsNullOrEmpty(e.hint);
+        poemTitle.text = showHint ? "ヒント" : "一言";
+        poemText.text = showHint ? e.hint : hidden ? "" : e.unlocked ? e.poem : PoemHiddenText;
 
         // アイコン（解除済みは色つきのアイコン、未取得は灰色の下地に鍵）
         if (e.unlocked && e.icon != null)

@@ -5,6 +5,7 @@ using Nakahira;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Rendering.Universal;
+using Yurube.Achievements;
 
 // リザルト画面（1位の表彰）。「積み木の表彰台」の演出。
 //  1. 暗転した中、スポットライトが1位の場所を照らす
@@ -109,6 +110,8 @@ public class ResultScreen : MonoBehaviour
     bool winnerHappy, textShown;
     bool done, leaving;
     float doneTime;
+    // 試合で解除した実績を、勝敗表示のあとに1枚ずつ見せる係（中身は Yurube 側）
+    AchievementResultPresenter m_achievements;
 
     // 演出の時間（早送り・スローモーションをかける）
     float Dt => Time.unscaledDeltaTime * baseSpeed * slow;
@@ -125,6 +128,8 @@ public class ResultScreen : MonoBehaviour
         BuildStage();
         BuildPodiums();
         BuildUI();
+        // 解除した実績があるときだけ、勝敗表示のあとにカードで見せる
+        m_achievements = AchievementResultPresenter.Create(uiRoot, font);
         ApplyLights();
         StartCoroutine(Ceremony());
     }
@@ -414,6 +419,10 @@ public class ResultScreen : MonoBehaviour
 
         // 早送りしていたら、ここで普通の速さに戻す
         baseSpeed = 1f;
+
+        // 解除した実績をカードで見せる（1件も無ければ何も出ずにすぐ終わる）
+        yield return m_achievements.Play();
+
         done = true;
         doneTime = Time.unscaledTime;
     }
@@ -637,6 +646,8 @@ public class ResultScreen : MonoBehaviour
         bool submit = MenuInput.Submit() || MenuInput.AnyClick();
         if (!done)
         {
+            // 実績カードを見せている間は、画面側では早送りしない（カードの操作はカード側が受ける）
+            if (m_achievements != null && m_achievements.IsPlaying) return;
             // 演出中に押したら早送り
             if (submit) baseSpeed = skipSpeed;
             return;

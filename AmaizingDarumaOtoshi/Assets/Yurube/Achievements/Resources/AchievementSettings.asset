@@ -18,3 +18,9 @@ MonoBehaviour:
   m_unlockSound: {fileID: 0}
   m_defaultIcon: {fileID: 0}
   m_accentColor: {r: 0.96, g: 0.6, b: 0.18, a: 1}
+  m_resultPresentation: 1
+  m_resultMaxCards: 3
+  m_resultSlideSeconds: 0.45
+  m_resultHoldSeconds: 2.2
+  m_resultProgressSeconds: 1.8
+  m_revealStyles: []

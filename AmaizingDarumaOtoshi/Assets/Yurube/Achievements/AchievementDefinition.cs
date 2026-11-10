@@ -83,12 +83,27 @@ namespace Yurube.Achievements
         [Tooltip("通知・一覧に出すアイコン（未設定ならカテゴリーの色で代用）")]
         public Sprite icon;
 
+        // ---- シークレット実績のヒント ----
+        // 未解除のシークレット実績では、しきい値に達するまで条件もヒントも伏せる。
+        // しきい値を超えると、条件の代わりにこのヒントだけを出す（AchievementHints が見る）。
+
+        [Tooltip("ヒント。シークレット実績で、しきい値を超えたときだけ出す（それまでは完全に伏せる）")]
+        [TextArea(1, 3)] public string hint;
+
+        [Tooltip("ヒントを出し始める進捗の数。0 なら目標の半分（千本ノックなら500）")]
+        [Min(0)] public int hintAtProgress;
+
+        [Tooltip("ヒントを出し始める試合数のしきい値。0 なら既定値（AchievementHints.DefaultMatchThreshold）")]
+        [Min(0)] public int hintAtMatches;
+
         public AchievementDefinition() { }
 
         public AchievementDefinition(string id, string name, string poem, AchievementCategory category,
                                      string condition, AchievementMetric metric, int target,
                                      AchievementRarity rarity = AchievementRarity.Bronze,
-                                     bool special = false, bool secret = false)
+                                     bool special = false, bool secret = false,
+                                     string hint = null,
+                                     int hintAtProgress = 0, int hintAtMatches = 0)
         {
             this.id = id;
             this.name = name;
@@ -100,6 +115,9 @@ namespace Yurube.Achievements
             this.rarity = rarity;
             this.special = special;
             this.secret = secret;
+            this.hint = hint;
+            this.hintAtProgress = hintAtProgress;
+            this.hintAtMatches = hintAtMatches;
         }
 
         public string CategoryName => AchievementCatalog.CategoryName(category);

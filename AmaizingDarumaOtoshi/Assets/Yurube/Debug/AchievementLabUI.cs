@@ -30,7 +30,6 @@ namespace Yurube.Lab
         string m_stackText = "5";
         string m_progressText2 = "0";
         float m_duration;
-        bool m_allowNormalReset;   // 本編のデータを操作してよいか（誤操作防止）
         string m_flash = "";
         float m_flashTime;
 
@@ -620,6 +619,35 @@ namespace Yurube.Lab
             if (GUILayout.Button("効果音を鳴らす", m_button)) MenuSounds.Decide();
             GUILayout.EndHorizontal();
             GUILayout.Label("※ 「解除する」でも通知が出ます（解除済みの実績は出ません）。", m_small);
+
+            // ---- リザルトで見せる実績（解除しても、ゲーム中の通知は出さない） ----
+            GUILayout.Space(8f);
+            GUILayout.Label("リザルトで見せる実績：" + AchievementManager.PendingCount + " 件（まだ見せていない解除）", m_label);
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("未表示を「見せた」ことにする", m_button))
+            {
+                int count = AchievementManager.PendingCount;
+                AchievementManager.MarkAllNotified();
+                Flash(count + " 件を表示済みにしました（次のリザルトには出ません）");
+            }
+            if (GUILayout.Button("未解除を3件解除して未表示にする", m_button)) UnlockThreeForResult();
+            GUILayout.EndHorizontal();
+            GUILayout.Label("※ リザルトのカードは試合のあとの ResultTowerScene で出ます。このラボでは出ません。", m_small);
+        }
+
+        // リザルトのカードを試す用：未解除を3件解除する（ラボの保存先に入る）
+        void UnlockThreeForResult()
+        {
+            int count = 0;
+            foreach (var data in AchievementManager.All)
+            {
+                if (data.IsUnlocked) continue;
+                AchievementManager.DebugUnlock(data);
+                count++;
+                if (count >= 3) break;
+            }
+            Flash(count > 0 ? "未解除を " + count + " 件解除しました（未表示 " + AchievementManager.PendingCount + " 件）"
+                            : "未解除の実績がありません");
         }
 
         void PreviewThree()
@@ -693,43 +721,10 @@ namespace Yurube.Lab
 
             GUILayout.Space(8f);
 
-            // ================= 本編のデータ =================
-            GUILayout.Label("【本編のデータ】" + AchievementManager.NormalStorageKey
-                            + "　保存：" + (AchievementManager.HasSave(AchievementManager.NormalStorageKey) ? "あり" : "なし"), m_label);
-            GUILayout.Label("ゲーム本編で解除した実績。ここから消すと、次に遊ぶときは最初からになります。", m_small);
-            m_allowNormalReset = GUILayout.Toggle(m_allowNormalReset,
-                "本編のデータを操作する（チェックすると下のボタンが使えます）", m_label);
-
-            bool previousEnabled = GUI.enabled;
-            GUI.enabled = previousEnabled && m_allowNormalReset;
-
-            GUILayout.BeginHorizontal();
-            if (GUILayout.Button("本編の解除をリセット", m_button))
-            {
-                AchievementManager.DebugResetStorage(AchievementManager.NormalStorageKey, true, false);
-                Flash("本編の解除状態をリセットしました（ラボのデータはそのまま）");
-            }
-            if (GUILayout.Button("本編の進捗をリセット", m_button))
-            {
-                AchievementManager.DebugResetStorage(AchievementManager.NormalStorageKey, false, true);
-                Flash("本編の進捗をリセットしました（ラボのデータはそのまま）");
-            }
-            GUILayout.EndHorizontal();
-
-            if (GUILayout.Button("本編を全部初期化（ゲームの実績を消す）", m_button))
-            {
-                AchievementManager.DebugClearStorage(AchievementManager.NormalStorageKey);
-                Flash("本編の実績データを全部消しました（ラボのデータはそのまま）");
-            }
-
-            if (GUILayout.Button("本編を全解除（報酬キャラの解放テスト）", m_button))
-            {
-                AchievementManager.DebugUnlockAllStorage(AchievementManager.NormalStorageKey);
-                Flash("本編の実績を全解除しました。セレクト画面で「"
-                      + AchievementRewards.RewardCharacterName + "」が選べるようになります");
-            }
-
-            GUI.enabled = previousEnabled;
+            // 本編のデータ（全解除・リセット・初期化）は「実績ヒントの確認」に移した
+            // （メニュー「Yurube > 実績ヒントの確認（デバッグ）」）
+            GUILayout.Label("【本編のデータ】", m_label);
+            GUILayout.Label("本編の全解除・リセット・初期化は、メニューの「Yurube > 実績ヒントの確認（デバッグ）」で行います。", m_small);
 
             GUILayout.Label("※ 保存したあと再生を止めて開始し直すと、解除状態が残っているか確認できます。", m_small);
         }

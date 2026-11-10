@@ -44,6 +44,14 @@ namespace Yurube.Achievements
         }
 
         public static string StorageKey => s_storageKey;
+
+        // データは変えずに「表示を作り直して」と知らせる（ヒントの確認など、見た目だけを更新したいとき）
+        public static void NotifyChanged()
+        {
+            Initialize();
+            Changed?.Invoke();
+        }
+
         public static int UnlockedCount
         {
             get
@@ -213,8 +221,10 @@ namespace Yurube.Achievements
             || metric == AchievementMetric.RallyBest
             || metric == AchievementMetric.MultiKOBest;
 
-        static int CountOf(AchievementMetric metric)
+        // 数の種類ごとの累計（進捗の上限で止めていない、生の回数）。シークレット実績のヒントの切り替えにも使う
+        public static int CountOf(AchievementMetric metric)
         {
+            Initialize();
             s_counters.TryGetValue(metric, out int value);
             return value;
         }
@@ -323,11 +333,16 @@ namespace Yurube.Achievements
         {
             if (data.IsUnlocked) return;
             data.IsUnlocked = true;
+            // 解除した瞬間に日時を確定して保存する（表示するときに日時を入れ直さない）
             data.UnlockedAt = DateTime.UtcNow;
+            // まだリザルトで見せていない、という印。リザルトで見せたときに MarkNotified で消す
+            data.IsNotified = false;
             Save();
             Debug.Log("[Achievement] 解除: " + data.Id + " " + data.Name);
             Unlocked?.Invoke(data);
-            AchievementNotification.Enqueue(data);
+            // 解除のお知らせ。リザルトでまとめて見せる設定のときは、ゲーム中の通知は出さない
+            // （通知そのものは残してあるので、設定を切り替えれば元に戻る）
+            if (!ShowInResult) AchievementNotification.Enqueue(data);
             if (AllUnlocked)
             {
                 Debug.Log("[Achievement] 全実績解除。報酬キャラクター「" + AchievementRewards.RewardCharacterName + "」が選べるようになりました");
@@ -335,6 +350,65 @@ namespace Yurube.Achievements
             // ほかの実績の解除で条件を満たす実績（「ほかのすべてを解除」など）を見直す
             RefreshMetaAchievements();
         }
+
+        // 解除をゲーム中に通知せず、リザルトでまとめて見せるか（AchievementSettings で切り替える）
+        public static bool ShowInResult
+        {
+            get
+            {
+                var settings = AchievementSettings.Instance;
+                return settings == null || settings.ResultPresentation;
+            }
+        }
+
+        //========================================
+        // リザルトで見せる実績（未表示の解除済み）
+        //========================================
+
+        // まだリザルトで見せていない実績。解除した順（古い順）に返す。
+        // リザルトの前にアプリを終了しても、保存した印が残っているので次回に出せる。
+        public static List<AchievementData> PendingAchievements()
+        {
+            Initialize();
+            var list = new List<AchievementData>();
+            foreach (var data in s_all)
+            {
+                if (data.IsUnlocked && !data.IsNotified) list.Add(data);
+            }
+            list.Sort((a, b) =>
+            {
+                int byTime = a.UnlockedAt.CompareTo(b.UnlockedAt);
+                return byTime != 0 ? byTime : a.Number.CompareTo(b.Number);
+            });
+            return list;
+        }
+
+        public static int PendingCount
+        {
+            get
+            {
+                int n = 0;
+                foreach (var a in All) if (a.IsUnlocked && !a.IsNotified) n++;
+                return n;
+            }
+        }
+
+        // リザルトで見せ終わった印をつける（表示が終わってから呼ぶ）
+        public static void MarkNotified(IEnumerable<AchievementData> shown)
+        {
+            Initialize();
+            bool changed = false;
+            foreach (var data in shown)
+            {
+                if (data == null || data.IsNotified) continue;
+                data.IsNotified = true;
+                changed = true;
+            }
+            if (changed) Save();
+        }
+
+        // 未表示をすべて「見せた」ことにする（デバッグ用）
+        public static void MarkAllNotified() => MarkNotified(PendingAchievements());
 
         //========================================
         // 試合の区切り
@@ -383,7 +457,14 @@ namespace Yurube.Achievements
             public List<string> counters = new List<string>();
             public List<string> characters = new List<string>();
             public int winStreak;
+            // リザルトで見せた実績のID。notifyVersion が 0 の古いセーブ（この項目が無い）は、
+            // すべて見せた扱いにして、更新直後に昔の実績がまとめて流れないようにする
+            public List<string> notified = new List<string>();
+            public int notifyVersion;
         }
+
+        // 保存形式の版。1 から「リザルトで見せたか」を持つ
+        const int NotifyVersion = 1;
 
         public static void Save()
         {
@@ -394,7 +475,9 @@ namespace Yurube.Achievements
                 if (!data.IsUnlocked) continue;
                 blob.unlocked.Add(data.Id);
                 blob.unlockedAt.Add(data.UnlockedAt.ToString("o"));
+                if (data.IsNotified) blob.notified.Add(data.Id);
             }
+            blob.notifyVersion = NotifyVersion;
             foreach (var pair in s_counters)
             {
                 blob.counters.Add((int)pair.Key + "=" + pair.Value);
@@ -465,6 +548,23 @@ namespace Yurube.Achievements
                             }
                         }
                     }
+
+                    // リザルトで見せたか。古いセーブ（この項目が無い）は、すべて見せた扱いにする
+                    if (blob.notifyVersion <= 0 || blob.notified == null)
+                    {
+                        foreach (var data in s_all)
+                        {
+                            if (data.IsUnlocked) data.IsNotified = true;
+                        }
+                    }
+                    else
+                    {
+                        var notified = new HashSet<string>(blob.notified);
+                        foreach (var data in s_all)
+                        {
+                            data.IsNotified = data.IsUnlocked && notified.Contains(data.Id);
+                        }
+                    }
                 }
             }
             RefreshAll();
@@ -489,6 +589,7 @@ namespace Yurube.Achievements
                 data.Progress = 0;
                 data.IsUnlocked = false;
                 data.UnlockedAt = DateTime.MinValue;
+                data.IsNotified = false;
             }
         }
 
@@ -519,6 +620,7 @@ namespace Yurube.Achievements
             {
                 data.IsUnlocked = false;
                 data.UnlockedAt = DateTime.MinValue;
+                data.IsNotified = false;
             }
             Save();
             Changed?.Invoke();
@@ -552,6 +654,7 @@ namespace Yurube.Achievements
                     {
                         data.IsUnlocked = false;
                         data.UnlockedAt = DateTime.MinValue;
+                        data.IsNotified = false;
                     }
                 }
                 if (resetProgress)
@@ -624,6 +727,9 @@ namespace Yurube.Achievements
             }
             foreach (var pair in counters) blob.counters.Add((int)pair.Key + "=" + pair.Value);
             blob.characters.AddRange(usedCharacters);
+            // デバッグの全解除。リザルトで大量に流れないよう、見せた扱いにしておく
+            foreach (var data in s_all) blob.notified.Add(data.Id);
+            blob.notifyVersion = NotifyVersion;
 
             PlayerPrefs.SetString(key, JsonUtility.ToJson(blob));
             PlayerPrefs.Save();
