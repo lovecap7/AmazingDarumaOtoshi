@@ -250,6 +250,20 @@ namespace Nakahira
         [Tooltip("エクスカリバーの予定の線はさらにこの距離(m)離れる(詠唱中はだるきんぐの向きで動くので)")]
         [Min(0.0f)] public float SwordMargin = 1.0f;
 
+        [Header("必殺技:あおだるの六腕(暗転返し・とっさの六腕)")]
+        [Tooltip("暗転返し:みだるのファンネルのカットイン中に六腕で返す確率(余裕(1 − 集中度の割合)を掛けて使う)")]
+        [Range(0.0f, 1.0f)] public float BlackoutCounterChance = 0.6f;
+        [Tooltip("暗転返し:暗転してから六腕を撃つまでの遅れ(秒。止まらない時間で測る。みだるのカットインは 2 秒)")]
+        [Min(0.0f)] public float BlackoutCounterDelay = 0.3f;
+        [Tooltip("暗転返し:みだるが「明らかに近い」とみなす差(m)。みだるから見て、自分がほかの敵よりこれ以上近い")]
+        [Min(0.0f)] public float BlackoutNearMargin = 2.0f;
+        [Tooltip("とっさの六腕:撃ってから効き始めるまでの時間(秒。六腕の出現 0.25 秒＋余裕)。これより早く当たる弾には撃たない")]
+        [Min(0.0f)] public float ArmsLeadTime = 0.3f;
+        [Tooltip("とっさの六腕:弾が 1 発でも撃つ「追い込まれた」ときの段数(この段数以下)")]
+        [Min(0)] public int ArmsPanicStack = 1;
+        [Tooltip("とっさの六腕:弾が 1 発でも撃つ「追い込まれた」ときの集中度の割合(これ以上)")]
+        [Range(0.0f, 1.5f)] public float ArmsPanicLoad = 0.8f;
+
         [Header("積む:ジャンプ")]
         [Tooltip("ジャンプする距離の誤差(割合)。大きいほど跳ぶのが早すぎたり遅すぎたりする")]
         [Range(0.0f, 1.0f)] public float JumpDistanceError = 0.1f;

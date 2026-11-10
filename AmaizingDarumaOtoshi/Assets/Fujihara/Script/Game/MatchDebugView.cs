@@ -68,9 +68,20 @@ public class MatchDebugView : MonoBehaviour
     void ShowResult(DarumaMatch.MatchResult result)
     {
         string title = result.Reason == DarumaMatch.FinishReason.TimeUp ? "タイムアップ！" : "しあい しゅうりょう！";
-        m_finishText.text = result.Winner != null
-            ? $"{title}\n<size=70%>しょうしゃ：{result.Winner.Label}　{CharaName(result.Winner)}</size>"
-            : $"{title}\n<size=70%>ひきわけ</size>";
+        m_finishText.text = result.Winner == null ? $"{title}\n<size=70%>ひきわけ</size>"
+            : result.WinnerTeam >= 0 ? $"{title}\n<size=70%>しょうしゃ：{TeamWinnerText(result.WinnerTeam)}</size>"
+            : $"{title}\n<size=70%>しょうしゃ：{result.Winner.Label}　{CharaName(result.Winner)}</size>";
+    }
+
+    // チーム戦の勝者：「赤チーム（1P、CPU）」
+    string TeamWinnerText(int team)
+    {
+        int t = team % MatchSetup.TeamCount;
+        var members = new System.Collections.Generic.List<string>();
+        foreach (var p in m_director.Players)
+            if (p != null && p.Entry != null && p.Entry.team == team) members.Add(p.Label);
+        string names = members.Count > 0 ? "（" + string.Join("、", members) + "）" : "";
+        return $"{MatchSetup.TeamNames[t]}チーム{names}";
     }
 
     // ---------------- 目印 ----------------

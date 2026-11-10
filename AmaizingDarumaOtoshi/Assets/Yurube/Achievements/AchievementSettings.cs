@@ -24,6 +24,20 @@ namespace Yurube.Achievements
         [Tooltip("通知の飾りに使う色")]
         [SerializeField] Color m_accentColor = new Color(0.96f, 0.60f, 0.18f);
 
+        [Header("リザルトで見せる実績")]
+        [Tooltip("解除をゲーム中に通知せず、試合後のリザルトでまとめて見せる（オフにすると今までの右上の通知に戻る）")]
+        [SerializeField] bool m_resultPresentation = true;
+        [Tooltip("リザルトで個別に見せる最大件数。多いぶんは「ほか○件」にまとめる")]
+        [SerializeField, Min(1)] int m_resultMaxCards = 3;
+        [Tooltip("カードが右から入ってくる秒数")]
+        [SerializeField, Min(0.05f)] float m_resultSlideSeconds = 0.45f;
+        [Tooltip("カードを出しておく秒数（この間に入力が無ければ次へ）")]
+        [SerializeField, Min(0.2f)] float m_resultHoldSeconds = 2.2f;
+        [Tooltip("最後の進捗ゲージが伸びる秒数")]
+        [SerializeField, Min(0.2f)] float m_resultProgressSeconds = 1.8f;
+        [Tooltip("レアリティ別の演出。空なら既定の演出で動く（差し替えたいときだけ入れる）")]
+        [SerializeField] List<AchievementRevealStyle> m_revealStyles = new List<AchievementRevealStyle>();
+
         static AchievementSettings s_instance;
 
         public static AchievementSettings Instance
@@ -48,6 +62,26 @@ namespace Yurube.Achievements
         public AudioClip UnlockSound => m_unlockSound;
         public Sprite DefaultIcon => m_defaultIcon;
         public Color AccentColor => m_accentColor;
+
+        // ---- リザルトで見せる実績 ----
+        public bool ResultPresentation => m_resultPresentation;
+        public int ResultMaxCards => Mathf.Max(1, m_resultMaxCards);
+        public float ResultSlideSeconds => Mathf.Max(0.05f, m_resultSlideSeconds);
+        public float ResultHoldSeconds => Mathf.Max(0.2f, m_resultHoldSeconds);
+        public float ResultProgressSeconds => Mathf.Max(0.2f, m_resultProgressSeconds);
+
+        // レアリティ別の演出。入っていなければ既定の演出を作って返す（無くても動く）
+        public AchievementRevealStyle StyleFor(AchievementRarity rarity)
+        {
+            if (m_revealStyles != null)
+            {
+                foreach (var style in m_revealStyles)
+                {
+                    if (style != null && style.Rarity == rarity) return style;
+                }
+            }
+            return AchievementRevealStyle.GetDefault(rarity);
+        }
 
         // 実際に遊べるキャラクターの数（「みんなの力」の目標）。
         // セレクトの一覧には、まだプレハブが無いキャラも並んでいるので、遊べるものだけ数える

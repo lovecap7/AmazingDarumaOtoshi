@@ -5,6 +5,7 @@ using Nakahira;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Rendering.Universal;
+using Yurube.Achievements;
 
 // リザルト画面（1位の表彰）その2。「積み木タワーの高さ自慢」の演出。
 //  1. 1位の顔はタワーの横で待っている。カメラは足元から見上げる
@@ -125,6 +126,8 @@ public class ResultTowerScreen : MonoBehaviour
     float shake;
     bool happy, done, leaving;
     float doneTime;
+    // 試合で解除した実績を、勝敗表示のあとに1枚ずつ見せる係（中身は Yurube 側）
+    AchievementResultPresenter m_achievements;
 
     float Dt => Time.unscaledDeltaTime * baseSpeed;
 
@@ -140,6 +143,8 @@ public class ResultTowerScreen : MonoBehaviour
         BuildStage();
         BuildTowers();
         BuildUI();
+        // 解除した実績があるときだけ、勝敗表示のあとにカードで見せる
+        m_achievements = AchievementResultPresenter.Create(uiRoot, font);
         StartCoroutine(Ceremony());
     }
 
@@ -582,6 +587,10 @@ public class ResultTowerScreen : MonoBehaviour
         shake = 0.25f;
 
         baseSpeed = 1f;
+
+        // 解除した実績をカードで見せる（1件も無ければ何も出ずにすぐ終わる）
+        yield return m_achievements.Play();
+
         done = true;
         doneTime = Time.unscaledTime;
     }
@@ -726,6 +735,8 @@ public class ResultTowerScreen : MonoBehaviour
         bool submit = MenuInput.Submit() || MenuInput.AnyClick();
         if (!done)
         {
+            // 実績カードを見せている間は、画面側では早送りしない（カードの操作はカード側が受ける）
+            if (m_achievements != null && m_achievements.IsPlaying) return;
             if (submit) baseSpeed = skipSpeed;   // 演出中に押したら早送り
             return;
         }

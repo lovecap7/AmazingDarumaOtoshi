@@ -261,7 +261,7 @@ MonoBehaviour:
   logoScale: 1.45
   hammerScale: 0.75
   buttonScale: 0.9
-  headModel: {fileID: 919132149155446097, guid: 41b0a15e37ba3fd43a08624c09d91c2d, type: 3}
+  headModel: {fileID: 919132149155446097, guid: a54aff5306b0dbe41aae15b383011655, type: 3}
   headModelHeight: 0.85
   headModelYaw: 180
   blockModelMesh: {fileID: 8944754907838720677, guid: ba0d32a3acf1aa74ea9439f5714316e9, type: 3}
