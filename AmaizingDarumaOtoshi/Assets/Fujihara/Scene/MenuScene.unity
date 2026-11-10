@@ -304,7 +304,7 @@ MonoBehaviour:
     showScoreNumbers: 0
     notebookMemo: "\u3060\u308B\u307E\u90E8\u3000\u308C\u3093\u3057\u3085\u3046\u30CE\u30FC\u30C8"
   creditsText: "<size=150%>\u30A2\u30E1\u30A4\u30B8\u30F3\u30B0 \u3060\u308B\u307E\u843D\u3068\u3057</size>\n\n\n<size=110%>\u30D7\u30ED\u30B0\u30E9\u30E0\uFF08\u4E94\u5341\u97F3\u9806\uFF09</size>\n\u4E95\u4E0A\n\u5FD7\u9DF9\n\u4E2D\u5DDD\n\u4E2D\u5E73\n\u85E4\u539F\n\n\n<size=110%>\u30D5\u30A9\u30F3\u30C8</size>\nYuji Syuku (SIL Open Font License)\n\n\n\n<size=120%>Thank you for Playing!</size>"
-  headModel: {fileID: 919132149155446097, guid: 41b0a15e37ba3fd43a08624c09d91c2d, type: 3}
+  headModel: {fileID: 919132149155446097, guid: a54aff5306b0dbe41aae15b383011655, type: 3}
   headModelHeight: 0.85
   headModelYaw: 180
   blockModelMesh: {fileID: 8944754907838720677, guid: ba0d32a3acf1aa74ea9439f5714316e9, type: 3}
