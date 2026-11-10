@@ -77,7 +77,7 @@
 | `NetworkDarumaGhost.cs` | クライアントで DarumaGhost を止める |
 | `NetworkTumiki.cs` | ホストでは `Start` で自分を Spawn。色と状態（炎 / 積まれている / ポンと出る途中）を配る。クライアントで煙・炎・ポンと出る演出。割れて消えたら NetEffects に知らせる |
 | `NetStageSync.cs` | ステージ番号を配る。クライアントでは StageSwitcher と全 TumikiSpawner を止める |
-| `NetConnectScreen.cs`（`suehara/NetConnectScene.unity`） | **本番の入り口**（2026-11-04）。メニューの「たたかう → オンライン」から来る。見た目はセレクト画面と同じ（同じ GameObject に藤原さんの `TitleClubRoomDressing` を付けて部室の背景）。「ホスト」→ へやばんごう・IP・集まった人（1P〜4P）を出し、A / Start で全員 NetStages へ（`NetSceneFlow.Load`）。「さんか」→ へやばんごう（4けた）か IP アドレスをキーボードで入れてつなぐ。NetworkManager はプレハブ（`Network/NetworkManager.prefab`。NetStages のものと同じ設定）から作る。NetStages で切断したら（NetLobbyUI・NetSceneFlow）ここに戻ってくる |
+| `NetConnectScreen.cs`（`suehara/NetConnectScene.unity`） | **本番の入り口**（2026-11-04）。メニューの「たたかう → オンライン」から来る。見た目はセレクト画面と同じ（同じ GameObject に藤原さんの `TitleClubRoomDressing` を付けて部室の背景）。「ホスト」→ へやばんごう・集まった人（1P〜4P）を出し（IP アドレスは 11/10 から出さない。へやばんごうが使えないときだけその知らせを出す）、A / Start で全員 NetStages へ（`NetSceneFlow.Load`）。「さんか」→ へやばんごう（4けた）か IP アドレスをキーボードで入れてつなぐ。NetworkManager はプレハブ（`Network/NetworkManager.prefab`。NetStages のものと同じ設定）から作る。NetStages で切断したら（NetLobbyUI・NetSceneFlow）ここに戻ってくる。切れたときのお知らせに、切れた理由（エラーコードなど）は出さない（11/10） |
 | `NetRoom.cs` | へやばんごうで LAN の中のホストを見つける。ホストは UDP 47777（使われていれば 47778〜47780）で問い合わせを待ち、番号が合えばゲームのポートを返す（シーンをまたいで答え続け、ホストをやめたら消える）。さんかはブロードキャストとこの PC に問い合わせる。**LAN の中だけ。インターネット越しにするならここを Unity Relay の参加コードに置き換える** |
 
 消したもの: `NetStageSpawner.cs`（NetMatch に置き換え）、`suehara/NetTestUI.cs`（NetLobbyUI に置き換え）
@@ -142,7 +142,7 @@
   → `NetMatch` は、ホスト自身の分だけすぐ出し、ほかの人は `SceneManager.OnLoadComplete`（その人が読み終えた）で出す。ユーザーが2台で確認済み。
 - 2026-11-09: ステージ19・20 のネット対応。ホストで動かして、全部品の状態の書き出しと読み込みの数が合うこと、
   キューで突く・球が止まるときのエフェクト・音・文字・揺れがクライアントへ送る流れに乗ることを確認（エラーなし）。
-  **クライアント側の見た目は未確認**（Multiplayer Play Mode か PC 2台で確認する）。
+  2026-11-10: PC 2台でクライアント側の見た目も問題なし（ユーザーが確認）。
 
 ### テストのしかた
 本番の流れ: MenuScene から再生 →「たたかう → オンライン」→ ホストは「ホスト」、参加する人は「さんか」でホストの画面のへやばんごうを入れる → ホストが A / Start で試合のシーンへ →
