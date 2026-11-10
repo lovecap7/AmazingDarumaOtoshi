@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9a7a62d9f13f31d49a3bc6e86f714e0a, type: 3}
+  m_Name: GameModelSettings
+  m_EditorClassIdentifier: Assembly-CSharp::GameModelSettings
+  useModels: 1
+  roster: {fileID: 11400000, guid: 0aaf3a65396bc1940a8bcd03c495c9f0, type: 2}
+  headYaw: 0
+  ghostUsesModelShape: 1
+  tsumikiMesh: {fileID: 8944754907838720677, guid: ba0d32a3acf1aa74ea9439f5714316e9, type: 3}
+  tsumikiPattern: 1
+  patternMaterials:
+  - {fileID: 2100000, guid: 8f86eddebab74864d977a52390515cf9, type: 2}
+  - {fileID: 2100000, guid: 92219c187a262a54e9ba4d161c76f85f, type: 2}
+  - {fileID: 2100000, guid: 0fcc4cff7aa9ac34198faf340a106fc7, type: 2}
+  - {fileID: 2100000, guid: 7dd69ac4b33285c499d571be0c49136e, type: 2}
+  plainMaterials:
+  - {fileID: 2100000, guid: 79ab084c4b0c9874aa1682d1cdf6200b, type: 2}
+  - {fileID: 2100000, guid: 02a492f4e4ac5ff4dbcb47d88726187b, type: 2}
+  - {fileID: 2100000, guid: 025cc94517bc975459a7b9cab953bfae, type: 2}
+  - {fileID: 2100000, guid: c80c67b4cf110ec4283bc0423e510b3d, type: 2}
+  resultHeadHeight: 0.85

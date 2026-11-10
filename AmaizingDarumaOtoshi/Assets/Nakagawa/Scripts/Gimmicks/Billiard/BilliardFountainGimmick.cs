@@ -8,7 +8,7 @@ namespace Nakagawa
     //  ・ポケットが光って膨らむ(ため) → ポンポンと1個ずつ撃ち出す(持ち主なし。速いうちは当たると危ない)
     //  ・盤面の積み木の上限(TumikiSpawner)を超える分は撃たない
     //  ・撃ち出した積み木は着地すると普通の落ちている積み木になるので、噴き出したポケットの周りが取り合いになる
-    public class BilliardFountainGimmick : BilliardPocketGimmick
+    public class BilliardFountainGimmick : BilliardPocketGimmick, INetGimmickState
     {
         [SerializeField] TumikiBlock m_tumikiPrefab;
         [Tooltip("盤面の上限を調べる TumikiSpawner(未設定なら上限なし)")]
@@ -51,6 +51,7 @@ namespace Nakagawa
             public bool Charging;
             public int Index;
             public MeshRenderer Glow;
+            public float Charge;   // ネット対戦用(suehara): ための進み(0〜1)
         }
 
         readonly List<Shot> m_shots = new List<Shot>();
@@ -86,16 +87,15 @@ namespace Nakagawa
         private void Update()
         {
             if (m_shots.Count == 0 || GimmickClock.IsNetClient) return;
+            using var relay = GimmickNet.Relay();   // ネット対戦用(suehara)
             float dt = GimmickClock.IsHeld ? 0.0f : Time.deltaTime;
             for (int i = m_shots.Count - 1; i >= 0; i--)
             {
                 var s = m_shots[i];
                 s.Timer -= dt;
                 // ポケットの光: ための間は膨らみながら点滅、撃っている間は明るく
-                float charge = s.Charging && m_chargeTime > 0.0f ? 1.0f - Mathf.Clamp01(s.Timer / m_chargeTime) : 1.0f;
-                float blink = GimmickPalette.Blink(Time.time, s.Charging ? 8.0f : 14.0f);
-                s.Glow.transform.localScale = Vector3.one * Mathf.Lerp(0.8f, 2.0f, charge);
-                EffectMeshes.SetColor(s.Glow, GimmickPalette.WithAlpha(Color, Mathf.Lerp(0.4f, 0.9f, blink) * charge));
+                s.Charge = s.Charging && m_chargeTime > 0.0f ? 1.0f - Mathf.Clamp01(s.Timer / m_chargeTime) : 1.0f;
+                UpdateGlow(s);
 
                 if (s.Timer > 0.0f) continue;
                 s.Charging = false;
@@ -141,6 +141,60 @@ namespace Nakagawa
         {
             if (m_colors != null && m_colors.Length > 0) return m_colors[index % m_colors.Length];
             return (TumikiColor)Random.Range(0, 4);
+        }
+
+        void UpdateGlow(Shot s)
+        {
+            float blink = GimmickPalette.Blink(Time.time, s.Charging ? 8.0f : 14.0f);
+            s.Glow.transform.localScale = Vector3.one * Mathf.Lerp(0.8f, 2.0f, s.Charge);
+            EffectMeshes.SetColor(s.Glow, GimmickPalette.WithAlpha(Color, Mathf.Lerp(0.4f, 0.9f, blink) * s.Charge));
+        }
+
+        //========================================
+        // ネット対戦用(suehara): ポケットの光をホストから受け取る(撃ち出す積み木はネットワークに乗っているので別に届く)
+        //========================================
+
+        const int kMaxNetShots = 4;
+
+        public void WriteNetState(GimmickNetState s)
+        {
+            int n = Mathf.Min(m_shots.Count, kMaxNetShots);
+            s.AddInt(n);
+            for (int i = 0; i < n; i++)
+            {
+                s.AddVec3(m_shots[i].Origin);
+                s.Add(m_shots[i].Charge);
+                s.AddBool(m_shots[i].Charging);
+            }
+        }
+
+        public void ReadNetState(GimmickNetState s)
+        {
+            int n = Mathf.Clamp(s.Int(), 0, kMaxNetShots);
+            while (m_shots.Count > n)
+            {
+                var last = m_shots[m_shots.Count - 1];
+                if (last.Glow != null) Destroy(last.Glow.gameObject);
+                m_shots.RemoveAt(m_shots.Count - 1);
+            }
+            for (int i = 0; i < n; i++)
+            {
+                Vector3 origin = s.Vec3();
+                float charge = s.Float();
+                bool charging = s.Bool();
+                if (!s.Ok) return;
+                if (i >= m_shots.Count)
+                {
+                    var shot = new Shot { Glow = EffectMeshes.Create("FountainGlow", transform, EffectMeshes.Disc, true) };
+                    m_shots.Add(shot);
+                }
+                var sh = m_shots[i];
+                sh.Origin = origin;
+                sh.Charge = charge;
+                sh.Charging = charging;
+                sh.Glow.transform.position = origin + Vector3.up * 0.05f;
+                UpdateGlow(sh);
+            }
         }
     }
 }

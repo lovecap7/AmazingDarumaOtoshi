@@ -8,7 +8,7 @@ namespace Nakagawa
     //  ・予告: プレイヤーの足元に輪が出て点滅しながら縮み、光の粒が昇る
     //  ・入れ替え: 全員(生きているキャラクター)を、別の人がいた位置へ同時にワープさせる(自分の位置に戻る人はいない)
     //    1人しかいないときは、台の上のランダムな的玉と入れ替える
-    public class BilliardShuffleGimmick : BilliardPocketGimmick
+    public class BilliardShuffleGimmick : BilliardPocketGimmick, INetGimmickState
     {
         [SerializeField] float m_warningTime = 1.3f;
         [Tooltip("入れ替えた後、少しのあいだ動きを止める時間(ワープの余韻)")]
@@ -48,15 +48,7 @@ namespace Nakagawa
             m_table = table;
             m_time = 0.0f;
             m_nextSparkle = 0.0f;
-            ClearTargets();
-            foreach (var c in FindObjectsByType<DarumaCharacter>())
-            {
-                if (c == null || !c.CanBeAffected) continue;
-                var t = new Target { Character = c };
-                t.Ring = EffectMeshes.Create("ShuffleRing", transform, EffectMeshes.Ring, true);
-                t.Column = EffectMeshes.Create("ShuffleColumn", transform, EffectMeshes.Tube, true);
-                m_targets.Add(t);
-            }
+            BuildTargets();
             GimmickSound.Play(GimmickSound.Charge, 0.3f, GimmickSound.Charge.length / Mathf.Max(0.1f, m_warningTime));
         }
 
@@ -65,6 +57,21 @@ namespace Nakagawa
             m_time = -1.0f;
             ClearTargets();
             Unfreeze();
+        }
+
+        void BuildTargets()
+        {
+            ClearTargets();
+            // ネット対戦用(suehara): クライアントのキャラクターは表示専用(DarumaCharacter は止めてある)なので、出ている人を全員選ぶ
+            bool client = GimmickClock.IsNetClient;
+            foreach (var c in FindObjectsByType<DarumaCharacter>())
+            {
+                if (c == null || (client ? !c.gameObject.activeInHierarchy : !c.CanBeAffected)) continue;
+                var t = new Target { Character = c };
+                t.Ring = EffectMeshes.Create("ShuffleRing", transform, EffectMeshes.Ring, true);
+                t.Column = EffectMeshes.Create("ShuffleColumn", transform, EffectMeshes.Tube, true);
+                m_targets.Add(t);
+            }
         }
 
         void ClearTargets()
@@ -85,6 +92,8 @@ namespace Nakagawa
                 if (m_freezeTimer <= 0.0f) Unfreeze();
             }
             if (m_time < 0.0f) return;
+            // ネット対戦用(suehara): ホストは光の粒・入れ替えの演出を送り、クライアントは自分では出さない(予告の輪だけ自分で出す)
+            using var relay = GimmickNet.RelayOrMute();
             if (!GimmickClock.IsHeld) m_time += Time.deltaTime;
             float t = m_warningTime > 0.0f ? Mathf.Clamp01(m_time / m_warningTime) : 1.0f;
 
@@ -105,7 +114,44 @@ namespace Nakagawa
                 if (sparkle) GimmickBurst.Play(m_warningEffect, p + Vector3.up * 0.1f);
             }
 
-            if (t >= 1.0f) Swap();
+            if (t >= 1.0f)
+            {
+                // ネット対戦用(suehara): 入れ替えはホストだけ(クライアントは予告を片付けるだけ)
+                if (GimmickClock.IsNetClient)
+                {
+                    m_time = -1.0f;
+                    ClearTargets();
+                }
+                else Swap();
+            }
+        }
+
+        //========================================
+        // ネット対戦用(suehara): 予告の経過時間をホストから受け取る(輪・光の柱はクライアントの Update が出す)
+        //========================================
+
+        public void WriteNetState(GimmickNetState s)
+        {
+            s.AddBool(m_time >= 0.0f);
+            s.Add(Mathf.Max(0.0f, m_time));
+        }
+
+        public void ReadNetState(GimmickNetState s)
+        {
+            bool active = s.Bool();
+            float time = s.Float();
+            if (!s.Ok) return;
+            if (!active)
+            {
+                if (m_time >= 0.0f)
+                {
+                    m_time = -1.0f;
+                    ClearTargets();
+                }
+                return;
+            }
+            if (m_time < 0.0f) BuildTargets();
+            m_time = time;
         }
 
         void Swap()

@@ -283,6 +283,7 @@ public class ResultTowerScreen : MonoBehaviour
         for (int b = 0; b < colors.Count; b++)
         {
             var blk = ToyKit.CreateBlock("", colors[b], blockMesh, new Vector2(1.05f, 0.68f), BlockD, font, letterMat, out _);
+            GameModelSettings.ApplyBlock(blk, colors[b]);   // 試合と同じ積み木のモデルに（色も試合のまま）
             blk.SetParent(t.root, false);
             blk.localPosition = new Vector3(0f, (b + 0.5f) * BlockH, 0f);
             blk.gameObject.SetActive(false);
@@ -297,6 +298,9 @@ public class ResultTowerScreen : MonoBehaviour
         var mat = GhostMaterial(new Color(Mathf.Lerp(0.92f, tint.r, 0.25f), Mathf.Lerp(0.95f, tint.g, 0.25f), Mathf.Lerp(1f, tint.b, 0.25f), 0.55f));
         var body = t.face.root.Find("Body");
         if (body != null) body.GetComponent<Renderer>().sharedMaterial = mat;
+        // 頭がモデルなら、モデルも半透明にする
+        var model = t.face.root.Find("HeadModel");
+        if (model != null) foreach (var r in model.GetComponentsInChildren<Renderer>()) r.sharedMaterial = mat;
         t.face.body = mat;
         var tail = ToyKit.Primitive(PrimitiveType.Sphere, "Tail", t.face.root);
         tail.localScale = new Vector3(0.5f, 0.42f, 0.5f);
@@ -330,7 +334,8 @@ public class ResultTowerScreen : MonoBehaviour
         t.face.root.SetParent(t.root, false);
         t.face.root.localPosition = new Vector3(0f, HeadR, 0f);
         if (e.character != null && e.character.color != Color.white) t.face.body.SetColor("_BaseColor", e.character.color);
-        t.tag = ToyKit.Text3D(font, letterMat, e.label, t.root, new Vector2(2f, 0.5f), 3f);
+        GameModelSettings.ApplyHead(t.face, e.character);   // 選んだキャラのモデルに
+        t.tag =ToyKit.Text3D(font, letterMat, e.label, t.root, new Vector2(2f, 0.5f), 3f);
         t.tag.color = e.playerColor;
         // 名札は顔の前の床に立てる
         t.tag.transform.localPosition = new Vector3(0f, 0.2f, -HeadR - 0.45f);

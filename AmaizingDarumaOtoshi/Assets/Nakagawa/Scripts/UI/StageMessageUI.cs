@@ -39,6 +39,9 @@ namespace Nakagawa
         public static void Show(string text, Color color, float size = 1.0f, float duration = 2.0f)
         {
             if (string.IsNullOrEmpty(text)) return;
+            // ネット対戦用(suehara): クライアントで二重に出さない / ホストで出した文章をクライアントにも送る(GimmickNet)
+            if (GimmickNet.Muted) return;
+            if (GimmickNet.Relaying) GimmickNet.MessageSent?.Invoke(text, color, size, duration);
             if (s_instance == null)
             {
                 var go = new GameObject("StageMessageUI");

@@ -9,7 +9,7 @@ namespace Nakagawa
     //  ・画面の右上に小さな窓を出し、賭けの表の上に置いたサブカメラの映像で「どこに賭けたか」を見せる
     //  ・球が止まったら判定: 的中なら配当として盤全体に積み木が降る(0 は多め)、ハズレならチップは場に没収される
     // RouletteGame が Place → Resolve → Clear の順に呼ぶ
-    public class RouletteBet : MonoBehaviour
+    public class RouletteBet : MonoBehaviour, INetGimmickState
     {
         [Header("賭けの表")]
         [Tooltip("賭けるマスの中心(緑・赤・黒の順)")]
@@ -144,13 +144,10 @@ namespace Nakagawa
         {
             if (m_kind < 0) return false;
             bool hit = (int)result == m_kind;
-            m_state = hit ? State.Won : State.Lost;
-            m_time = 0.0f;
+            ShowResult(hit);
             Transform spot = Spot(m_kind);
             if (hit)
             {
-                m_result.text = m_hitText;
-                m_result.color = m_gold;
                 if (spot != null) GimmickBurst.Play(m_hitEffect, spot.position + Vector3.up * 0.3f);
                 GimmickSound.Play(GimmickSound.Charge, 0.35f, 1.8f);
                 if (m_payoutRain != null && wheel != null)
@@ -161,11 +158,50 @@ namespace Nakagawa
             }
             else
             {
-                m_result.text = m_missText;
-                m_result.color = new Color(0.7f, 0.7f, 0.75f, 1.0f);
                 GimmickSound.Play(GimmickSound.Pop, 0.3f, 0.6f);
             }
             return hit;
+        }
+
+        // 判定の結果を表に出す(チップの山が高くなる / 回収される)
+        void ShowResult(bool hit)
+        {
+            m_state = hit ? State.Won : State.Lost;
+            m_time = 0.0f;
+            if (m_result == null) return;
+            m_result.text = hit ? m_hitText : m_missText;
+            m_result.color = hit ? m_gold : new Color(0.7f, 0.7f, 0.75f, 1.0f);
+        }
+
+        //========================================
+        // ネット対戦用(suehara): どの色に賭けたか・判定の結果をホストから受け取る
+        // (チップが落ちる・弾む動き、表の光、画面の窓はクライアントの Update が出す。判定のときのエフェクト・音・配当はホストから届く)
+        //========================================
+
+        public void WriteNetState(GimmickNetState s)
+        {
+            s.AddInt(m_kind);
+            s.AddInt((int)m_state);
+        }
+
+        public void ReadNetState(GimmickNetState s)
+        {
+            int kind = s.Int();
+            var state = (State)s.Int();
+            if (!s.Ok) return;
+
+            if (kind < 0)
+            {
+                if (m_kind >= 0) Clear();
+                return;
+            }
+            if (kind != m_kind)
+            {
+                // チップを置く(置いたときの音はホストから届くので、ここでは鳴らさない)
+                using (GimmickNet.Mute()) Place((RouletteWheel.PocketKind)Mathf.Clamp(kind, 0, 2));
+            }
+            bool decided = state == State.Won || state == State.Lost;
+            if (decided && m_state != state) ShowResult(state == State.Won);
         }
 
         // チップと光る枠を片付け、窓を閉じる

@@ -9,7 +9,7 @@ namespace Nakagawa
     //  ・飛んでいる積み木は壁と同じように跳ね返る(ITumikiReflector)
     //  ・見た目は進む向きに転がり、速いと軌跡が出る
     [RequireComponent(typeof(Rigidbody), typeof(SphereCollider))]
-    public class RouletteBall : MonoBehaviour, ITumikiReflector
+    public class RouletteBall : MonoBehaviour, ITumikiReflector, INetGimmickState
     {
         [SerializeField, Min(0.1f)] float m_radius = 0.6f;
         [SerializeField] Transform m_visual;
@@ -118,6 +118,7 @@ namespace Nakagawa
         void HandleContact(Collision collision)
         {
             if (!Visible || GimmickClock.IsNetClient) return;
+            using var relay = GimmickNet.Relay();   // ネット対戦用(suehara)
             // 飛んでいる積み木は積み木の側で跳ね返る
             var block = collision.collider.GetComponentInParent<TumikiBlock>();
             if (block != null && block.CurrentState == TumikiBlock.State.Flying) return;
@@ -148,6 +149,37 @@ namespace Nakagawa
             GimmickSound.Play(BilliardFx.Strike, Mathf.Lerp(0.2f, 0.45f, k), Random.Range(1.1f, 1.25f));
             if (!isBlock) BilliardFx.Shake(Mathf.Lerp(0.08f, 0.3f, k), 0.2f);
             Knocked?.Invoke(target, point, power);
+        }
+
+        //========================================
+        // ネット対戦用(suehara): 位置・見せる/隠す・大きさ・速さ(転がる見た目と軌跡用)をホストから受け取る
+        //========================================
+
+        public void WriteNetState(GimmickNetState s)
+        {
+            s.AddVec3(Position);
+            s.AddBool(Visible);
+            s.AddBool(m_collider.enabled);
+            s.Add(m_visual != null ? m_visual.localScale.x / Mathf.Max(0.0001f, m_visualScale.x) : 1.0f);
+            s.AddVec3(m_velocity);
+        }
+
+        public void ReadNetState(GimmickNetState s)
+        {
+            Vector3 pos = s.Vec3();
+            bool visible = s.Bool();
+            bool collide = s.Bool();
+            float scale = s.Float();
+            Vector3 velocity = s.Vec3();
+            if (!s.Ok) return;
+
+            if (visible != Visible || collide != m_collider.enabled) SetVisible(visible, collide);
+            m_rb.position = pos;
+            transform.position = pos;
+            m_lastPosition = pos;
+            m_hasLast = true;
+            m_velocity = visible ? velocity : Vector3.zero;
+            SetScale(scale);
         }
     }
 }

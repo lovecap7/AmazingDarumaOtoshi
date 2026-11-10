@@ -79,6 +79,9 @@ namespace Nakagawa
         public static void Play(AudioClip clip, float volume, float pitch = 1.0f)
         {
             if (clip == null || volume <= 0.0f) return;
+            // ネット対戦用(suehara): クライアントで二重に鳴らさない / ホストで鳴らしたものをクライアントにも送る(GimmickNet)
+            if (GimmickNet.Muted) return;
+            if (GimmickNet.Relaying) GimmickNet.SoundSent?.Invoke(clip, volume, pitch);
             var go = new GameObject("GimmickSound");
             var source = go.AddComponent<AudioSource>();
             source.clip = clip;

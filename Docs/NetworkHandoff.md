@@ -1,6 +1,6 @@
 # ネット対戦 引き継ぎメモ
 
-最終更新: 2026-11-04（Claude との作業セッション4回目: NetStages を AllStages から作り直し）
+最終更新: 2026-11-09（ステージ19 ビリヤード・20 ルーレットのネット対応、NetStages の作り直し、クライアントが最初の試合で操作できない不具合の修正）
 担当: 末原（suehara）
 
 このメモだけで作業を再開できるように、方針・現状・既知の問題・次のタスクをまとめています。
@@ -62,6 +62,7 @@
 | `NetMatchDriver.cs` / `INetMatchDriver.cs` | Match に付けてネットの試合にする部品。出したキャラ・幽霊を Spawn する |
 | `NetMatchPlayer.cs` / `NetPlayer.prefab` | 接続した人ごとの1人分（PlayerObject）。NetworkCommandSource（入力）と NetMatchPlayer（中身の同期）。MatchPlayer は実行時に付ける |
 | `NetEffects.cs` | NetMatch と同じ GameObject。ホストの生成予告を見た目だけの予告で出す / 割れた積み木の破片を出す |
+| `NetGimmickSync.cs` | NetMatch と同じ GameObject（2026-11-09）。ホストだけが動かすギミック（ステージ19 ビリヤード・20 ルーレット。`INetGimmickState` を持つもの）の見た目をクライアントに見せる。**状態**: ホストが 0.05 秒ごとに、表示中のギミックの状態（数の並び）をまとめて送り、クライアントは 0.12 秒遅らせて前後の間を補間し、毎フレーム `ReadNetState` を呼ぶ。ギミックの見分けはシーンの中の並び（一番上は名前、その下は親からの順番）。**エフェクト・音・文字・揺れ**: ホストで `GimmickNet.Relay()` の範囲に出た `GimmickBurst.Play` / `GimmickSound.Play` / `BilliardFx.Shake` / `StageMessageUI.Show` を、そのままクライアントでも出す（エフェクトの設定は JSON で送る。材質は送らない。音は名前で探す） |
 | `NetLobbyUI.cs` | NetStages の接続まわり。つないでいないときの中央の接続パネル（NetStages を直接開いたときの試験用。クリック操作）、切断したときの戻り（接続画面から来たときは接続画面へ）、NetSessionMenu を自動で付ける。リザルトから戻ったとき、シーンに入っている2つ目の NetworkManager を消す |
 | `NetSessionMenu.cs` | NetStages でつないでいる間の表示とメニュー（2026-11-04。クリックなし）。右上にいまの試合の設定・へやばんごう・人数。Start（+）/ Tab でメニュー（見た目は中川さんの PauseMenu と同じ）: ホストの開始待ちは「試合を はじめる / モード / ストック / 時間 / へやを かいさん / とじる」、試合中とさんかは「かいさん（ぬける）/ とじる」。ホストが変えたルールは `NetMatch.SetRules` ですぐ全員に配る。開いている間はキャラの入力（NetPadKeyboardInput）と、OnGUI で描く開発用の表示（StageSwitcher・TumikiImpactModeToggle・SpawnPointDebugView・StageCameraTuner・CharacterLabUI。OnGUI はどの UI よりも上に出るため）を止める。**Yurube さんの必殺技のゲージ・カットインも OnGUI なのでメニューの上に出る**（止めると必殺技が止まるのでそのまま）。ネット対戦は時間を止められないので、試合中に開いても試合は進む |
 | `NetSceneFlow.cs` | ネットのシーン遷移（自動で1個作られ、シーンをまたいで残る）。ホストの `Load(scene)` で全員を暗くしてから NGO で切り替え、読み終わったら明るくする。リザルトで切断したら NetStages に戻す |
@@ -82,7 +83,7 @@
 消したもの: `NetStageSpawner.cs`（NetMatch に置き換え）、`suehara/NetTestUI.cs`（NetLobbyUI に置き換え）
 
 ### Assets/suehara/（テスト用）
-- `NetStages.unity`: AllStages の複製（2026-11-04 に作り直し。ステージ89個）。Match（DarumaMatch）は非表示で置いておき、接続したら NetMatch が表示する。
+- `NetStages.unity`: AllStages の複製（2026-11-09 に作り直し。ステージ91個。ステージ19 ビリヤード・20 ルーレット入り）。Match（DarumaMatch）は非表示で置いておき、接続したら NetMatch が表示する。
   Match のキャラ・幽霊・積み木は `*_Net` を設定済み。TumikiSpawner（全90個）の積み木も `Tumiki_Net`。
   UnityTransport の切断判定は 10 秒（DisconnectTimeoutMS）。
   **AllStages にステージや設定が足されたら、メニューの「Tools → ネット対戦 → NetStages を AllStages から作り直す」で取り込む**
@@ -103,6 +104,10 @@
 | `Nakagawa/Scripts/GimmickUtil.cs`（中川さん） | ネットのクライアントでは影響を受けるものを見つけない（ギミックがクライアントの積み木・キャラを動かさない。ワープがクライアントのキャラの Kinematic を外す不具合の対策） |
 | `RisingWallGimmick` / `TurntableGimmick` / `FanGimmick` / `MovingFloorGimmick`（中川さん） | GimmickClock で時間を進め、高さ・角度・位置を時間から決める。時計を合わせて一度に動いたときは乗っているものを運ばない |
 | `Nakagawa/Scripts/Spawn/TumikiSpawnWarning.cs`（中川さん） | 見た目だけの予告 `CreateView`（時間が来ても生成しない） |
+| `Nakagawa/Scripts/Gimmicks/Common/GimmickNet.cs`（新規）（中川さんのフォルダ。2026-11-09、ユーザー了承済み） | `INetGimmickState`（ホストで `WriteNetState`、クライアントで `ReadNetState`）、`GimmickNetState`（数の並び。番号・フラグは補間しない）、`GimmickNet.Relay()` / `Mute()` / `RelayOrMute()` |
+| `GimmickBurst` / `GimmickSound` / `BilliardFx.Shake` / `StageMessageUI.Show`（中川さん） | 先頭に2行: `Mute()` の範囲なら出さない、`Relay()` の範囲ならクライアントへ送る |
+| ステージ19: `BilliardBall` / `BilliardCue` / `BilliardTable` / `BilliardTiltGimmick` / `BilliardShuffleGimmick` / `BilliardFountainGimmick` / `BilliardPocketGimmick`（中川さん） | ホストの処理に `Relay()`。`INetGimmickState` で、玉（位置・転がる向き・大きさ・表示・軌跡）、キュー（構え・突く動き・狙いのガイド。クライアントでは動きを進めない）、玉が出る場所の印、傾き（経過時間・向き）、入れ替えの予告（入れ替えはホストだけ）、噴出のポケットの光を受け取る。`FindTable()`（クライアントで自分の台を探す） |
+| ステージ20: `RouletteGame` / `RouletteWheel` / `RouletteBall` / `RouletteBet` / `RouletteWeightRain` / `RouletteTumikiRain`（中川さん） | ホストの処理に `Relay()`。`INetGimmickState` で、ディーラーの手・電飾・音の進み、盤の角度（cos・sin で送る）・ポケットの予告と奈落（当たり判定も作り直す）、球、賭けた色と判定（置くときは `Mute()`）、重り・影、積み木の雨の輪を受け取る。降ってくる・噴き出す積み木は `Tumiki_Net` なので別に届く |
 | `Fujihara/Scene/MenuScene.unity`（藤原さん。了承済み） | MainMenu の `onlineSceneName` に `NetConnectScene` を入れた（この1か所だけ） |
 | `ProjectSettings/EditorBuildSettings.asset` | `suehara/NetConnectScene.unity` を追加 |
 | `Assets/DefaultNetworkPrefabs.asset` | Net Cube, Tumiki_Net, DarumaCharacter_Net, DarumaGhost_Net, NetPlayer の5件 |
@@ -131,7 +136,13 @@
   クライアント側は作り直したあと未確認（シーン内の NetworkObject の識別番号は計算し直してある）。
 - 2026-11-04: 接続画面（NetConnectScene）。メニュー → オンライン → ホスト / さんか（へやばんごう・IP アドレス）→ 全員で NetStages へ →
   ホストをやめる・切断で接続画面に戻る、まで問題なし（ユーザーが確認）。移る途中でホストが止まったときも接続画面に戻る。
-- **PC 2台の LAN テストは未実施**。
+- 2026-11-09: PC 2台のエディター同士でつながった（ファイアウォールを直したあと）。
+- 2026-11-09 直した不具合: クライアントだけ、部屋に入って最初の試合で操作できない（抜けて入り直すと操作できる）。
+  接続画面から全員で NetStages へ移るとき、ホストが読み込みの途中で参加者の NetPlayer を出していたため、クライアントでは読み込み中の前のシーンと一緒に消えていた。
+  → `NetMatch` は、ホスト自身の分だけすぐ出し、ほかの人は `SceneManager.OnLoadComplete`（その人が読み終えた）で出す。ユーザーが2台で確認済み。
+- 2026-11-09: ステージ19・20 のネット対応。ホストで動かして、全部品の状態の書き出しと読み込みの数が合うこと、
+  キューで突く・球が止まるときのエフェクト・音・文字・揺れがクライアントへ送る流れに乗ることを確認（エラーなし）。
+  **クライアント側の見た目は未確認**（Multiplayer Play Mode か PC 2台で確認する）。
 
 ### テストのしかた
 本番の流れ: MenuScene から再生 →「たたかう → オンライン」→ ホストは「ホスト」、参加する人は「さんか」でホストの画面のへやばんごうを入れる → ホストが A / Start で試合のシーンへ →
@@ -171,6 +182,10 @@ NetStages を直接開いて試すとき:
   - シューターの矢印・加速床の輪などの飾りの点滅はホストとずれる（見た目だけ）
   - バンパーが弾いたときの膨らみ、シューター・加速床・ワープ・低重力の演出はクライアントで出ない（ホストの結果の位置は届く）
   - ワープの瞬間移動は、クライアントでは NetworkTransform の補間ですべるように見える
+  - ステージ19・20: ルーレットの賭けの表のチップが落ちる・弾む動き、ビリヤードの入れ替えの予告の輪は、クライアントが自分で進める（ホストと少しずれる）。
+    入れ替えの予告の輪は、クライアントでは出ているキャラ全員に出る（ホストはやられ中などを除く）
+  - ステージ19・20 のように、ホストだけで動くギミックを新しく作るときは、`INetGimmickState` を付けて状態を送り、
+    エフェクト・音は `GimmickNet.Relay()` の範囲で出す（`Nakagawa/Scripts/Gimmicks/Common/GimmickNet.cs` の説明を参照）
 - ヒットストップの揺れ・カメラの揺れ・効果音（A-09, C-06。MatchAudio は Match を後から表示するので付かない）
 - `Time.timeScale` を使う演出（EliminationCinematic）: ホストだけスローになり、ホストの物理も遅くなる（B-11）
 - 新キャラ7体（Yurube/Prefabs: Akadaru, Aodaru, DaruKing, Hebi, Iwa, Kidaru, Midaru）は Variant ではない独立プレハブ。ネット用がない
@@ -179,6 +194,7 @@ NetStages を直接開いて試すとき:
   → DarumaCommand に Special を足して命令経由にするのが本筋（Yurube さんと相談。B-03）
 - 特殊ブロック（Shitaka/, Yurube/Script/Blocks）、きいろだるのパッシブ・ファンネルの積み木生成
 - 1台に複数人、CPU、Relay/Lobby
+- チーム戦（2026-11-09 に本編に入った。`MatchRules.teams` / `Entry.team`）: ネット対戦はいつも個人戦（NetMatch のルールに teams を入れていない）
 
 ## 6. 次にやること（優先度順・タスク一覧から）
 

@@ -71,6 +71,9 @@ namespace Nakagawa
         // カメラを揺らす(試合のカメラに CameraShake があれば)
         public static void Shake(float amplitude, float duration)
         {
+            // ネット対戦用(suehara): クライアントで二重に揺らさない / ホストの揺れをクライアントにも送る(GimmickNet)
+            if (GimmickNet.Muted) return;
+            if (GimmickNet.Relaying) GimmickNet.ShakeSent?.Invoke(amplitude, duration);
             if (s_shake == null)
             {
                 var cam = Camera.main;

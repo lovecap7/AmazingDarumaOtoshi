@@ -7,7 +7,7 @@ namespace Nakagawa
     // 傾き: 玉が入ったポケットの方へ台が傾く
     //  ・一定時間、台の上のプレイヤー・積み木・玉が、ポケットの方向へ押し流される(強さは始めと終わりでなめらかに変わる)
     //  ・床に流れる向きの矢印が並んで流れ、地鳴りが鳴り、台の見た目(m_tiltVisual)が少し傾く
-    public class BilliardTiltGimmick : BilliardPocketGimmick
+    public class BilliardTiltGimmick : BilliardPocketGimmick, INetGimmickState
     {
         [Header("効果")]
         [SerializeField] float m_duration = 6.0f;
@@ -165,6 +165,43 @@ namespace Nakagawa
                 float blink = Mathf.Lerp(0.6f, 1.0f, GimmickPalette.Blink(m_time - cx * 0.08f, 2.5f));
                 EffectMeshes.SetColor(r, GimmickPalette.WithAlpha(Color, inside ? 0.75f * s * edge * blink : 0.0f));
             }
+        }
+
+        //========================================
+        // ネット対戦用(suehara): 傾きの経過時間と向きをホストから受け取る(矢印・台の傾き・地鳴りはクライアントの Update が出す)
+        //========================================
+
+        public void WriteNetState(GimmickNetState s)
+        {
+            s.AddBool(IsActive);
+            s.Add(Mathf.Max(0.0f, m_time));
+            s.Add(m_dir.x);
+            s.Add(m_dir.z);
+        }
+
+        public void ReadNetState(GimmickNetState s)
+        {
+            bool active = s.Bool();
+            float time = s.Float();
+            Vector3 dir = new Vector3(s.Float(), 0.0f, s.Float());
+            if (!s.Ok) return;
+
+            if (!active)
+            {
+                if (IsActive) Stop();
+                return;
+            }
+            if (m_table == null) m_table = FindTable();
+            if (m_table == null) return;
+            m_dir = dir.sqrMagnitude > 0.01f ? dir.normalized : Vector3.right;
+            bool starting = !IsActive;
+            m_time = time;
+            if (starting)
+            {
+                BuildArrows();
+                if (m_loop == null) m_loop = GimmickSound.CreateLoop(transform, GimmickSound.Rumble);
+            }
+            else if (m_arrowRoot != null) m_arrowRoot.rotation = Quaternion.LookRotation(m_dir);
         }
     }
 }

@@ -15,7 +15,7 @@ namespace Nakagawa
     //     そのポケットを奈落にする(既に奈落なら隣)。盤はゆっくり止まり、球は台の外へ回収される
     // 球の動きは奈落でも通常のポケットでも同じ。回数を重ねるほど奈落が増え、次の回転までの間隔も短くなる
     // 開始のカウントダウン中は止まり、試合が終わったら新しく回さない。ネット対戦のクライアントでは何もしない
-    public class RouletteGame : MonoBehaviour
+    public class RouletteGame : MonoBehaviour, INetGimmickState
     {
         enum Phase { Idle, HandIn, Twist, HandToRim, Flick, Orbit, Drop, Hop, Settled, Collect }
 
@@ -187,6 +187,7 @@ namespace Nakagawa
             if (m_needsReset) ResetGame();
             if (GimmickClock.IsNetClient || m_wheel == null || m_ball == null) return;
             if (GimmickClock.IsHeld) return;
+            using var relay = GimmickNet.Relay();   // ネット対戦用(suehara)
             float dt = Time.fixedDeltaTime;
             m_t += dt;
 
@@ -598,5 +599,57 @@ namespace Nakagawa
 
         float Ratio(float length) => length > 0.0f ? Mathf.Clamp01(m_t / length) : 1.0f;
         static float Ease(float t) => t * t * (3.0f - 2.0f * t);
+
+        //========================================
+        // ネット対戦用(suehara): ディーラーの手・電飾・音に使う進行の状態をホストから受け取る
+        // (盤・球・賭け・出来事はそれぞれが受け取る。手の動き・電飾・音はクライアントの Update が出す)
+        //========================================
+
+        public void WriteNetState(GimmickNetState s)
+        {
+            s.AddBool(m_handVisible);
+            s.AddVec3(m_handTargetPos);
+            s.AddRot(m_handTargetRot);
+            s.AddInt((int)m_phase);
+            s.Add(m_ballAngle);
+            s.Add(m_hopFrom);
+            s.AddInt(m_result);
+            s.Add(m_resultFlash);
+            s.Add(m_ballSpeed);
+        }
+
+        public void ReadNetState(GimmickNetState s)
+        {
+            bool handVisible = s.Bool();
+            Vector3 handPos = s.Vec3();
+            Quaternion handRot = s.Rot();
+            int phase = s.Int();
+            float ballAngle = s.Float();
+            float hopFrom = s.Float();
+            int result = s.Int();
+            float flash = s.Float();
+            float ballSpeed = s.Float();
+            if (!s.Ok) return;
+
+            if (handVisible != m_handVisible)
+            {
+                m_handVisible = handVisible;
+                if (m_hand != null) m_hand.gameObject.SetActive(handVisible);
+                if (handVisible)
+                {
+                    // 出てきたときはその位置から(遠くからすべって来ないように)
+                    m_handPos = handPos;
+                    m_handRot = handRot;
+                }
+            }
+            m_handTargetPos = handPos;
+            m_handTargetRot = handRot;
+            m_phase = (Phase)Mathf.Clamp(phase, 0, (int)Phase.Collect);
+            m_ballAngle = ballAngle;
+            m_hopFrom = hopFrom;
+            m_result = result;
+            m_resultFlash = flash;
+            m_ballSpeed = ballSpeed;
+        }
     }
 }

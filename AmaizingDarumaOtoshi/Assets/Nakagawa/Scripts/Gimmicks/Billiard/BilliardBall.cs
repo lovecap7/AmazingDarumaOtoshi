@@ -10,7 +10,7 @@ namespace Nakagawa
     //  ・ポケット(床の穴)に落ちたら台(BilliardTable)に知らせる。台が消す・復活させる
     // 物理の回転は止め(Rigidbody の freezeRotation)、見た目(m_visual)だけを進む向きに転がす
     [RequireComponent(typeof(Rigidbody), typeof(SphereCollider))]
-    public class BilliardBall : MonoBehaviour, ITumikiReflector
+    public class BilliardBall : MonoBehaviour, ITumikiReflector, INetGimmickState
     {
         public enum Kind { Cue, Object }
 
@@ -222,6 +222,7 @@ namespace Nakagawa
         private void FixedUpdate()
         {
             if (!InPlay || m_rb.isKinematic) return;
+            using var relay = GimmickNet.Relay();   // ネット対戦用(suehara)
             Vector3 v = m_rb.linearVelocity;
             Vector3 h = Flat(v);
             if (h.magnitude > m_maxSpeed)
@@ -298,6 +299,7 @@ namespace Nakagawa
         void HandleContact(Collision collision, bool enter)
         {
             if (!InPlay || m_rb.isKinematic || GimmickClock.IsNetClient) return;
+            using var relay = GimmickNet.Relay();   // ネット対戦用(suehara)
             Vector3 point = collision.contactCount > 0 ? collision.GetContact(0).point : transform.position;
 
             // ほかの玉: 音と火花だけ(跳ね返りは物理に任せる)
@@ -379,5 +381,39 @@ namespace Nakagawa
         }
 
         static Vector3 Flat(Vector3 v) => new Vector3(v.x, 0.0f, v.z);
+
+        //========================================
+        // ネット対戦用(suehara): 位置・転がる見た目・見せる/隠す・軌跡をホストから受け取る(GimmickNet)
+        //========================================
+
+        public void WriteNetState(GimmickNetState s)
+        {
+            s.AddVec3(transform.position);
+            s.AddRot(m_visual != null ? m_visual.localRotation : Quaternion.identity);
+            s.Add(m_visual != null ? m_visual.localScale.x / Mathf.Max(0.0001f, m_visualScale.x) : 1.0f);
+            s.AddBool(m_visual == null || m_visual.gameObject.activeSelf);
+            s.AddBool(m_trail != null && m_trail.emitting);
+        }
+
+        public void ReadNetState(GimmickNetState s)
+        {
+            Vector3 pos = s.Vec3();
+            Quaternion rot = s.Rot();
+            float scale = s.Float();
+            bool visible = s.Bool();
+            bool trail = s.Bool();
+            if (!s.Ok) return;
+
+            m_anim = Anim.None;
+            transform.position = pos;
+            m_rb.position = pos;
+            if (m_visual != null)
+            {
+                m_visual.localRotation = rot;
+                m_visual.localScale = m_visualScale * scale;
+            }
+            if (m_visual == null || m_visual.gameObject.activeSelf != visible) SetVisible(visible);
+            if (m_trail != null) m_trail.emitting = visible && trail;
+        }
     }
 }

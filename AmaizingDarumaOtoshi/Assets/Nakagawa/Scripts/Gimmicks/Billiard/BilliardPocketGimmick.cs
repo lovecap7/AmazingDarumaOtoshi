@@ -24,5 +24,15 @@ namespace Nakagawa
         public virtual void Stop() { }
 
         protected virtual void OnDisable() => Stop();
+
+        // ネット対戦用(suehara): このギミックを並べている台(クライアントでは Activate が呼ばれないので、自分で探す)
+        protected BilliardTable FindTable()
+        {
+            foreach (var t in FindObjectsByType<BilliardTable>())
+            {
+                foreach (var g in t.Gimmicks) if (g == this) return t;
+            }
+            return null;
+        }
     }
 }
