@@ -1,0 +1,68 @@
+{
+  "id": "prologue",
+  "title": "序章「はじまりは、おにぎり」",
+  "stageId": "DebugStage31",
+  "sceneName": "AllStages",
+  "playerCharacter": "kidaru",
+  "clearKey": "Story.Clear.prologue",
+  "rules": { "mode": "Stock", "stocks": 3, "timeLimit": 0, "cpuSpecial": false },
+  "cpu": [
+    { "character": "midaru", "level": 1 }
+  ],
+  "speakers": [
+    { "id": "akadaru", "name": "あかだる", "color": "#E8544B" },
+    { "id": "aodaru", "name": "あおだる", "color": "#4B8BE8" },
+    { "id": "midaru", "name": "みだる", "color": "#4BA85A" },
+    { "id": "kidaru", "name": "きだる", "color": "#E8C64B" }
+  ],
+  "before": [
+    { "speaker": "", "direction": true, "text": "（春。部室。ホワイトボードには「練習メニュー：素振り1000回／積み上げ100段／走り込み！」とある）" },
+    { "speaker": "kidaru", "text": "あの、ここがだるま落とし部ですか？ おにぎりが出るって聞いて来ました！" },
+    { "speaker": "akadaru", "text": "おにぎり……？ まあいい！ ようこそ、七転高校だるま落とし部へ！ オレは主将のあかだるだ！" },
+    { "speaker": "aodaru", "text": "……副主将。あおだる" },
+    { "speaker": "midaru", "text": "分析担当のみだるです（眼鏡をクイッ）。おにぎりなら、部費の0.8%で用意してあります" },
+    { "speaker": "akadaru", "text": "部訓は『一撃入魂』！ 目標は全国制覇だ！ さっそく練習試合といくぞ！" },
+    { "speaker": "kidaru", "text": "ええっ、いきなりですか！？ ぼく、やり方がわかりませんっ" },
+    { "speaker": "midaru", "text": "問題ありません。私が説明します" },
+    { "speaker": "", "direction": true, "text": "（ふと、窓際のだるま人形に目が止まる）", "eventId": "doll_shake" },
+    { "speaker": "kidaru", "text": "あれ？ あのだるまさん、目が片方しか入ってないですね" },
+    { "speaker": "akadaru", "text": "先代から続く願掛けだるまだ。全国制覇したら、もう片方の目を入れる決まりなんだ" },
+    { "speaker": "midaru", "text": "……いつからそこにあるのか、記録がありません。データの欠損です（眼鏡をクイッ）" },
+    { "speaker": "kidaru", "text": "ふしぎです！" }
+  ],
+  "tutorial": [
+    { "speaker": "midaru", "text": "まずは基本から。左スティックで歩いて、Aボタンでジャンプです", "condition": "MoveAndJump", "count": 1 },
+    { "speaker": "midaru", "text": "そこに落ちている積み木。近づいて拾うと、頭に積めます。積んだ分がそのまま体力です", "condition": "Stack", "count": 1 },
+    { "speaker": "midaru", "text": "Xボタンでハンマー、Bボタンで積み木を飛ばせます。どちらか一度、やってみましょう", "condition": "Attack", "count": 1 },
+    { "speaker": "midaru", "text": "積み木が0のときに攻撃されると、そのまま落ちてしまいます。10個まで積めますが、増えるほど動きは遅くなります", "condition": "DialogueDone" }
+  ],
+  "matchStart": [
+    { "speaker": "midaru", "text": "では……私と一試合、やりましょう。手加減はしませんよ" }
+  ],
+  "yellowExtra": [
+    { "speaker": "kidaru", "text": "あっ、増えた！" },
+    { "speaker": "midaru", "text": "……確率的にあり得ません。ノートに記録しておきます" }
+  ],
+  "cpuTaunts": [
+    { "speaker": "midaru", "text": "……データ通りです" },
+    { "speaker": "midaru", "text": "そこ、甘いですよ" }
+  ],
+  "defeat": [
+    { "speaker": "akadaru", "text": "まだまだだが、その根性は買うぞ！" }
+  ],
+  "after": [
+    { "speaker": "akadaru", "text": "うむ、いい動きだ！ 新入りにしては根性がある！" },
+    { "speaker": "aodaru", "text": "……明日から、走る" },
+    { "speaker": "kidaru", "text": "ええっ！ 走るんですか！？" },
+    { "speaker": "midaru", "text": "うちの練習メニューの実施率は100%です" },
+    { "speaker": "kidaru", "text": "ぼく、がんばります！ おにぎりのために！" },
+    { "speaker": "akadaru", "text": "おう！ 全国制覇のためにな！" },
+    { "speaker": "", "direction": true, "text": "（誰もいなくなった部室。窓際のだるま人形が、カタ、と小さく揺れた）", "eventId": "doll_shake" }
+  ],
+  "newspaper": {
+    "header": "だるま新聞",
+    "headline": "新入部員きだる、入部の決め手は『おにぎり』",
+    "body": "七転高校だるま落とし部に、新しい部員が入った。入部の決め手は部費の0.8%で用意されるおにぎりだという。主将のあかだるは「根性がある」と太鼓判を押した。",
+    "image": ""
+  }
+}

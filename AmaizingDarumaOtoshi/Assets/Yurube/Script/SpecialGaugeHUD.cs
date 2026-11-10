@@ -8,6 +8,10 @@ namespace Yurube
     // 満タン時は枠・バー・READY表示を発光させ、溜まったことが一目で分かるようにする。
     public static class SpecialGaugeHUD
     {
+        // ストーリー用(Yurube): 会話中は描かない。
+        // OnGUI はオーバーレイのキャンバスより手前に描かれるため、そのままだと会話ウィンドウの上にゲージが出てしまう。
+        public static bool Suppressed;
+
         static GUIStyle s_nameStyle;
         static GUIStyle s_statusStyle;
         static GUIStyle s_readyStyle;
@@ -16,6 +20,8 @@ namespace Yurube
         public static void Draw(SpecialGauge gauge, DarumaCharacter character, string statusOverride = null)
         {
             if (gauge == null || character == null || DarumaMatch.Current == null) return;
+            // ストーリーの会話中は描かない（会話より手前に出てしまうため）
+            if (Suppressed) return;
 
             // シーン遷移の黒フェードはキャンバスより手前にあるが、OnGUI はそのさらに手前に描かれる。
             // そのままだとリザルトへ移る黒画面の上にゲージだけ残ってしまうので、黒の濃さに合わせて一緒に消す。
@@ -56,14 +62,14 @@ namespace Yurube
             }
 
             // MatchHud と同じ 1920x1080 基準の配置。
-            // 各プレイヤーのストックパネルの真上に必殺技ゲージを置く。
+            // 各プレイヤーのストックパネルのすぐ上（復活待ちの表示より上）に、HUD の一部として置く。
             const float panelWidth = 300.0f;
             const float panelHeight = 128.0f;
             const float panelSpacing = 24.0f;
             const float panelBottom = 120.0f;
             const float width = 300.0f;
             // 「READY! [L / Y]」が1行に収まり、文字の上端が切れない高さ
-            const float height = 58.0f;
+            const float height = 50.0f;
 
             Matrix4x4 oldMatrix = GUI.matrix;
             Color oldColor = GUI.color;
@@ -78,7 +84,7 @@ namespace Yurube
             float panelCenterX = virtualWidth * 0.5f - totalWidth * 0.5f
                 + panelWidth * 0.5f + listIndex * (panelWidth + panelSpacing);
             float x = panelCenterX - width * 0.5f;
-            float gaugeBottom = panelBottom + panelHeight * 0.5f + 10.0f;
+            float gaugeBottom = panelBottom + panelHeight * 0.5f + 32.0f;
             float y = virtualHeight - gaugeBottom - height;
 
             bool full = gauge.IsFull;

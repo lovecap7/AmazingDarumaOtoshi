@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using TMPro;
@@ -47,7 +47,8 @@ public class MainMenu : MonoBehaviour
     // 項目の種類。並び順・数は items で自由に変えられる（同じ種類を2つ置かない）
     // Settings：サウンドとビデオを1枚の看板にまとめたもの　Sound／Video：別々の看板（前の形）
     // Book：キャラのずかん（roster が無ければクレジット）　Achievements：じっせき　Credits：クレジット
-    public enum ItemKind { Battle, Settings, Book, Achievements, Quit, Sound, Video, Credits, None = 99 }
+    // Story：ストーリーの章を始める（中身は Yurube/Story）
+    public enum ItemKind { Battle, Settings, Book, Achievements, Quit, Sound, Video, Credits, Story, None = 99 }
 
     [Serializable]
     public class MenuItem
@@ -77,6 +78,7 @@ public class MainMenu : MonoBehaviour
     {
         new MenuItem(ItemKind.Battle, "たたかう", "だるまを積んで、飛ばして、\n最後の一人を落とせ！",
                      "だるまを叩き合って、相手の頭を落とせば勝ち！\nローカルかオンラインで遊べます。", -0.4f),
+        new MenuItem(ItemKind.Story, "ストーリーモード", "部活の物語を\nあそぶ", "章ごとの練習試合と会話をあそびます。", -0.35f),
         new MenuItem(ItemKind.Settings, "せってい", "", "音量と画面の設定を変更します。", -0.3f),
         new MenuItem(ItemKind.Book, "ずかん", "キャラクターの\n性能を見る", "キャラクターの名前・パッシブ・必殺技が見られます。", -0.2f),
         new MenuItem(ItemKind.Achievements, "じっせき", "これまでの\nきろくを 見る", "集めた実績が見られます。", -0.1f),
@@ -1428,6 +1430,17 @@ public class MainMenu : MonoBehaviour
                 else if (kind == ItemKind.Book && book.HasEntries) book.Open();   // キャラのずかん
                 else credits.Play();
                 phase = Phase.Credits;
+                break;
+            }
+
+            case ItemKind.Story:
+            {
+                // ストーリー：積み木を叩き飛ばして、少し待ってから章を始める（中身は Yurube/Story）
+                outIdx = index;
+                impactTime = sim;
+                phase = Phase.Leaving;
+                yield return new WaitForSecondsRealtime(0.55f);
+                Yurube.Story.StoryLauncher.StartPrologue();
                 break;
             }
 

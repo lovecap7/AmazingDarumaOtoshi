@@ -1,4 +1,4 @@
-﻿using Nakahira;
+using Nakahira;
 using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -15,6 +15,10 @@ namespace Nakagawa
     [DefaultExecutionOrder(100)]   // キャラクターが入力を読んだあとに解く(再開の A でジャンプしないように)
     public class PauseMenu : MonoBehaviour
     {
+        // ストーリー用(Yurube): 会話中はポーズ画面を出さない。
+        // ストーリーの会話も DarumaMatch.Pause で試合を止めているので、そのときだけ画面を閉じておく。
+        public static bool SuppressForStory;
+
         enum Item { Resume, RuleSelect, Title }
 
         [Header("操作")]
@@ -72,6 +76,12 @@ namespace Nakagawa
         private void Update()
         {
             if (m_match == null || m_canvas == null) return;
+            // ストーリー用(Yurube): 会話中は出さない
+            if (SuppressForStory)
+            {
+                if (m_canvas.gameObject.activeSelf) m_canvas.gameObject.SetActive(false);
+                return;
+            }
             if (!m_match.IsPaused)
             {
                 if (m_canvas.gameObject.activeSelf) m_canvas.gameObject.SetActive(false);
