@@ -227,6 +227,7 @@ public class ResultScreen : MonoBehaviour
                 // 順位の数字は一番下の積み木に書く（1位は叩き出したあとに一番下になる2個目に書く）
                 string label = (winner ? b == 1 : b == 0) ? e.rank.ToString() : "";
                 var t = ToyKit.CreateBlock(label, Palette[(b * 2 + i) % Palette.Length], blockMesh, new Vector2(1.05f, 0.68f), BlockD, font, letterMat, out _);
+                GameModelSettings.ApplyBlock(t, Palette[(b * 2 + i) % Palette.Length]);   // 試合と同じ積み木のモデルに
                 t.SetParent(p.column, false);
                 t.localPosition = new Vector3(0f, (b + 0.5f) * BlockH, 0f);
                 t.localRotation = Quaternion.Euler(0f, winner ? 0f : UnityEngine.Random.Range(-6f, 6f), 0f);
@@ -239,6 +240,7 @@ public class ResultScreen : MonoBehaviour
             p.headBase = new Vector3(0f, count * BlockH + HeadR, 0f);
             p.face.root.localPosition = p.headBase;
             TintHead(p.face, e);
+            GameModelSettings.ApplyHead(p.face, e.character);   // 選んだキャラのモデルに
             p.face.root.gameObject.SetActive(false);
 
             p.tag = ToyKit.Text3D(font, letterMat, e.label, p.column, new Vector2(2f, 0.5f), 3f);
