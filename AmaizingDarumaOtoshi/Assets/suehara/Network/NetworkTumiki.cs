@@ -14,6 +14,7 @@ public class NetworkTumiki : NetworkBehaviour
     const byte kHarmful = 1;   // 攻撃判定がある(炎)
     const byte kStacked = 2;   // 積まれている
     const byte kPopping = 4;   // ポンと出る演出の途中(生成された直後)
+    const byte kFlying = 8;    // 飛んでいる(必殺技・ショットの見た目が読む。Yurube.SpecialNet)
 
     const BindingFlags kPrivate = BindingFlags.NonPublic | BindingFlags.Instance;
 
@@ -93,8 +94,13 @@ public class NetworkTumiki : NetworkBehaviour
         if (m_block.IsHarmful) b |= kHarmful;
         if (m_block.CurrentState == TumikiBlock.State.Stacked) b |= kStacked;
         if (GetComponent<Nakagawa.TumikiSpawnPop>() != null) b |= kPopping;
+        if (m_block.CurrentState == TumikiBlock.State.Flying) b |= kFlying;
         return b;
     }
+
+    // クライアント: 飛んでいるか・見た目の速さ(TumikiBlock を止めているので、届いた状態と動きから答える)
+    public bool IsFlying => (m_flags.Value & kFlying) != 0;
+    public float Speed => m_speed;
 
     void ApplyColor(byte c)
     {

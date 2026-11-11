@@ -63,6 +63,8 @@
 | `NetMatchPlayer.cs` / `NetPlayer.prefab` | 接続した人ごとの1人分（PlayerObject）。NetworkCommandSource（入力）と NetMatchPlayer（中身の同期）。MatchPlayer は実行時に付ける |
 | `NetEffects.cs` | NetMatch と同じ GameObject。ホストの生成予告を見た目だけの予告で出す / 割れた積み木の破片を出す |
 | `NetGimmickSync.cs` | NetMatch と同じ GameObject（2026-11-09）。ホストだけが動かすギミック（ステージ19 ビリヤード・20 ルーレット。`INetGimmickState` を持つもの）の見た目をクライアントに見せる。**状態**: ホストが 0.05 秒ごとに、表示中のギミックの状態（数の並び）をまとめて送り、クライアントは 0.12 秒遅らせて前後の間を補間し、毎フレーム `ReadNetState` を呼ぶ。ギミックの見分けはシーンの中の並び（一番上は名前、その下は親からの順番）。**エフェクト・音・文字・揺れ**: ホストで `GimmickNet.Relay()` の範囲に出た `GimmickBurst.Play` / `GimmickSound.Play` / `BilliardFx.Shake` / `StageMessageUI.Show` を、そのままクライアントでも出す（エフェクトの設定は JSON で送る。材質は送らない。音は名前で探す） |
+| 必殺技（2026-11-12） | ローカルと同じ動きにする。**ホスト**は必殺技をいつもどおり動かす（当たり・倒す・はじく・壊す・ゲージを使うのはホストだけ）。ネット対戦の人のボタン（L / Y）と行動ボタン（だるきんぐの詠唱の確定）は `NetworkCommandSource` が送り、Yurube さんの `SpecialInput` が `SpecialNet.NetSpecialPressed` / `NetAnyActionPressed` で読む（届いてから2フレームを過ぎた押下は捨てる）。技の区切り（発動・だるきんぐの向きの確定・いわだるの跳び上がり）で `SpecialNet.Send` が決まった値（積み木の数・位置・向き・使った積み木）をクライアントへ送る。**クライアント**は届いた知らせ（`INetSpecial.NetReceive`）で同じ必殺技の流れを動かし、カットイン・ガイド・ビーム・毒沼・隕石・聖剣などを同じように出す（`SpecialNet.IsClient` で勝負に関わる処理はしない）。ゲージ・無敵の残り時間は `NetworkDarumaCharacter` が配る。分裂弾（みだる）はネット用の積み木なのでそのまま届く。ホストで7体とも発動・知らせの送信までは確認、**クライアントの見た目は未確認** |
+| `NetSpecialSync.cs` | NetMatch と同じ GameObject。`Yurube.SpecialNet` をつなぐ（ホスト: 入力の受け渡しと出来事の送信 / クライアント: 出来事の受け取り、積み木の「飛んでいるか・速さ」を `NetworkTumiki` の状態で答える） |
 | `NetLobbyUI.cs` | NetStages の接続まわり。つないでいないときの中央の接続パネル（NetStages を直接開いたときの試験用。クリック操作）、切断したときの戻り（接続画面から来たときは接続画面へ）、NetSessionMenu を自動で付ける。リザルトから戻ったとき、シーンに入っている2つ目の NetworkManager を消す |
 | `NetSessionMenu.cs` | NetStages でつないでいる間の表示とメニュー（2026-11-04。クリックなし）。右上にいまの試合の設定・へやばんごう・人数。Start（+）/ Tab でメニュー（見た目は中川さんの PauseMenu と同じ）: ホストの開始待ちは「試合を はじめる / モード / ストック / 時間 / へやを かいさん / とじる」、試合中とさんかは「かいさん（ぬける）/ とじる」。ホストが変えたルールは `NetMatch.SetRules` ですぐ全員に配る。開いている間はキャラの入力（NetPadKeyboardInput）と、OnGUI で描く開発用の表示（StageSwitcher・TumikiImpactModeToggle・SpawnPointDebugView・StageCameraTuner・CharacterLabUI。OnGUI はどの UI よりも上に出るため）を止める。**Yurube さんの必殺技のゲージ・カットインも OnGUI なのでメニューの上に出る**（止めると必殺技が止まるのでそのまま）。ネット対戦は時間を止められないので、試合中に開いても試合は進む |
 | キャラ選択（2026-11-11） | メニュー（Start / Tab）の「キャラクター」から、だれでも自分のキャラを選べる（開始待ちの間だけ。試合中は「試合中は 変えられません」）。選ぶとその場で体が入れ替わる。選んだキャラは同じ部屋にいる間だけ覚え（`NetMatchPlayer.SavedCharacterId`）、試合のシーンに入るたびにホストへ送る。部屋に入る（ホストになる・さんかする）たびに `NetMatchPlayer.ResetChoices` であかだるに戻す（2026-11-11 から。ホストも最初からあかだるで出す）。だるきんぐは実績をすべて解除するまで選べない（キャラクターセレクトと同じ）。**必殺技は未対応のまま**（B-03） |
@@ -114,6 +116,7 @@
 | `GimmickBurst` / `GimmickSound` / `BilliardFx.Shake` / `StageMessageUI.Show`（中川さん） | 先頭に2行: `Mute()` の範囲なら出さない、`Relay()` の範囲ならクライアントへ送る |
 | ステージ19: `BilliardBall` / `BilliardCue` / `BilliardTable` / `BilliardTiltGimmick` / `BilliardShuffleGimmick` / `BilliardFountainGimmick` / `BilliardPocketGimmick`（中川さん） | ホストの処理に `Relay()`。`INetGimmickState` で、玉（位置・転がる向き・大きさ・表示・軌跡）、キュー（構え・突く動き・狙いのガイド。クライアントでは動きを進めない）、玉が出る場所の印、傾き（経過時間・向き）、入れ替えの予告（入れ替えはホストだけ）、噴出のポケットの光を受け取る。`FindTable()`（クライアントで自分の台を探す） |
 | ステージ20: `RouletteGame` / `RouletteWheel` / `RouletteBall` / `RouletteBet` / `RouletteWeightRain` / `RouletteTumikiRain`（中川さん） | ホストの処理に `Relay()`。`INetGimmickState` で、ディーラーの手・電飾・音の進み、盤の角度（cos・sin で送る）・ポケットの予告と奈落（当たり判定も作り直す）、球、賭けた色と判定（置くときは `Mute()`）、重り・影、積み木の雨の輪を受け取る。降ってくる・噴き出す積み木は `Tumiki_Net` なので別に届く |
+| `Yurube/Script/SpecialNet.cs`（新規）と必殺技まわり（Yurube さん。2026-11-12、ユーザー了承済み） | `SpecialNet`（入口。通信は知らない）・`INetSpecial`。`SpecialInput`: ネット対戦の人のボタンを `SpecialNet` から読む。7体の `*Special`: 区切りで `Send`、`NetReceive` でクライアントの見た目、勝負に関わる処理は `IsClient` で止める（だるきんぐ: 斬撃の即死・自動確定 / いわだる: 即死・積み木の破壊・跳ぶ・体の一時停止と位置の戻し / あおだる: `AodaruSixArms` のはじき）。`AkadaruShotTrail`: 飛んでいるか・速さ・向きを `SpecialNet` から読む。`KidaruWheelVisual`: クライアントでは動いた分から速さを出す |
 | `Fujihara/Script/Common/MenuInput.cs`（藤原さん。2026-11-11、ユーザー了承済み） | 入力を読む関数すべての先頭で、このウィンドウが選ばれていなければ何も押されていないことにする（`Application.isFocused`）。Multiplayer Play Mode で 2P の入力がメインのエディターのメニュー（メインメニュー・接続画面など）にも届いていたため |
 | `Fujihara/Scene/MenuScene.unity`（藤原さん。了承済み） | MainMenu の `onlineSceneName` に `NetConnectScene` を入れた（この1か所だけ） |
 | `ProjectSettings/EditorBuildSettings.asset` | `suehara/NetConnectScene.unity` を追加 |
@@ -151,6 +154,7 @@
   ホスト自身の NetPlayer とキャラも、クライアントが読み込んでいる途中に出していたため（上と同じ理由）。
   → ほかの人と一緒に移ってきたときは、ホストの分も含めて全員が読み終えてから（`SceneManager.OnLoadEventCompleted`）まとめて出す（20秒待っても来なければ待たずに出す）。
   **シーンを移る途中にホストが出した NetworkObject は、クライアントで消えることがある**。読み込み中に積み木の生成などで出したものも同じことが起きうる（未確認）。
+- MCP で試すときの注意: `Tumiki_Net` を Instantiate してすぐキャラに積むと、Spawn のときに NetworkRigidbody が物理を有効に戻し、積まれたまま落ちて奈落の高さで消える（キャラの積み木に壊れた積み木が残り、エラーが出る）。1フレーム待って Spawn されてから積む。実際の試合では起きない。
 - Unity MCP は MPPM の 2P のエディターを一覧に出すことがあるが、宛先に指定してもメインのエディターに届く（2P は MCP から動かせない）。
 - 2026-11-09: ステージ19・20 のネット対応。ホストで動かして、全部品の状態の書き出しと読み込みの数が合うこと、
   キューで突く・球が止まるときのエフェクト・音・文字・揺れがクライアントへ送る流れに乗ることを確認（エラーなし）。
@@ -189,7 +193,7 @@ NetStages を直接開いて試すとき:
 - 試合
   - 接続してきた人は試合中でもすぐ参加する（ストックは満タンで出る）。次の試合から参加にするかは要検討
   - ルールの選択はホストのテスト用画面だけ（本番はセレクト画面から。B-08）
-  - クライアントでは無敵中の点滅、名札・HUD の「頭の高さ」（積み木の高さ）が出ない
+  - クライアントでは名札・HUD の「頭の高さ」（積み木の高さ）が出ない（無敵中の点滅は 2026-11-12 から出る。NetworkDarumaCharacter）
 - ギミック
   - シューターの矢印・加速床の輪などの飾りの点滅はホストとずれる（見た目だけ）
   - バンパーが弾いたときの膨らみ、シューター・加速床・ワープ・低重力の演出はクライアントで出ない（ホストの結果の位置は届く）
@@ -201,9 +205,8 @@ NetStages を直接開いて試すとき:
 - ヒットストップの揺れ・カメラの揺れ・効果音（A-09, C-06。MatchAudio は Match を後から表示するので付かない）
 - `Time.timeScale` を使う演出（EliminationCinematic）: ホストだけスローになり、ホストの物理も遅くなる（B-11）
 - 新キャラ7体のネット用 Variant は 2026-11-11 に作った（キャラ選択）。ただしパッシブ・必殺技のスクリプトはクライアントの表示用の体でも動いたまま（クライアントだけで何かを出す・動かすものがあれば止める必要がある。未確認）
-- **必殺技は各キャラの Special スクリプトが `Keyboard.current`（L）/ `Gamepad.current`（Y）を直接読んでいる**。
-  DarumaCommand を通らないので、クライアントから出せない＆ホストの入力で他人の必殺技が出る恐れ。
-  → DarumaCommand に Special を足して命令経由にするのが本筋（Yurube さんと相談。B-03）
+- 必殺技（B-03）は 2026-11-11〜12 に対応（下の「必殺技」）。**クライアント側の見た目は未確認**。
+- パッシブ: Yurube さんのキャラのパッシブは、クライアントの表示専用の体でも動いたまま。きだる（積み木を出す）・だるきんぐ（積み木を外す）などはクライアントだけで動いてしまう恐れがある（未対応）
 - 特殊ブロック（Shitaka/, Yurube/Script/Blocks）、きいろだるのパッシブ・ファンネルの積み木生成
 - 1台に複数人、CPU、Relay/Lobby
 - チーム戦（2026-11-09 に本編に入った。`MatchRules.teams` / `Entry.team`）: ネット対戦はいつも個人戦（NetMatch のルールに teams を入れていない）

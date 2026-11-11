@@ -56,6 +56,34 @@ public class NetPadKeyboardInput : MonoBehaviour, IDarumaCommandSource
         };
     }
 
+    // 操作を受け付けるか(この画面を選んでいて、メニュー・抽選の演出を出していない)
+    static bool Accepting => Application.isFocused && !NetSessionMenu.IsOpen && !NetStageLottery.IsPlaying;
+
+    // 必殺技ボタンを押したか(ローカルと同じ: キーボードは L、ゲームパッドは上(Y / △))
+    public bool ReadSpecialPressed()
+    {
+        if (!Accepting) return false;
+        var k = Keyboard.current;
+        if (k != null && k.lKey.wasPressedThisFrame) return true;
+        var pad = Gamepad.current;
+        return pad != null && pad.buttonNorth.wasPressedThisFrame;
+    }
+
+    // 何かの行動ボタンを押したか(だるきんぐの詠唱の確定。ローカルの SpecialInput.WasAnyActionPressed と同じボタン。ただし Start はメニューを開くので除く)
+    public bool ReadAnyActionPressed()
+    {
+        if (!Accepting) return false;
+        var k = Keyboard.current;
+        if (k != null && (k.spaceKey.wasPressedThisFrame || k.jKey.wasPressedThisFrame || k.kKey.wasPressedThisFrame
+            || k.lKey.wasPressedThisFrame || k.enterKey.wasPressedThisFrame)) return true;
+        var pad = Gamepad.current;
+        return pad != null && (pad.buttonSouth.wasPressedThisFrame || pad.buttonEast.wasPressedThisFrame
+            || pad.buttonWest.wasPressedThisFrame || pad.buttonNorth.wasPressedThisFrame
+            || pad.leftShoulder.wasPressedThisFrame || pad.rightShoulder.wasPressedThisFrame
+            || pad.leftTrigger.wasPressedThisFrame || pad.rightTrigger.wasPressedThisFrame
+            || pad.selectButton.wasPressedThisFrame);
+    }
+
     Vector2 ToWorldMove(Vector2 stick)
     {
         if (m_camera == null) return stick;

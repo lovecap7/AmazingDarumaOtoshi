@@ -122,7 +122,8 @@ namespace Yurube
             // 撃った瞬間だけマズルフラッシュ(打ち返しでは出さない)
             if (m_block != null && m_block.ReturnCount == 0)
             {
-                AkadaruShotFlash.Spawn(muzzlePosition, m_block.Direction, m_block.Speed,
+                // ネット対戦用(suehara): クライアントの積み木は止めてあるので、向き・速さは SpecialNet から読む
+                AkadaruShotFlash.Spawn(muzzlePosition, SpecialNet.Direction(m_block), SpecialNet.Speed(m_block),
                     m_minSpeed, m_maxSpeed, material);
             }
         }
@@ -307,7 +308,8 @@ namespace Yurube
             // 凍結中はトレイルの形をそのまま保つ(位置も太さも変えない)
             if (m_specialHold) return;
 
-            if (m_block.CurrentState != TumikiBlock.State.Flying)
+            // ネット対戦用(suehara): クライアントの積み木は止めてあるので、飛んでいるかは SpecialNet から読む
+            if (!SpecialNet.IsFlying(m_block))
             {
                 // 必殺技のビームは、弾が止まった後もその場に残す
                 if (m_special && m_specialFreeze)
@@ -447,7 +449,7 @@ namespace Yurube
         {
             if (m_trail == null || m_block == null) return;
 
-            float t = Mathf.InverseLerp(m_minSpeed, m_maxSpeed, m_block.Speed);
+            float t = Mathf.InverseLerp(m_minSpeed, m_maxSpeed, SpecialNet.Speed(m_block));   // ネット対戦用(suehara)
 
             m_trail.time = Mathf.Lerp(m_minTime, m_maxTime, t);
             m_trail.startWidth = Mathf.Lerp(m_minWidth, m_maxWidth, t);

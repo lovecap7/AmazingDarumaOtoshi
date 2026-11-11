@@ -8,7 +8,7 @@ namespace Yurube
     // 発動すると6本のハンマー(阿修羅のような腕)を出し、
     // プレイヤーを起点にした3方向から近づく積み木を、操作に関係なくはじき返す。
     [RequireComponent(typeof(DarumaCharacter))]
-    public class AodaruSpecial : MonoBehaviour, ISpecialAbility
+    public class AodaruSpecial : MonoBehaviour, ISpecialAbility, INetSpecial
     {
         [Header("必殺技")]
         [Tooltip("効果時間(秒)")]
@@ -67,6 +67,18 @@ namespace Yurube
 
             m_gauge.Consume();
 
+            float yaw = m_character.transform.eulerAngles.y;
+            // ネット対戦用(suehara): クライアントでも同じ見た目を出す(積み木をはじくのはホストだけ。AodaruSixArms)
+            SpecialNet.Send(m_character, this, kNetActivate, new[] { yaw });
+            PlayActivate(yaw);
+
+            if (m_logSpecial) Debug.Log("[あおだる] 必殺技『六腕』発動", this);
+            return true;
+        }
+
+        // 六腕を出してカットインを再生する(ホストとクライアントで同じ)
+        void PlayActivate(float yaw)
+        {
             var root = new GameObject("AodaruSixArms");
             m_arms = root.AddComponent<AodaruSixArms>();
 
@@ -76,7 +88,7 @@ namespace Yurube
             m_arms.Initialize(
                 m_character,
                 m_duration,
-                m_character.transform.eulerAngles.y,
+                yaw,
                 m_knockRadius,
                 m_knockSpeed,
                 m_knockInterval,
@@ -84,9 +96,18 @@ namespace Yurube
 
             // あかだる・いわだる・へびだると同じタイミングで専用カットインを再生する
             AodaruCutIn.Show(m_cutInName, m_character);
+        }
 
-            if (m_logSpecial) Debug.Log("[あおだる] 必殺技『六腕』発動", this);
-            return true;
+        //========================================
+        // ネット対戦用(suehara): クライアントで、ホストの発動と同じ見た目を出す
+        //========================================
+
+        const int kNetActivate = 0;
+
+        public void NetReceive(int ev, float[] v, TumikiBlock[] blocks)
+        {
+            if (ev != kNetActivate || v.Length < 1 || m_arms != null) return;
+            PlayActivate(v[0]);
         }
 
         private void OnDestroy()

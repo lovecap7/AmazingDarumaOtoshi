@@ -72,7 +72,10 @@ namespace Yurube
                         && Keyboard.current != null
                         && Keyboard.current.lKey.wasPressedThisFrame;
 
-                // ネット対戦など、機器が特定できない入力元はここでは拾わない
+                // ネット対戦用(suehara): ネット対戦の人は、その人の端末で押したボタンがホストに届いたもの(SpecialNet)
+                if (SpecialNet.NetSpecialPressed != null) return SpecialNet.NetSpecialPressed(me);
+
+                // 機器が特定できない入力元はここでは拾わない
                 return false;
             }
 
@@ -133,6 +136,9 @@ namespace Yurube
 
                 if (me.GetComponent<KeyboardDarumaInput>() != null)
                     return IsKeyboardSpecialOwner(me) && AnyKeyboardAction(Keyboard.current);
+
+                // ネット対戦用(suehara): ネット対戦の人の行動ボタン(SpecialNet)
+                if (SpecialNet.NetAnyActionPressed != null) return SpecialNet.NetAnyActionPressed(me);
 
                 return false;
             }

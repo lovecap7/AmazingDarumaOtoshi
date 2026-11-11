@@ -10,7 +10,7 @@ namespace Yurube
     // その場で自分の積み木を撃ち、撃った一発が
     // 「積んでいる積み木の数(撃つ前の数)」に分裂して近くの敵へホーミングする。
     [RequireComponent(typeof(DarumaCharacter))]
-    public class MidaruSpecial : MonoBehaviour, ISpecialAbility
+    public class MidaruSpecial : MonoBehaviour, ISpecialAbility, INetSpecial
     {
         [Header("必殺技")]
         [Tooltip("撃ち出す速さ(m/s)")]
@@ -91,6 +91,8 @@ namespace Yurube
 
             // カットインを先に開始し、その間に実際の分裂処理を組み立てる。
             // timeScale=0中は弾が動かず、カットイン終了後に本来の攻撃が始まる。
+            // ネット対戦用(suehara): クライアントでも同じカットインを出す(分裂した弾はネットワークに乗った積み木なので、そのまま届く)
+            SpecialNet.Send(m_character, this, kNetActivate, null, cutInBlocks.ToArray());
             MidaruCutIn.Show(m_cutInName, m_character, cutInBlocks);
 
             Split(block, Mathf.Max(1, count), position, direction);
@@ -98,6 +100,20 @@ namespace Yurube
 
             if (m_logSpecial) Debug.Log($"[みだる] 必殺技：{Mathf.Max(1, count)}発のファンネルに分裂", this);
             return true;
+        }
+
+        //========================================
+        // ネット対戦用(suehara): クライアントで、ホストの発動と同じカットインを出す
+        //========================================
+
+        const int kNetActivate = 0;
+
+        public void NetReceive(int ev, float[] v, TumikiBlock[] blocks)
+        {
+            if (ev != kNetActivate) return;
+            var list = new List<TumikiBlock>();
+            foreach (var b in blocks) if (b != null) list.Add(b);
+            MidaruCutIn.Show(m_cutInName, m_character, list);
         }
 
         // 撃った1個を count 個に分裂させ、敵へホーミングさせる

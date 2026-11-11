@@ -1031,7 +1031,8 @@ namespace Nakahira
             if (old != null)
             {
                 // 上の段から順に(AddBottom で下に足していくと、元と同じ並びになる)
-                for (int i = old.Stack.Count - 1; i >= 0; i--) blocks.Add(old.Stack.Get(i));
+                // 壊れて消えた積み木が残っていても止まらないように飛ばす
+                for (int i = old.Stack.Count - 1; i >= 0; i--) if (old.Stack.Get(i) != null) blocks.Add(old.Stack.Get(i));
                 m_owners.Remove(old);
                 foreach (var b in blocks) b.transform.SetParent(null, true);
                 Destroy(old.gameObject);

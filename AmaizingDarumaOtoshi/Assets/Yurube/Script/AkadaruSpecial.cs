@@ -9,7 +9,7 @@ namespace Yurube
     // 自分の積み木を1個飛ばし、発射地点から伸びる残像ビームに一定時間当たり判定を付ける。
     // ビームが相手に当たると、相手と自分が即死し、積み木は破壊される。
     [RequireComponent(typeof(DarumaCharacter))]
-    public class AkadaruSpecial : MonoBehaviour, ISpecialAbility
+    public class AkadaruSpecial : MonoBehaviour, ISpecialAbility, INetSpecial
     {
         [Header("弾")]
         [Tooltip("必殺技の積み木の速さ(m/s)")]
@@ -95,6 +95,19 @@ namespace Yurube
             var tron = block.gameObject.AddComponent<TronProjectile>();
             tron.Begin(m_character, m_trailDuration, m_ownerGrace, m_hitInterval, m_logSpecial);
 
+            // ネット対戦用(suehara): クライアントでも同じ見た目を出す(当たり判定の TronProjectile はホストだけ)
+            SpecialNet.Send(m_character, this, kNetActivate,
+                new[] { position.x, position.y, position.z, direction.x, direction.z, cutInBlocks }, new[] { block });
+
+            PlayActivateVisuals(block, position, cutInBlocks);
+
+            if (m_logSpecial) Debug.Log("[あかだる] 必殺技『終焉の軌跡』発動", this);
+            return true;
+        }
+
+        // 発動の見た目(ビーム・地面の焦げ・カットイン)。ホストとクライアントで同じものを出す
+        void PlayActivateVisuals(TumikiBlock block, Vector3 position, int cutInBlocks)
+        {
             // 見た目は通常の射撃と同じ AkadaruShotTrail をそのまま使う
             var shotTrail = block.GetComponent<AkadaruShotTrail>();
             if (shotTrail == null) shotTrail = block.gameObject.AddComponent<AkadaruShotTrail>();
@@ -108,9 +121,21 @@ namespace Yurube
             // 発動カットイン(ゲームを一時停止、実モデルの3D演出)
             SpecialCutIn.Show(m_cutInSpecialName, m_cutInColor, m_effectMaterial,
                 m_character, block, cutInBlocks);
+        }
 
-            if (m_logSpecial) Debug.Log("[あかだる] 必殺技『終焉の軌跡』発動", this);
-            return true;
+        //========================================
+        // ネット対戦用(suehara): クライアントで、ホストの発動と同じ見た目を出す
+        //========================================
+
+        const int kNetActivate = 0;
+
+        public void NetReceive(int ev, float[] v, TumikiBlock[] blocks)
+        {
+            if (ev != kNetActivate || v.Length < 6 || blocks.Length < 1 || blocks[0] == null) return;
+            var block = blocks[0];
+            var position = new Vector3(v[0], v[1], v[2]);
+            SpecialNet.MarkLaunched(block, new Vector3(v[3], 0.0f, v[4]));
+            PlayActivateVisuals(block, position, Mathf.RoundToInt(v[5]));
         }
 
         // 試合中だけ、画面左下にゲージを出す(ラボはラボUI側で表示する)

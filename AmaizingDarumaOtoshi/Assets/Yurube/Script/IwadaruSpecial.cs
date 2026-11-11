@@ -11,7 +11,7 @@ namespace Yurube
     // その後、積み木をすべて消費して巨大隕石へ変化し、上空から落下して着弾地点の
     // 敵・積み木をまとめて破壊する。
     [RequireComponent(typeof(DarumaCharacter))]
-    public class IwadaruSpecial : MonoBehaviour, ISpecialAbility
+    public class IwadaruSpecial : MonoBehaviour, ISpecialAbility, INetSpecial
     {
         [Header("必殺技")]
         [Tooltip("発動前のカウントダウン(秒)")]
@@ -229,7 +229,8 @@ namespace Yurube
                 case State.Countdown:
                     m_stateTime += dt;
                     UpdateWarning();
-                    if (m_stateTime >= m_countdown) BeginJump();
+                    // ネット対戦用(suehara): クライアントは自分では跳ばない(ホストの着弾地点が届く。NetReceive)
+                    if (m_stateTime >= m_countdown && !SpecialNet.IsClient) BeginJump();
                     break;
 
                 case State.Rising:
@@ -288,7 +289,21 @@ namespace Yurube
             if (!m_character.CanBeAffected) return false;
             if (m_character.Hammer != null && m_character.Hammer.IsBusy) return false;
 
-            m_snapshotBlocks = Mathf.Clamp(m_character.Stack.Count, 1, m_maxBlocks);
+            int blocks = m_character.Stack.Count;
+            m_gauge.Consume();
+            // ネット対戦用(suehara): クライアントでも予告円・カウントダウンを出す(積み木の数で大きさが決まる)
+            SpecialNet.Send(m_character, this, kNetActivate, new float[] { blocks });
+            BeginActivate(blocks);
+
+            if (m_logSpecial)
+                Debug.Log($"[いわだる] 必殺技『いわだる崩し』発動: 積み木{m_snapshotBlocks}個 半径{m_attackRadius:F1}m 高度{m_meteorHeight:F1}m", this);
+            return true;
+        }
+
+        // 大きさを決めて予告(カウントダウン)を始める(ホストとクライアントで同じ)
+        void BeginActivate(int blocks)
+        {
+            m_snapshotBlocks = Mathf.Clamp(blocks, 1, m_maxBlocks);
             float t = m_maxBlocks > 1
                 ? Mathf.InverseLerp(1.0f, m_maxBlocks, m_snapshotBlocks)
                 : 1.0f;
@@ -301,7 +316,6 @@ namespace Yurube
             m_fallTime = Mathf.Lerp(m_minFallTime, m_maxFallTime, t);
             m_meteorScale = Mathf.Lerp(m_minMeteorScale, m_maxMeteorScale, t);
 
-            m_gauge.Consume();
             m_state = State.Countdown;
             m_stateTime = 0.0f;
             m_impactApplied = false;
@@ -314,22 +328,29 @@ namespace Yurube
             m_character.MovementOnly = true;
             BeginRainbow();
             CreateWarning();
-
-            if (m_logSpecial)
-                Debug.Log($"[いわだる] 必殺技『いわだる崩し』発動: 積み木{m_snapshotBlocks}個 半径{m_attackRadius:F1}m 高度{m_meteorHeight:F1}m", this);
-            return true;
         }
 
         void BeginJump()
         {
-            m_targetPosition = m_character.transform.position;
-            m_groundY = GetGroundY(m_targetPosition);
+            Vector3 target = m_character.transform.position;
+            float groundY = GetGroundY(target);
+            // ネット対戦用(suehara): 着弾地点をクライアントへ送る(クライアントはここから同じ時間で隕石を動かす)
+            SpecialNet.Send(m_character, this, kNetJump, new[] { target.x, target.y, target.z, groundY });
+            ApplyJump(target, groundY);
+        }
+
+        // 隕石になって跳び上がる(ホストとクライアントで同じ)
+        void ApplyJump(Vector3 target, float groundY)
+        {
+            m_targetPosition = target;
+            m_groundY = groundY;
             m_apexY = m_groundY + m_meteorHeight;
 
             // 予告円はカットイン後・落下中も着弾まで表示し続ける
             ConsumeAllBlocks();
             SetCharacterHidden(true);
-            m_character.SetSuspended(true);
+            // ネット対戦用(suehara): クライアントの体は表示専用(物理を動かさない)
+            if (!SpecialNet.IsClient) m_character.SetSuspended(true);
 
             m_meteor = CreateMeteor(m_targetPosition);
             if (m_meteor != null)
@@ -407,14 +428,25 @@ namespace Yurube
             if (m_character != null)
             {
                 m_hideCharacter = false;
-                m_character.SetSuspended(false);
-                m_character.Teleport(new Vector3(m_targetPosition.x, m_groundY, m_targetPosition.z), 0.0f);
-                m_character.Rigidbody.linearVelocity = Vector3.zero;
+                // ネット対戦用(suehara): クライアントの体は表示専用(位置はホストから届く)
+                if (!SpecialNet.IsClient)
+                {
+                    m_character.SetSuspended(false);
+                    m_character.Teleport(new Vector3(m_targetPosition.x, m_groundY, m_targetPosition.z), 0.0f);
+                    m_character.Rigidbody.linearVelocity = Vector3.zero;
+                }
                 m_character.SetInvincible(m_impactRecovery + 0.3f);
             }
         }
 
         void ApplyImpact()
+        {
+            // ネット対戦用(suehara): 倒す・積み木を壊すのはホストだけ(クライアントは見た目だけ)
+            if (!SpecialNet.IsClient) ApplyImpactDamage();
+            ApplyImpactVisuals();
+        }
+
+        void ApplyImpactDamage()
         {
             // 撃破時だけEliminationCinematicがEffect_Eliminationを生成し、
             // Time.timeScaleを0.15へ落とすため、隕石キルでは一時的に止める。
@@ -466,7 +498,10 @@ namespace Yurube
                 RemoveBlockFromStack(block);
                 block.Break(Vector3.up * 2.0f, 0.0f, 0.0f);
             }
+        }
 
+        void ApplyImpactVisuals()
+        {
             // 着弾直後の白〜薄黄色の衝撃波リング。
             // 以前の赤橙のGimmickShockwave複数リングは、クレーター発光と重複するため置き換えた。
             float effectT = m_blockFactor;
@@ -1102,8 +1137,12 @@ namespace Yurube
                 m_character.SetSuspended(false);
                 m_character.SetInvincible(0.0f);
                 m_character.MovementOnly = false;
-                m_character.Teleport(new Vector3(m_targetPosition.x, m_groundY, m_targetPosition.z), 0.0f);
-                m_character.Rigidbody.linearVelocity = Vector3.zero;
+                // ネット対戦用(suehara): クライアントの体は表示専用(位置はホストから届く)
+                if (!SpecialNet.IsClient)
+                {
+                    m_character.Teleport(new Vector3(m_targetPosition.x, m_groundY, m_targetPosition.z), 0.0f);
+                    m_character.Rigidbody.linearVelocity = Vector3.zero;
+                }
             }
 
             if (m_meteorTrailMaterial != null) Destroy(m_meteorTrailMaterial);
@@ -1113,6 +1152,29 @@ namespace Yurube
 
             if (m_logSpecial && previous != State.Idle)
                 Debug.Log("[いわだる] 必殺技終了", this);
+        }
+
+        //========================================
+        // ネット対戦用(suehara): クライアントで、ホストの発動・跳び上がりと同じ見た目を出す
+        // (そのあとの上昇 → カットイン → 落下 → 着弾は、ホストと同じ時間でクライアントが自分で進める)
+        //========================================
+
+        const int kNetActivate = 0;
+        const int kNetJump = 1;
+
+        public void NetReceive(int ev, float[] v, TumikiBlock[] blocks)
+        {
+            if (ev == kNetActivate && v.Length >= 1)
+            {
+                if (m_state != State.Idle) return;
+                BeginActivate(Mathf.RoundToInt(v[0]));
+                return;
+            }
+            if (ev == kNetJump && v.Length >= 4)
+            {
+                if (m_state != State.Countdown) return;
+                ApplyJump(new Vector3(v[0], v[1], v[2]), v[3]);
+            }
         }
 
         void Abort()

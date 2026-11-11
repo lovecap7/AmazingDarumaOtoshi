@@ -7,7 +7,7 @@ namespace Yurube
     // カットイン後、発動位置を中心に円形の毒沼を生成する。
     // 沼に入った敵には移動速度低下＋移動入力反転のデバフを付与する。
     [RequireComponent(typeof(DarumaCharacter))]
-    public class HebidaruSpecial : MonoBehaviour, ISpecialAbility
+    public class HebidaruSpecial : MonoBehaviour, ISpecialAbility, INetSpecial
     {
         [Header("必殺技")]
         [SerializeField] string m_specialName = "反転毒沼";
@@ -90,6 +90,18 @@ namespace Yurube
             if (m_character == null || m_gauge == null || !m_gauge.IsFull) return false;
 
             int blocks = m_character.Stack != null ? m_character.Stack.Count : 0;
+            // ネット対戦用(suehara): クライアントでも同じカットイン・毒沼を出す(積み木の数で沼の大きさが決まる)
+            SpecialNet.Send(m_character, this, kNetActivate, new float[] { blocks });
+            m_gauge.Consume();
+            BeginCutIn(blocks);
+
+            if (m_logSpecial) Debug.Log("[へびだる] 反転毒沼", this);
+            return true;
+        }
+
+        // 沼の大きさを決めてカットインを始める(終わったら Update で毒沼を出す。ホストとクライアントで同じ)
+        void BeginCutIn(int blocks)
+        {
             m_snapshotBlocks = Mathf.Clamp(blocks, 1, m_maxBlocks);
             float t = m_maxBlocks > 1
                 ? Mathf.InverseLerp(1.0f, m_maxBlocks, m_snapshotBlocks)
@@ -97,16 +109,25 @@ namespace Yurube
             m_activeSwampRadius = Mathf.Lerp(m_minSwampRadius, m_maxSwampRadius, t)
                 * Mathf.Max(0.1f, m_swampRadiusScale);
 
-            m_gauge.Consume();
             m_state = State.CutIn;
 
             GameObject subject = m_character.Stack != null && m_character.Stack.Head != null
                 ? m_character.Stack.Head.gameObject
                 : m_character.gameObject;
             HebidaruCutIn.Show(m_specialName, subject);
+        }
 
-            if (m_logSpecial) Debug.Log("[へびだる] 反転毒沼", this);
-            return true;
+        //========================================
+        // ネット対戦用(suehara): クライアントで、ホストの発動と同じカットイン・毒沼を出す
+        // (毒沼が付ける毒はクライアントでは見た目だけ。表示専用のキャラクターは動きが止めてあるため)
+        //========================================
+
+        const int kNetActivate = 0;
+
+        public void NetReceive(int ev, float[] v, TumikiBlock[] blocks)
+        {
+            if (ev != kNetActivate || v.Length < 1 || m_state != State.Idle || m_swamp != null) return;
+            BeginCutIn(Mathf.RoundToInt(v[0]));
         }
 
         void SpawnSwamp()
