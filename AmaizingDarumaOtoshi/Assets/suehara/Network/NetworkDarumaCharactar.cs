@@ -10,33 +10,64 @@ using UnityEngine;
 //    (積み木そのものは NetworkTumiki が位置を同期する)
 //  ・ハンマーの振りの見た目は NetworkHammerView が見せる
 //  ・操作はキャラクターではなく1人分(NetPlayer)の NetworkCommandSource が送り、DarumaMatch がつなぐ
+//  ・無敵の残り時間: ホストから受け取り、クライアントでも同じように点滅させる(必殺技の見た目も IsInvincible を読む)
+//  ・必殺技ゲージ(Yurube.SpecialGauge): ホストの溜まり具合を受け取る(クライアントは積み木を積んでいないので自分では溜まらない)
 public class NetworkDarumaCharacter : NetworkBehaviour
 {
-    readonly NetworkVariable<byte> m_stackCount = new NetworkVariable<byte>();
+    const BindingFlags kPrivate = BindingFlags.NonPublic | BindingFlags.Instance;
+    // 無敵の残り時間は、これ以上ずれたら送り直す(間はクライアントが自分で減らす)
+    const float kInvincibleResend = 0.25f;
 
+    readonly NetworkVariable<byte> m_stackCount = new NetworkVariable<byte>();
+    readonly NetworkVariable<float> m_invincible = new NetworkVariable<float>();
+    readonly NetworkVariable<byte> m_gauge = new NetworkVariable<byte>();
+
+    DarumaCharacter m_character;
     DarumaStack m_stack;
     Transform m_head;
     float m_fallSpeed = 8.0f;
 
+    Yurube.SpecialGauge m_specialGauge;
+    FieldInfo m_invincibleField, m_gaugeBlocksField;
+    float m_blinkInterval = 0.1f;
+    float m_invincibleLeft;     // クライアント: 無敵の残り(届いた値から自分で減らす)
+    bool m_blinking;
+
     public override void OnNetworkSpawn()
     {
+        m_character = GetComponent<DarumaCharacter>();
         m_stack = GetComponentInChildren<DarumaStack>(true);
+        m_specialGauge = GetComponent<Yurube.SpecialGauge>();
+        m_invincibleField = typeof(DarumaCharacter).GetField("m_invincibleTimer", kPrivate);
+        m_gaugeBlocksField = typeof(Yurube.SpecialGauge).GetField("m_blocks", kPrivate);
 
         if (IsServer) return;
 
-        var character = GetComponent<DarumaCharacter>();
-        if (character != null) character.enabled = false;
+        if (m_character != null)
+        {
+            var blink = typeof(DarumaCharacter).GetField("m_blinkInterval", kPrivate);
+            if (blink != null) m_blinkInterval = Mathf.Max(0.01f, (float)blink.GetValue(m_character));
+            m_character.enabled = false;
+        }
+        m_invincibleLeft = m_invincible.Value;
+        m_invincible.OnValueChanged += (_, v) => m_invincibleLeft = v;
 
         // 積み木を持っていないので、DarumaStack の代わりにここで頭の高さを動かす
         if (m_stack != null)
         {
-            const BindingFlags f = BindingFlags.NonPublic | BindingFlags.Instance;
-            m_head = typeof(DarumaStack).GetField("m_head", f)?.GetValue(m_stack) as Transform;
-            var speed = typeof(DarumaStack).GetField("m_fallSpeed", f);
+            m_head = typeof(DarumaStack).GetField("m_head", kPrivate)?.GetValue(m_stack) as Transform;
+            var speed = typeof(DarumaStack).GetField("m_fallSpeed", kPrivate);
             if (speed != null) m_fallSpeed = (float)speed.GetValue(m_stack);
             m_stack.enabled = false;
         }
         // Rigidbody を動かさない設定(Kinematic)は NetworkRigidbody が行う
+    }
+
+    private void Update()
+    {
+        if (!IsSpawned || IsServer) return;
+        ClientUpdateInvincible();
+        ClientUpdateGauge();
     }
 
     private void LateUpdate()
@@ -44,10 +75,54 @@ public class NetworkDarumaCharacter : NetworkBehaviour
         if (!IsSpawned) return;
         if (IsServer)
         {
-            if (m_stack != null && m_stackCount.Value != (byte)m_stack.Count) m_stackCount.Value = (byte)m_stack.Count;
+            ServerSend();
             return;
         }
         ClientLateUpdate();
+    }
+
+    void ServerSend()
+    {
+        if (m_stack != null && m_stackCount.Value != (byte)m_stack.Count) m_stackCount.Value = (byte)m_stack.Count;
+
+        if (m_character != null && m_invincibleField != null)
+        {
+            float left = Mathf.Max(0.0f, (float)m_invincibleField.GetValue(m_character));
+            float sent = m_invincible.Value;
+            // 始まり・終わりはすぐ、間は大きくずれたときだけ送る
+            if ((left > 0.0f) != (sent > 0.0f) || Mathf.Abs(left - sent) > kInvincibleResend) m_invincible.Value = left;
+        }
+
+        if (m_specialGauge != null && m_gauge.Value != (byte)m_specialGauge.Blocks) m_gauge.Value = (byte)m_specialGauge.Blocks;
+    }
+
+    // DarumaCharacter.UpdateInvincible と同じ: 残り時間を減らし、その間は点滅する
+    void ClientUpdateInvincible()
+    {
+        if (m_character == null) return;
+        if (m_invincibleLeft <= 0.0f)
+        {
+            if (m_blinking)
+            {
+                // 終わったら表示を戻す
+                m_blinking = false;
+                m_character.SetInvincible(0.0f);
+                foreach (var r in GetComponentsInChildren<Renderer>()) r.enabled = true;
+            }
+            return;
+        }
+        m_invincibleLeft = Mathf.Max(0.0f, m_invincibleLeft - Time.deltaTime);
+        m_character.SetInvincible(m_invincibleLeft);
+        m_blinking = true;
+        bool visible = m_invincibleLeft <= 0.0f || Mathf.FloorToInt(m_invincibleLeft / m_blinkInterval) % 2 == 0;
+        foreach (var r in GetComponentsInChildren<Renderer>()) r.enabled = visible;
+    }
+
+    void ClientUpdateGauge()
+    {
+        if (m_specialGauge == null || m_gaugeBlocksField == null) return;
+        int blocks = m_gauge.Value;
+        if ((int)m_gaugeBlocksField.GetValue(m_specialGauge) != blocks) m_gaugeBlocksField.SetValue(m_specialGauge, blocks);
     }
 
     // DarumaStack.LateUpdate の頭の部分と同じ動き

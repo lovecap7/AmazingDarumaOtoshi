@@ -327,6 +327,8 @@ namespace Yurube
         private void FixedUpdate()
         {
             if (m_character == null) return;
+            // ネット対戦用(suehara): 積み木をはじくのはホストだけ(クライアントは見た目だけ)
+            if (SpecialNet.IsClient) return;
 
             // 出現し終わってから、消え始めるまでだけ判定を出す
             float activeFrom = Mathf.Max(0.01f, m_introTime);

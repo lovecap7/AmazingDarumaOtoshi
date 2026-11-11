@@ -14,6 +14,9 @@ namespace Yurube
         Quaternion m_headOriginalRotation;
         bool m_active;
         float m_rollAngle;
+        // ネット対戦用(suehara): クライアントで速さを出すための前の位置
+        Vector3 m_lastPosition;
+        bool m_hasLastPosition;
 
         private void Awake()
         {
@@ -101,6 +104,13 @@ namespace Yurube
             Vector3 velocity = m_character.Rigidbody != null
                 ? m_character.Rigidbody.linearVelocity
                 : Vector3.zero;
+            // ネット対戦用(suehara): クライアントの体は物理で動かない(位置が届くだけ)ので、動いた分から速さを出す
+            if (SpecialNet.IsClient)
+            {
+                velocity = Time.deltaTime > 0.0f && m_hasLastPosition ? (rootPosition - m_lastPosition) / Time.deltaTime : Vector3.zero;
+                m_lastPosition = rootPosition;
+                m_hasLastPosition = true;
+            }
             float forwardSpeed = Vector3.Dot(
                 new Vector3(velocity.x, 0.0f, velocity.z),
                 m_character.transform.forward);

@@ -11,7 +11,7 @@ namespace Yurube
     // 無敵中は既存の点滅を使わず、モデルを虹色に発光させる。
     [DefaultExecutionOrder(-100)]
     [RequireComponent(typeof(DarumaCharacter))]
-    public class KidaruSpecial : MonoBehaviour, ISpecialAbility
+    public class KidaruSpecial : MonoBehaviour, ISpecialAbility, INetSpecial
     {
         [Header("必殺技")]
         [Tooltip("積み木0個のときの効果時間(秒)")]
@@ -145,16 +145,40 @@ namespace Yurube
                 var stackBlock = m_character.Stack.Get(i);
                 if (stackBlock != null) cutInBlocks.Add(stackBlock);
             }
+            // ネット対戦用(suehara): クライアントでも同じカットイン・虹色・車輪を出す(無敵・速さはホストが決める)
+            SpecialNet.Send(m_character, this, kNetActivate, new[] { duration }, cutInBlocks.ToArray());
+            PlayActivate(duration, cutInBlocks);
+
+            if (m_logSpecial)
+                Debug.Log($"[きだる] 必殺技『黄金化』発動: 無敵+速度UP {duration:F1}秒 (積み木{blocks}個)", this);
+            return true;
+        }
+
+        // カットインを再生して、効果時間のあいだ無敵・虹色・車輪にする(ホストとクライアントで同じ)
+        void PlayActivate(float duration, IList<TumikiBlock> cutInBlocks)
+        {
             KidaruCutIn.Show(m_cutInName, m_character, cutInBlocks);
 
             m_character.SetInvincible(duration);
             m_activeUntil = Time.time + duration;
             if (m_wheel != null) m_wheel.Begin();
             BeginRainbow();
+        }
 
-            if (m_logSpecial)
-                Debug.Log($"[きだる] 必殺技『黄金化』発動: 無敵+速度UP {duration:F1}秒 (積み木{blocks}個)", this);
-            return true;
+        //========================================
+        // ネット対戦用(suehara): クライアントで、ホストの発動と同じ見た目を出す
+        //========================================
+
+        const int kNetActivate = 0;
+
+        public void NetReceive(int ev, float[] v, TumikiBlock[] blocks)
+        {
+            if (ev != kNetActivate || v.Length < 1 || IsActive) return;
+            var list = new List<TumikiBlock>();
+            foreach (var b in blocks) if (b != null) list.Add(b);
+            LastBlocks = list.Count;
+            LastDuration = v[0];
+            PlayActivate(v[0], list);
         }
 
         void BeginRainbow()

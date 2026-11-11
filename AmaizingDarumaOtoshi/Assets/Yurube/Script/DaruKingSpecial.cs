@@ -9,7 +9,7 @@ namespace Yurube
     // 詠唱中に移動入力で方向を決め、任意の行動ボタンまたは詠唱時間経過で確定。
     // カットイン終了後、確定方向へ直線状の即死攻撃を1回だけ放つ。
     [RequireComponent(typeof(DarumaCharacter))]
-    public class DaruKingSpecial : MonoBehaviour, ISpecialAbility
+    public class DaruKingSpecial : MonoBehaviour, ISpecialAbility, INetSpecial
     {
         [Header("詠唱")]
         [SerializeField] string m_specialName = "エクスカリバー";
@@ -155,6 +155,9 @@ namespace Yurube
                 UpdateGuide();
                 UpdateChargeEffect();
 
+                // ネット対戦用(suehara): クライアントは自分では確定しない(ホストが確定した向きが届く。NetReceive)
+                if (SpecialNet.IsClient) return;
+
                 bool anyButton = m_stateTime >= m_anyButtonMinTime
                     && (SpecialInput.WasAnyActionPressed(m_character) || m_cpuConfirm);   // m_cpuConfirm:CPU 用(中平)
                 if (anyButton || m_stateTime >= m_chargeDuration)
@@ -197,6 +200,17 @@ namespace Yurube
             if (m_character == null || m_gauge == null || !m_gauge.IsFull) return false;
 
             m_gauge.Consume();
+            // ネット対戦用(suehara): クライアントでも詠唱の見た目(ガイド・光・虹色)を出す
+            SpecialNet.Send(m_character, this, kNetBeginCharge);
+            BeginCharge();
+
+            if (m_logSpecial) Debug.Log("[だるきんぐ] エクスカリバー詠唱開始", this);
+            return true;
+        }
+
+        // 詠唱を始める(ホストとクライアントで同じ)
+        void BeginCharge()
+        {
             m_state = State.Charging;
             m_stateTime = 0.0f;
             m_attackApplied = false;
@@ -216,18 +230,27 @@ namespace Yurube
 
             m_resolvedLength = ResolveAttackLength(HorizontalForward());
             CreateGuide();
-
-            if (m_logSpecial) Debug.Log("[だるきんぐ] エクスカリバー詠唱開始", this);
-            return true;
         }
 
         void CompleteCharge()
         {
             if (m_state != State.Charging || m_character == null) return;
 
-            m_attackDirection = HorizontalForward();
-            m_attackOrigin = m_character.transform.position;
-            m_resolvedLength = ResolveAttackLength(m_attackDirection);
+            Vector3 direction = HorizontalForward();
+            Vector3 origin = m_character.transform.position;
+            float length = ResolveAttackLength(direction);
+            // ネット対戦用(suehara): 確定した向き・位置・長さをクライアントへ送る(クライアントはこれでカットイン・聖剣を出す)
+            SpecialNet.Send(m_character, this, kNetConfirm,
+                new[] { direction.x, direction.z, origin.x, origin.y, origin.z, length });
+            ApplyConfirm(direction, origin, length);
+        }
+
+        // 確定した向きでカットインを始める(終わったら Update で斬撃。ホストとクライアントで同じ)
+        void ApplyConfirm(Vector3 direction, Vector3 origin, float length)
+        {
+            m_attackDirection = direction;
+            m_attackOrigin = origin;
+            m_resolvedLength = length;
             DestroyGuide();
 
             m_state = State.CutIn;
@@ -244,6 +267,30 @@ namespace Yurube
 
             if (m_logSpecial)
                 Debug.Log($"[だるきんぐ] エクスカリバー方向確定 {m_attackDirection}", this);
+        }
+
+        //========================================
+        // ネット対戦用(suehara): クライアントで、ホストの詠唱・確定と同じ見た目を出す
+        //========================================
+
+        const int kNetBeginCharge = 0;
+        const int kNetConfirm = 1;
+
+        public void NetReceive(int ev, float[] v, TumikiBlock[] blocks)
+        {
+            if (ev == kNetBeginCharge)
+            {
+                if (m_state != State.Idle) return;
+                BeginCharge();
+                return;
+            }
+            if (ev == kNetConfirm && v.Length >= 6)
+            {
+                // 詠唱の知らせが届く前に確定が来たときも、そこから始める
+                if (m_state == State.Idle) BeginCharge();
+                if (m_state != State.Charging) return;
+                ApplyConfirm(new Vector3(v[0], 0.0f, v[1]).normalized, new Vector3(v[2], v[3], v[4]), v[5]);
+            }
         }
 
         Vector3 HorizontalForward()
@@ -482,7 +529,8 @@ namespace Yurube
             m_attackFlashStrength = 0.55f;
 
             CreateBeam();
-            ApplyExcaliburDamage();
+            // ネット対戦用(suehara): 倒すのはホストだけ(クライアントは見た目だけ)
+            if (!SpecialNet.IsClient) ApplyExcaliburDamage();
 
             // あかだると同じ焦げシェーダーで、斬撃ラインの地面を焼く
             GroundScorch.SpawnLine(
