@@ -436,6 +436,7 @@ namespace Yurube
             {
                 if (character == null || character == m_character) continue;
                 if (character.IsInvincible) continue;
+                if (DarumaMatch.AreFriends(m_character, character)) continue;   // チーム戦:味方には当たらない(中平)
 
                 Vector3 delta = character.transform.position - m_targetPosition;
                 delta.y = 0.0f;
@@ -462,6 +463,9 @@ namespace Yurube
                 Vector3 delta = block.transform.position - m_targetPosition;
                 delta.y = 0.0f;
                 if (delta.magnitude > m_attackRadius) continue;
+                // チーム戦:味方に積まれている積み木は壊さない(中平)
+                if (block.CurrentState == TumikiBlock.State.Stacked
+                    && DarumaMatch.AreFriends(m_character, block.GetComponentInParent<DarumaCharacter>())) continue;
 
                 RemoveBlockFromStack(block);
                 block.Break(Vector3.up * 2.0f, 0.0f, 0.0f);

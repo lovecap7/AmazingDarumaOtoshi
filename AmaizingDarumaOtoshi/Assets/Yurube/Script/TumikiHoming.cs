@@ -27,6 +27,9 @@ namespace Yurube
         // 何も設定されていないときは動かさない(Begin で false になる)
         bool m_finished = true;
         bool m_loggedStart;
+        // 追い始めたときの弾の持ち主と打ち返し回数(はじき返されたら変わるので、追うのをやめる。中平)
+        IDarumaAttacker m_launchOwner;
+        int m_launchReturnCount;
 
         // この発射でホーミングを始めたか(同じ積み木を何度も拾い直さないためのフラグ)
         public bool ConsumedLaunch { get; private set; }
@@ -70,6 +73,8 @@ namespace Yurube
             m_finished = false;
             m_loggedStart = false;
             ConsumedLaunch = true;
+            m_launchOwner = m_block != null ? m_block.Owner : null;
+            m_launchReturnCount = m_block != null ? m_block.ReturnCount : 0;
             enabled = true;
         }
 
@@ -93,6 +98,14 @@ namespace Yurube
             {
                 ConsumedLaunch = false;
                 enabled = false;
+                return;
+            }
+
+            // はじき返された(ハンマーで打ち返された・六腕ではじかれた)ら、追うのをやめる(中平)
+            // 打ち返すと持ち主か打ち返し回数が変わる。この発射の間は ConsumedLaunch が残るので、パッシブも付け直さない
+            if (m_block.Owner != m_launchOwner || m_block.ReturnCount != m_launchReturnCount)
+            {
+                Finish();
                 return;
             }
 
@@ -152,6 +165,7 @@ namespace Yurube
             foreach (var character in FindObjectsByType<DarumaCharacter>(FindObjectsInactive.Exclude))
             {
                 if (character == null || character == m_shooter) continue;
+                if (DarumaMatch.AreFriends(m_shooter, character)) continue;   // チーム戦:味方は追わない(中平)
 
                 float sqr = (character.transform.position - transform.position).sqrMagnitude;
                 if (sqr >= nearestSqr) continue;

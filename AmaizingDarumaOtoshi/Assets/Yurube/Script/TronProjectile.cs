@@ -216,6 +216,12 @@ namespace Yurube
             var block = other.GetComponentInParent<TumikiBlock>();
             if (block != null)
             {
+                // 自分・味方に積まれている積み木は壊さない(中平。前は自分の積み木も壊れていた)
+                if (block.CurrentState == TumikiBlock.State.Stacked)
+                {
+                    var holder = block.GetComponentInParent<DarumaCharacter>();
+                    if (holder != null && (holder == m_owner || DarumaMatch.AreFriends(m_owner, holder))) return;
+                }
                 if (block != m_block) BreakBlock(block);
                 return;
             }
@@ -224,8 +230,10 @@ namespace Yurube
             var target = other.GetComponentInParent<DarumaCharacter>();
             if (target == null) return;
 
-            // 発動直後は自分自身を守る
-            if (target == m_owner && Time.time < m_ownerGraceUntil) return;
+            // 自分の軌跡では自分はダメージを受けない(中平。前は発動直後の m_ownerGraceUntil の間だけだった)
+            if (target == m_owner) return;
+            // チーム戦:味方には当たらない(中平)
+            if (DarumaMatch.AreFriends(m_owner, target)) return;
 
             if (target.IsInvincible || !target.CanBeAffected) return;
 
