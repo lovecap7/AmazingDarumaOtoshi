@@ -75,7 +75,7 @@ namespace Nakahira
 
         private void Awake()
         {
-            m_specialState = new CpuSpecialState(m_special);
+            m_specialState = new CpuSpecialState(m_special, m_melee);
             m_states = new CpuState[] { m_collect, m_flee, m_melee, m_shot, m_approach, m_wait, m_specialState };
             m_isEngagedWith = IsEngagedWith;
         }

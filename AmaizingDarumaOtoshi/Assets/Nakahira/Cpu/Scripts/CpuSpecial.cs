@@ -65,6 +65,8 @@ namespace Nakahira
         MatchPlayer m_funnelTarget;
         // いわだる(隕石):狙う敵(撃ったあとはカウントダウンの間ついていく)
         MatchPlayer m_meteorTarget;
+        // へびだる(毒沼):狙う敵(一番段数が少ない敵)
+        MatchPlayer m_swampTarget;
         // 敵の方との差がこれ(度)以内になったら撃つ(分裂弾は 1 秒に 360° 曲がって追う)
         const float kFunnelFaceAngle = 15.0f;
 
@@ -209,7 +211,7 @@ namespace Nakahira
             switch (m_ability)
             {
                 case IwadaruSpecial iwa: return MeteorChance(c, iwa);   // 隕石
-                case HebidaruSpecial _: return true;   // 毒沼
+                case HebidaruSpecial hebi: return SwampChance(c, hebi);   // 毒沼
                 case AkadaruSpecial _:  return TronChance(c);   // トロン(ビーム)
                 case DaruKingSpecial _: return true;   // エクスカリバー
                 case MidaruSpecial _:   return FunnelChance(c);   // ファンネル
@@ -292,30 +294,78 @@ namespace Nakahira
         // 射程の外でも、満タンなら近づきに行く(撃ちどころを見逃していても入れる)
         public bool WantsApproach(CpuContext c)
         {
-            if (Disabled || m_gauge == null || !m_gauge.IsFull || c.StackCount <= 0) return false;
+            if (Disabled || m_gauge == null || !m_gauge.IsFull) return false;
+            // へびだるの毒沼は積み木 0 個でも撃てる(ほかは 1 個以上)
+            if (m_ability is HebidaruSpecial) return true;
+            if (c.StackCount <= 0) return false;
             return m_ability is MidaruSpecial || m_ability is IwadaruSpecial;
         }
 
-        // 撃ったあと、狙った敵についていく最中か(いわだるのカウントダウン中。円が自分についてくる)
-        public bool IsFollowing => !Disabled && m_ability is IwadaruSpecial iwa && iwa.CountdownRemaining > 0.0f;
-        // ついていく敵(撃ったときに狙っていた敵)
-        public MatchPlayer FollowTarget => m_meteorTarget;
-
-        // 状態「必殺技」で近づく敵(いなければ null)。current:今近づいている敵(少し優先する)
-        //  ・みだる:道で一番近い敵
-        //  ・いわだる:一番積み木を積んでいる(一番遅い)敵。同じなら道で近い方(確実に倒せれば一番有利なので。中平が決めた)
-        public CpuOpponent ApproachTarget(CpuContext c, MatchPlayer current)
+        // 撃ったあと、敵についていく最中か
+        //  ・いわだる:カウントダウン中(円が自分についてくる)
+        //  ・へびだる:毒沼が出ている間(沼が自分についてくる。反転中の敵を追って殴る)
+        public bool IsFollowing
         {
-            bool meteor = m_ability is IwadaruSpecial;
+            get
+            {
+                if (Disabled) return false;
+                if (m_ability is IwadaruSpecial iwa) return iwa.CountdownRemaining > 0.0f;
+                if (m_ability is HebidaruSpecial hebi) return hebi.IsActive;
+                return false;
+            }
+        }
+        // へびだるの毒沼が出ている間か(近づいたら殴るに引き継ぐ)
+        public bool IsSwampFollowing => IsFollowing && m_ability is HebidaruSpecial;
+
+        // ついていく敵(いなければ null)。current:今ついていっている敵
+        //  ・いわだる:撃ったときに狙っていた敵
+        //  ・へびだる:反転している敵のうち道で一番近い敵。いなければ一番段数が少ない敵
+        public CpuOpponent FollowTarget(CpuContext c, MatchPlayer current)
+        {
+            if (m_ability is IwadaruSpecial)
+            {
+                CpuOpponent o = c.Perception.Find(m_meteorTarget);
+                return IsReachable(o) ? o : ApproachTarget(c, current);
+            }
             CpuOpponent best = null;
             float bestScore = float.MinValue;
             foreach (var o in c.Perception.Opponents)
             {
-                if (o.IsGhost || o.IsInvincible || o.Character == null) continue;
-                if (float.IsPositiveInfinity(o.PathDistance)) continue;   // 歩いて行けない
-                // いわだるは段数が大きいほど(1 段 = 道 100m 分)、みだるは道が近いほど高い
-                float score = (meteor ? o.StackCount * 100.0f : 0.0f) - o.PathDistance;
-                if (o.Player == current) score += meteor ? 50.0f : 1.0f;   // 今の相手を少し優先(ころころ変えない)
+                if (!IsReachable(o) || !c.IsTrapped(o)) continue;
+                float score = -o.PathDistance + (o.Player == current ? 1.0f : 0.0f);
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    best = o;
+                }
+            }
+            return best ?? ApproachTarget(c, current);
+        }
+
+        // 近づける敵か(生存者・無敵でない・歩いて行ける)
+        private static bool IsReachable(CpuOpponent o)
+        {
+            if (o == null || o.IsGhost || o.IsInvincible || o.Character == null) return false;
+            return !float.IsPositiveInfinity(o.PathDistance);
+        }
+
+        // 状態「必殺技」で近づく敵(いなければ null)。current:今近づいている敵(少し優先する)
+        //  ・みだる:道で一番近い敵
+        //  ・いわだる:一番積み木を積んでいる(一番遅い)敵。同じなら道で近い方(確実に倒せれば一番有利なので。中平が決めた)
+        //  ・へびだる:一番段数が少ない敵(首だけで逃げている敵を捕まえる。中平が決めた)。同じなら道で近い方
+        public CpuOpponent ApproachTarget(CpuContext c, MatchPlayer current)
+        {
+            bool meteor = m_ability is IwadaruSpecial;
+            bool swamp = m_ability is HebidaruSpecial;
+            CpuOpponent best = null;
+            float bestScore = float.MinValue;
+            foreach (var o in c.Perception.Opponents)
+            {
+                if (!IsReachable(o)) continue;
+                // 1 段 = 道 100m 分。いわだるは段数が大きいほど、へびだるは小さいほど、みだるは道が近いほど高い
+                float stackScore = meteor ? o.StackCount * 100.0f : swamp ? -o.StackCount * 100.0f : 0.0f;
+                float score = stackScore - o.PathDistance;
+                if (o.Player == current) score += meteor || swamp ? 50.0f : 1.0f;   // 今の相手を少し優先(ころころ変えない)
                 if (score > bestScore)
                 {
                     bestScore = score;
@@ -323,6 +373,16 @@ namespace Nakahira
                 }
             }
             return best;
+        }
+
+        // へびだる(毒沼):狙う敵(一番段数が少ない敵)が「今撃ったときの沼の半径 + SwampFireMargin」以内に入ったとき。
+        // 入ってから撃つのではなく、撃ちながらにじり寄って沼に飲み込む(壁際に追い詰める・首だけで逃げる敵を捕まえる。中平が決めた)
+        private bool SwampChance(CpuContext c, HebidaruSpecial hebi)
+        {
+            CpuOpponent target = ApproachTarget(c, m_swampTarget);
+            m_swampTarget = target != null ? target.Player : null;
+            if (target == null) return false;
+            return target.FlatDistance <= hebi.PredictRadius(c.StackCount) + c.Params.SwampFireMargin;
         }
 
         // いわだる(隕石):狙う敵(一番積み木を積んでいる敵)が、今撃ったときの円の半径 × MeteorFireRadiusRatio 以内にいるとき

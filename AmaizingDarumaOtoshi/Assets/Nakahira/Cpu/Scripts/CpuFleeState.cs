@@ -56,7 +56,13 @@ namespace Nakahira
             float urgency = 0.0f;
             foreach (var o in c.Perception.Opponents) urgency = Mathf.Max(urgency, EnterUrgency(c, o));
             // 逃げている最中は、追っ手がいる間は続けたい
-            if (m_pursuers.Count > 0) urgency = Mathf.Max(urgency, c.Params.StackThreatUrgency);
+            // (自分の毒沼で反転した追っ手は数えない)
+            foreach (var pursuer in m_pursuers)
+            {
+                if (c.IsTrapped(c.Perception.Find(pursuer))) continue;
+                urgency = Mathf.Max(urgency, c.Params.StackThreatUrgency);
+                break;
+            }
             return urgency;
         }
 
@@ -123,6 +129,7 @@ namespace Nakahira
             CpuParams p = c.Params;
             if (o.ThreatDistance > p.FleeEnterDistance) return 0.0f;
             if (o.IsGhost) return p.GhostThreatUrgency;
+            if (c.IsTrapped(o)) return 0.0f;   // 自分の毒沼で反転している敵からは逃げない(思うように動けないので)
             if (o.StackDiff <= -p.FleeStackGap) return p.StackThreatUrgency;
             if (ZeroStackCheck && o.StackDiff < 0) return p.StackThreatUrgency;
             return 0.0f;

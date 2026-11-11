@@ -43,6 +43,12 @@ namespace Nakahira
         public bool IsSpecialInvincible => SpecialInvincibleRemaining > 0.0f;
         Yurube.IwadaruSpecial m_iwadaru;
 
+        // へびだるの毒沼が出ている(カットイン中も含む)。この間は、反転している敵から逃げず、段数が不利でも殴りに行く
+        public bool IsSwampOut => m_hebidaru != null && m_hebidaru.IsActive;
+        Yurube.HebidaruSpecial m_hebidaru;
+        // 自分の毒沼で反転している敵か(へびだるの毒沼が出ている間だけ true)
+        public bool IsTrapped(CpuOpponent o) => IsSwampOut && o != null && !o.IsGhost && o.Character != null && o.Character.MovementInverted;
+
         // 集中度(認識の疲れ)。出来事(弾に反応した・攻撃を受けた等)のたびに足され、時間で減る
         // 判定には「疲れ ÷ 容量」の割合(LoadRatio)を使う。うまい CPU ほど容量が大きく、割合が上がりにくい
         //  ・割合が高いほど、弾・相手の振りに反応できる確率が下がる
@@ -82,6 +88,7 @@ namespace Nakahira
                 m_kidaruOwner = self;
                 m_kidaru = self != null ? self.GetComponent<Yurube.KidaruSpecial>() : null;
                 m_iwadaru = self != null ? self.GetComponent<Yurube.IwadaruSpecial>() : null;
+                m_hebidaru = self != null ? self.GetComponent<Yurube.HebidaruSpecial>() : null;
             }
             Params = p;
             DeltaTime = dt;

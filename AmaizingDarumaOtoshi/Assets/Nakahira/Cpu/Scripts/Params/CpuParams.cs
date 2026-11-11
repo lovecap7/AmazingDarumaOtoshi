@@ -271,6 +271,10 @@ namespace Nakahira
         [Tooltip("狙う敵より自分の方が速いとき(カウントダウンの間に追いつける)は、円の半径 × この割合 以内で撃つ")]
         [Range(0.0f, 1.0f)] public float MeteorFastFireRadiusRatio = 0.9f;
 
+        [Header("必殺技:へびだるの毒沼(自分中心の円。8 秒ついてくる。入った敵は遅くなり、移動が反転する)")]
+        [Tooltip("狙う敵(一番段数が少ない敵)が「沼の半径 + この距離(m)」以内に入ったら撃ち、そのまま追って沼に飲み込む")]
+        [Min(0.0f)] public float SwampFireMargin = 4.0f;
+
         [Header("必殺技:みだるのファンネル(積んでいた数に分裂して、近い敵から順に追う)")]
         [Tooltip("一番近い敵がこの距離(m)以内で、間に壁がなければ、そちらへ向き直って撃つ(どの状態の最中でも)")]
         [Min(0.0f)] public float FunnelRange = 8.0f;
