@@ -264,6 +264,10 @@ namespace Nakahira
         [Tooltip("黄金化の残りがこれ(秒)より多い間は、無敵で防げる危ない場所(隕石・ビーム・エクスカリバー)を気にしない")]
         [Min(0.0f)] public float GoldenHazardMargin = 0.5f;
 
+        [Header("必殺技:あかだるのトロン(向いている向きへ撃つ。通った跡が 15 秒ビームになる)")]
+        [Tooltip("この距離(m)以内で、間に壁のない敵がいたら、そちらへ向き直って撃つ(どの状態の最中でも)。狙いのぶれは股抜きショットと同じ")]
+        [Min(0.0f)] public float TronRange = 12.0f;
+
         [Header("必殺技:あおだるの六腕(暗転返し・とっさの六腕)")]
         [Tooltip("暗転返し:みだるのファンネルのカットイン中に六腕で返す確率(余裕(1 − 集中度の割合)を掛けて使う)")]
         [Range(0.0f, 1.0f)] public float BlackoutCounterChance = 0.6f;

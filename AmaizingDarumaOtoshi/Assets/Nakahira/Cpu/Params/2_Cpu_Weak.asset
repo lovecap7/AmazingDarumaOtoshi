@@ -127,6 +127,7 @@ MonoBehaviour:
   GoldenFireDistance: 8
   GoldenAttackScore: 0.7
   GoldenHazardMargin: 0.5
+  TronRange: 12
   BlackoutCounterChance: 0.1
   BlackoutCounterDelay: 1
   BlackoutNearMargin: 2
