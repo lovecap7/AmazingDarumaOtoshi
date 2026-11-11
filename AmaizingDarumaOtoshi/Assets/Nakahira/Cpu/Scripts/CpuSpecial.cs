@@ -8,7 +8,7 @@ namespace Nakahira
 {
     // CPU が必殺技を撃つ(1人の CPU につき1つ)
     // ゲージが満タンで、そのキャラの発動条件(ShouldActivate)を満たしたら撃つ
-    // 今はほとんどのキャラが「満タンになったらすぐ撃つ」。キャラごとの撃ちどころは ShouldActivate に足す(設計メモ 6.2.1)
+    // キャラごとの撃ちどころは ShouldActivate(設計メモ 6.2.1)。だるきんぐはため中の向き直り・確定も AimExcalibur でする
     //
     // あおだる(六腕)は次の 2 つのときだけ撃つ
     //  ・暗転返し:みだるのファンネルのカットイン中(時間が止まっている間)に撃つ。
@@ -70,6 +70,10 @@ namespace Nakahira
         // 敵の方との差がこれ(度)以内になったら撃つ(分裂弾は 1 秒に 360° 曲がって追う)
         const float kFunnelFaceAngle = 15.0f;
 
+        // だるきんぐ(エクスカリバー):ため中か・狙いのぶれ(度。ため始めに一度だけ決める)
+        bool m_kingCharging;
+        float m_kingAimError;
+
         // 撃つと決めた理由を Console に出す(テスト用)
         public static bool LogDecisions;
 
@@ -107,6 +111,14 @@ namespace Nakahira
 
             // 暗転返しは時間が止まっている間に撃つので、下の「時間が止まっている間は撃たない」より先に見る
             if (m_ability is AodaruSpecial && UpdateBlackoutCounter(c, engaged)) return Activated();
+
+            // だるきんぐ:ため中(ゲージは空)は、線に敵が入る向きへ向きを変え続け、中心部分に入ったら確定する
+            if (m_ability is DaruKingSpecial king && king.IsCharging)
+            {
+                AimExcalibur(c, king);
+                return false;
+            }
+            m_kingCharging = false;
 
             if (!m_gauge.IsFull)
             {
@@ -213,12 +225,117 @@ namespace Nakahira
                 case IwadaruSpecial iwa: return MeteorChance(c, iwa);   // 隕石
                 case HebidaruSpecial hebi: return SwampChance(c, hebi);   // 毒沼
                 case AkadaruSpecial _:  return TronChance(c);   // トロン(ビーム)
-                case DaruKingSpecial _: return true;   // エクスカリバー
+                case DaruKingSpecial king: return ExcaliburChance(c, king);   // エクスカリバー
                 case MidaruSpecial _:   return FunnelChance(c);   // ファンネル
                 case KidaruSpecial _:   return KidaruChance(c, current);   // 黄金化
                 default:                return true;
             }
         }
+
+        // だるきんぐ(エクスカリバー):向きを変えれば線(太さ全体)に 2 人入るとき(1 対 1 なら 1 人)
+        // 撃つとため(2 秒)が始まり、その間に向きを決める(AimExcalibur)
+        private static bool ExcaliburChance(CpuContext c, DaruKingSpecial king)
+        {
+            int need = ExcaliburNeed(c);
+            if (need <= 0) return false;
+            BestExcaliburDir(c, king.AttackWidth * 0.5f, c.Params.ExcaliburConfirmHalfWidth, out _, out int full);
+            return full >= need;
+        }
+
+        // ため中:線の中心部分に一番多く入る向き(2 人入らなければ 1 人)へ向きを変え続ける。
+        // 今の向きの線の中心部分に 2 人(1 対 1 なら 1 人)入ったら確定を頼む(発動直後 0.15 秒は DaruKingSpecial が待つ)。
+        // そうならなければ 2 秒でため切る。狙いのぶれは股抜きショットと同じ
+        private void AimExcalibur(CpuContext c, DaruKingSpecial king)
+        {
+            if (!m_kingCharging)
+            {
+                m_kingCharging = true;
+                float error = Mathf.Lerp(c.Params.ShotAimError, c.Params.ShotAimErrorMax, c.LoadRatio);
+                m_kingAimError = Random.Range(-error, error);
+            }
+            float half = king.AttackWidth * 0.5f;
+            float center = Mathf.Min(c.Params.ExcaliburConfirmHalfWidth, half);
+            BestExcaliburDir(c, half, center, out Vector3 dir, out _);
+            m_aiming = dir != Vector3.zero;   // 狙える敵がいなければ今の向きのまま
+            if (m_aiming) m_aimDir = Quaternion.Euler(0.0f, m_kingAimError, 0.0f) * dir;
+
+            Vector3 forward = c.Self.transform.forward;
+            forward.y = 0.0f;
+            if (forward.sqrMagnitude < 0.0001f) return;
+            forward.Normalize();
+            int need = Mathf.Max(1, ExcaliburNeed(c));
+            if (CountOnLine(c, forward, center) < need) return;
+            king.RequestConfirm();
+            if (LogDecisions) Debug.Log($"[CPU 必殺技] {c.Self.name} エクスカリバー確定(中心部分に {need} 人以上)");
+        }
+
+        // 線に入れたい人数:自分以外の生存者(幽霊・復活待ちを除く)が 1 人だけなら 1、2 人以上なら 2、いなければ 0
+        private static int ExcaliburNeed(CpuContext c)
+        {
+            int alive = 0;
+            foreach (var o in c.Perception.Opponents)
+            {
+                if (o.IsGhost || o.Character == null) continue;
+                alive++;
+            }
+            return Mathf.Min(alive, 2);
+        }
+
+        // 自分から dir の向きの線の、中心から左右 halfWidth 以内にいる敵(無敵でない)の数
+        private static int CountOnLine(CpuContext c, Vector3 dir, float halfWidth)
+        {
+            Vector3 pos = c.Position;
+            int count = 0;
+            foreach (var o in c.Perception.Opponents)
+            {
+                if (o.IsGhost || o.IsInvincible || o.Character == null) continue;
+                Vector3 d = o.Position - pos;
+                d.y = 0.0f;
+                float along = Vector3.Dot(d, dir);
+                if (along < 0.0f) continue;
+                if ((d - dir * along).sqrMagnitude <= halfWidth * halfWidth) count++;
+            }
+            return count;
+        }
+
+        // 線に一番多く敵が入る向き。候補は「敵 1 人の方」と「敵 2 人の真ん中の方」(2 人から線までの距離がそろう)
+        // 中心部分(center)に入る数が多い順 → 太さ全体(half)に入る数が多い順 → 今の向きから回る角度が小さい順。返り値は中心部分の数
+        private static int BestExcaliburDir(CpuContext c, float half, float center, out Vector3 best, out int bestFull)
+        {
+            best = Vector3.zero;
+            bestFull = 0;
+            int bestCenter = -1;
+            float bestAngle = float.MaxValue;
+            Vector3 forward = c.Self.transform.forward;
+            forward.y = 0.0f;
+            Vector3 pos = c.Position;
+            var list = c.Perception.Opponents;
+            for (int i = 0; i < list.Count; i++)
+            {
+                if (!IsExcaliburTarget(list[i])) continue;
+                for (int j = i; j < list.Count; j++)
+                {
+                    if (!IsExcaliburTarget(list[j])) continue;
+                    Vector3 d = j == i ? list[i].Position - pos : (list[i].Position - pos) + (list[j].Position - pos);
+                    d.y = 0.0f;
+                    if (d.sqrMagnitude < 0.0001f) continue;
+                    d.Normalize();
+                    int inCenter = CountOnLine(c, d, center);
+                    int inFull = CountOnLine(c, d, half);
+                    float angle = Vector3.Angle(forward, d);
+                    bool better = inCenter > bestCenter
+                        || (inCenter == bestCenter && (inFull > bestFull || (inFull == bestFull && angle < bestAngle)));
+                    if (!better) continue;
+                    best = d;
+                    bestCenter = inCenter;
+                    bestFull = inFull;
+                    bestAngle = angle;
+                }
+            }
+            return Mathf.Max(0, bestCenter);
+        }
+
+        private static bool IsExcaliburTarget(CpuOpponent o) => o != null && !o.IsGhost && !o.IsInvincible && o.Character != null;
 
         // きだる(黄金化):攻めるとき。殴っている最中か、攻めに行っていて相手まで道で GoldenFireDistance 以内
         // (遠くで撃って効き目を無駄にしない)

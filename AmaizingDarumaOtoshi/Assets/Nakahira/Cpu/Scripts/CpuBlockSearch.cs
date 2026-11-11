@@ -47,7 +47,7 @@ namespace Nakahira
         // 積むが選ばれない場面か(盤面に拾える積み木がない・積み終わった)。攻めに行く・待つで使う
         public static bool NothingToCollect(CpuContext c)
         {
-            return c.StackCount >= c.Params.CollectUntil || !HasAnyCollectable();
+            return c.StackCount >= c.CollectUntil || !HasAnyCollectable();
         }
 
         // 拾いに行く候補(拾える・諦めていない・探す範囲内・跳んで届く高さ)を集め、まっすぐの距離 + extraCost の小さい順に並べる
@@ -55,6 +55,7 @@ namespace Nakahira
         public static void Gather(CpuContext c, List<Candidate> results, Func<TumikiBlock, float> extraCost)
         {
             results.Clear();
+            if (c.IsStackFull) return;   // 積める上限まで積んでいる(だるきんぐの 2 段)
             Vector3 pos = c.Position;
             foreach (var block in TumikiBlock.All)
             {

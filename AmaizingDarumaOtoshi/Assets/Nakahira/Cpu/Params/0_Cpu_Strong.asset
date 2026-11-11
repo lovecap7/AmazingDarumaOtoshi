@@ -135,6 +135,7 @@ MonoBehaviour:
   GoldenAttackScore: 0.7
   GoldenHazardMargin: 0.5
   TronRange: 12
+  ExcaliburConfirmHalfWidth: 0.8
   BlackoutCounterChance: 0.6
   BlackoutCounterDelay: 0.3
   BlackoutNearMargin: 2

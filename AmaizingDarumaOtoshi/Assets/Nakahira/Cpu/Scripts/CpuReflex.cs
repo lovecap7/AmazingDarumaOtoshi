@@ -170,7 +170,7 @@ namespace Nakahira
             // 難しい順に、落ち着いているほど選びやすい。間に合わない反応は飛ばす
             float reaction = p.ReflexReaction;
             Action action = Action.None;
-            if (Random.value < p.CatchChance * alert && CanCatch(c, firstThreat, reaction)) action = Action.Catch;
+            if (!c.IsStackFull && Random.value < p.CatchChance * alert && CanCatch(c, firstThreat, reaction)) action = Action.Catch;
             else if (Random.value < p.ReturnChance * alert && CanReturn(c, first, firstThreat, reaction)) action = Action.Return;
             else if (CanDodge(c, firstThreat, reaction)) action = Action.Dodge;
             if (action == Action.None) return;

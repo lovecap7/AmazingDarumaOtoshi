@@ -122,6 +122,14 @@ namespace Yurube
             end = origin + direction * m_resolvedLength;
         }
 
+        // ---- CPU が詠唱を確定するため(CPU 用(中平)。人の操作は変わらない) ----
+        // CPU から確定を頼まれたか(人の「任意の行動ボタン」の代わり。発動直後 m_anyButtonMinTime 秒は待つ)
+        bool m_cpuConfirm;
+        public void RequestConfirm()
+        {
+            if (m_state == State.Charging) m_cpuConfirm = true;
+        }
+
         private void Awake()
         {
             m_character = GetComponent<DarumaCharacter>();
@@ -148,7 +156,7 @@ namespace Yurube
                 UpdateChargeEffect();
 
                 bool anyButton = m_stateTime >= m_anyButtonMinTime
-                    && SpecialInput.WasAnyActionPressed(m_character);
+                    && (SpecialInput.WasAnyActionPressed(m_character) || m_cpuConfirm);   // m_cpuConfirm:CPU 用(中平)
                 if (anyButton || m_stateTime >= m_chargeDuration)
                     CompleteCharge();
                 return;
@@ -192,6 +200,7 @@ namespace Yurube
             m_state = State.Charging;
             m_stateTime = 0.0f;
             m_attackApplied = false;
+            m_cpuConfirm = false;   // CPU 用(中平)
 
             // 方向入力での旋回だけ残し、並進移動と攻撃を止める
             m_previousMovementOnly = m_character.MovementOnly;

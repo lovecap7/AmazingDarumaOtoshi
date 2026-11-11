@@ -168,8 +168,8 @@ namespace Nakahira
             TumikiBlock current = m_pickup.Target;
             if (current != null && CpuBlockSearch.ShouldYield(c, current.transform.position)) c.GiveUp(current, c.Params.YieldCooldown);
 
-            // 今狙っている積み木がまだ安全なら続ける
-            if (current != null && CpuBlockSearch.IsCollectable(current) && !c.IsGivenUp(current)
+            // 今狙っている積み木がまだ安全なら続ける(積める上限まで積んだら拾わない)
+            if (current != null && !c.IsStackFull && CpuBlockSearch.IsCollectable(current) && !c.IsGivenUp(current)
                 && CpuBlockSearch.TryGetPathLength(c.Position, current.transform.position, c.Params, m_queryPath, out float currentLength)
                 && IsSafeDetour(c, current.transform.position, currentLength))
             {

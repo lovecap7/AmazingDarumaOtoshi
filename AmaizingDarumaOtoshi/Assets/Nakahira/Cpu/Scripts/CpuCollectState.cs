@@ -34,7 +34,7 @@ namespace Nakahira
 
         public override float Evaluate(CpuContext c)
         {
-            if (c.StackCount >= c.Params.CollectUntil) return 0.0f;
+            if (c.StackCount >= c.CollectUntil) return 0.0f;
             // 拾える積み木がなくても、ほかにやることがなければ積む(待つ)
             if (!CpuBlockSearch.HasAnyCollectable()) return c.Params.CollectScore * 0.1f;
             // 満タン近くなら、攻めに行ける相手がいればそちらを選ぶ(遊ぶ)
@@ -54,7 +54,7 @@ namespace Nakahira
 
         public override bool Tick(CpuContext c, ref DarumaCommand cmd)
         {
-            if (c.StackCount >= c.Params.CollectUntil) return false;
+            if (c.StackCount >= c.CollectUntil) return false;
 
             m_thinkTimer -= c.DeltaTime;
             if (m_thinkTimer <= 0.0f)
