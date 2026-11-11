@@ -107,8 +107,13 @@ namespace Nakahira
         CapsuleCollider m_body;
         HitStop m_hitStop;
         IDarumaCommandSource m_commandSource;
-        // 前のステップでRigidbodyの速度に掛けた時間の倍率(本来の速度を復元するのに使う)
-        float m_appliedTimeScale = 1.0f;
+        // 前のステップの本来の速度(時間の倍率・外からの速度を掛ける前)と、実際に Rigidbody に渡した速度
+        // 次のステップでは「本来の速度 + 物理(衝突・押し戻し)で変わった分」から計算する
+        // (渡した速度を時間の倍率で割り戻すと、ヒットストップ中の押し戻しまで 1/倍率 に増えて真上に飛んでしまうため)
+        Vector3 m_lastVelocity;
+        Vector3 m_lastAppliedVelocity;
+        // 前のステップの時間の倍率
+        float m_lastTimeScale = 1.0f;
 
         Vector3 m_moveDirection; // ワールド空間の移動方向(XZ)
         bool m_jumpRequested;
@@ -121,7 +126,6 @@ namespace Nakahira
 
         // ギミックからの影響(IGimmickAffectable)
         Vector3 m_carryVelocity;      // 次のステップで上乗せする運搬速度
-        Vector3 m_appliedExternal;    // 前のステップで上乗せした速度(本来の速度を復元するのに使う)
         Vector3 m_knockback;          // はじかれた・力で押された水平方向の速度(減衰する)
         Vector3 m_force;              // 次のステップで加える力(加速度)
         float m_knockbackUp;          // はじかれた上向きの速度(次のステップで1回だけ反映)
@@ -268,12 +272,18 @@ namespace Nakahira
             // 本来の速度で計算し、最後に時間の倍率を掛けてRigidbodyに渡す(ヒットストップ中はスローになる)
             float timeScale = LocalTimeScale;
             float dt = Time.fixedDeltaTime * timeScale;
-            Vector3 v = m_rb.linearVelocity / m_appliedTimeScale - m_appliedExternal;
+            // 物理で変わった分(押し戻し・衝突)は割り戻さずにそのまま足す
+            Vector3 contact = m_rb.linearVelocity - m_lastAppliedVelocity;
+            Vector3 v = m_lastVelocity + contact;
+            // スロー中は、衝突で上下の動きを止めることはできても、新しく勢いを足すことはできない
+            // (重なった積み木などの押し戻しが毎ステップたまり、明けた瞬間に真上へ飛ぶのを防ぐ)
+            if (m_lastTimeScale < 1.0f) v.y = SlowContactVertical(m_lastVelocity.y, contact.y, m_lastTimeScale);
 
             UpdateMove(ref v, dt);
             UpdateGravity(ref v, dt);
             UpdateJump(ref v);
             Vector3 external = UpdateExternal(ref v, dt);
+            m_lastVelocity = v;
 
             // 速さの倍率は水平方向にだけ、このステップの速度に掛ける(次のステップでは移動入力・外からの速度から計算し直す)
             Vector3 total = v + external;
@@ -283,10 +293,21 @@ namespace Nakahira
             m_speedScale = 1.0f;
 
             m_rb.linearVelocity = total * timeScale;
-            m_appliedTimeScale = timeScale;
+            m_lastAppliedVelocity = m_rb.linearVelocity;
+            m_lastTimeScale = timeScale;
 
             // 地上でも自前の重力で速度は負になるので、空中にいることも条件にする
             m_isFallingInAir = !m_isGrounded && v.y < 0.0f;
+        }
+
+        // スロー中に衝突で変わった上下の速度を、本来の速度に直す
+        // 落下を止める(着地)・上昇を止める(天井)ことはできるが、止まった先の逆向きの勢いは残さない
+        private static float SlowContactVertical(float lastVy, float contactVy, float timeScale)
+        {
+            float vy = lastVy + contactVy / timeScale;
+            if (contactVy > 0.0f) return Mathf.Min(vy, Mathf.Max(lastVy, 0.0f));
+            if (contactVy < 0.0f) return Mathf.Max(vy, Mathf.Min(lastVy, 0.0f));
+            return lastVy;
         }
 
         // 上昇中は通常の重力、落下中は倍率を掛けた重力
@@ -319,7 +340,6 @@ namespace Nakahira
             m_knockback *= Mathf.Exp(-m_knockbackDamping * dt);
             if (m_knockback.sqrMagnitude < 0.01f) m_knockback = Vector3.zero;
 
-            m_appliedExternal = external;
             return external;
         }
 
@@ -423,6 +443,9 @@ namespace Nakahira
             Vector3 v = m_rb.linearVelocity;
             v.y = 0.0f;
             m_rb.linearVelocity = v;
+            // 本来の速度の上下も止める(ヒットストップ中に拾っても落下の勢いが残らないように)
+            m_lastVelocity.y = 0.0f;
+            m_lastAppliedVelocity.y = 0.0f;
 
             TumikiBlock overflow = m_stack.AddBottom(block);
             if (overflow != null)
