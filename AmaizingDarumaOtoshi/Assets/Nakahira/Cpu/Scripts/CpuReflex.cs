@@ -77,6 +77,12 @@ namespace Nakahira
         // 状態が出した操作に、とっさの反応を割り込ませる(毎フレーム、状態の Tick のあとに呼ぶ)
         public void Apply(CpuContext c, ref DarumaCommand cmd)
         {
+            // きだるの黄金化中(無敵)は弾を気にしない(打ち返し・ジャンプ乗り・ジャンプ避けをしない)
+            if (c.IsGolden)
+            {
+                Reset();
+                return;
+            }
             ForgetPassedBlocks();
             NoticeNewThreat(c);
             if (m_block == null) return;

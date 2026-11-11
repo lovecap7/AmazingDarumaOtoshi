@@ -250,6 +250,20 @@ namespace Nakahira
         [Tooltip("エクスカリバーの予定の線はさらにこの距離(m)離れる(詠唱中はだるきんぐの向きで動くので)")]
         [Min(0.0f)] public float SwordMargin = 1.0f;
 
+        [Header("必殺技:撃ちどころ(あおだる以外)")]
+        [Tooltip("撃ちどころが来てから気づくまでの遅れ(秒)。気づくかは 余裕(1 − 集中度の割合) の確率で、見逃したら 1 秒ごとに引き直す")]
+        [Min(0.0f)] public float SpecialNoticeDelay = 0.2f;
+        [Tooltip("ゲージが満タンになったとき、撃ちどころを待たずにすぐ撃ってしまう確率")]
+        [Range(0.0f, 1.0f)] public float SpecialRashChance = 0.0f;
+
+        [Header("必殺技:きだるの黄金化(無敵＋速さ 1.5 倍)")]
+        [Tooltip("攻めに行くの最中は、相手までの道の距離がこれ(m)以内になったら撃つ(殴るに入ったらすぐ撃つ)")]
+        [Min(0.0f)] public float GoldenFireDistance = 8.0f;
+        [Tooltip("黄金化中の殴る・攻めに行くの点数(逃げずに攻め続ける。段数が不利な相手にも殴りかかる)")]
+        [Range(0.0f, 1.0f)] public float GoldenAttackScore = 0.7f;
+        [Tooltip("黄金化の残りがこれ(秒)より多い間は、無敵で防げる危ない場所(隕石・ビーム・エクスカリバー)を気にしない")]
+        [Min(0.0f)] public float GoldenHazardMargin = 0.5f;
+
         [Header("必殺技:あおだるの六腕(暗転返し・とっさの六腕)")]
         [Tooltip("暗転返し:みだるのファンネルのカットイン中に六腕で返す確率(余裕(1 − 集中度の割合)を掛けて使う)")]
         [Range(0.0f, 1.0f)] public float BlackoutCounterChance = 0.6f;

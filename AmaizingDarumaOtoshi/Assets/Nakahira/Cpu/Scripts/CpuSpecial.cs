@@ -36,6 +36,17 @@ namespace Nakahira
         // とっさの六腕:撃つと決めてから、撃てないまま(ハンマーを振っているなど)あきらめるまでの時間(秒)
         const float kArmsGiveUp = 0.3f;
 
+        // 撃ちどころ(あおだる以外):満タンになってからまだ撃っていないか・すぐ撃ってしまうか
+        bool m_wasFull;
+        bool m_rash;
+        // 撃ちどころが続いているか・気づいたか・次に気づくか試す時刻
+        bool m_inChance;
+        bool m_noticed;
+        float m_nextNotice;
+
+        // 撃ちどころを見逃したとき、引き直すまでの間隔(秒)
+        const float kRenoticeInterval = 1.0f;
+
         // 撃つと決めた理由を Console に出す(テスト用)
         public static bool LogDecisions;
 
@@ -55,11 +66,13 @@ namespace Nakahira
             m_blackoutCounter = false;
             m_armsDecided.Clear();
             m_armsPending = false;
+            m_wasFull = false;
+            ForgetChance();
         }
 
-        // 撃てたら true。engaged:その相手と戦っている最中か(殴る・逃げる・撃つ・攻めに行く)
+        // 撃てたら true。engaged:その相手と戦っている最中か(殴る・逃げる・撃つ・攻めに行く)。current:今の状態
         // 時間が止まっている間(カットイン中)も毎フレーム呼ばれる
-        public bool Apply(CpuContext c, Func<MatchPlayer, bool> engaged)
+        public bool Apply(CpuContext c, Func<MatchPlayer, bool> engaged, CpuState current)
         {
             Bind(c.Self);
             if (m_ability == null || m_gauge == null) return false;
@@ -67,15 +80,59 @@ namespace Nakahira
             // 暗転返しは時間が止まっている間に撃つので、下の「時間が止まっている間は撃たない」より先に見る
             if (m_ability is AodaruSpecial && UpdateBlackoutCounter(c, engaged)) return Activated();
 
-            if (!m_gauge.IsFull) return false;
+            if (!m_gauge.IsFull)
+            {
+                m_wasFull = false;
+                return false;
+            }
             // 時間が止まっている・遅くなっている間(ほかの必殺技のカットイン・ヒットストップ・やられ演出)は撃たない
             if (Time.timeScale < DarumaMatch.PlaySpeed) return false;
 
             if (m_ability is AodaruSpecial) return UpdateReflexArms(c) && Activated();
 
-            if (!ShouldActivate(c)) return false;
+            // 満タンになった瞬間に、撃ちどころを待たずにすぐ撃ってしまうかを決める(よわいほど多い)
+            if (!m_wasFull)
+            {
+                m_wasFull = true;
+                m_rash = Random.value < c.Params.SpecialRashChance;
+                ForgetChance();
+                if (LogDecisions && m_rash) Debug.Log($"[CPU 必殺技] {c.Self.name} 満タン → 撃ちどころを待たずに撃つ");
+            }
+            if (!m_rash && !Notice(c, ShouldActivate(c, current))) return false;
+            // 撃てない間(ハンマーを振っているなど)は、撃ちどころが続く間 毎フレーム試す
             if (!m_ability.TryActivate()) return false;
+            m_wasFull = false;
+            ForgetChance();
             return Activated();
+        }
+
+        // 撃ちどころに気づいたか。撃ちどころが来てから SpecialNoticeDelay 秒後に、余裕(1 − 集中度の割合)の確率で気づく。
+        // 見逃したら、撃ちどころが続いている間 kRenoticeInterval 秒ごとに引き直す
+        private bool Notice(CpuContext c, bool chance)
+        {
+            if (!chance)
+            {
+                ForgetChance();
+                return false;
+            }
+            if (!m_inChance)
+            {
+                m_inChance = true;
+                m_noticed = false;
+                m_nextNotice = Time.time + c.Params.SpecialNoticeDelay;
+            }
+            if (m_noticed) return true;
+            if (Time.time < m_nextNotice) return false;
+            m_nextNotice = Time.time + kRenoticeInterval;
+            m_noticed = Random.value < c.Alertness;
+            if (LogDecisions) Debug.Log($"[CPU 必殺技] {c.Self.name} 撃ちどころ → 気づいた={m_noticed}(余裕 {c.Alertness:0.00})");
+            return m_noticed;
+        }
+
+        private void ForgetChance()
+        {
+            m_inChance = false;
+            m_noticed = false;
         }
 
         private bool Activated()
@@ -94,14 +151,17 @@ namespace Nakahira
                 m_gauge = null;
                 m_armsDecided.Clear();
                 m_armsPending = false;
+                m_wasFull = false;
+                ForgetChance();
             }
             if (m_self == null) return;
             if (m_ability == null) m_ability = m_self.GetComponent<ISpecialAbility>();
             if (m_gauge == null) m_gauge = m_self.GetComponent<SpecialGauge>();
         }
 
-        // キャラごとの発動条件(ゲージが満タンのときだけ呼ばれる。あおだるは別)
-        private bool ShouldActivate(CpuContext c)
+        // キャラごとの撃ちどころ(ゲージが満タンのときだけ呼ばれる。あおだるは別)
+        // まだ撃ちどころを決めていないキャラは true(満タンになったら、気づく遅れのあとに撃つ)
+        private bool ShouldActivate(CpuContext c, CpuState current)
         {
             switch (m_ability)
             {
@@ -110,9 +170,22 @@ namespace Nakahira
                 case AkadaruSpecial _:  return true;   // トロン(ビーム)
                 case DaruKingSpecial _: return true;   // エクスカリバー
                 case MidaruSpecial _:   return true;   // ファンネル
-                case KidaruSpecial _:   return true;   // 黄金化
+                case KidaruSpecial _:   return KidaruChance(c, current);   // 黄金化
                 default:                return true;
             }
+        }
+
+        // きだる(黄金化):攻めるとき。殴っている最中か、攻めに行っていて相手まで道で GoldenFireDistance 以内
+        // (遠くで撃って効き目を無駄にしない)
+        private static bool KidaruChance(CpuContext c, CpuState current)
+        {
+            if (current is CpuMeleeState melee) return melee.Target != null;
+            if (current is CpuApproachState approach && approach.Target != null)
+            {
+                CpuOpponent o = c.Perception.Find(approach.Target);
+                return o != null && o.PathDistance <= c.Params.GoldenFireDistance;
+            }
+            return false;
         }
 
         //========================================

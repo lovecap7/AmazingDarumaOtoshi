@@ -145,7 +145,7 @@ namespace Nakahira
             m_lastStackCount = stack;
 
             // 必殺技:ゲージが満タンで、キャラごとの発動条件を満たしたら撃つ(CpuSpecial。あおだるの暗転返しもここ)
-            m_special.Apply(m_context, m_isEngagedWith);
+            m_special.Apply(m_context, m_isEngagedWith, m_current);
 
             m_stateTime += dt;
             m_thinkTimer -= dt;
