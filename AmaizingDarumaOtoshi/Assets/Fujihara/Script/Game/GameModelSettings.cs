@@ -66,6 +66,34 @@ public class GameModelSettings : ScriptableObject
         return best;
     }
 
+    [Header("ハンマー（タイトル・メニュー・リザルトの ToyKit のハンマー）")]
+    [Tooltip("Blender のハンマー（Model/Hammer/hammer.fbx）。柄が +Y、頭の中心が y = 2.2、頭は X 向き（ToyKit のハンマーと同じ寸法）")]
+    public GameObject hammerModel;
+    [Tooltip("オフにすると、ハンマーは元の見た目（円柱の組み合わせ）")]
+    public bool useHammerModel = true;
+
+    [Tooltip("タイトル・メニューのカーソル（ロゴや項目を叩く）ハンマー。空なら共通のハンマー（hammerModel）")]
+    public GameObject cursorHammerModel;
+
+    // タイトル・メニューのカーソルのハンマー（無ければ null ＝ 共通のハンマー）
+    public static GameObject CursorHammer
+    {
+        get
+        {
+            var s = Current;
+            return s != null && s.useHammerModel ? s.cursorHammerModel : null;
+        }
+    }
+
+    public static GameObject HammerModel
+    {
+        get
+        {
+            var s = Current;
+            return s != null && s.useHammerModel ? s.hammerModel : null;
+        }
+    }
+
     // ---------------- リザルト画面（ToyKit の頭・積み木）用 ----------------
     [Header("リザルト")]
     [Tooltip("リザルトの頭のモデルの高さ（ToyKit の頭の球は 0.9）")]

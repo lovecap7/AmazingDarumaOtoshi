@@ -83,6 +83,8 @@ public class GameModelSwapper : MonoBehaviour
         if (fitted == null) return;
         mf.sharedMesh = fitted;
 
+        if (!ghost) SwapHammer(body, data);
+
         if (!ghost)
         {
             if (mat != null) SetFirstMaterial(mr, mat);
@@ -91,6 +93,33 @@ public class GameModelSwapper : MonoBehaviour
             // モデルに顔が描いてあるので、球の目は隠す
             foreach (Transform c in head) if (c.name == "Eye") c.gameObject.SetActive(false);
         }
+    }
+
+    // ---------------- ハンマー ----------------
+    // キャラのハンマー（CharacterData.hammerModel）を、元の角ばったハンマー（柄 Handle・頭 HammerHead）の位置に置き、元の見た目は消す。
+    // 元のハンマー：柄が +Z に 0〜1、頭の中心が z = 1.2、頭は縦（Y）向きで長さ 0.6
+    const float GameHammerHeadZ = 1.2f;
+
+    void SwapHammer(Transform body, CharacterData data)
+    {
+        if (data == null || data.hammerModel == null) return;
+        var hammer = body.GetComponentInChildren<DarumaHammer>(true);
+        if (hammer == null) return;
+        var pivot = hammer.transform;
+        var model = ToyKit.CreateHammerModel("HammerModelHead", data.hammerModel);
+        if (model == null) return;
+
+        // 元の柄と頭は、メッシュを外して見えなくする（点滅で Renderer がまた有効になっても出ないように）
+        foreach (Transform c in pivot)
+        {
+            if (c.name != "Handle" && c.name != "HammerHead") continue;
+            var mf = c.GetComponent<MeshFilter>();
+            if (mf != null) mf.sharedMesh = null;
+        }
+        model.name = "HammerModel";
+        model.SetParent(pivot, false);
+        model.localRotation = Quaternion.Euler(0f, 0f, 90f);   // 頭を X 向きから Y 向きへ
+        model.localScale = Vector3.one * (GameHammerHeadZ / ToyKit.HammerLength);
     }
 
     // ---------------- 積み木 ----------------

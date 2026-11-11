@@ -17,6 +17,7 @@ MonoBehaviour:
   color: {r: 0.95, g: 0.85, b: 0.2, a: 1}
   portrait: {fileID: -1180001305099005471, guid: b89e2af523fb11f4f93470427241b32c, type: 3}
   model: {fileID: 919132149155446097, guid: ae96fe206af4e254d804c31ea000ce4f, type: 3}
+  hammerModel: {fileID: 919132149155446097, guid: bd29b4fb88ef8d849a5dcfd06a506ca2, type: 3}
   prefab: {fileID: 9069936943766670842, guid: eee8c0cfb1cf6e24cc8ec6956b6554bf, type: 3}
   ease: 3
   passiveColor: 3

@@ -85,7 +85,7 @@ public partial class TitleScreen
         head = face.root; eyesNormal = face.eyesNormal; eyesHappy = face.eyesHappy; cheeks = face.cheeks;
         if (headModel != null) UseHeadModel();
         if (!showHead) head.gameObject.SetActive(false);
-        hammer = ToyKit.CreateHammer();
+        hammer = ToyKit.CreateHammer(GameModelSettings.CursorHammer);   // カーソルのハンマー（赤だるのハンマー）
         hammer.localScale = Vector3.one * hammerScale;
 
         subtitle = ToyKit.Text3D(font, new Material(font.material), subtitleText, null, new Vector2(11f, 0.5f), 4f);
