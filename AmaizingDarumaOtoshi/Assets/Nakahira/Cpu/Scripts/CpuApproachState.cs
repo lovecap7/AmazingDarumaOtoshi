@@ -25,7 +25,8 @@ namespace Nakahira
             if (!ShouldApproach(c)) return 0.0f;
             // 満タン近く(遊ぶ)でも点数は同じ(遊ぶ側では積むの点数が下がるので、積むには勝つ)。
             // 今の状態に足す StateStickiness 込みでも、殴る・撃つより低くなるようにしておく(近づいたら必ず引き継ぐ)
-            float score = c.Params.ApproachScore;
+            // きだるの黄金化中は、積むより攻めを選ぶ(逃げずに攻め続ける)
+            float score = c.IsGolden ? c.Params.GoldenAttackScore : c.Params.ApproachScore;
             if (m_target != null && IsValidTarget(c, c.Perception.Find(m_target))) return score;
             return ChooseTarget(c) != null ? score : 0.0f;
         }
@@ -72,7 +73,8 @@ namespace Nakahira
         }
 
         // 攻めに行く場面か:盤面に拾える積み木がない、または積み終わった(積むが選ばれない)、または満タン近く(遊ぶ)
-        private static bool ShouldApproach(CpuContext c) => c.IsPlayful || CpuBlockSearch.NothingToCollect(c);
+        // (きだるの黄金化中は、積み木があっても攻めに行く)
+        private static bool ShouldApproach(CpuContext c) => c.IsGolden || c.IsPlayful || CpuBlockSearch.NothingToCollect(c);
 
         // 狙える相手のうち、攻めの点数が一番高い相手(歩いて行けて、道が危険な相手のそばを通らない)
         private CpuOpponent ChooseTarget(CpuContext c)
@@ -84,7 +86,7 @@ namespace Nakahira
             {
                 if (!IsValidTarget(c, o)) continue;
                 if (!CpuNavMesh.TryFindPath(c.Position, o.Position, CpuPickupMotor.GoalTolerance, m_queryPath, out float length)) continue;
-                if (!CpuBlockSearch.AvoidsThreats(c, m_queryPath, c.Params.CollectThreatClearance)) continue;
+                if (!c.IsGolden && !CpuBlockSearch.AvoidsThreats(c, m_queryPath, c.Params.CollectThreatClearance)) continue;
                 float score = CpuAttackTarget.Score(c, o, length);
                 if (o.Player == m_target) score += c.Params.StateStickiness;
                 if (score > bestScore)
@@ -105,6 +107,7 @@ namespace Nakahira
         {
             if (o == null || o.IsGhost || o.IsInvincible || o.Character == null) return false;
             if (o.PathDistance <= c.Params.MeleeEnterDistance) return false;
+            if (c.IsGolden) return true;   // 黄金化中は不利な相手にも攻めに行く
             return o.StackDiff >= (c.IsPlayful ? 0 : c.Params.AdvantageMargin);
         }
 

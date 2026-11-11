@@ -145,7 +145,7 @@ namespace Nakahira
             m_lastStackCount = stack;
 
             // 必殺技:ゲージが満タンで、キャラごとの発動条件を満たしたら撃つ(CpuSpecial。あおだるの暗転返しもここ)
-            m_special.Apply(m_context, m_isEngagedWith);
+            m_special.Apply(m_context, m_isEngagedWith, m_current);
 
             m_stateTime += dt;
             m_thinkTimer -= dt;
@@ -166,6 +166,8 @@ namespace Nakahira
                 if (m_current != null) m_current.Tick(m_context, ref cmd);
             }
 
+            // 必殺技を撃つ向きへ向き直っている最中(あかだる)は、状態の動きを置き換える
+            m_special.OverrideAim(ref cmd);
             // 移動床の乗り降り:乗り場で待つ・乗っている間は移動を置き換える
             m_ride.Apply(m_context, m_current != null ? m_current.Route : null, ref cmd);
             // 危ない場所(隕石の予告円・ビーム・エクスカリバー)から出る・入らない(乗り降り中は隕石から出るだけ)

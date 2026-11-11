@@ -21,6 +21,13 @@ namespace Nakahira
         public bool IsPlayful => StackCount >= Params.PlayfulStack;
         public Vector3 Position => Self.transform.position;
 
+        // きだるの黄金化(無敵＋速さ 1.5 倍)の残り時間(秒。黄金化していなければ 0)
+        // 黄金化中は逃げない・弾に反応しない・相手の振りをかわさずに攻め続ける・無敵で防げる危ない場所を気にしない
+        public float GoldenRemaining => m_kidaru != null && m_kidaru.IsActive && Self.IsInvincible ? m_kidaru.RemainingSeconds : 0.0f;
+        public bool IsGolden => GoldenRemaining > 0.0f;
+        Yurube.KidaruSpecial m_kidaru;
+        DarumaCharacter m_kidaruOwner;
+
         // 集中度(認識の疲れ)。出来事(弾に反応した・攻撃を受けた等)のたびに足され、時間で減る
         // 判定には「疲れ ÷ 容量」の割合(LoadRatio)を使う。うまい CPU ほど容量が大きく、割合が上がりにくい
         //  ・割合が高いほど、弾・相手の振りに反応できる確率が下がる
@@ -55,6 +62,11 @@ namespace Nakahira
         {
             Self = self;
             Player = player;
+            if (self != m_kidaruOwner)
+            {
+                m_kidaruOwner = self;
+                m_kidaru = self != null ? self.GetComponent<Yurube.KidaruSpecial>() : null;
+            }
             Params = p;
             DeltaTime = dt;
         }

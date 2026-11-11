@@ -444,7 +444,8 @@ namespace Nakahira
         }
 
         // from から to までの間に壁(積み木・キャラクター以外の当たり判定)があるか
-        private static bool HasWall(Vector3 from, Vector3 to)
+        // (あかだるのトロンの狙いでも使う)
+        internal static bool HasWall(Vector3 from, Vector3 to)
         {
             Vector3 a = from + Vector3.up * kShotHeight;
             Vector3 b = new Vector3(to.x, from.y, to.z) + Vector3.up * kShotHeight;

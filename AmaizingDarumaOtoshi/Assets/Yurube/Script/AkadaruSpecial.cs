@@ -35,6 +35,9 @@ namespace Yurube
         SpecialGauge m_gauge;
         Material m_effectMaterial;
 
+        // CPU 用(中平): 必殺技の積み木の速さ(m/s。狙いの先読みに使う)
+        public float Speed => m_speed;
+
         private void Awake()
         {
             m_character = GetComponent<DarumaCharacter>();

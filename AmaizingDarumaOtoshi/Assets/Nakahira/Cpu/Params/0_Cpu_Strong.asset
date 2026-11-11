@@ -122,6 +122,12 @@ MonoBehaviour:
   HazardMargin: 0.5
   MeteorMargin: 1
   SwordMargin: 1
+  SpecialNoticeDelay: 0.2
+  SpecialRashChance: 0
+  GoldenFireDistance: 8
+  GoldenAttackScore: 0.7
+  GoldenHazardMargin: 0.5
+  TronRange: 12
   BlackoutCounterChance: 0.6
   BlackoutCounterDelay: 0.3
   BlackoutNearMargin: 2

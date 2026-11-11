@@ -82,8 +82,10 @@ namespace Nakahira
         public override float Evaluate(CpuContext c)
         {
             // 殴っている最中は、続けられる間は続けたい
-            if (m_target != null && CanContinue(c, c.Perception.Find(m_target))) return c.Params.MeleeScore;
-            return ChooseTarget(c) != null ? c.Params.MeleeScore : 0.0f;
+            // きだるの黄金化中は、積むより攻めを選ぶ(逃げずに攻め続ける)
+            float score = c.IsGolden ? c.Params.GoldenAttackScore : c.Params.MeleeScore;
+            if (m_target != null && CanContinue(c, c.Perception.Find(m_target))) return score;
+            return ChooseTarget(c) != null ? score : 0.0f;
         }
 
         public override float Threshold(CpuContext c) => c.Params.MeleeThreshold;
@@ -311,7 +313,7 @@ namespace Nakahira
             {
                 if (o.IsGhost || o.IsInvincible) continue;
                 if (o.PathDistance > c.Params.MeleeEnterDistance) continue;
-                if (o.StackDiff <= -c.Params.FleeStackGap) continue;
+                if (o.StackDiff <= -c.Params.FleeStackGap && !c.IsGolden) continue;   // 黄金化中は不利な相手にも殴りかかる
                 if (IsExposed(c, o)) continue;   // 首だけのときは、背を向けている相手だけ
                 if (InHazard(c, o)) continue;    // 危ない場所の中・向こう側の相手には行かない
                 float score = CpuAttackTarget.Score(c, o, o.PathDistance);
@@ -329,7 +331,7 @@ namespace Nakahira
         {
             if (o == null || o.IsGhost || o.IsInvincible || o.Character == null) return false;
             CpuParams p = c.Params;
-            if (o.StackDiff <= -p.FleeStackGap) return false;                 // 不利になった(逃げる)
+            if (o.StackDiff <= -p.FleeStackGap && !c.IsGolden) return false;  // 不利になった(逃げる。黄金化中は続ける)
             if (o.PathDistance > p.MeleeChaseDistance) return false;          // 離れた
             if (InHazard(c, o)) return false;                                 // 危ない場所の中・向こう側へ行った
             // 首だけで振り向かれた:相手の間合いの外まで離れたら終わる
@@ -348,7 +350,7 @@ namespace Nakahira
         // 自分が首だけ(0 段。一撃でやられる)で、相手がこちらを向いている(相手のハンマーが届く角度にいる)
         private static bool IsExposed(CpuContext c, CpuOpponent o)
         {
-            return c.StackCount == 0 && !IsBehind(c, o);
+            return c.StackCount == 0 && !c.IsGolden && !IsBehind(c, o);   // 黄金化中は無敵なので気にしない
         }
 
         // 自分が相手の背中側(相手の薙ぎ払いが届かない角度)にいるか
@@ -423,6 +425,13 @@ namespace Nakahira
         {
             bool startedSwing = o.IsSweeping && !m_lastTargetSweeping;
             m_lastTargetSweeping = o.IsSweeping;
+            // きだるの黄金化中(無敵)は、相手の振りをかわさずに殴り続ける(読みジャンプもしない)
+            if (c.IsGolden)
+            {
+                m_dodgeTime = -1.0f;
+                m_readJumpTime = -1.0f;
+                return;
+            }
             if (startedSwing)
             {
                 m_targetSwingStart = Time.time;
