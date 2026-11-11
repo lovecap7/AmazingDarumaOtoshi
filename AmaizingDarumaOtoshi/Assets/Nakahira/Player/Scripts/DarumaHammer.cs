@@ -373,6 +373,13 @@ namespace Nakahira
         private void HitCharacter(DarumaCharacter other, float bearing)
         {
             Vector3 point = other.transform.position + Vector3.up * m_sweepHeight;
+            // チーム戦で味方を殴ったときはダメージを与えない(無敵の相手を殴ったときと同じ。弾や必殺技は味方にも当たる)
+            DarumaMatch match = DarumaMatch.Current;
+            if (match != null && match.IsFriendly(m_owner, other))
+            {
+                Hit?.Invoke(new HammerHitInfo(this, m_owner, other, point, false, 0));
+                return;
+            }
             bool damaged = other.KnockBottom(ToWorldDirection(bearing), m_params.SweepLaunchSpeed, m_owner, out TumikiBlock knocked);
             if (damaged)
             {
