@@ -126,6 +126,9 @@ MonoBehaviour:
   SpecialRashChance: 0.1
   SpecialStateScore: 0.7
   SpecialGiveUpTime: 5
+  SpecialFollowScore: 0.9
+  MeteorFireRadiusRatio: 0.5
+  MeteorFastFireRadiusRatio: 0.9
   FunnelRange: 8
   GoldenFireDistance: 8
   GoldenAttackScore: 0.7

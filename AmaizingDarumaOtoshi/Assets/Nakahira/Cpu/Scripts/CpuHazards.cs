@@ -174,7 +174,7 @@ namespace Nakahira
             float now = Time.time;
             float reaction = c.Params.HazardReaction;
             float selfY = c.Position.y;
-            float golden = c.GoldenRemaining;
+            float golden = c.SpecialInvincibleRemaining;
             m_present.Clear();
             m_circles.Clear();
             m_segments.Clear();
@@ -184,7 +184,7 @@ namespace Nakahira
                 if (h.Owner == c.Self) continue;
                 if (!Notice(h.Source, now, reaction)) continue;
                 if (Mathf.Abs(h.Center.y - selfY) > kMaxHeightGap) continue;
-                // きだるの黄金化中は、落ちるまでに無敵が切れない隕石は気にしない(毒沼は無敵でも効くので避ける)
+                // 必殺技で無敵の間(きだるの黄金化・いわだるの隕石)は、落ちるまでに無敵が切れない隕石は気にしない(毒沼は無敵でも効くので避ける)
                 if (h.Kind == CpuHazardKind.Meteor && golden > h.TimeToImpact + c.Params.GoldenHazardMargin) continue;
                 m_circles.Add(h);
             }
@@ -193,7 +193,7 @@ namespace Nakahira
                 if (h.Kind == CpuHazardKind.Sword && h.Owner == c.Self) continue;
                 if (!Notice(h.Source, now, reaction)) continue;
                 if (Mathf.Abs(Mathf.Min(h.A.y, h.B.y) - selfY) > kMaxHeightGap) continue;
-                // きだるの黄金化中は、ビーム・エクスカリバーを気にしない(無敵で防げる。切れそうになったら避け始める)
+                // 必殺技で無敵の間は、ビーム・エクスカリバーを気にしない(無敵で防げる。切れそうになったら避け始める)
                 if (golden > c.Params.GoldenHazardMargin) continue;
                 m_segments.Add(h);
             }

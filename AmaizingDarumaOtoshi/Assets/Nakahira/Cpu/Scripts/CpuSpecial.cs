@@ -63,6 +63,8 @@ namespace Nakahira
 
         // みだる(ファンネル):1 発目が向かう一番近い敵
         MatchPlayer m_funnelTarget;
+        // いわだる(隕石):狙う敵(撃ったあとはカウントダウンの間ついていく)
+        MatchPlayer m_meteorTarget;
         // 敵の方との差がこれ(度)以内になったら撃つ(分裂弾は 1 秒に 360° 曲がって追う)
         const float kFunnelFaceAngle = 15.0f;
 
@@ -206,7 +208,7 @@ namespace Nakahira
         {
             switch (m_ability)
             {
-                case IwadaruSpecial _:  return true;   // 隕石
+                case IwadaruSpecial iwa: return MeteorChance(c, iwa);   // 隕石
                 case HebidaruSpecial _: return true;   // 毒沼
                 case AkadaruSpecial _:  return TronChance(c);   // トロン(ビーム)
                 case DaruKingSpecial _: return true;   // エクスカリバー
@@ -291,7 +293,49 @@ namespace Nakahira
         public bool WantsApproach(CpuContext c)
         {
             if (Disabled || m_gauge == null || !m_gauge.IsFull || c.StackCount <= 0) return false;
-            return m_ability is MidaruSpecial;
+            return m_ability is MidaruSpecial || m_ability is IwadaruSpecial;
+        }
+
+        // 撃ったあと、狙った敵についていく最中か(いわだるのカウントダウン中。円が自分についてくる)
+        public bool IsFollowing => !Disabled && m_ability is IwadaruSpecial iwa && iwa.CountdownRemaining > 0.0f;
+        // ついていく敵(撃ったときに狙っていた敵)
+        public MatchPlayer FollowTarget => m_meteorTarget;
+
+        // 状態「必殺技」で近づく敵(いなければ null)。current:今近づいている敵(少し優先する)
+        //  ・みだる:道で一番近い敵
+        //  ・いわだる:一番積み木を積んでいる(一番遅い)敵。同じなら道で近い方(確実に倒せれば一番有利なので。中平が決めた)
+        public CpuOpponent ApproachTarget(CpuContext c, MatchPlayer current)
+        {
+            bool meteor = m_ability is IwadaruSpecial;
+            CpuOpponent best = null;
+            float bestScore = float.MinValue;
+            foreach (var o in c.Perception.Opponents)
+            {
+                if (o.IsGhost || o.IsInvincible || o.Character == null) continue;
+                if (float.IsPositiveInfinity(o.PathDistance)) continue;   // 歩いて行けない
+                // いわだるは段数が大きいほど(1 段 = 道 100m 分)、みだるは道が近いほど高い
+                float score = (meteor ? o.StackCount * 100.0f : 0.0f) - o.PathDistance;
+                if (o.Player == current) score += meteor ? 50.0f : 1.0f;   // 今の相手を少し優先(ころころ変えない)
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    best = o;
+                }
+            }
+            return best;
+        }
+
+        // いわだる(隕石):狙う敵(一番積み木を積んでいる敵)が、今撃ったときの円の半径 × MeteorFireRadiusRatio 以内にいるとき
+        private bool MeteorChance(CpuContext c, IwadaruSpecial iwa)
+        {
+            if (c.StackCount <= 0) return false;
+            CpuOpponent target = ApproachTarget(c, m_meteorTarget);
+            m_meteorTarget = target != null ? target.Player : null;
+            if (target == null) return false;
+            // 自分の方が速い相手なら、カウントダウンの間に追いついて重なれるので、円の中に入っていれば撃つ
+            bool faster = c.Self.MoveSpeed > target.Character.MoveSpeed;
+            float ratio = faster ? c.Params.MeteorFastFireRadiusRatio : c.Params.MeteorFireRadiusRatio;
+            return target.FlatDistance <= iwa.PredictRadius(c.StackCount) * ratio;
         }
 
         // みだる(ファンネル):どの状態の最中でも、一番近い敵(1 発目が向かう敵)が FunnelRange 以内で、間に壁がないとき

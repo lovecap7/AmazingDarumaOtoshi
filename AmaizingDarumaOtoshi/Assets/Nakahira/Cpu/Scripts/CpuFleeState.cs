@@ -51,8 +51,8 @@ namespace Nakahira
 
         public override float Evaluate(CpuContext c)
         {
-            // きだるの黄金化中(無敵)は逃げない
-            if (c.IsGolden) return 0.0f;
+            // 必殺技で無敵の間(きだるの黄金化・いわだるの隕石)は逃げない
+            if (c.IsSpecialInvincible) return 0.0f;
             float urgency = 0.0f;
             foreach (var o in c.Perception.Opponents) urgency = Mathf.Max(urgency, EnterUrgency(c, o));
             // 逃げている最中は、追っ手がいる間は続けたい

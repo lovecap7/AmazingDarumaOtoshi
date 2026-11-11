@@ -262,6 +262,15 @@ namespace Nakahira
         [Tooltip("この時間(秒)たっても撃てなければ、状態「必殺技」を終える(すぐまた入ってよい)")]
         [Min(0.1f)] public float SpecialGiveUpTime = 5.0f;
 
+        [Tooltip("撃ったあとについていく間(いわだるのカウントダウン)の状態「必殺技」の点数(UrgentScore より高くして、すぐ切り替える)")]
+        [Range(0.0f, 1.0f)] public float SpecialFollowScore = 0.9f;
+
+        [Header("必殺技:いわだるの隕石(自分中心の円。3 秒のカウントダウンの間は円がついてくる)")]
+        [Tooltip("狙う敵(一番積み木を積んでいる敵)が、円の半径 × この割合 以内に入ったら撃つ")]
+        [Range(0.0f, 1.0f)] public float MeteorFireRadiusRatio = 0.5f;
+        [Tooltip("狙う敵より自分の方が速いとき(カウントダウンの間に追いつける)は、円の半径 × この割合 以内で撃つ")]
+        [Range(0.0f, 1.0f)] public float MeteorFastFireRadiusRatio = 0.9f;
+
         [Header("必殺技:みだるのファンネル(積んでいた数に分裂して、近い敵から順に追う)")]
         [Tooltip("一番近い敵がこの距離(m)以内で、間に壁がなければ、そちらへ向き直って撃つ(どの状態の最中でも)")]
         [Min(0.0f)] public float FunnelRange = 8.0f;
