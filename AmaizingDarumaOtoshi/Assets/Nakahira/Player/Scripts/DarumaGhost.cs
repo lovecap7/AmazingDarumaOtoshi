@@ -19,6 +19,11 @@ namespace Nakahira
         // 壁との当たり判定に使う半径
         [SerializeField] float m_radius = 0.45f;
         [SerializeField] DarumaHammer m_hammer;
+        [Header("壁との重なり")]
+        // 壁(ReflectWall)と重なったとき(せり上がり塀が足元から上がってきたなど)、壁の外へ押し出す速さ(m/秒)
+        [SerializeField, Min(0.1f)] float m_pushOutSpeed = 8.0f;
+        // 壁と重ならない場所を探す範囲(m)。出るとき・ワープしたとき・押し出すときに使う
+        [SerializeField, Min(0.1f)] float m_freeSearchRadius = 4.0f;
         [Header("出現の演出")]
         // 見た目の子オブジェクト(出現の演出で大きさを変える)
         [SerializeField] Transform m_visual;
@@ -32,6 +37,20 @@ namespace Nakahira
         Vector3 m_moveDirection;
         bool m_reviveRequested;
         readonly RaycastHit[] m_wallHits = new RaycastHit[8];
+        readonly Collider[] m_wallOverlaps = new Collider[16];
+        // 壁の外へ押し出している最中か・押し出す先
+        bool m_isPushingOut;
+        Vector3 m_pushTarget;
+        // 空いた場所が見つからなかったとき、次に探すまでの時間(毎フレーム探して重くならないように)
+        float m_searchCooldown;
+
+        // 壁と重なっているかを調べるときの余裕(m)。壁に沿って滑っているだけ(ほぼ接している)では重なりとみなさない
+        const float kOverlapTolerance = 0.02f;
+        // 空いた場所を探すとき、壁から離す余裕(m)
+        const float kFreeSkin = 0.02f;
+        // 空いた場所を探す刻み(m)。この距離ずつ外へ広げ、輪の上も同じ間隔で調べる
+        const float kSearchStep = 0.1f;
+        const float kSearchRetryTime = 0.5f;
 
         static readonly List<DarumaGhost> s_active = new List<DarumaGhost>();
 
@@ -91,6 +110,8 @@ namespace Nakahira
             foreach (var r in m_hiddenRenderers) if (r != null) r.enabled = true;
             m_hiddenRenderers.Clear();
             if (isActiveAndEnabled && !s_active.Contains(this)) s_active.Add(this);
+            // 見えない間にせり上がり塀などが上がってきて重なっていたら、見える前に外へ出す
+            SnapToFreePosition();
         }
 
         // 瞬間移動する(ワープなど)。浮いている高さはそのままで、ステージ範囲内に収める
@@ -98,6 +119,9 @@ namespace Nakahira
         {
             position.y = transform.position.y;
             if (m_stageArea != null) position = m_stageArea.Clamp(position, m_radius);
+            // 着いた先が壁の中なら、一番近い空いた場所にずらす
+            if (TryFindFreePosition(position, out Vector3 free)) position = free;
+            m_isPushingOut = false;
             transform.position = position;
             transform.rotation = Quaternion.Euler(0.0f, yawDegrees, 0.0f) * transform.rotation;
         }
@@ -113,6 +137,8 @@ namespace Nakahira
         public void Init(StageArea stageArea)
         {
             m_stageArea = stageArea;
+            // やられた場所が壁の中(ステージの範囲の端は外壁の中・せり上がった塀の上でやられたなど)なら、一番近い空いた場所に出す
+            SnapToFreePosition();
         }
 
         public void SetCommandSource(IDarumaCommandSource source)
@@ -141,7 +167,102 @@ namespace Nakahira
                 if (command.Sweep) m_hammer.TrySweep();
             }
 
-            UpdateMove();
+            // 壁と重なっている間は操作で動かさず、壁の外へ押し出す
+            if (!UpdatePushOut()) UpdateMove();
+        }
+
+        //========================================
+        // 壁と重ならないようにする
+        // 壁の中にいると、壁に沿って滑る処理(SlideAlongWalls)がどの向きにも「距離 0 で壁に当たった」になり、二度と動けなくなるため
+        //========================================
+
+        // 壁と重なっていたら、一番近い空いた場所へすべるように押し出す。押し出している間は true
+        private bool UpdatePushOut()
+        {
+            if (m_searchCooldown > 0.0f) m_searchCooldown -= Time.deltaTime;
+
+            if (!m_isPushingOut || !IsFree(m_pushTarget))
+            {
+                m_isPushingOut = false;
+                if (!OverlapsWall(transform.position, -kOverlapTolerance) || m_searchCooldown > 0.0f) return false;
+                if (!TryFindFreePosition(transform.position, out m_pushTarget))
+                {
+                    m_searchCooldown = kSearchRetryTime;
+                    return false;
+                }
+                m_isPushingOut = true;
+            }
+
+            float dt = Time.deltaTime * LocalTimeScale;
+            transform.position = Vector3.MoveTowards(transform.position, m_pushTarget, m_pushOutSpeed * dt);
+            if ((transform.position - m_pushTarget).sqrMagnitude < 0.000001f) m_isPushingOut = false;
+            return true;
+        }
+
+        // 壁と重なっていたら、一番近い空いた場所へすぐ移す(見えていないときに使う)
+        private void SnapToFreePosition()
+        {
+            m_isPushingOut = false;
+            if (TryFindFreePosition(transform.position, out Vector3 free)) transform.position = free;
+        }
+
+        // pos から一番近い、壁と重ならずステージの範囲内の場所を探す(浮いている高さはそのまま)。見つからなければ false
+        // 同じ距離に空いた場所がいくつかあるときは、ステージの中心に近いほうを選ぶ
+        public bool TryFindFreePosition(Vector3 pos, out Vector3 result)
+        {
+            float y = pos.y;
+            if (m_stageArea != null)
+            {
+                pos = m_stageArea.Clamp(pos, m_radius);
+                pos.y = y;
+            }
+            result = pos;
+            if (IsFree(pos)) return true;
+
+            Vector3 center = m_stageArea != null ? m_stageArea.transform.position : pos;
+            for (float d = kSearchStep; d <= m_freeSearchRadius + 0.0001f; d += kSearchStep)
+            {
+                int count = Mathf.Max(8, Mathf.CeilToInt(2.0f * Mathf.PI * d / kSearchStep));
+                bool found = false;
+                float best = float.MaxValue;
+                for (int i = 0; i < count; i++)
+                {
+                    float a = 2.0f * Mathf.PI * i / count;
+                    Vector3 p = pos + new Vector3(Mathf.Cos(a), 0.0f, Mathf.Sin(a)) * d;
+                    if (!IsFree(p)) continue;
+                    float toCenter = new Vector2(p.x - center.x, p.z - center.z).sqrMagnitude;
+                    if (toCenter >= best) continue;
+                    best = toCenter;
+                    result = p;
+                    found = true;
+                }
+                if (found) return true;
+            }
+            result = pos;
+            return false;
+        }
+
+        // ステージの範囲内で、壁から少し離れている
+        private bool IsFree(Vector3 pos)
+        {
+            if (m_stageArea != null)
+            {
+                Vector3 c = m_stageArea.Clamp(pos, m_radius);
+                if (Mathf.Abs(c.x - pos.x) > 0.001f || Mathf.Abs(c.z - pos.z) > 0.001f) return false;
+            }
+            return !OverlapsWall(pos, kFreeSkin);
+        }
+
+        // 壁(ReflectWall)と重なっているか。当たりの球は SlideAlongWalls と同じ(半径に margin を足す)
+        private bool OverlapsWall(Vector3 pos, float margin)
+        {
+            Vector3 origin = pos + Vector3.up * (m_radius + 0.05f);
+            int count = Physics.OverlapSphereNonAlloc(origin, m_radius + margin, m_wallOverlaps, ~0, QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < count; i++)
+            {
+                if (m_wallOverlaps[i].GetComponentInParent<ReflectWall>() != null) return true;
+            }
+            return false;
         }
 
         private void UpdateMove()
