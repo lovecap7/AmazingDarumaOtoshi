@@ -13,7 +13,8 @@ using UnityEngine.UI;
 // 見た目はセレクト画面(MatchSelect)に合わせている(部室の背景は同じ GameObject に付けた TitleClubRoomDressing)。
 //  ・はじめ  : 「ホスト」と「さんか」のカードから選ぶ(B でメニューへ)
 //  ・ホスト  : へやを開いて、へやばんごう(4けた。NetRoom)と集まった人を出す(IP アドレスは出さない)。A / Start で全員そろって試合のシーン(NetStages)へ
-//  ・さんか  : へやばんごう(LAN の中で NetRoom が探す)か IP アドレスをキーボードで入れてつなぐ。つながったらホストが始めるのを待つ
+//  ・さんか  : へやばんごう(LAN の中で NetRoom が探す)か IP アドレスをキーボードで入れてつなぐ。
+//              コントローラーでは、へやばんごうを ↑↓(数字)・←→(けた)で入れる(コントローラーの A で「さんか」を選ぶと、この形から始まる)。つながったらホストが始めるのを待つ
 //              (ホストが始めると、NGO のシーン管理で自動的に試合のシーンへ移る)
 //  ・つながらなかった・切れたときはお知らせを出して、この画面に残る(切れた理由のエラーコードなどは出さない)
 // 試合のシーンで切断したとき(NetLobbyUI・NetSceneFlow)も、この画面に戻ってくる。
@@ -72,6 +73,8 @@ public class NetConnectScreen : MonoBehaviour
 
     NetworkManager m_nm;
     string m_address;             // さんか: 入れているもの(へやばんごう か IP アドレス)
+    bool m_padMode;               // さんか: コントローラーでへやばんごうを入れている(↑↓で数字、←→でけた)
+    int m_digit;                  // さんか: コントローラーで選んでいるけた(0 = 左)
     string m_target;              // さんか: つなぎに行っている IP アドレス
     NetRoom.Search m_search;      // さんか: へやばんごうで探している途中
     string m_message;
@@ -90,6 +93,7 @@ public class NetConnectScreen : MonoBehaviour
     Button m_startButton;
     // さんか
     TextMeshProUGUI m_joinLabel, m_addressText, m_joinStatus;
+    TextMeshProUGUI m_arrowUp, m_arrowDown;   // コントローラーで選んでいるけたの上下の ▲▼
     RectTransform m_addressBox;
     Button m_connectButton;
 
@@ -188,6 +192,8 @@ public class NetConnectScreen : MonoBehaviour
     void StartHost()
     {
         if (!CanStart) return;
+        // 部屋に入ったときは、あかだる・ステージおまかせから
+        NetMatchPlayer.ResetChoices();
         // 同じ LAN の他の PC から来られるように、すべてのネットワークで待つ
         Transport.SetConnectionData("127.0.0.1", m_port, "0.0.0.0");
         if (m_nm.StartHost())
@@ -273,6 +279,8 @@ public class NetConnectScreen : MonoBehaviour
     void StartClient(string address, ushort port)
     {
         if (!CanStart) return;
+        // 部屋に入ったときは、あかだる・ステージおまかせから
+        NetMatchPlayer.ResetChoices();
         m_target = address;
         Transport.SetConnectionData(address, port);
         Transport.MaxConnectAttempts = m_connectAttempts;
@@ -418,6 +426,9 @@ public class NetConnectScreen : MonoBehaviour
                 MenuSounds.Decide();
                 SetMessage(null, kError);
                 m_joinState = JoinState.Input;
+                // コントローラーで選んだら、へやばんごうもコントローラーで入れる形から始める
+                m_padMode = false;
+                if (PadPressed()) EnterPadMode();
                 GoTo(Screen.Join);
             }
         }
@@ -449,6 +460,21 @@ public class NetConnectScreen : MonoBehaviour
         {
             // 貼り付け(Ctrl + V)
             if (k != null && (k.leftCtrlKey.isPressed || k.rightCtrlKey.isPressed) && k.vKey.wasPressedThisFrame) Paste(GUIUtility.systemCopyBuffer);
+            // コントローラー(十字キー・左スティック。キーボードの矢印でもよい): ↑↓で数字を変え、←→でけたを選ぶ
+            int dy = MenuInput.UpRepeat() ? 1 : MenuInput.DownRepeat() ? -1 : 0;
+            int dx = MenuInput.LeftRepeat() ? -1 : MenuInput.RightRepeat() ? 1 : 0;
+            if (dx != 0 || dy != 0)
+            {
+                bool entered = !m_padMode;
+                EnterPadMode();
+                // 切り替えた最初の1回は、いまのけたを見せるだけにする
+                if (!entered)
+                {
+                    if (dx != 0) m_digit = Mathf.Clamp(m_digit + dx, 0, kRoomDigits - 1);
+                    if (dy != 0) ChangeDigit(dy);
+                }
+                MenuSounds.Cursor();
+            }
             if (submit) Submit();
             else if (cancel) { MenuSounds.Cancel(); SetMessage(null, kError); GoTo(Screen.Choose); }
             return;
@@ -463,9 +489,46 @@ public class NetConnectScreen : MonoBehaviour
         if (cancel) { MenuSounds.Cancel(); SetMessage(null, kError); Stop(); }
     }
 
+    // コントローラーでへやばんごうを入れる形にする(いまの入力が4けたの数字でなければ 0000 から)
+    void EnterPadMode()
+    {
+        if (m_padMode) return;
+        m_padMode = true;
+        if (!IsRoomNumber(m_address)) m_address = new string('0', kRoomDigits);
+        m_digit = 0;
+    }
+
+    // 選んでいるけたの数字を1つ上げる・下げる(9 の次は 0)
+    void ChangeDigit(int delta)
+    {
+        var chars = m_address.ToCharArray();
+        int d = chars[m_digit] - '0';
+        chars[m_digit] = (char)('0' + (d + 10 + delta) % 10);
+        m_address = new string(chars);
+    }
+
+    static bool IsRoomNumber(string s)
+    {
+        if (s == null || s.Length != kRoomDigits) return false;
+        foreach (char c in s) if (c < '0' || c > '9') return false;
+        return true;
+    }
+
+    // コントローラーのボタン・十字キーを押した(キーボードではなくコントローラーで操作している)
+    static bool PadPressed()
+    {
+        foreach (var g in Gamepad.all)
+        {
+            if (g.buttonSouth.wasPressedThisFrame || g.startButton.wasPressedThisFrame) return true;
+        }
+        return false;
+    }
+
     void OnTextInput(char c)
     {
         if (m_leaving || m_screen != Screen.Join || m_joinState != JoinState.Input || !Application.isFocused) return;
+        // キーボードで打ったら、キーボードで入れる形に戻す
+        m_padMode = false;
         if (c == '\b')
         {
             if (m_address.Length > 0) { m_address = m_address.Substring(0, m_address.Length - 1); MenuSounds.Cursor(); }
@@ -485,6 +548,7 @@ public class NetConnectScreen : MonoBehaviour
             if (IsAddressChar(c) && sb.Length < kMaxAddressLength) sb.Append(c);
         }
         if (sb.Length == 0) return;
+        m_padMode = false;
         m_address = sb.ToString();
         MenuSounds.Cursor();
     }
@@ -498,9 +562,10 @@ public class NetConnectScreen : MonoBehaviour
             case Screen.Choose: return "←→：選ぶ　A / Start：決定　B：メニューへ";
             case Screen.Host: return "A / Start：はじめる　B：へやを とじる";
             default:
-                return m_joinState == JoinState.Input
-                    ? "キーボード：へやばんごう か IP アドレスを入れる(Ctrl + V で はりつけ)　Enter / A：つなぐ　Esc / B：戻る"
-                    : "B：やめる";
+                if (m_joinState != JoinState.Input) return "B：やめる";
+                return m_padMode
+                    ? "↑↓：数字を 変える　←→：けたを 選ぶ　A：つなぐ　B：戻る　(キーボードで 打っても 入れられます)"
+                    : "キーボード：へやばんごう か IP アドレスを入れる(Ctrl + V で はりつけ)　十字キー：コントローラーで入れる　Enter / A：つなぐ　Esc / B：戻る";
         }
     }
 
@@ -553,7 +618,20 @@ public class NetConnectScreen : MonoBehaviour
         bool input = m_joinState == JoinState.Input;
         // 入力中だけカーソルを点滅させる
         bool caret = input && Mathf.Repeat(Time.unscaledTime, 1.0f) < 0.55f;
-        m_addressText.text = (m_address.Length > 0 ? m_address : (caret ? "" : " ")) + (input ? (caret ? "<color=#E8735A>|</color>" : "<alpha=#00>|") : "");
+        if (input && m_padMode && IsRoomNumber(m_address))
+        {
+            // コントローラー: 4けたを間を空けて並べ、選んでいるけたに色、上下に ▲▼
+            var sb = new System.Text.StringBuilder();
+            for (int i = 0; i < kRoomDigits; i++)
+            {
+                if (i > 0) sb.Append("<space=0.6em>");
+                if (i == m_digit) sb.Append("<color=#E8735A>").Append(m_address[i]).Append("</color>");
+                else sb.Append(m_address[i]);
+            }
+            m_addressText.text = sb.ToString();
+        }
+        else m_addressText.text = (m_address.Length > 0 ? m_address : (caret ? "" : " ")) + (input ? (caret ? "<color=#E8735A>|</color>" : "<alpha=#00>|") : "");
+        UpdateDigitArrows(input && m_padMode);
         m_addressBox.localScale = Vector3.Lerp(m_addressBox.localScale, Vector3.one * (input ? 1.0f : 0.94f), 1.0f - Mathf.Exp(-12.0f * dt));
 
         string status;
@@ -583,6 +661,22 @@ public class NetConnectScreen : MonoBehaviour
         m_joinStatus.color = color;
         m_joinLabel.text = m_joinState == JoinState.Input ? "ホストの へやばんごうを 入れてね" : "ホストの へや";
         Pulse(m_connectButton, input);
+    }
+
+    // コントローラーで入れているとき、選んでいるけたの上下に ▲▼ を出す(少し上下に揺らす)
+    void UpdateDigitArrows(bool show)
+    {
+        m_arrowUp.gameObject.SetActive(show);
+        m_arrowDown.gameObject.SetActive(show);
+        if (!show) return;
+        m_addressText.ForceMeshUpdate();
+        var info = m_addressText.textInfo;
+        if (m_digit >= info.characterCount) return;
+        var c = info.characterInfo[m_digit];
+        float x = (c.bottomLeft.x + c.topRight.x) * 0.5f;
+        float bob = 4.0f * Mathf.Sin(Time.unscaledTime * 6.0f);
+        m_arrowUp.rectTransform.anchoredPosition = new Vector2(x, 66.0f + bob);
+        m_arrowDown.rectTransform.anchoredPosition = new Vector2(x, -66.0f - bob);
     }
 
     // 押せるボタンはゆっくり大きくなったり小さくなったりする。押せないときは灰色
@@ -692,7 +786,13 @@ public class NetConnectScreen : MonoBehaviour
         var ol = m_addressBox.gameObject.AddComponent<Outline>(); ol.effectColor = ToyKit.Ink; ol.effectDistance = new Vector2(4.0f, -4.0f);
         m_addressText = ToyKit.UIText("Text", m_addressBox, m_font, "", 100.0f, ToyKit.Ink);
         ToyKit.Stretch(m_addressText.rectTransform);
-        var example = ToyKit.UIText("Example", join, m_font, "4けたの 数字(ホストの 画面に 出ています)。IP アドレスでも つなげます", 30.0f, new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.6f));
+        var arrowColor = new Color(0.91f, 0.45f, 0.35f);
+        m_arrowUp = ToyKit.UIText("ArrowUp", m_addressText.rectTransform, m_font, "▲", 30.0f, arrowColor);
+        ToyKit.Anchor(m_arrowUp.rectTransform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(60.0f, 36.0f));
+        m_arrowDown = ToyKit.UIText("ArrowDown", m_addressText.rectTransform, m_font, "▼", 30.0f, arrowColor);
+        ToyKit.Anchor(m_arrowDown.rectTransform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(60.0f, 36.0f));
+        var example = ToyKit.UIText("Example", join, m_font, "4けたの 数字(ホストの 画面に 出ています)。十字キーでも 入れられます。IP アドレスでも つなげます", 30.0f, new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.6f));
+        example.enableAutoSizing = true; example.fontSizeMin = 20.0f; example.fontSizeMax = 30.0f;
         ToyKit.Anchor(example.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.0f, 10.0f), new Vector2(1300.0f, 50.0f));
         m_joinStatus = ToyKit.UIText("Status", join, m_font, "", 42.0f, ToyKit.Ink);
         m_joinStatus.textWrappingMode = TextWrappingModes.Normal;

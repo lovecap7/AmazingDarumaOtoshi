@@ -82,6 +82,7 @@ public class NetLobbyUI : MonoBehaviour
     void StartHost()
     {
         s_message = null;
+        NetMatchPlayer.ResetChoices();   // 部屋に入ったときは、あかだる・ステージおまかせから
         // 同じ LAN の他の PC から来られるように、すべてのネットワークで待つ
         Transport.SetConnectionData("127.0.0.1", m_port, "0.0.0.0");
         if (m_nm.StartHost()) NetRoom.Open(m_port);
@@ -97,6 +98,7 @@ public class NetLobbyUI : MonoBehaviour
             return;
         }
         s_message = null;
+        NetMatchPlayer.ResetChoices();   // 部屋に入ったときは、あかだる・ステージおまかせから
         m_address = address;
         PlayerPrefs.SetString(kAddressKey, address);
         Transport.SetConnectionData(address, m_port);

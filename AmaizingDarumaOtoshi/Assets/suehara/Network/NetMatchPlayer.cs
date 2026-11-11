@@ -60,13 +60,24 @@ public class NetMatchPlayer : NetworkBehaviour
     // いまのキャラの番号(ホストが決めて配る)
     int m_character = NetCharacterList.None;
 
-    // この PC の人が選んだキャラ(シーンを移っても・次に起動しても覚えておく)
-    const string kCharacterKey = "Net.Character";
-    public static string SavedCharacterId
+    // 部屋に入ったときのキャラ(あかだる)とステージ(おまかせ)
+    public const string DefaultCharacterId = "akadaru";
+
+    // この PC の人が選んだキャラ・ステージ(試合のシーンに入るたびにホストへ送る)。
+    // 同じ部屋にいる間(試合 → リザルト → ロビー)は覚えておき、部屋に入るたび(ResetChoices)にあかだる・おまかせへ戻す
+    public static string SavedCharacterId { get; private set; } = DefaultCharacterId;
+    public static string SavedStageId { get; private set; } = "";
+
+    // 部屋に入る(ホストになる・さんかする)ときに呼ぶ
+    public static void ResetChoices()
     {
-        get => PlayerPrefs.GetString(kCharacterKey, "");
-        set => PlayerPrefs.SetString(kCharacterKey, value ?? "");
+        SavedCharacterId = DefaultCharacterId;
+        SavedStageId = "";
     }
+
+    // ドメインの再読み込みをしない設定でも、再生のたびに戻す
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetStatics() => ResetChoices();
 
     // この PC の人の1人分(なければ null)
     public static NetMatchPlayer Local
@@ -85,12 +96,6 @@ public class NetMatchPlayer : NetworkBehaviour
     // 選んだステージ(NetCharacterList.stages の番号。NetCharacterList.None ならおまかせ)。ホストが試合を始めるときに抽選する
     int m_stageVote = NetCharacterList.None;
     public int StageVote => m_stageVote;
-    const string kStageKey = "Net.Stage";
-    public static string SavedStageId
-    {
-        get => PlayerPrefs.GetString(kStageKey, "");
-        set => PlayerPrefs.SetString(kStageKey, value ?? "");
-    }
 
     public override void OnNetworkSpawn()
     {
@@ -102,12 +107,21 @@ public class NetMatchPlayer : NetworkBehaviour
             else
             {
                 var entry = new MatchSetup.Entry { playerIndex = Index, deviceName = "Net" };
+                // 最初はあかだるで出す(その人が別のキャラを選んでいれば、このあと届く頼みで入れ替わる)
+                var list = NetCharacterList.Instance;
+                int first = list != null ? list.IndexOf(DefaultCharacterId) : NetCharacterList.None;
+                if (first != NetCharacterList.None)
+                {
+                    entry.character = list.HostData(first);
+                    m_character = first;
+                }
                 match.AddNetPlayer(Player, entry, GetComponent<NetworkCommandSource>());
                 m_registered = true;
             }
         }
 
-        // 前に選んだキャラをホストに伝える(試合のシーンに入るたびに NetPlayer は作り直されるので、そのたびに送る)
+        // 選んでいるキャラ・ステージをホストに伝える(試合のシーンに入るたびに NetPlayer は作り直されるので、そのたびに送る。
+        // 部屋に入ったばかりなら、あかだる・おまかせ)
         if (IsOwner)
         {
             var list = NetCharacterList.Instance;
