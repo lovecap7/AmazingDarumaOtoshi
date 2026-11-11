@@ -17,6 +17,9 @@ namespace Nakahira
     //  ・とっさの六腕:自分に当たる弾が 2 発以上あるとき、または追い込まれている(段数が少なく、集中度の割合が高い)ときに弾が来たとき
     public class CpuSpecial
     {
+        // ストーリー用(Yurube): 章の設定でCPUの必殺技を止める（チュートリアルなど）
+        public static bool Disabled;
+
         DarumaCharacter m_self;
         ISpecialAbility m_ability;
         SpecialGauge m_gauge;
@@ -74,6 +77,7 @@ namespace Nakahira
         // 時間が止まっている間(カットイン中)も毎フレーム呼ばれる
         public bool Apply(CpuContext c, Func<MatchPlayer, bool> engaged, CpuState current)
         {
+            if (Disabled) return false;
             Bind(c.Self);
             if (m_ability == null || m_gauge == null) return false;
 

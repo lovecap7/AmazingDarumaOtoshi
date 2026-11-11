@@ -191,6 +191,8 @@ namespace Nakahira
         public float KillY => m_killY;
         // 他の生存者にダメージを与えた
         public event Action<DarumaCharacter> DealtDamage;
+        // ストーリー用(Yurube): 操作命令を受け取った（チュートリアルの判定用。挙動は変えない）
+        public event Action<DarumaCommand> CommandReceived;
 
         private void Awake()
         {
@@ -226,6 +228,10 @@ namespace Nakahira
         // 操作命令を受け取る(将来ネットワークから受け取る場合もここを使う)
         public void ApplyCommand(in DarumaCommand command)
         {
+            // ストーリー用(Yurube): チュートリアルの「移動・ジャンプ・攻撃をした」判定に使う。
+            // 受け取った命令をそのまま流すだけで、動きは変えない。
+            CommandReceived?.Invoke(command);
+
             Vector2 move = Vector2.ClampMagnitude(command.Move, 1.0f);
             if (MovementInverted) move = -move;
             m_moveDirection = new Vector3(move.x, 0.0f, move.y);

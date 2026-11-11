@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Net;
-using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using TMPro;
 using Unity.Netcode;
@@ -13,10 +12,10 @@ using UnityEngine.UI;
 // ネット対戦(LAN)の入り口。メニューの「たたかう → オンライン」から来る(NetConnectScene)。
 // 見た目はセレクト画面(MatchSelect)に合わせている(部室の背景は同じ GameObject に付けた TitleClubRoomDressing)。
 //  ・はじめ  : 「ホスト」と「さんか」のカードから選ぶ(B でメニューへ)
-//  ・ホスト  : へやを開いて、へやばんごう(4けた。NetRoom)・IP アドレスと集まった人を出す。A / Start で全員そろって試合のシーン(NetStages)へ
+//  ・ホスト  : へやを開いて、へやばんごう(4けた。NetRoom)と集まった人を出す(IP アドレスは出さない)。A / Start で全員そろって試合のシーン(NetStages)へ
 //  ・さんか  : へやばんごう(LAN の中で NetRoom が探す)か IP アドレスをキーボードで入れてつなぐ。つながったらホストが始めるのを待つ
 //              (ホストが始めると、NGO のシーン管理で自動的に試合のシーンへ移る)
-//  ・つながらなかった・切れたときは理由を出して、この画面に残る
+//  ・つながらなかった・切れたときはお知らせを出して、この画面に残る(切れた理由のエラーコードなどは出さない)
 // 試合のシーンで切断したとき(NetLobbyUI・NetSceneFlow)も、この画面に戻ってくる。
 public class NetConnectScreen : MonoBehaviour
 {
@@ -77,7 +76,6 @@ public class NetConnectScreen : MonoBehaviour
     NetRoom.Search m_search;      // さんか: へやばんごうで探している途中
     string m_message;
     Color m_messageColor = kError;
-    string[] m_localAddresses = Array.Empty<string>();
 
     // ---- 画面の部品 ----
     RectTransform m_canvas;
@@ -113,7 +111,6 @@ public class NetConnectScreen : MonoBehaviour
     {
         SceneName = gameObject.scene.name;
         m_address = PlayerPrefs.GetString(kAddressKey, "127.0.0.1");
-        m_localAddresses = LocalAddresses();
         m_letterMat = ToyKit.LetterMaterial(m_font);
         m_popMat = ToyKit.PopMaterial(m_letterMat);
 
@@ -197,7 +194,6 @@ public class NetConnectScreen : MonoBehaviour
         {
             NetRoom.Open(m_port);
             SetMessage(null, kError);
-            m_localAddresses = LocalAddresses();
             GoTo(Screen.Host);
             return;
         }
@@ -320,9 +316,8 @@ public class NetConnectScreen : MonoBehaviour
             SetMessage($"{m_target} に つながりませんでした。\nホストの IP アドレス・同じ LAN(Wi-Fi)にいるか・ファイアウォールを たしかめてね", kError);
             return;
         }
-        // ホストが理由を付けて切ったときはそれも出す
-        string reason = m_nm.DisconnectReason;
-        SetMessage(string.IsNullOrEmpty(reason) ? "ホストとの 接続が 切れました" : $"ホストとの 接続が 切れました({reason})", kError);
+        // 切れた理由(エラーコードなど)は画面に出さない
+        SetMessage("ホストとの 接続が 切れました", kError);
     }
 
     // 止まった: ホストははじめの画面へ、さんかは入力に戻る(お知らせはそのまま)
@@ -533,10 +528,8 @@ public class NetConnectScreen : MonoBehaviour
         bool hosting = m_nm != null && m_nm.IsServer;
         int room = NetRoom.Current;
         m_hostRoom.text = room > 0 && NetRoom.IsAnswering ? room.ToString() : "----";
-        string ip = m_localAddresses.Length > 0 ? string.Join(" / ", m_localAddresses) : "(見つかりません)";
-        m_hostAddress.text = room > 0 && !NetRoom.IsAnswering
-            ? $"へやばんごうが 使えません。IP アドレスで さんかしてね：{ip}"
-            : $"見つからないときは IP アドレス：{ip}";
+        // IP アドレスは出さない。へやばんごうが使えないときだけ知らせる
+        m_hostAddress.text = room > 0 && !NetRoom.IsAnswering ? "へやばんごうが 使えません(ほかの アプリが 使っているかもしれません)" : "";
 
         int count = hosting ? m_nm.ConnectedClientsIds.Count : 0;
         for (int i = 0; i < m_chips.Length; i++)
@@ -662,7 +655,7 @@ public class NetConnectScreen : MonoBehaviour
         m_chooseMessage.textWrappingMode = TextWrappingModes.Normal;
         ToyKit.Anchor(m_chooseMessage.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.0f, -400.0f), new Vector2(1600.0f, 110.0f));
 
-        // ---- ホスト: IP アドレスと集まった人 ----
+        // ---- ホスト: へやばんごうと集まった人 ----
         var host = m_roots[(int)Screen.Host];
         Header(host, "ホスト", ToyKit.Palette[1]);
         Plate(host, new Vector2(0.0f, 40.0f), new Vector2(1400.0f, 640.0f));
@@ -791,27 +784,5 @@ public class NetConnectScreen : MonoBehaviour
         t.fontSharedMaterial = m_letterMat;
         ToyKit.Stretch(t.rectTransform);
         return new Button { rect = r, bg = r.GetComponent<Image>(), text = t, color = color };
-    }
-
-    // この PC の LAN の IP アドレス(さんかする人に伝える)
-    static string[] LocalAddresses()
-    {
-        var list = new List<string>();
-        try
-        {
-            foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
-            {
-                if (ni.OperationalStatus != OperationalStatus.Up || ni.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
-                foreach (var a in ni.GetIPProperties().UnicastAddresses)
-                {
-                    if (a.Address.AddressFamily == AddressFamily.InterNetwork) list.Add(a.Address.ToString());
-                }
-            }
-        }
-        catch (Exception e)
-        {
-            Debug.LogWarning("[NetConnectScreen] IP アドレスを調べられませんでした: " + e.Message);
-        }
-        return list.ToArray();
     }
 }

@@ -118,10 +118,8 @@ public class NetLobbyUI : MonoBehaviour
             s_message = $"{m_address} につながりませんでした。ホストの IP アドレス・同じ LAN(Wi-Fi)にいるか・ファイアウォールを確かめてください";
             return;
         }
-        // ホストが理由を付けて切ったとき(定員など)はそれも出す
-        string reason = m_nm.DisconnectReason;
+        // 切れた理由(エラーコードなど)は画面に出さない
         s_message = "ホストとの接続が切れました";
-        if (!string.IsNullOrEmpty(reason)) s_message += $"\n({reason})";
     }
 
     // 止まったら、次のフレームでシーンを読み直して最初の状態に戻す(試合・積み木・キャラクターを残さない)

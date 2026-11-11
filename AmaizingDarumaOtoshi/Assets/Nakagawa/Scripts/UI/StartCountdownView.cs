@@ -60,6 +60,12 @@ namespace Nakagawa
             if (m_canvas != null) Destroy(m_canvas.gameObject);
         }
 
+        // ストーリー用(Yurube): 会話中はカウントダウンの数字を隠す（会話の後ろに残らないように）
+        public void SetHidden(bool hidden)
+        {
+            if (m_canvas != null) m_canvas.gameObject.SetActive(!hidden);
+        }
+
         private TextMeshProUGUI CreateText(string name, TMP_FontAsset font, Material mat)
         {
             var t = ToyKit.UIText(name, m_canvas, font, "", m_fontSize, Color.white);
