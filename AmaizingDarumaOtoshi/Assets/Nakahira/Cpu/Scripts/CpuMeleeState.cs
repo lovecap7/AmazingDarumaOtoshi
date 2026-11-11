@@ -558,7 +558,7 @@ namespace Nakahira
         // すぐそば(MeleePickupRadius)で、相手の間合いの外にある積み木を拾う
         private bool TryPickupNearby(CpuContext c, CpuOpponent o, ref DarumaCommand cmd)
         {
-            if (c.StackCount >= c.Params.CollectUntil) return false;
+            if (c.StackCount >= c.CollectUntil) return false;
             if (m_pickup.Target != null && !IsSafeNearby(c, o, m_pickup.Target)) m_pickup.Clear();
             if (m_pickup.Target == null)
             {

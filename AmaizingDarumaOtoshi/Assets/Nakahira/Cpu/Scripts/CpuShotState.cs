@@ -292,6 +292,7 @@ namespace Nakahira
         private static bool HasNearbyCollectable(CpuContext c)
         {
             float radius = c.Params.ShotNearbyRadius;
+            if (c.IsStackFull) return false;   // 積める上限まで積んでいる(だるきんぐの 2 段)
             foreach (var block in TumikiBlock.All)
             {
                 if (!CpuBlockSearch.IsCollectable(block) || c.IsGivenUp(block)) continue;

@@ -365,6 +365,8 @@ public class TitleClubRoomDressing : MonoBehaviour
             hm.SetParent(root, false);
             hm.position = rack + new Vector3(-0.7f, 0f, -4.4f + i * 2.2f);
             hm.rotation = Quaternion.Euler(0f, 0f, i == 3 ? 4f : 0f);
+            // Blender のハンマーがあればそれにする（使い込んで色あせたヘッド）
+            if (UprightHammer(hm, 0.8f, 8.3f, 0.75f, Color.Lerp(headColors[i], new Color(0.5f, 0.45f, 0.4f), 0.3f))) continue;
             var stick = ToyKit.Primitive(PrimitiveType.Cylinder, "Handle", hm);
             stick.localScale = new Vector3(0.35f, 3.6f, 0.35f);
             stick.localPosition = new Vector3(0f, 4.4f, 0f);
@@ -385,6 +387,8 @@ public class TitleClubRoomDressing : MonoBehaviour
         giant.SetParent(root, false);
         giant.position = new Vector3(14f, 0f, BackZ - 2.5f);
         giant.rotation = Quaternion.Euler(-14f, -20f, 8f);
+        if (!UprightHammer(giant, 0f, 12.5f, 1f, new Color(0.75f, 0.2f, 0.15f)))
+        {
         var gStick = ToyKit.Primitive(PrimitiveType.Cylinder, "Handle", giant);
         gStick.localScale = new Vector3(0.8f, 6f, 0.8f);
         gStick.localPosition = new Vector3(0f, 6f, 0f);
@@ -406,11 +410,14 @@ public class TitleClubRoomDressing : MonoBehaviour
             band.localPosition = new Vector3(x, 12.5f, 0f);
             band.GetComponent<Renderer>().sharedMaterial = ToyKit.Lit(new Color(0.9f, 0.75f, 0.2f), 0.6f);
         }
+        }
         // 床に転がった練習用ハンマー
         var floorHammer = new GameObject("FloorHammer").transform;
         floorHammer.SetParent(root, false);
         floorHammer.position = new Vector3(-9f, 0.65f, 6f);
         floorHammer.rotation = Quaternion.Euler(0f, 40f, 90f);
+        // 頭の半径が 0.6（床から浮いている高さ 0.65 に収まる）
+        if (UprightHammer(floorHammer, -1.6f, 2.8f, 1f, Color.Lerp(Palette[4], new Color(0.5f, 0.45f, 0.4f), 0.3f))) return;
         var fStick = ToyKit.Primitive(PrimitiveType.Cylinder, "Handle", floorHammer);
         fStick.localScale = new Vector3(0.35f, 2.6f, 0.35f);
         fStick.GetComponent<Renderer>().sharedMaterial = handle;
@@ -418,6 +425,22 @@ public class TitleClubRoomDressing : MonoBehaviour
         fHead.localScale = new Vector3(1.3f, 0.6f, 1.3f);
         fHead.localPosition = new Vector3(0f, 2.8f, 0f);
         fHead.GetComponent<Renderer>().sharedMaterial = ToyKit.Lit(Color.Lerp(Palette[4], new Color(0.5f, 0.45f, 0.4f), 0.3f), 0.3f);
+    }
+
+    // 柄を +Y に立てた Blender のハンマーを parent の中に置く（根元 y = baseY、頭の中心 y = headY、頭は X 向き）。
+    // girth：太さ（1 で長さに合わせた太さ）。headColor：頭の色。モデルが無ければ何もせず false
+    static bool UprightHammer(Transform parent, float baseY, float headY, float girth, Color headColor)
+    {
+        var hm = ToyKit.CreateHammerModel();
+        if (hm == null) return false;
+        hm.SetParent(parent, false);
+        hm.localPosition = new Vector3(0f, baseY, 0f);
+        hm.localRotation = Quaternion.Euler(-90f, 0f, 0f);   // 柄（+Z）を上（+Y）へ
+        float k = (headY - baseY) / ToyKit.HammerLength;
+        hm.localScale = new Vector3(k * girth, k * girth, k);
+        var mat = ToyKit.Lit(headColor, 0.4f);
+        foreach (var r in hm.GetComponentsInChildren<Renderer>()) if (r.name == "Head") r.sharedMaterial = mat;
+        return true;
     }
 
     // ================= 練習用の積み木 =================
@@ -608,10 +631,19 @@ public class TitleClubRoomDressing : MonoBehaviour
         m.hammerPivot = new GameObject("HammerPivot").transform;
         m.hammerPivot.SetParent(m.root, false);
         m.hammerPivot.localPosition = new Vector3(ToyKit.BlockW * s * 0.45f, bh * 1.4f, 0.2f * s);
-        m.hammer = ToyKit.CreateHammer();
+        m.hammer = ToyKit.CreateHammer(HammerFor(headModel));   // 頭のだるまのキャラのハンマー
         m.hammer.SetParent(m.hammerPivot, false);
         m.hammer.localScale = Vector3.one * s * hammerScale;
         return m;
+    }
+
+    // 頭のモデルからキャラを探して、そのキャラのハンマー（見つからなければ null ＝ 共通のハンマー）
+    static GameObject HammerFor(GameObject headModel)
+    {
+        var s = GameModelSettings.Current;
+        if (s == null || s.roster == null || headModel == null) return null;
+        var c = s.roster.characters.Find(x => x != null && x.model == headModel);
+        return c != null ? c.hammerModel : null;
     }
 
     void BuildMembers()
@@ -630,8 +662,9 @@ public class TitleClubRoomDressing : MonoBehaviour
         if (swinger != null)
         {
             // 素振り：1.3 秒ごとに、構え → 一気に振り抜く → ゆっくり戻す
+            // ハンマーは体の右側に持つので、右うしろ（+110°）に構えて、体の前を通って左（-80°）へ振り抜く
             float c = Mathf.Repeat(t, 1.3f);
-            float yaw = c < 0.18f ? Mathf.Lerp(-110f, 80f, Mathf.SmoothStep(0f, 1f, c / 0.18f)) : Mathf.Lerp(80f, -110f, Mathf.SmoothStep(0f, 1f, (c - 0.18f) / 1.12f));
+            float yaw = c < 0.18f ? Mathf.Lerp(110f, -80f, Mathf.SmoothStep(0f, 1f, c / 0.18f)) : Mathf.Lerp(-80f, 110f, Mathf.SmoothStep(0f, 1f, (c - 0.18f) / 1.12f));
             swinger.hammerPivot.localRotation = Quaternion.Euler(0f, yaw, 0f);
             swinger.root.position = swinger.basePos + Vector3.up * (c < 0.25f ? Mathf.Sin(c / 0.25f * Mathf.PI) * 0.4f : 0f);
             swinger.head.localRotation = Quaternion.Euler(0f, 180f + yaw * 0.15f, 0f);

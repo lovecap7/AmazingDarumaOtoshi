@@ -220,6 +220,19 @@ MonoBehaviour:
   roster: {fileID: 11400000, guid: 0aaf3a65396bc1940a8bcd03c495c9f0, type: 2}
   stageColumns: 10
   stageVote: 0
+  characterList:
+  - {fileID: 11400000, guid: 7ffcf080adad0f64380e6846824a2978, type: 2}
+  - {fileID: 11400000, guid: 9fc5324d816f46cb80cbe99a1d9c3a1a, type: 2}
+  - {fileID: 11400000, guid: 9588c7355b504c679a28f0edc20286ae, type: 2}
+  - {fileID: 11400000, guid: e43cc62756685ffd67cfbe3f5daee82e, type: 2}
+  - {fileID: 11400000, guid: 2b5708eb758d4e6cba69b6f25708a191, type: 2}
+  - {fileID: 11400000, guid: 880980730b0e8834b8ebf9e6632fbe19, type: 2}
+  - {fileID: 11400000, guid: 1f06724f149cbe7e579c84eb0b14933a, type: 2}
+  - {fileID: 11400000, guid: 131e300f47642b649a73e705bc310b6e, type: 2}
+  characterColumns: 4
+  characterRows: 2
+  showRandomCharacter: 1
+  centerLastCharacterRow: 1
   stageList: []
   maxStages: 0
   showRandomStage: 1
@@ -260,6 +273,8 @@ MonoBehaviour:
     randomCharacter: "\u30E9\u30F3\u30C0\u30E0"
     randomLetter: "\uFF1F"
     chooseCharacter: "\u3048\u3089\u3093\u3067\u306D"
+    easeLabel: "\u4F7F\u3044\u3084\u3059\u3055"
+    easeUnknown: "\uFF1F"
     join: "A / Start \u3067\u53C2\u52A0"
     typeNone: "\u306A\u3057"
     typeCpu: CPU

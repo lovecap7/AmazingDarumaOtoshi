@@ -663,11 +663,24 @@ public partial class ClubOpeningMovie
             e.localPosition = new Vector3(x, GHeadD * 0.5f + 0.09f, 0.38f);
             e.GetComponent<Renderer>().sharedMaterial = eye;
         }
+        UsePuppetHeadModel(p.body, color);   // 色に合うだるまのモデルに（目は隠す）
         p.pivot = new GameObject("HammerPivot").transform;
         p.pivot.SetParent(p.body, false);
         p.pivot.localPosition = new Vector3(0.5f, 0.35f, 0.05f);
         p.hammer = new GameObject("Hammer").transform;
         p.hammer.SetParent(p.pivot, false);
+        // Blender のハンマーがあればそれにする（柄 +Z、頭の中心 z = 1.05、頭は縦向き＝今の角ばったハンマーと同じ置き方）
+        var model = ToyKit.CreateHammerModel("HammerHead", HammerModelFor(color));   // そのだるまのキャラのハンマー
+        if (model != null)
+        {
+            model.SetParent(p.hammer, false);
+            model.localRotation = Quaternion.Euler(0f, 0f, 90f);   // 頭を X 向きから Y 向きへ
+            model.localScale = Vector3.one * (1.05f / ToyKit.HammerLength);
+            // キャラのハンマーがあればその色のまま。無いときだけ、ライバルは紫の頭・金の帯にする
+            if (rivalHammer && HammerModelFor(color) == null) ApplyRivalHammer(p.hammer);
+        }
+        else
+        {
         var handle = ToyKit.Primitive(PrimitiveType.Cube, "Handle", p.hammer);
         handle.localScale = new Vector3(0.08f, 0.08f, 1f);
         handle.localPosition = new Vector3(0f, 0f, 0.5f);
@@ -686,6 +699,7 @@ public partial class ClubOpeningMovie
                 band.localPosition = new Vector3(0f, y, 1.05f);
             }
             ApplyRivalHammer(p.hammer);
+        }
         }
         // 走ったあとの煙
         p.trail = p.root.gameObject.AddComponent<TrailRenderer>();
@@ -724,6 +738,7 @@ public partial class ClubOpeningMovie
         var b = ToyKit.Primitive(PrimitiveType.Cylinder, "MatchTumiki", matchRoot);
         b.localScale = new Vector3(1f, GBlockH * 0.5f, 1f);
         b.GetComponent<Renderer>().sharedMaterial = ToyKit.Lit(TumikiColorUtil.ToUnityColor(color), 0.55f);
+        UseTsumikiModel(b, TumikiColorUtil.ToUnityColor(color), true);   // 試合と同じ積み木のモデルに
         return b;
     }
 

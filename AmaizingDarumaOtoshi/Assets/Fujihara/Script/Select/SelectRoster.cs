@@ -6,7 +6,21 @@ using UnityEngine;
 public class SelectRoster : ScriptableObject
 {
     public List<CharacterData> characters = new List<CharacterData>();
+
+    [Tooltip("キャラクターセレクトとずかんに並べる順（左上から右へ。ドラッグで並べ替えられる）。空なら characters の順。" +
+             "ここに無いキャラは並ばない（縦横のマスの数は SelectScene の MatchSelect で決める）")]
+    public List<CharacterData> characterOrder = new List<CharacterData>();
+
     public List<StageData> stages = new List<StageData>();
+
+    // 画面に並べるキャラ：characterOrder（空なら characters）の順に、空欄と重なりを除いたもの
+    public List<CharacterData> OrderedCharacters()
+    {
+        var source = characterOrder != null && characterOrder.Count > 0 ? characterOrder : characters;
+        var list = new List<CharacterData>();
+        if (source != null) foreach (var c in source) if (c != null && !list.Contains(c)) list.Add(c);
+        return list;
+    }
 
     // ステージセレクト（ローカル）の動かせるプレビュー。メニュー「Fujihara > ステージ一覧を更新」で AllStages から自動で作る
     // （StageData は Nakagawa のフォルダにあるので、こちらに id で持つ）

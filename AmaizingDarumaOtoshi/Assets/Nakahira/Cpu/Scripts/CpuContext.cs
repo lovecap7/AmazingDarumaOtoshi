@@ -21,6 +21,14 @@ namespace Nakahira
         public bool IsPlayful => StackCount >= Params.PlayfulStack;
         public Vector3 Position => Self.transform.position;
 
+        // 積める段数の上限(だるきんぐは 2 段。ほかのキャラは上限なし)
+        public int StackLimit => m_kingPassive != null ? m_kingPassive.MaxStack : int.MaxValue;
+        // 上限まで積んでいる(だるきんぐの 2 段)。これ以上拾わない(積む・殴りながら積む・逃げながら拾う・ジャンプ乗りをしない)
+        public bool IsStackFull => StackCount >= StackLimit;
+        // ここまで積んだら積むのをやめる段数(CollectUntil と積める上限の小さい方)
+        public int CollectUntil => Mathf.Min(Params.CollectUntil, StackLimit);
+        Yurube.DaruKingPassive m_kingPassive;
+
         // きだるの黄金化(無敵＋速さ 1.5 倍)の残り時間(秒。黄金化していなければ 0)
         // 黄金化中は逃げない・弾に反応しない・相手の振りをかわさずに攻め続ける・無敵で防げる危ない場所を気にしない
         public float GoldenRemaining => m_kidaru != null && m_kidaru.IsActive && Self.IsInvincible ? m_kidaru.RemainingSeconds : 0.0f;
@@ -37,11 +45,14 @@ namespace Nakahira
                 float t = GoldenRemaining;
                 // いわだるは落ちたあとも 1.4 秒以上無敵が続く(IwadaruSpecial.TryActivate)。余裕を見て 1 秒足す
                 if (m_iwadaru != null && m_iwadaru.IsActive && Self.IsInvincible) t = Mathf.Max(t, m_iwadaru.TimeToImpact + 1.0f);
+                // だるきんぐは詠唱〜斬ったあとまで無敵(歩けない)。詠唱中は残りのため＋カットインと斬る演出の分、そのあとは 1 秒と見ておく
+                if (m_daruking != null && m_daruking.IsActive && Self.IsInvincible) t = Mathf.Max(t, m_daruking.ChargeRemaining + 1.0f);
                 return t;
             }
         }
         public bool IsSpecialInvincible => SpecialInvincibleRemaining > 0.0f;
         Yurube.IwadaruSpecial m_iwadaru;
+        Yurube.DaruKingSpecial m_daruking;
 
         // へびだるの毒沼が出ている(カットイン中も含む)。この間は、反転している敵から逃げず、段数が不利でも殴りに行く
         public bool IsSwampOut => m_hebidaru != null && m_hebidaru.IsActive;
@@ -89,6 +100,8 @@ namespace Nakahira
                 m_kidaru = self != null ? self.GetComponent<Yurube.KidaruSpecial>() : null;
                 m_iwadaru = self != null ? self.GetComponent<Yurube.IwadaruSpecial>() : null;
                 m_hebidaru = self != null ? self.GetComponent<Yurube.HebidaruSpecial>() : null;
+                m_daruking = self != null ? self.GetComponent<Yurube.DaruKingSpecial>() : null;
+                m_kingPassive = self != null ? self.GetComponent<Yurube.DaruKingPassive>() : null;
             }
             Params = p;
             DeltaTime = dt;

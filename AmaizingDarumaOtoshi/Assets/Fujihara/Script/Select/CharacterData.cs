@@ -16,6 +16,8 @@ public class CharacterData : ScriptableObject
     public Sprite portrait;
     [Tooltip("キャラの3Dモデル（Blender で作っただるま。足元が原点）。メニュー「Fujihara > キャラの顔写真を撮る」で、このモデルを撮って portrait に入れる")]
     public GameObject model;
+    [Tooltip("キャラのハンマーのモデル（Model/Hammer/hammer_<id>.fbx）。試合・タイトル・ムービーで、このキャラが持つハンマーになる（空なら共通のハンマー）")]
+    public GameObject hammerModel;
 
     // セレクト画面・ずかんのアイコンの背景。どのキャラも灰色（だるまの色が映えるように。color は使わない）
     public static readonly Color IconBackground = new Color(0.66f, 0.66f, 0.68f);

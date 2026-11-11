@@ -50,6 +50,16 @@ public class MatchSelect : MonoBehaviour
     [Tooltip("オン：全員が投票して抽選で決める（オンライン用）。オフ：1P だけがえらび、左に動かせるプレビューが出る（ローカル）")]
     [SerializeField] bool stageVote = false;
 
+    [Header("キャラクターセレクトの並べ方（並び順は SelectRoster の Character Order。ずかんと同じ）")]
+    [Tooltip("横に並べるマスの数（列）。例：4 なら「赤 青 緑 黄 ／ 岩 蛇 …」、3 なら「赤 青 緑 ／ 黄 岩 蛇 …」")]
+    [SerializeField, Range(1, 12)] int characterColumns = 8;
+    [Tooltip("縦に並べるマスの数（行）。0 ならキャラの数から自動。足りないときは自動で増える。行が多いほどマスは小さくなる")]
+    [SerializeField, Range(0, 6)] int characterRows = 0;
+    [Tooltip("最後に「ランダム」のマスを出す")]
+    [SerializeField] bool showRandomCharacter = true;
+    [Tooltip("オン：最後の行（マスが足りない行）を真ん中にそろえる　オフ：左にそろえる（空いたところは右に残る）")]
+    [SerializeField] bool centerLastCharacterRow = true;
+
     [Header("ステージセレクトの並べ方")]
     [Tooltip("並べるステージ（この順に並ぶ）。空なら SelectRoster のステージ（中川さんの StageSelectList から「Fujihara > ステージ一覧を更新」で作る一覧）を全部")]
     [SerializeField] List<StageData> stageList = new List<StageData>();
@@ -825,7 +835,9 @@ public class MatchSelect : MonoBehaviour
         var p = new Player { index = i, cpuLevel = Mathf.Clamp(level, 1, MatchSetup.MaxCpuLevel) };
         p.charToken = MakeToken(p, charRoot);
         slots[i] = p;
-        SetCharacter(p, charTiles.Find(t => t.random));
+        // 最初はランダムのマス（ランダムを出していなければ、左上のキャラ）
+        var first = charTiles.Find(t => t.random) ?? (charTiles.Count > 0 ? charTiles[0] : null);
+        if (first != null) SetCharacter(p, first);
         Debug.Log($"{p.Label} CPU Lv{level}");
         return p;
     }
@@ -1724,9 +1736,11 @@ public class MatchSelect : MonoBehaviour
         ToyKit.Stretch(battleButtonText.rectTransform);
 
         // 報酬キャラクター（だるきんぐ）は、実績を全部解除するまで一覧に出さない
-        var characters = Yurube.Achievements.AchievementRewards.AvailableCharacters(roster.characters);
-        int count = characters.Count + 1;   // 最後にランダム
-        var grid = GridLayout(count, 8, new Vector2(1760f, 430f), new Vector2(205f, 205f), 16f, 350f);
+        // 並べるキャラ：SelectRoster の characterOrder（空なら全キャラ）の順。ずかんも同じ順
+        var characters = Yurube.Achievements.AchievementRewards.AvailableCharacters(roster.OrderedCharacters());
+        int count = characters.Count + (showRandomCharacter ? 1 : 0);   // 最後にランダム
+        var grid = GridLayout(count, characterColumns, new Vector2(1760f, 430f), new Vector2(205f, 205f), 16f, 350f,
+                              characterRows > 0 ? characterRows : 0, centerLastCharacterRow, characterRows > 0 || !centerLastCharacterRow);
         for (int i = 0; i < count; i++)
         {
             bool random = i == characters.Count;
@@ -1981,12 +1995,14 @@ public class MatchSelect : MonoBehaviour
 
     // 数に合わせてマスの大きさと並びを決める（入りきらなければ小さくする）
     // fixedRows > 0 のときは「maxCols 列 × fixedRows 行」のマス目の大きさで並べる（マスが足りなければ行を増やす）
-    static Cell[] GridLayout(int count, int maxCols, Vector2 area, Vector2 maxSize, float gap, float top, int fixedRows = 0)
+    // centerLast：最後の行（マスが足りない行）を真ん中にそろえる（false なら左にそろえる）
+    // keepCols：マスが列の数より少なくても、列の数ぶんのマス目で並べる（左上から詰める）
+    static Cell[] GridLayout(int count, int maxCols, Vector2 area, Vector2 maxSize, float gap, float top, int fixedRows = 0, bool centerLast = true, bool keepCols = false)
     {
-        int cols = fixedRows > 0 ? Mathf.Max(1, maxCols) : Mathf.Max(1, Mathf.Min(count, maxCols));
+        int cols = fixedRows > 0 || keepCols ? Mathf.Max(1, maxCols) : Mathf.Max(1, Mathf.Min(count, maxCols));
         int rows = Mathf.Max(fixedRows, Mathf.CeilToInt(count / (float)cols));
         if (fixedRows > 0 && rows > fixedRows)
-            Debug.LogWarning($"MatchSelect：ステージのマス {count} 個が {cols}×{fixedRows} に入りきらないので、{rows} 行にしました");
+            Debug.LogWarning($"MatchSelect：マス {count} 個が {cols}×{fixedRows} に入りきらないので、{rows} 行にしました");
         float scale = Mathf.Min(1f,
             (area.x - gap * (cols - 1)) / (cols * maxSize.x),
             (area.y - gap * (rows - 1)) / (rows * maxSize.y));
@@ -1995,7 +2011,7 @@ public class MatchSelect : MonoBehaviour
         for (int i = 0; i < count; i++)
         {
             int col = i % cols, row = i / cols;
-            int inRow = Mathf.Min(cols, count - row * cols);   // 最後の行は中央寄せ
+            int inRow = centerLast ? Mathf.Min(cols, count - row * cols) : cols;   // 最後の行は中央寄せ（左寄せなら全行同じ位置）
             cells[i].pos = new Vector2((col - (inRow - 1) * 0.5f) * (size.x + gap), top - size.y * 0.5f - row * (size.y + gap));
             cells[i].size = size;
         }

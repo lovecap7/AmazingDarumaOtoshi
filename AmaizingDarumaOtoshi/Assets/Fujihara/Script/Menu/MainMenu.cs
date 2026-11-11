@@ -171,6 +171,9 @@ public class MainMenu : MonoBehaviour
     [Header("モデル（タイトルと同じものを入れる）")]
     [Tooltip("山のてっぺんに乗る頭（だるまのモデル。足元が原点）。空なら黄色いスマイル")]
     [SerializeField] GameObject headModel;
+    [Tooltip("オン：開くたびに、SelectRoster のキャラ（モデルのあるもの）からランダムに1体選び、その頭と、そのキャラのハンマー（カーソル）を出す。" +
+             "オフ：上の Head Model と、共通のカーソルのハンマー（GameModelSettings）")]
+    [SerializeField] bool randomDaruma = true;
     [SerializeField] float headModelHeight = 0.85f;
     [Tooltip("頭のモデルの向き（Y 軸まわり）。顔がカメラを向くように合わせる")]
     [SerializeField] float headModelYaw = 180f;
@@ -222,7 +225,11 @@ public class MainMenu : MonoBehaviour
     // 看板に操作画面が出る（叩くと看板の上に乗る）種類
     static bool IsPanelKind(ItemKind k) => k == ItemKind.Battle || k == ItemKind.Settings || k == ItemKind.Sound || k == ItemKind.Video;
 
-    static readonly Vector3 BlockSize = new Vector3(2.6f, 0.72f, 1.1f);
+    static readonly Vector3 BaseBlockSize = new Vector3(2.6f, 0.72f, 1.1f);
+    [Tooltip("左に積んである項目の積み木（たたかう など）の大きさ。1 で元の大きさ。文字・頭・ハンマーの位置も合わせて変わる")]
+    [SerializeField, Range(0.5f, 1.3f)] float blockScale = 0.9f;
+    Vector3 BlockSize => BaseBlockSize * blockScale;
+    Vector2 BlockTextBox => new Vector2(2.3f, 0.6f) * blockScale;
     const float BoardDepth = 0.3f;
     const float CanvasScale = 0.005f;   // 看板の UI：1ピクセル = 5mm
     const float FlyTime = 0.6f, HangTime = 0.05f, DropTime = 0.12f, ReturnTime = 0.55f;
@@ -449,7 +456,7 @@ public class MainMenu : MonoBehaviour
         for (int i = 0; i < n; i++)
         {
             blockColors[i] = colors[i % colors.Length];
-            blocks[i] = ToyKit.CreateBlock(ItemAt(i) != null ? ItemAt(i).label : "", blockColors[i], menuMesh, new Vector2(2.3f, 0.6f), BlockSize.z, font, letterMat, out blockMats[i]);
+            blocks[i] = ToyKit.CreateBlock(ItemAt(i) != null ? ItemAt(i).label : "", blockColors[i], menuMesh, BlockTextBox, BlockSize.z, font, letterMat, out blockMats[i]);
             if (UseBlockModel(blocks[i], ref blockMats[i], i % colors.Length)) blockColors[i] = Color.white;   // 色はテクスチャにあるので、暗くするときは白を基準にする
             blocks[i].SetParent(space, false);
             blocks[i].gameObject.AddComponent<BoxCollider>().size = BlockSize;
@@ -466,7 +473,7 @@ public class MainMenu : MonoBehaviour
         choiceLanded = new bool[2];
         for (int i = 0; i < 2; i++)
         {
-            choiceBlocks[i] = ToyKit.CreateBlock(At(texts.choiceLabels, i), choiceColors[i], menuMesh, new Vector2(2.3f, 0.6f), BlockSize.z, font, letterMat, out choiceMats[i]);
+            choiceBlocks[i] = ToyKit.CreateBlock(At(texts.choiceLabels, i), choiceColors[i], menuMesh, BlockTextBox, BlockSize.z, font, letterMat, out choiceMats[i]);
             UseBlockModel(choiceBlocks[i], ref choiceMats[i], i == 0 ? 0 : 5);
             choiceBlocks[i].SetParent(space, false);
             choiceBlocks[i].gameObject.AddComponent<BoxCollider>().size = BlockSize;
@@ -474,15 +481,28 @@ public class MainMenu : MonoBehaviour
             choiceScale[i] = 1f;
         }
 
+        // 頭とカーソルのハンマー：ランダムなら、選んだキャラの頭とそのキャラのハンマー（組で出す）
+        var pick = randomDaruma ? PickDaruma() : null;
+        var head = pick != null ? pick.model : headModel;
+        var cursorHammer = pick != null && pick.hammerModel != null ? pick.hammerModel : GameModelSettings.CursorHammer;
         face = ToyKit.CreateHead();
-        ToyKit.AttachHeadModel(face.root, headModel, headModelHeight, headModelYaw);   // 空ならスマイルのまま
+        ToyKit.AttachHeadModel(face.root, head, headModelHeight, headModelYaw);   // 空ならスマイルのまま
         face.root.SetParent(space, false);
-        hammer = ToyKit.CreateHammer();
+        hammer = ToyKit.CreateHammer(cursorHammer);
         hammer.SetParent(space, false);
         hammer.localScale = Vector3.one * hammerScale;
 
         BuildBoard();
         BuildOverlay();
+    }
+
+    // ランダムに選ぶだるま：SelectRoster の並び（キャラクターセレクトと同じ）のうち、頭のモデルがあり、選べるようになっているキャラ
+    CharacterData PickDaruma()
+    {
+        if (roster == null) return null;
+        var list = Yurube.Achievements.AchievementRewards.AvailableCharacters(roster.OrderedCharacters())
+            .FindAll(c => c != null && c.model != null);
+        return list.Count > 0 ? list[UnityEngine.Random.Range(0, list.Count)] : null;
     }
 
     // 積み木の本体をタイトルと同じモデルにする（横長の楕円の円柱。大きさは今の積み木と同じ）。差し替えたら true
@@ -491,7 +511,7 @@ public class MainMenu : MonoBehaviour
         if (blockModelMesh == null || blockModelMaterials == null || blockModelMaterials.Length == 0) return false;
         var src = blockModelMaterials[paletteIndex % blockModelMaterials.Length];
         if (src == null) return false;
-        mat = ToyKit.UseBlockModel(block, mat, blockModelMesh, src, BlockSize, blockModelTextWidth);
+        mat = ToyKit.UseBlockModel(block, mat, blockModelMesh, src, BlockSize, blockModelTextWidth * blockScale);
         return true;
     }
 

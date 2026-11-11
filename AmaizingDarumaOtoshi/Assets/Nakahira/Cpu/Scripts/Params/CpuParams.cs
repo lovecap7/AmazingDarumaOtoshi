@@ -291,6 +291,10 @@ namespace Nakahira
         [Tooltip("この距離(m)以内で、間に壁のない敵がいたら、そちらへ向き直って撃つ(どの状態の最中でも)。狙いのぶれは股抜きショットと同じ")]
         [Min(0.0f)] public float TronRange = 12.0f;
 
+        [Header("必殺技:だるきんぐのエクスカリバー(ため中に向きを決める。線の上の敵は即死)")]
+        [Tooltip("線の中心から左右この距離(m)以内に 2 人(1 対 1 なら 1 人)入ったら、ため中に確定する。撃ち始めは線の太さ全体で数える")]
+        [Min(0.0f)] public float ExcaliburConfirmHalfWidth = 0.8f;
+
         [Header("必殺技:あおだるの六腕(暗転返し・とっさの六腕)")]
         [Tooltip("暗転返し:みだるのファンネルのカットイン中に六腕で返す確率(余裕(1 − 集中度の割合)を掛けて使う)")]
         [Range(0.0f, 1.0f)] public float BlackoutCounterChance = 0.6f;

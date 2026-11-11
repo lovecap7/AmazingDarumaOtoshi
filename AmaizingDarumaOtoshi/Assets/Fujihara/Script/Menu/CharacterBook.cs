@@ -5,7 +5,7 @@ using UnityEngine.UI;
 
 // メニューの「ずかん」。キャラクターを左の一覧から選ぶと、右に名前・パッシブ・必殺技が出る（ハンマー性能は今は性能差が無いので出さない）。
 // 上下：えらぶ　B / Esc / 右クリック：とじる。一覧はクリックでも選べる
-// 中身は CharacterData（SelectRoster.characters の順）。MainMenu が組み立てて Open() で開く
+// 中身は CharacterData（SelectRoster.characterOrder の順。キャラクターセレクトと同じ）。MainMenu が組み立てて Open() で開く
 [RequireComponent(typeof(CanvasGroup))]
 public class CharacterBook : MonoBehaviour
 {
@@ -56,7 +56,7 @@ public class CharacterBook : MonoBehaviour
         this.uiSprite = uiSprite;
         this.knobSprite = knobSprite;
         this.texts = texts ?? new Texts();
-        characters = roster != null ? roster.characters.FindAll(c => c != null) : new List<CharacterData>();
+        characters = roster != null ? roster.OrderedCharacters() : new List<CharacterData>();   // キャラクターセレクトと同じ順
         group = GetComponent<CanvasGroup>();
         Build();
         Apply();

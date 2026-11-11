@@ -18,6 +18,9 @@ namespace Yurube
         DarumaCharacter m_character;
         bool m_reportedPassive;
 
+        // 積める段数の上限(CPU が上限を越えて拾わないための読み取り用。CPU 用(中平))
+        public int MaxStack => m_maxStack;
+
         private void Awake()
         {
             m_character = GetComponent<DarumaCharacter>();
