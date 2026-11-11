@@ -51,6 +51,14 @@ namespace Yurube
 
         public bool IsActive => m_state != State.Idle || m_swamp != null;
 
+        // CPU 用(中平): 積み木 blocks 個で撃ったときの毒沼の半径(m。TryActivate と同じ計算)
+        public float PredictRadius(int blocks)
+        {
+            int n = Mathf.Clamp(blocks, 1, m_maxBlocks);
+            float t = m_maxBlocks > 1 ? Mathf.InverseLerp(1.0f, m_maxBlocks, n) : 1.0f;
+            return Mathf.Lerp(m_minSwampRadius, m_maxSwampRadius, t) * Mathf.Max(0.1f, m_swampRadiusScale);
+        }
+
         private void Awake()
         {
             m_character = GetComponent<DarumaCharacter>();

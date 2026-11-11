@@ -174,6 +174,13 @@ namespace Yurube
         // ---- CPU が予告円を避けるための読み取り用(中平追加。動きには関係しない) ----
         // 発動したキャラクター(隕石はこのキャラクターには当たらない)
         public DarumaCharacter Caster => m_character;
+        // 積み木 blocks 個で撃ったときの予告円の半径(m。TryActivate と同じ計算)
+        public float PredictRadius(int blocks)
+        {
+            int n = Mathf.Clamp(blocks, 1, m_maxBlocks);
+            float t = m_maxBlocks > 1 ? Mathf.InverseLerp(1.0f, m_maxBlocks, n) : 1.0f;
+            return Mathf.Lerp(m_minRadius, m_maxRadius, t) * Mathf.Max(0.1f, m_attackRadiusScale);
+        }
         // 予告円が出ていて、これから隕石が落ちるか(カウントダウン〜落下中)
         public bool IsThreatening => m_state == State.Countdown || m_state == State.Rising
             || m_state == State.CutIn || m_state == State.Falling;

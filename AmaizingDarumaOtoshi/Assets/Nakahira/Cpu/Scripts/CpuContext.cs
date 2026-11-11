@@ -28,6 +28,27 @@ namespace Nakahira
         Yurube.KidaruSpecial m_kidaru;
         DarumaCharacter m_kidaruOwner;
 
+        // 必殺技で無敵になっている残り時間の見込み(秒)。きだるの黄金化・いわだるの隕石(カウントダウン〜落ちたあとまで無敵)
+        // この間は逃げない・弾に反応しない・無敵で防げる危ない場所を気にしない
+        public float SpecialInvincibleRemaining
+        {
+            get
+            {
+                float t = GoldenRemaining;
+                // いわだるは落ちたあとも 1.4 秒以上無敵が続く(IwadaruSpecial.TryActivate)。余裕を見て 1 秒足す
+                if (m_iwadaru != null && m_iwadaru.IsActive && Self.IsInvincible) t = Mathf.Max(t, m_iwadaru.TimeToImpact + 1.0f);
+                return t;
+            }
+        }
+        public bool IsSpecialInvincible => SpecialInvincibleRemaining > 0.0f;
+        Yurube.IwadaruSpecial m_iwadaru;
+
+        // へびだるの毒沼が出ている(カットイン中も含む)。この間は、反転している敵から逃げず、段数が不利でも殴りに行く
+        public bool IsSwampOut => m_hebidaru != null && m_hebidaru.IsActive;
+        Yurube.HebidaruSpecial m_hebidaru;
+        // 自分の毒沼で反転している敵か(へびだるの毒沼が出ている間だけ true)
+        public bool IsTrapped(CpuOpponent o) => IsSwampOut && o != null && !o.IsGhost && o.Character != null && o.Character.MovementInverted;
+
         // 集中度(認識の疲れ)。出来事(弾に反応した・攻撃を受けた等)のたびに足され、時間で減る
         // 判定には「疲れ ÷ 容量」の割合(LoadRatio)を使う。うまい CPU ほど容量が大きく、割合が上がりにくい
         //  ・割合が高いほど、弾・相手の振りに反応できる確率が下がる
@@ -66,6 +87,8 @@ namespace Nakahira
             {
                 m_kidaruOwner = self;
                 m_kidaru = self != null ? self.GetComponent<Yurube.KidaruSpecial>() : null;
+                m_iwadaru = self != null ? self.GetComponent<Yurube.IwadaruSpecial>() : null;
+                m_hebidaru = self != null ? self.GetComponent<Yurube.HebidaruSpecial>() : null;
             }
             Params = p;
             DeltaTime = dt;

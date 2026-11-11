@@ -256,6 +256,29 @@ namespace Nakahira
         [Tooltip("ゲージが満タンになったとき、撃ちどころを待たずにすぐ撃ってしまう確率")]
         [Range(0.0f, 1.0f)] public float SpecialRashChance = 0.0f;
 
+        [Header("必殺技:状態「必殺技」(撃てる所まで近づく。今はみだる)")]
+        [Tooltip("状態「必殺技」の点数(殴る・撃つより高く、逃げるより低い)")]
+        [Range(0.0f, 1.0f)] public float SpecialStateScore = 0.7f;
+        [Tooltip("この時間(秒)たっても撃てなければ、状態「必殺技」を終える(すぐまた入ってよい)")]
+        [Min(0.1f)] public float SpecialGiveUpTime = 5.0f;
+
+        [Tooltip("撃ったあとについていく間(いわだるのカウントダウン)の状態「必殺技」の点数(UrgentScore より高くして、すぐ切り替える)")]
+        [Range(0.0f, 1.0f)] public float SpecialFollowScore = 0.9f;
+
+        [Header("必殺技:いわだるの隕石(自分中心の円。3 秒のカウントダウンの間は円がついてくる)")]
+        [Tooltip("狙う敵(一番積み木を積んでいる敵)が、円の半径 × この割合 以内に入ったら撃つ")]
+        [Range(0.0f, 1.0f)] public float MeteorFireRadiusRatio = 0.5f;
+        [Tooltip("狙う敵より自分の方が速いとき(カウントダウンの間に追いつける)は、円の半径 × この割合 以内で撃つ")]
+        [Range(0.0f, 1.0f)] public float MeteorFastFireRadiusRatio = 0.9f;
+
+        [Header("必殺技:へびだるの毒沼(自分中心の円。8 秒ついてくる。入った敵は遅くなり、移動が反転する)")]
+        [Tooltip("狙う敵(一番段数が少ない敵)が「沼の半径 + この距離(m)」以内に入ったら撃ち、そのまま追って沼に飲み込む")]
+        [Min(0.0f)] public float SwampFireMargin = 4.0f;
+
+        [Header("必殺技:みだるのファンネル(積んでいた数に分裂して、近い敵から順に追う)")]
+        [Tooltip("一番近い敵がこの距離(m)以内で、間に壁がなければ、そちらへ向き直って撃つ(どの状態の最中でも)")]
+        [Min(0.0f)] public float FunnelRange = 8.0f;
+
         [Header("必殺技:きだるの黄金化(無敵＋速さ 1.5 倍)")]
         [Tooltip("攻めに行くの最中は、相手までの道の距離がこれ(m)以内になったら撃つ(殴るに入ったらすぐ撃つ)")]
         [Min(0.0f)] public float GoldenFireDistance = 8.0f;

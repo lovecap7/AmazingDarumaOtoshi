@@ -313,7 +313,8 @@ namespace Nakahira
             {
                 if (o.IsGhost || o.IsInvincible) continue;
                 if (o.PathDistance > c.Params.MeleeEnterDistance) continue;
-                if (o.StackDiff <= -c.Params.FleeStackGap && !c.IsGolden) continue;   // 黄金化中は不利な相手にも殴りかかる
+                // 黄金化中・自分の毒沼で反転している敵には、不利でも殴りかかる
+                if (o.StackDiff <= -c.Params.FleeStackGap && !c.IsGolden && !c.IsTrapped(o)) continue;
                 if (IsExposed(c, o)) continue;   // 首だけのときは、背を向けている相手だけ
                 if (InHazard(c, o)) continue;    // 危ない場所の中・向こう側の相手には行かない
                 float score = CpuAttackTarget.Score(c, o, o.PathDistance);
@@ -331,7 +332,7 @@ namespace Nakahira
         {
             if (o == null || o.IsGhost || o.IsInvincible || o.Character == null) return false;
             CpuParams p = c.Params;
-            if (o.StackDiff <= -p.FleeStackGap && !c.IsGolden) return false;  // 不利になった(逃げる。黄金化中は続ける)
+            if (o.StackDiff <= -p.FleeStackGap && !c.IsGolden && !c.IsTrapped(o)) return false;  // 不利になった(逃げる。黄金化中・反転中の敵なら続ける)
             if (o.PathDistance > p.MeleeChaseDistance) return false;          // 離れた
             if (InHazard(c, o)) return false;                                 // 危ない場所の中・向こう側へ行った
             // 首だけで振り向かれた:相手の間合いの外まで離れたら終わる
