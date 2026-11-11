@@ -188,6 +188,7 @@ namespace Yurube
             foreach (var character in FindObjectsByType<DarumaCharacter>(FindObjectsInactive.Exclude))
             {
                 if (character == null || character == m_owner) continue;
+                if (DarumaMatch.AreFriends(m_owner, character)) continue;   // チーム戦:味方には効かない(中平)
 
                 Vector3 delta = character.transform.position - transform.position;
                 delta.y = 0.0f;

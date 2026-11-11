@@ -186,6 +186,7 @@ namespace Yurube
             foreach (var character in FindObjectsByType<DarumaCharacter>(FindObjectsInactive.Exclude))
             {
                 if (character == null || character == m_character) continue;
+                if (DarumaMatch.AreFriends(m_character, character)) continue;   // チーム戦:味方は追わない(中平)
                 enemies.Add(character);
             }
 

@@ -703,6 +703,7 @@ namespace Yurube
             {
                 if (character == null || character == m_character) continue;
                 if (character.IsInvincible) continue;
+                if (DarumaMatch.AreFriends(m_character, character)) continue;   // チーム戦:味方には当たらない(中平)
 
                 Vector3 delta = character.transform.position - m_attackOrigin;
                 delta.y = 0.0f;

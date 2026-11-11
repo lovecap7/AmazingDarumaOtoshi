@@ -1232,6 +1232,12 @@ namespace Nakahira
             return null;
         }
 
+        // 試合中で、攻撃する側と、される側が味方か(試合の外(ラボ)では false)。必殺技・ホーミングから使う
+        public static bool AreFriends(IDarumaAttacker attacker, DarumaCharacter victim)
+        {
+            return Current != null && Current.IsFriendly(attacker, victim);
+        }
+
         // 攻撃する側と、される側が味方か(チーム戦で、別の人で、同じチーム)
         public bool IsFriendly(IDarumaAttacker attacker, DarumaCharacter victim)
         {
