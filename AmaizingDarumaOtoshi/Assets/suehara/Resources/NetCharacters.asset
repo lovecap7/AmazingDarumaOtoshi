@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f528f3666d2a09d4d8bed1d41b1fa32f, type: 3}
+  m_Name: NetCharacters
+  m_EditorClassIdentifier: Assembly-CSharp::NetCharacterList
+  entries:
+  - character: {fileID: 11400000, guid: 7ffcf080adad0f64380e6846824a2978, type: 2}
+    netPrefab: {fileID: 2753810390526799817, guid: 7a58ebc4ebf1f584a8200f677de105f4, type: 3}
+  - character: {fileID: 11400000, guid: 9fc5324d816f46cb80cbe99a1d9c3a1a, type: 2}
+    netPrefab: {fileID: 6466798695997517278, guid: 83a9a0d7750f21642b02d38d2ee7ceb6, type: 3}
+  - character: {fileID: 11400000, guid: 9588c7355b504c679a28f0edc20286ae, type: 2}
+    netPrefab: {fileID: 8429103937018006007, guid: 79b1291dd54e6ae4482c7d0421330e8f, type: 3}
+  - character: {fileID: 11400000, guid: 2b5708eb758d4e6cba69b6f25708a191, type: 2}
+    netPrefab: {fileID: 4869233315688891701, guid: 57eda204efd21c0449ca8e23714bf9ae, type: 3}
+  - character: {fileID: 11400000, guid: 880980730b0e8834b8ebf9e6632fbe19, type: 2}
+    netPrefab: {fileID: 7076798801522861260, guid: eea3dc3b1d7d52e49a440f0d06f02c74, type: 3}
+  - character: {fileID: 11400000, guid: 131e300f47642b649a73e705bc310b6e, type: 2}
+    netPrefab: {fileID: 0}
+  - character: {fileID: 11400000, guid: 6861391686e2281499c7e378c84ec6e1, type: 2}
+    netPrefab: {fileID: 0}
+  - character: {fileID: 11400000, guid: 30b06d92798c28b4698825cb71668ff9, type: 2}
+    netPrefab: {fileID: 0}
+  - character: {fileID: 11400000, guid: e43cc62756685ffd67cfbe3f5daee82e, type: 2}
+    netPrefab: {fileID: 709945691102349937, guid: 696cd56a9c877994eb70c6fbbff481d7, type: 3}
+  - character: {fileID: 11400000, guid: 1f06724f149cbe7e579c84eb0b14933a, type: 2}
+    netPrefab: {fileID: 8278863396553816243, guid: c51b99446bd2451469cd1d8e0c9d8fa2, type: 3}

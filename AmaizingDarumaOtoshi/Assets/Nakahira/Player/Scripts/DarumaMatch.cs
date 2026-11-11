@@ -1019,6 +1019,35 @@ namespace Nakahira
             else CheckLastOne();
         }
 
+        // ホスト: 開始待ちの間に、キャラを変えた人の体を出し直す(いまの場所に、いまの Entry.character のキャラで出す)
+        // 積んでいた積み木は、同じ順番のまま新しい体に積み替える(積み木は体の子なので、そのままだと取り残される)
+        public void NetRespawnPlayer(MatchPlayer p)
+        {
+            if (m_net == null || !m_net.IsServer || !IsNetWaiting || !m_players.Contains(p)) return;
+            var old = p.Character;
+            Vector3 pos = old != null ? old.transform.position : FarthestSpawnPoint(p);
+            Quaternion rot = old != null ? old.transform.rotation : Quaternion.identity;
+            var blocks = new List<TumikiBlock>();
+            if (old != null)
+            {
+                // 上の段から順に(AddBottom で下に足していくと、元と同じ並びになる)
+                for (int i = old.Stack.Count - 1; i >= 0; i--) blocks.Add(old.Stack.Get(i));
+                m_owners.Remove(old);
+                foreach (var b in blocks) b.transform.SetParent(null, true);
+                Destroy(old.gameObject);
+            }
+            if (p.Ghost != null) Destroy(p.Ghost.gameObject);
+            m_appearing.RemoveAll(a => a.player == p);
+            SpawnMatchCharacter(p, pos, false);
+            if (p.Character != null)
+            {
+                // 向きも元の体にそろえる
+                if (old != null) p.Character.Teleport(pos, Mathf.DeltaAngle(p.Character.transform.eulerAngles.y, rot.eulerAngles.y));
+                foreach (var b in blocks) if (b != null) p.Character.Stack.AddBottom(b);
+            }
+            Debug.Log($"[DarumaMatch] {p.Label} のキャラを {(p.CharacterData != null ? p.CharacterData.displayName : "-")} に変えた");
+        }
+
         // ホスト: 試合を始める(やり直す)。全員を最初の状態に戻して出現ポイントに出し直し、カウントダウンから始める
         public void BeginNetMatch()
         {

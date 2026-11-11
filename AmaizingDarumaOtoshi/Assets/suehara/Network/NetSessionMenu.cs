@@ -8,8 +8,9 @@ using UnityEngine.UI;
 // ネット対戦の試合のシーン(NetStages)で、つないでいる間に出す表示とメニュー。NetLobbyUI が自動で付ける。
 //  ・右上: いまの試合の設定(モード・ストック・時間)・へやばんごう・人数(見るだけ。クリックはしない)
 //  ・Start(+ / キーボードは Tab)でメニューを開く。見た目は試合のポーズ画面(PauseMenu)と同じ
-//      ホスト(開始待ち): 試合を はじめる / モード / ストック / 時間 / へやを かいさん / とじる
-//      ホスト(試合中) ・さんか: へやを かいさん(ぬける) / とじる
+//      ホスト(開始待ち): 試合を はじめる / キャラクター / モード / ストック / 時間 / へやを かいさん / とじる
+//      ホスト(試合中) ・さんか: キャラクター / へやを かいさん(ぬける) / とじる
+//    キャラクター: 自分のキャラを選ぶ画面を開く(だれでも。開始待ちの間だけ。選ぶとその場で体が入れ替わる。NetMatchPlayer.RequestCharacter)
 //    ↑↓：えらぶ　←→：かえる　A：決定　B / Start：とじる。かいさん・ぬけるは「はい / いいえ」で確かめる
 //  ・メニューを開いている間は、キャラクターの操作(NetPadKeyboardInput)とステージの切り替え(左右キー)を止める
 // ホストが変えた設定はすぐ NetMatch に入れるので、さんかした人の右上にも同じ設定が出る。
@@ -37,7 +38,7 @@ public class NetSessionMenu : MonoBehaviour
     // メニューを開いているか(開いている間はキャラクターを動かさない)
     public static bool IsOpen { get; private set; }
 
-    enum Item { Start, Mode, Stocks, Time, Leave, Close }
+    enum Item { Start, Character, Mode, Stocks, Time, Leave, Close }
 
     NetworkManager m_nm;
     TMP_FontAsset m_font;
@@ -73,6 +74,15 @@ public class NetSessionMenu : MonoBehaviour
         "StageSwitcher", "TumikiImpactModeToggle", "SpawnPointDebugView", "StageCameraTuner", "CharacterLabUI",
     };
     readonly List<MonoBehaviour> m_hidden = new List<MonoBehaviour>();
+
+    // ---- キャラクターを選ぶ画面 ----
+    const int kPickColumns = 5;
+    class Card { public Image bg, icon; public TextMeshProUGUI letter, name; public RectTransform now; }
+    RectTransform m_picker;
+    readonly List<Card> m_cards = new List<Card>();
+    TextMeshProUGUI m_pickName, m_pickDesc;
+    bool m_picking;
+    int m_pickIndex;
     // 最後に NetMatch に入れたルール(変わったときだけ入れ直す)
     NetMatch.RulesData? m_sentRules;
 
@@ -195,6 +205,7 @@ public class NetSessionMenu : MonoBehaviour
         m_openFrame = Time.frameCount;
         m_openTime = Time.unscaledTime;
         m_confirming = false;
+        m_picking = false;
         RebuildItems();
         m_index = 0;   // 開いたら一番上(ホストの開始待ちなら「試合を はじめる」)から
         m_menuTag.color = IsHost ? ToyKit.Palette[1] : ToyKit.Palette[3];
@@ -216,6 +227,8 @@ public class NetSessionMenu : MonoBehaviour
     void Close(bool sound = true)
     {
         IsOpen = false;
+        m_picking = false;
+        m_info.gameObject.SetActive(true);
         m_menu.gameObject.SetActive(false);
         RestoreHidden();
         if (sound) MenuSounds.Cancel();
@@ -238,9 +251,11 @@ public class NetSessionMenu : MonoBehaviour
     void RebuildItems()
     {
         var items = new List<Item>();
+        if (CanEditRules) items.Add(Item.Start);
+        // キャラクターはだれでも(試合中は薄くして選べない)
+        if (NetCharacterList.Instance != null) items.Add(Item.Character);
         if (CanEditRules)
         {
-            items.Add(Item.Start);
             items.Add(Item.Mode);
             // ストックの行はいつも出しておく(モードで板の大きさが変わらないように)。ストック以外では薄くして選べない
             items.Add(Item.Stocks);
@@ -269,8 +284,8 @@ public class NetSessionMenu : MonoBehaviour
             var item = ToyKit.UIRounded($"Item{i}", m_panel, kItemColor, 20.0f);
             ToyKit.Anchor(item, new Vector2(0.5f, 1.0f), new Vector2(0.0f, -top - i * step + 6.0f), new Vector2(560.0f, 74.0f));
             m_itemImages.Add(item.GetComponent<Image>());
-            // 設定の行は左に名前・右に「＜ 値 ＞」、ほかは真ん中に名前
-            bool value = IsValue(items[i]);
+            // 設定の行は左に名前・右に「＜ 値 ＞」(キャラクターは右にいまのキャラ)、ほかは真ん中に名前
+            bool value = IsValue(items[i]) || items[i] == Item.Character;
             var t = Text("Text", item, "", 34.0f, Color.white, m_letterMat);
             ToyKit.Stretch(t.rectTransform);
             t.rectTransform.offsetMin = new Vector2(36.0f, 0.0f);
@@ -287,6 +302,7 @@ public class NetSessionMenu : MonoBehaviour
         }
         m_index = Mathf.Max(0, m_items.IndexOf(current));
         m_confirm.SetAsLastSibling();
+        m_picker.SetAsLastSibling();
     }
 
     //========================================
@@ -297,6 +313,11 @@ public class NetSessionMenu : MonoBehaviour
     {
         // 試合が始まった・終わったなどで項目が変わったら作り直す
         RebuildItems();
+        if (m_picking)
+        {
+            UpdatePicker();
+            return;
+        }
         if (m_confirming)
         {
             if (Pressed(Dir.Left) || Pressed(Dir.Right) || Pressed(Dir.Up) || Pressed(Dir.Down)) { m_confirmIndex = 1 - m_confirmIndex; MenuSounds.Cursor(); }
@@ -333,6 +354,9 @@ public class NetSessionMenu : MonoBehaviour
                 Net.StartMatch(BuildRules());
                 Close(false);
                 break;
+            case Item.Character:
+                OpenPicker();
+                break;
             case Item.Leave:
                 m_confirming = true;
                 m_confirmIndex = 1;   // 最初は「いいえ」
@@ -349,8 +373,16 @@ public class NetSessionMenu : MonoBehaviour
 
     static bool IsValue(Item item) => item == Item.Mode || item == Item.Stocks || item == Item.Time;
 
-    // ストックの行はストックのときだけ選べる
-    static bool Selectable(Item item) => item != Item.Stocks || s_mode == MatchSetup.MatchMode.Stock;
+    // ストックの行はストックのときだけ、キャラクターは開始待ちの間だけ選べる
+    static bool Selectable(Item item)
+    {
+        if (item == Item.Stocks) return s_mode == MatchSetup.MatchMode.Stock;
+        if (item == Item.Character) return CanPickCharacter;
+        return true;
+    }
+
+    // 自分のキャラを変えられるか(開始待ちの間で、自分の1人分がいる)
+    static bool CanPickCharacter => Net != null && !Net.IsStarted && NetMatchPlayer.Local != null && NetCharacterList.Instance != null;
 
     // 選べる行だけをたどる
     void Move(int delta)
@@ -393,6 +425,7 @@ public class NetSessionMenu : MonoBehaviour
         switch (item)
         {
             case Item.Start: return "試合を はじめる";
+            case Item.Character: return "キャラクター";
             case Item.Mode: return "モード";
             case Item.Stocks: return "ストック";
             case Item.Time: return "時間";
@@ -409,8 +442,184 @@ public class NetSessionMenu : MonoBehaviour
             case Item.Mode: return $"＜ {new MatchSetup.MatchRules { mode = s_mode }.ModeName} ＞";
             case Item.Stocks: return Selectable(item) ? $"＜ {s_stocks}機 ＞" : "ー";
             case Item.Time: return $"＜ {TimeLabel(TimeLimit)} ＞";
+            case Item.Character: return CanPickCharacter ? CurrentCharacterName : "試合中は 変えられません";
             default: return "";
         }
+    }
+
+    // 自分のいまのキャラの名前
+    static string CurrentCharacterName
+    {
+        get
+        {
+            var local = NetMatchPlayer.Local;
+            var list = NetCharacterList.Instance;
+            var data = local != null && list != null ? list.Character(local.CharacterIndex) : null;
+            return data != null ? data.displayName : "だるま";
+        }
+    }
+
+    //========================================
+    // キャラクターを選ぶ画面
+    //========================================
+
+    void OpenPicker()
+    {
+        var list = NetCharacterList.Instance;
+        var local = NetMatchPlayer.Local;
+        if (list == null || local == null || list.Count == 0) return;
+        m_picking = true;
+        // いまのキャラから(なければ選べる最初のキャラ)
+        m_pickIndex = local.CharacterIndex < list.Count ? local.CharacterIndex : 0;
+        if (!list.IsAvailable(m_pickIndex)) MovePick(1, 0);
+        m_picker.gameObject.SetActive(true);
+        MenuSounds.Decide();
+    }
+
+    void ClosePicker(bool sound = true)
+    {
+        m_picking = false;
+        m_picker.gameObject.SetActive(false);
+        m_info.gameObject.SetActive(true);
+        if (sound) MenuSounds.Cancel();
+    }
+
+    void UpdatePicker()
+    {
+        // 試合が始まったら選べない
+        if (!CanPickCharacter)
+        {
+            ClosePicker(false);
+            return;
+        }
+        if (PressedToggle()) { Close(); return; }
+        if (PressedCancel()) { ClosePicker(); return; }
+
+        int dx = Pressed(Dir.Left) ? -1 : Pressed(Dir.Right) ? 1 : 0;
+        int dy = Pressed(Dir.Up) ? -1 : Pressed(Dir.Down) ? 1 : 0;
+        if (dx != 0 || dy != 0)
+        {
+            MovePick(dx, dy);
+            MenuSounds.Cursor();
+        }
+        if (!PressedSubmit()) return;
+
+        var list = NetCharacterList.Instance;
+        if (!list.IsAvailable(m_pickIndex)) { MenuSounds.Cancel(); return; }
+        NetMatchPlayer.Local.RequestCharacter(m_pickIndex);
+        MenuSounds.Decide();
+        ClosePicker(false);
+    }
+
+    // 選べるキャラだけをたどる(左右は並びの順、上下は1段ずつ)
+    void MovePick(int dx, int dy)
+    {
+        var list = NetCharacterList.Instance;
+        int n = list.Count;
+        for (int tries = 0; tries < n; tries++)
+        {
+            if (dy != 0)
+            {
+                int rows = (n + kPickColumns - 1) / kPickColumns;
+                int col = m_pickIndex % kPickColumns;
+                int row = ((m_pickIndex / kPickColumns) + rows + dy) % rows;
+                m_pickIndex = Mathf.Min(row * kPickColumns + col, n - 1);
+            }
+            else m_pickIndex = (m_pickIndex + n + (dx != 0 ? dx : 1)) % n;
+            if (list.IsAvailable(m_pickIndex)) return;
+        }
+    }
+
+    void AnimatePicker(float pulse)
+    {
+        var list = NetCharacterList.Instance;
+        var local = NetMatchPlayer.Local;
+        if (list == null) return;
+        for (int i = 0; i < m_cards.Count; i++)
+        {
+            var c = m_cards[i];
+            bool on = i == m_pickIndex;
+            bool available = list.IsAvailable(i);
+            c.bg.color = on ? kSelectedColor : kItemColor;
+            c.bg.rectTransform.localScale = Vector3.one * (on ? pulse : 1.0f);
+            var data = list.Character(i);
+            c.name.text = available && data != null ? data.displayName : "？？？";
+            c.name.color = on ? ToyKit.Ink : available ? Color.white : new Color(1.0f, 1.0f, 1.0f, 0.3f);
+            c.icon.color = available ? Color.white : new Color(0.1f, 0.1f, 0.1f, 0.8f);
+            c.now.gameObject.SetActive(local != null && local.CharacterIndex == i);
+        }
+        var sel = list.Character(m_pickIndex);
+        m_pickName.text = sel != null && list.IsAvailable(m_pickIndex) ? sel.displayName : "？？？";
+        m_pickDesc.text = sel != null && list.IsAvailable(m_pickIndex) ? Description(sel) : "まだ 選べません";
+    }
+
+    static string Description(CharacterData c)
+    {
+        var lines = new List<string>();
+        if (!string.IsNullOrEmpty(c.passiveName) || !string.IsNullOrEmpty(c.passiveText)) lines.Add($"パッシブ：{c.passiveName}　{c.passiveText}");
+        if (!string.IsNullOrEmpty(c.specialName) || !string.IsNullOrEmpty(c.specialText)) lines.Add($"必殺技：{c.specialName}　{c.specialText}");
+        return lines.Count > 0 ? string.Join("\n", lines) : "";
+    }
+
+    void BuildPicker()
+    {
+        m_picker = ToyKit.UIRounded("CharacterPicker", m_menu, kPanelColor, 28.0f);
+        ToyKit.Anchor(m_picker, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1320.0f, 860.0f));
+        m_picker.gameObject.AddComponent<Outline>().effectColor = ToyKit.Ink;
+
+        var title = Text("Title", m_picker, "キャラクター", 60.0f, Color.white, m_popMat);
+        ToyKit.Anchor(title.rectTransform, new Vector2(0.5f, 1.0f), new Vector2(0.0f, -60.0f), new Vector2(800.0f, 80.0f));
+
+        var list = NetCharacterList.Instance;
+        int n = list != null ? list.Count : 0;
+        const float cardW = 220.0f, cardH = 230.0f, gapX = 240.0f, gapY = 250.0f;
+        for (int i = 0; i < n; i++)
+        {
+            int col = i % kPickColumns, row = i / kPickColumns;
+            var card = ToyKit.UIRounded($"Card{i}", m_picker, kItemColor, 20.0f);
+            ToyKit.Anchor(card, new Vector2(0.5f, 1.0f), new Vector2((col - (kPickColumns - 1) * 0.5f) * gapX, -250.0f - row * gapY), new Vector2(cardW, cardH));
+            var data = list.Character(i);
+
+            var iconRt = ToyKit.UIImage("Icon", card, Color.white);
+            ToyKit.Anchor(iconRt, new Vector2(0.5f, 1.0f), new Vector2(0.0f, -88.0f), new Vector2(150.0f, 150.0f));
+            var icon = iconRt.GetComponent<Image>();
+            icon.preserveAspect = true;
+            TextMeshProUGUI letter = null;
+            if (data != null && data.portrait != null) icon.sprite = data.portrait;
+            else
+            {
+                // 顔の画像が無いキャラは、色と頭文字で仮に出す(キャラクターセレクトと同じ)
+                icon.color = data != null ? data.color : Color.gray;
+                letter = Text("Letter", iconRt, data != null && !string.IsNullOrEmpty(data.displayName) ? data.displayName.Substring(0, 1) : "?", 80.0f, Color.white, m_popMat);
+                ToyKit.Stretch(letter.rectTransform);
+            }
+
+            var name = Text("Name", card, "", 32.0f, Color.white, m_letterMat);
+            name.enableAutoSizing = true; name.fontSizeMin = 20.0f; name.fontSizeMax = 32.0f;
+            ToyKit.Anchor(name.rectTransform, new Vector2(0.5f, 0.0f), new Vector2(0.0f, 34.0f), new Vector2(cardW - 16.0f, 44.0f));
+
+            var now = ToyKit.UIRounded("Now", card, ToyKit.Palette[1], 12.0f);
+            ToyKit.Anchor(now, new Vector2(1.0f, 1.0f), new Vector2(-30.0f, -6.0f), new Vector2(84.0f, 40.0f));
+            now.gameObject.AddComponent<Outline>().effectColor = ToyKit.Ink;
+            var nowText = Text("Label", now, "いま", 26.0f, Color.white, m_popMat);
+            ToyKit.Stretch(nowText.rectTransform);
+
+            m_cards.Add(new Card { bg = card.GetComponent<Image>(), icon = icon, letter = letter, name = name, now = now });
+        }
+
+        int rows = (n + kPickColumns - 1) / kPickColumns;
+        float descTop = -250.0f - (rows - 1) * gapY - cardH * 0.5f - 30.0f;
+        m_pickName = Text("SelName", m_picker, "", 44.0f, kSelectedColor, m_letterMat);
+        ToyKit.Anchor(m_pickName.rectTransform, new Vector2(0.5f, 1.0f), new Vector2(0.0f, descTop - 30.0f), new Vector2(1200.0f, 56.0f));
+        m_pickDesc = Text("SelDesc", m_picker, "", 28.0f, kPale, m_letterMat);
+        m_pickDesc.enableAutoSizing = true; m_pickDesc.fontSizeMin = 20.0f; m_pickDesc.fontSizeMax = 28.0f;
+        ToyKit.Anchor(m_pickDesc.rectTransform, new Vector2(0.5f, 1.0f), new Vector2(0.0f, descTop - 100.0f), new Vector2(1200.0f, 80.0f));
+
+        var hint = Text("Hint", m_picker, "←→↑↓：選ぶ　A：決定(すぐに 入れ替わります)　B：もどる", 28.0f, kSelectedColor, null);
+        hint.enableAutoSizing = true; hint.fontSizeMin = 20.0f; hint.fontSizeMax = 28.0f;
+        ToyKit.Anchor(hint.rectTransform, new Vector2(0.5f, 0.0f), new Vector2(0.0f, 40.0f), new Vector2(1240.0f, 40.0f));
+
+        m_picker.gameObject.SetActive(false);
     }
 
     //========================================
@@ -489,6 +698,12 @@ public class NetSessionMenu : MonoBehaviour
         m_menuHint.text = m_items.Count > 0 && IsValue(m_items[m_index])
             ? "↑↓：選ぶ　←→ / A：変える　B / Start：とじる"
             : "↑↓：選ぶ　A：決定　B / Start：とじる";
+
+        // キャラクターを選んでいる間は、メニューの板を隠して選ぶ画面だけを出す
+        // 右上の表示も、選ぶ画面に重ならないように隠す
+        m_panel.gameObject.SetActive(!m_picking);
+        m_info.gameObject.SetActive(!m_picking);
+        if (m_picking) AnimatePicker(pulse);
 
         m_confirm.gameObject.SetActive(m_confirming);
         for (int i = 0; i < m_confirmItems.Length; i++)
@@ -583,6 +798,7 @@ public class NetSessionMenu : MonoBehaviour
             ToyKit.Stretch(m_confirmTexts[i].rectTransform);
         }
         m_confirm.gameObject.SetActive(false);
+        BuildPicker();
         m_menu.gameObject.SetActive(false);
         m_canvas.gameObject.SetActive(false);
     }
