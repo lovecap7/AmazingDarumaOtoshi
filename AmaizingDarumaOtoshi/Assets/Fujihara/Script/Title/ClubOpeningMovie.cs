@@ -629,16 +629,19 @@ public partial class ClubOpeningMovie : MonoBehaviour
             b.localScale = new Vector3(ToyKit.BlockW * s * 0.85f, bh * 0.49f, ToyKit.BlockD * s * 0.85f);
             b.localPosition = new Vector3(0f, bh * (i + 0.5f), 0f);
             b.GetComponent<Renderer>().sharedMaterial = ToyKit.Lit(i % 2 == 0 ? bodyA : bodyB, 0.5f);
+            // 積み木のモデルにする：部員の色の積み木を、柄あり・柄なしの交互に
+            UseTsumikiModel(b, bodyA, i % 2 == 0);
             m.blocks.Add(b);
         }
         m.bodyY = bh * count;
         m.face = ToyKit.CreateHead();
+        UseHeadModel(m.face, bodyA);   // 色に合うだるまのモデルに
         m.face.root.SetParent(m.root, false);
         m.face.root.localScale = Vector3.one * s;
         m.pivot = new GameObject("HammerPivot").transform;
         m.pivot.SetParent(m.root, false);
         m.pivot.localRotation = Quaternion.Euler(-70f, 0f, 0f);   // 柄を上に向けて持つ
-        var hammer = ToyKit.CreateHammer();
+        var hammer = ToyKit.CreateHammer(HammerModelFor(bodyA));   // その部員のキャラのハンマー
         hammer.SetParent(m.pivot, false);
         hammer.localScale = Vector3.one * s * 0.6f;
         m.Update(0f, 0f);
@@ -731,7 +734,11 @@ public partial class ClubOpeningMovie : MonoBehaviour
     {
         var t = CreateMember(setRoot, pos, -90f, Blue, Yellow, 1.2f, count);
         var palette = new[] { Red, Blue, Yellow, Green, new Color(0.7f, 0.4f, 0.9f) };
-        for (int i = 0; i < t.blocks.Count; i++) t.blocks[i].GetComponent<Renderer>().sharedMaterial = ToyKit.Lit(palette[i % palette.Length], 0.55f);
+        for (int i = 0; i < t.blocks.Count; i++)
+        {
+            t.blocks[i].GetComponent<Renderer>().sharedMaterial = ToyKit.Lit(palette[i % palette.Length], 0.55f);
+            UseTsumikiModel(t.blocks[i], palette[i % palette.Length], true);
+        }
         t.pivot.gameObject.SetActive(false);
         return t;
     }
@@ -800,6 +807,7 @@ public partial class ClubOpeningMovie : MonoBehaviour
         pencil.localScale = new Vector3(0.18f, 1.6f, 0.18f);
         pencil.GetComponent<Renderer>().sharedMaterial = ToyKit.Lit(new Color(1f, 0.8f, 0.2f), 0.4f);
         var mini = ToyKit.CreateHead();
+        UseHeadModel(mini, Red);   // あかだる
         mini.root.SetParent(root, false);
         mini.root.position = NoteSet + new Vector3(-4.6f, 0.45f, -1.6f);
         mini.root.rotation = Quaternion.Euler(0f, 200f, 0f);

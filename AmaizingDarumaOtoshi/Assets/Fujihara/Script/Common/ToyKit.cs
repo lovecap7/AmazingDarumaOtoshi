@@ -320,8 +320,13 @@ public static class ToyKit
     }
 
     // 根元（持ち手の端）が原点。柄は +Z 方向へ伸び、頭は X 方向を向く
-    public static Transform CreateHammer()
+    // Blender のハンマー（GameModelSettings.hammerModel）があればそれを使う
+    // hammerModel：使うハンマーのモデル（キャラのハンマーなど。null なら共通のハンマー）
+    public static Transform CreateHammer(GameObject hammerModel = null)
     {
+        var model = CreateHammerModel("Head", hammerModel);
+        if (model != null) return model;
+
         var root = new GameObject("Hammer").transform;
         var handle = Primitive(PrimitiveType.Cylinder, "Handle", root);
         handle.localScale = new Vector3(0.14f, HammerLength * 0.5f, 0.14f);
@@ -345,6 +350,102 @@ public static class ToyKit
             r.GetComponent<Renderer>().sharedMaterial = band;
         }
         return root;
+    }
+
+    // Blender のハンマーを、CreateHammer と同じ向き・大きさで作る（根元が原点、柄は +Z、頭の中心は z = HammerLength、頭は X 向き）。
+    // モデルは部品ごと（マテリアルごと）に分けて、名前を「Head（headName）」「Band」「Tape」「Handle」にする
+    // （頭の色を名前で変える処理がそのまま使えるように）。各部品の位置はその部品の中心。モデルが無ければ null
+    // modelOverride：共通のハンマーの代わりに使うモデル（キャラのハンマー）。ハンマーのモデルを使わない設定なら無視する
+    public static Transform CreateHammerModel(string headName = "Head", GameObject modelOverride = null)
+    {
+        var model = GameModelSettings.HammerModel;
+        if (model == null) return null;
+        if (modelOverride != null) model = modelOverride;
+        var parts = HammerParts(model);
+        if (parts == null) return null;
+
+        var root = new GameObject("Hammer").transform;
+        var holder = new GameObject("Model").transform;
+        holder.SetParent(root, false);
+        holder.localRotation = Quaternion.Euler(90f, 0f, 0f);   // モデルの +Y（柄）をハンマーの +Z へ
+        foreach (var p in parts)
+        {
+            var go = new GameObject(p.kind == "Head" ? headName : p.kind);
+            go.transform.SetParent(holder, false);
+            go.transform.localPosition = p.center;
+            go.AddComponent<MeshFilter>().sharedMesh = p.mesh;
+            go.AddComponent<MeshRenderer>().sharedMaterial = p.material;
+        }
+        return root;
+    }
+
+    class HammerPart { public string kind; public Mesh mesh; public Material material; public Vector3 center; }
+    static readonly Dictionary<GameObject, List<HammerPart>> s_hammerParts = new Dictionary<GameObject, List<HammerPart>>();
+
+    // モデルのメッシュを、マテリアル（サブメッシュ）ごとの部品に分ける（1回だけ作って使い回す）
+    static List<HammerPart> HammerParts(GameObject model)
+    {
+        // 作ったメッシュは再生を止めると消える（このプロジェクトは再生のたびにスクリプトを読み直さない設定なので、
+        // 覚えておいた一覧だけが次の再生まで残る）。消えていたら作り直す
+        if (s_hammerParts.TryGetValue(model, out var cached))
+        {
+            if (cached != null && cached.TrueForAll(p => p.mesh != null)) return cached;
+            s_hammerParts.Remove(model);
+        }
+        var mf = model.GetComponentInChildren<MeshFilter>(true);
+        var mr = model.GetComponentInChildren<MeshRenderer>(true);
+        if (mf == null || mr == null || mf.sharedMesh == null) return null;
+        var src = mf.sharedMesh;
+        if (!src.isReadable)
+        {
+            Debug.LogWarning($"[ToyKit] {src.name} の Read/Write がオフなので、ハンマーのモデルを使えません");
+            return null;
+        }
+        var mats = mr.sharedMaterials;
+        var verts = src.vertices; var normals = src.normals; var tangents = src.tangents;
+        var uv = new List<Vector2>(); src.GetUVs(0, uv);
+        var colors = src.colors;
+        var list = new List<HammerPart>();
+        for (int s = 0; s < src.subMeshCount; s++)
+        {
+            var tris = src.GetTriangles(s);
+            var map = new Dictionary<int, int>();
+            var v = new List<Vector3>(); var n = new List<Vector3>(); var t = new List<Vector4>(); var u = new List<Vector2>(); var c = new List<Color>();
+            var outTris = new int[tris.Length];
+            for (int k = 0; k < tris.Length; k++)
+            {
+                int i = tris[k];
+                if (!map.TryGetValue(i, out int j))
+                {
+                    j = v.Count; map[i] = j;
+                    v.Add(verts[i]);
+                    if (normals.Length == verts.Length) n.Add(normals[i]);
+                    if (tangents.Length == verts.Length) t.Add(tangents[i]);
+                    if (uv.Count == verts.Length) u.Add(uv[i]);
+                    if (colors.Length == verts.Length) c.Add(colors[i]);
+                }
+                outTris[k] = j;
+            }
+            var b = new Bounds(v.Count > 0 ? v[0] : Vector3.zero, Vector3.zero);
+            foreach (var p in v) b.Encapsulate(p);
+            for (int k = 0; k < v.Count; k++) v[k] -= b.center;
+
+            var m = new Mesh { name = src.name + "_" + s };
+            m.SetVertices(v);
+            if (n.Count == v.Count) m.SetNormals(n);
+            if (t.Count == v.Count) m.SetTangents(t);
+            if (u.Count == v.Count) m.SetUVs(0, u);
+            if (c.Count == v.Count) m.SetColors(c);
+            m.SetTriangles(outTris, 0);
+            m.RecalculateBounds();
+
+            var mat = s < mats.Length ? mats[s] : null;
+            string mn = mat != null ? mat.name : "";
+            string kind = mn.Contains("Head") ? "Head" : mn.Contains("Band") ? "Band" : mn.Contains("Grip") ? "Tape" : "Handle";
+            list.Add(new HammerPart { kind = kind, mesh = m, material = mat, center = b.center });
+        }
+        s_hammerParts[model] = list;
+        return list;
     }
 
     // 角度0のとき、ハンマーの頭の右面がちょうど contact に当たる根元の位置

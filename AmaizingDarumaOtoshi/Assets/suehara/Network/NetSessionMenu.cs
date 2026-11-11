@@ -8,9 +8,11 @@ using UnityEngine.UI;
 // ネット対戦の試合のシーン(NetStages)で、つないでいる間に出す表示とメニュー。NetLobbyUI が自動で付ける。
 //  ・右上: いまの試合の設定(モード・ストック・時間)・へやばんごう・人数(見るだけ。クリックはしない)
 //  ・Start(+ / キーボードは Tab)でメニューを開く。見た目は試合のポーズ画面(PauseMenu)と同じ
-//      ホスト(開始待ち): 試合を はじめる / キャラクター / モード / ストック / 時間 / へやを かいさん / とじる
-//      ホスト(試合中) ・さんか: キャラクター / へやを かいさん(ぬける) / とじる
+//      ホスト(開始待ち): 試合を はじめる / キャラクター / ステージ / モード / ストック / 時間 / へやを かいさん / とじる
+//      ホスト(試合中) ・さんか: キャラクター / ステージ / へやを かいさん(ぬける) / とじる
 //    キャラクター: 自分のキャラを選ぶ画面を開く(だれでも。開始待ちの間だけ。選ぶとその場で体が入れ替わる。NetMatchPlayer.RequestCharacter)
+//    ステージ    : 自分が遊びたいステージ(おまかせも)を選ぶ画面を開く(だれでも。開始待ちの間だけ。NetMatchPlayer.RequestStage)。
+//                  ホストが「試合を はじめる」を押すと、みんなが選んだものから抽選して(NetMatch.StartWithLottery・NetStageLottery)そのステージで始める
 //    ↑↓：えらぶ　←→：かえる　A：決定　B / Start：とじる。かいさん・ぬけるは「はい / いいえ」で確かめる
 //  ・メニューを開いている間は、キャラクターの操作(NetPadKeyboardInput)とステージの切り替え(左右キー)を止める
 // ホストが変えた設定はすぐ NetMatch に入れるので、さんかした人の右上にも同じ設定が出る。
@@ -38,7 +40,7 @@ public class NetSessionMenu : MonoBehaviour
     // メニューを開いているか(開いている間はキャラクターを動かさない)
     public static bool IsOpen { get; private set; }
 
-    enum Item { Start, Character, Mode, Stocks, Time, Leave, Close }
+    enum Item { Start, Character, Stage, Mode, Stocks, Time, Leave, Close }
 
     NetworkManager m_nm;
     TMP_FontAsset m_font;
@@ -75,12 +77,20 @@ public class NetSessionMenu : MonoBehaviour
     };
     readonly List<MonoBehaviour> m_hidden = new List<MonoBehaviour>();
 
-    // ---- キャラクターを選ぶ画面 ----
-    const int kPickColumns = 5;
+    // ---- キャラクター・ステージを選ぶ画面(同じ作り。種類ごとに1つ) ----
+    enum PickKind { Character, Stage }
     class Card { public Image bg, icon; public TextMeshProUGUI letter, name; public RectTransform now; }
-    RectTransform m_picker;
-    readonly List<Card> m_cards = new List<Card>();
-    TextMeshProUGUI m_pickName, m_pickDesc;
+    class Picker
+    {
+        public PickKind kind;
+        public RectTransform root;
+        public int columns;
+        public readonly List<Card> cards = new List<Card>();
+        public TextMeshProUGUI name, desc;
+    }
+    static readonly Color kRandomColor = new Color(0.55f, 0.45f, 0.75f);
+    Picker m_charPicker, m_stagePicker;
+    Picker m_picker;   // 開いている選ぶ画面
     bool m_picking;
     int m_pickIndex;
     // 最後に NetMatch に入れたルール(変わったときだけ入れ直す)
@@ -90,7 +100,7 @@ public class NetSessionMenu : MonoBehaviour
     bool Connected => m_nm != null && m_nm.IsListening && (m_nm.IsServer || m_nm.IsConnectedClient);
     static NetMatch Net => NetMatch.Instance != null && NetMatch.Instance.IsSpawned ? NetMatch.Instance : null;
     // ホストがルールを変えられるのは開始待ちのときだけ
-    bool CanEditRules => IsHost && Net != null && !Net.IsStarted;
+    bool CanEditRules => IsHost && Net != null && !Net.IsStarted && !Net.IsLotteryRunning;
 
     void Start()
     {
@@ -124,7 +134,7 @@ public class NetSessionMenu : MonoBehaviour
         if (!IsOpen)
         {
             // 画面の切り替え中・リザルトへ移る前は開かない
-            if (!NetSceneFlow.IsBusy && !Fader.IsBusy && PressedToggle()) Open();
+            if (!NetSceneFlow.IsBusy && !Fader.IsBusy && !NetStageLottery.IsPlaying && PressedToggle()) Open();
         }
         else
         {
@@ -213,47 +223,64 @@ public class NetSessionMenu : MonoBehaviour
         m_menu.gameObject.SetActive(true);
         // メニューの左右でステージが切り替わらないように・開発用の表示がメニューの上に出ないようにする
         m_hidden.Clear();
+        m_hidden.AddRange(HideDevViews());
+        MenuSounds.Decide();
+    }
+
+    // 開発用の表示(OnGUI)とステージの切り替え(左右キー)を止める。止めたものを返す(RestoreDevViews で戻す)
+    // ステージの抽選の演出(NetStageLottery)の間も使う
+    public static List<MonoBehaviour> HideDevViews()
+    {
+        var hidden = new List<MonoBehaviour>();
         foreach (var b in FindObjectsByType<MonoBehaviour>())
         {
             if (b.enabled && kHideWhileOpen.Contains(b.GetType().Name))
             {
                 b.enabled = false;
-                m_hidden.Add(b);
+                hidden.Add(b);
             }
         }
-        MenuSounds.Decide();
+        return hidden;
+    }
+
+    public static void RestoreDevViews(List<MonoBehaviour> hidden)
+    {
+        // ステージの切り替えは、試合が終わったら NetMatch が止めているので、そのままにする
+        bool finished = Net != null && Net.Match != null && Net.Match.IsFinished;
+        foreach (var b in hidden)
+        {
+            if (b == null) continue;
+            if (finished && b is Nakagawa.StageSwitcher) continue;
+            b.enabled = true;
+        }
+        hidden.Clear();
     }
 
     void Close(bool sound = true)
     {
         IsOpen = false;
         m_picking = false;
+        if (m_picker != null) m_picker.root.gameObject.SetActive(false);
+        m_picker = null;
         m_info.gameObject.SetActive(true);
         m_menu.gameObject.SetActive(false);
         RestoreHidden();
         if (sound) MenuSounds.Cancel();
     }
 
-    void RestoreHidden()
-    {
-        // ステージの切り替えは、試合が終わったら NetMatch が止めているので、そのままにする
-        bool finished = Net != null && Net.Match != null && Net.Match.IsFinished;
-        foreach (var b in m_hidden)
-        {
-            if (b == null) continue;
-            if (finished && b is Nakagawa.StageSwitcher) continue;
-            b.enabled = true;
-        }
-        m_hidden.Clear();
-    }
+    void RestoreHidden() => RestoreDevViews(m_hidden);
 
     // いまの状態で出す項目
     void RebuildItems()
     {
         var items = new List<Item>();
         if (CanEditRules) items.Add(Item.Start);
-        // キャラクターはだれでも(試合中は薄くして選べない)
-        if (NetCharacterList.Instance != null) items.Add(Item.Character);
+        // キャラクター・ステージはだれでも(試合中は薄くして選べない)
+        if (NetCharacterList.Instance != null)
+        {
+            items.Add(Item.Character);
+            if (NetCharacterList.Instance.stages.Count > 0) items.Add(Item.Stage);
+        }
         if (CanEditRules)
         {
             items.Add(Item.Mode);
@@ -285,7 +312,7 @@ public class NetSessionMenu : MonoBehaviour
             ToyKit.Anchor(item, new Vector2(0.5f, 1.0f), new Vector2(0.0f, -top - i * step + 6.0f), new Vector2(560.0f, 74.0f));
             m_itemImages.Add(item.GetComponent<Image>());
             // 設定の行は左に名前・右に「＜ 値 ＞」(キャラクターは右にいまのキャラ)、ほかは真ん中に名前
-            bool value = IsValue(items[i]) || items[i] == Item.Character;
+            bool value = IsValue(items[i]) || items[i] == Item.Character || items[i] == Item.Stage;
             var t = Text("Text", item, "", 34.0f, Color.white, m_letterMat);
             ToyKit.Stretch(t.rectTransform);
             t.rectTransform.offsetMin = new Vector2(36.0f, 0.0f);
@@ -302,7 +329,8 @@ public class NetSessionMenu : MonoBehaviour
         }
         m_index = Mathf.Max(0, m_items.IndexOf(current));
         m_confirm.SetAsLastSibling();
-        m_picker.SetAsLastSibling();
+        m_charPicker.root.SetAsLastSibling();
+        m_stagePicker.root.SetAsLastSibling();
     }
 
     //========================================
@@ -351,11 +379,15 @@ public class NetSessionMenu : MonoBehaviour
         {
             case Item.Start:
                 MenuSounds.Decide();
-                Net.StartMatch(BuildRules());
+                // みんなが選んだステージから抽選して、決まったステージで始める
+                Net.StartWithLottery(BuildRules());
                 Close(false);
                 break;
             case Item.Character:
-                OpenPicker();
+                OpenPicker(PickKind.Character);
+                break;
+            case Item.Stage:
+                OpenPicker(PickKind.Stage);
                 break;
             case Item.Leave:
                 m_confirming = true;
@@ -378,11 +410,13 @@ public class NetSessionMenu : MonoBehaviour
     {
         if (item == Item.Stocks) return s_mode == MatchSetup.MatchMode.Stock;
         if (item == Item.Character) return CanPickCharacter;
+        if (item == Item.Stage) return CanPickStage;
         return true;
     }
 
-    // 自分のキャラを変えられるか(開始待ちの間で、自分の1人分がいる)
-    static bool CanPickCharacter => Net != null && !Net.IsStarted && NetMatchPlayer.Local != null && NetCharacterList.Instance != null;
+    // 自分のキャラ・ステージを変えられるか(開始待ちの間(抽選中は除く)で、自分の1人分がいる)
+    static bool CanPickCharacter => Net != null && !Net.IsStarted && !Net.IsLotteryRunning && NetMatchPlayer.Local != null && NetCharacterList.Instance != null;
+    static bool CanPickStage => CanPickCharacter && NetCharacterList.Instance.stages.Count > 0;
 
     // 選べる行だけをたどる
     void Move(int delta)
@@ -426,6 +460,7 @@ public class NetSessionMenu : MonoBehaviour
         {
             case Item.Start: return "試合を はじめる";
             case Item.Character: return "キャラクター";
+            case Item.Stage: return "ステージ";
             case Item.Mode: return "モード";
             case Item.Stocks: return "ストック";
             case Item.Time: return "時間";
@@ -443,6 +478,7 @@ public class NetSessionMenu : MonoBehaviour
             case Item.Stocks: return Selectable(item) ? $"＜ {s_stocks}機 ＞" : "ー";
             case Item.Time: return $"＜ {TimeLabel(TimeLimit)} ＞";
             case Item.Character: return CanPickCharacter ? CurrentCharacterName : "試合中は 変えられません";
+            case Item.Stage: return CanPickStage ? CurrentStageName : "試合中は 変えられません";
             default: return "";
         }
     }
@@ -459,35 +495,73 @@ public class NetSessionMenu : MonoBehaviour
         }
     }
 
+    // 自分が選んだステージの名前
+    static string CurrentStageName
+    {
+        get
+        {
+            var local = NetMatchPlayer.Local;
+            var list = NetCharacterList.Instance;
+            var data = local != null && list != null ? list.Stage(local.StageVote) : null;
+            return data != null ? data.displayName : "おまかせ";
+        }
+    }
+
     //========================================
-    // キャラクターを選ぶ画面
+    // キャラクター・ステージを選ぶ画面
+    //  キャラ  : 並びは NetCharacterList の順。まだ選べないキャラ(だるきんぐ)は飛ばす。決めるとすぐ入れ替わる
+    //  ステージ: 並びは NetCharacterList.stages の順で、最後がおまかせ。決めたものは、ホストが試合を始めるときの抽選に入る
     //========================================
 
-    void OpenPicker()
+    static int PickCount(PickKind kind)
     {
         var list = NetCharacterList.Instance;
+        if (list == null) return 0;
+        return kind == PickKind.Character ? list.Count : list.stages.Count + 1;
+    }
+
+    static bool PickAvailable(PickKind kind, int i) => kind == PickKind.Stage || NetCharacterList.Instance.IsAvailable(i);
+
+    static bool CanPick(PickKind kind) => kind == PickKind.Character ? CanPickCharacter : CanPickStage;
+
+    // いま選んでいるもの(ステージのおまかせは最後)
+    static int PickCurrent(PickKind kind)
+    {
         var local = NetMatchPlayer.Local;
-        if (list == null || local == null || list.Count == 0) return;
+        if (local == null) return -1;
+        if (kind == PickKind.Character) return local.CharacterIndex;
+        var list = NetCharacterList.Instance;
+        return list != null && list.Stage(local.StageVote) != null ? local.StageVote : PickCount(kind) - 1;
+    }
+
+    void OpenPicker(PickKind kind)
+    {
+        var picker = kind == PickKind.Character ? m_charPicker : m_stagePicker;
+        int n = PickCount(kind);
+        if (picker == null || NetMatchPlayer.Local == null || n == 0) return;
+        m_picker = picker;
         m_picking = true;
-        // いまのキャラから(なければ選べる最初のキャラ)
-        m_pickIndex = local.CharacterIndex < list.Count ? local.CharacterIndex : 0;
-        if (!list.IsAvailable(m_pickIndex)) MovePick(1, 0);
-        m_picker.gameObject.SetActive(true);
+        // いま選んでいるものから(なければ選べる最初のもの)
+        m_pickIndex = Mathf.Clamp(PickCurrent(kind), 0, n - 1);
+        if (!PickAvailable(kind, m_pickIndex)) MovePick(1, 0);
+        m_picker.root.gameObject.SetActive(true);
         MenuSounds.Decide();
     }
 
     void ClosePicker(bool sound = true)
     {
         m_picking = false;
-        m_picker.gameObject.SetActive(false);
+        if (m_picker != null) m_picker.root.gameObject.SetActive(false);
+        m_picker = null;
         m_info.gameObject.SetActive(true);
         if (sound) MenuSounds.Cancel();
     }
 
     void UpdatePicker()
     {
-        // 試合が始まったら選べない
-        if (!CanPickCharacter)
+        var kind = m_picker.kind;
+        // 試合が始まった・抽選が始まったら選べない
+        if (!CanPick(kind))
         {
             ClosePicker(false);
             return;
@@ -504,98 +578,126 @@ public class NetSessionMenu : MonoBehaviour
         }
         if (!PressedSubmit()) return;
 
-        var list = NetCharacterList.Instance;
-        if (!list.IsAvailable(m_pickIndex)) { MenuSounds.Cancel(); return; }
-        NetMatchPlayer.Local.RequestCharacter(m_pickIndex);
+        if (!PickAvailable(kind, m_pickIndex)) { MenuSounds.Cancel(); return; }
+        if (kind == PickKind.Character) NetMatchPlayer.Local.RequestCharacter(m_pickIndex);
+        else NetMatchPlayer.Local.RequestStage(m_pickIndex < PickCount(kind) - 1 ? m_pickIndex : NetCharacterList.None);
         MenuSounds.Decide();
         ClosePicker(false);
     }
 
-    // 選べるキャラだけをたどる(左右は並びの順、上下は1段ずつ)
+    // 選べるものだけをたどる(左右は並びの順、上下は1段ずつ)
     void MovePick(int dx, int dy)
     {
-        var list = NetCharacterList.Instance;
-        int n = list.Count;
+        var kind = m_picker.kind;
+        int n = PickCount(kind);
+        int columns = m_picker.columns;
         for (int tries = 0; tries < n; tries++)
         {
             if (dy != 0)
             {
-                int rows = (n + kPickColumns - 1) / kPickColumns;
-                int col = m_pickIndex % kPickColumns;
-                int row = ((m_pickIndex / kPickColumns) + rows + dy) % rows;
-                m_pickIndex = Mathf.Min(row * kPickColumns + col, n - 1);
+                int rows = (n + columns - 1) / columns;
+                int col = m_pickIndex % columns;
+                int row = ((m_pickIndex / columns) + rows + dy) % rows;
+                m_pickIndex = Mathf.Min(row * columns + col, n - 1);
             }
             else m_pickIndex = (m_pickIndex + n + (dx != 0 ? dx : 1)) % n;
-            if (list.IsAvailable(m_pickIndex)) return;
+            if (PickAvailable(kind, m_pickIndex)) return;
         }
     }
 
     void AnimatePicker(float pulse)
     {
         var list = NetCharacterList.Instance;
-        var local = NetMatchPlayer.Local;
-        if (list == null) return;
-        for (int i = 0; i < m_cards.Count; i++)
+        if (list == null || m_picker == null) return;
+        var kind = m_picker.kind;
+        int current = PickCurrent(kind);
+        for (int i = 0; i < m_picker.cards.Count; i++)
         {
-            var c = m_cards[i];
+            var c = m_picker.cards[i];
             bool on = i == m_pickIndex;
-            bool available = list.IsAvailable(i);
+            bool available = PickAvailable(kind, i);
             c.bg.color = on ? kSelectedColor : kItemColor;
             c.bg.rectTransform.localScale = Vector3.one * (on ? pulse : 1.0f);
-            var data = list.Character(i);
-            c.name.text = available && data != null ? data.displayName : "？？？";
+            c.name.text = available ? PickName(kind, i) : "？？？";
             c.name.color = on ? ToyKit.Ink : available ? Color.white : new Color(1.0f, 1.0f, 1.0f, 0.3f);
-            c.icon.color = available ? Color.white : new Color(0.1f, 0.1f, 0.1f, 0.8f);
-            c.now.gameObject.SetActive(local != null && local.CharacterIndex == i);
+            if (kind == PickKind.Character) c.icon.color = available ? (list.Character(i) != null && list.Character(i).portrait == null ? list.Character(i).color : Color.white) : new Color(0.1f, 0.1f, 0.1f, 0.8f);
+            c.now.gameObject.SetActive(current == i);
         }
-        var sel = list.Character(m_pickIndex);
-        m_pickName.text = sel != null && list.IsAvailable(m_pickIndex) ? sel.displayName : "？？？";
-        m_pickDesc.text = sel != null && list.IsAvailable(m_pickIndex) ? Description(sel) : "まだ 選べません";
+        bool selAvailable = PickAvailable(kind, m_pickIndex);
+        m_picker.name.text = selAvailable ? PickName(kind, m_pickIndex) : "？？？";
+        m_picker.desc.text = selAvailable ? PickDescription(kind, m_pickIndex) : "まだ 選べません";
     }
 
-    static string Description(CharacterData c)
+    static string PickName(PickKind kind, int i)
     {
+        var list = NetCharacterList.Instance;
+        if (kind == PickKind.Character) return list.Character(i) != null ? list.Character(i).displayName : "";
+        return list.Stage(i) != null ? list.Stage(i).displayName : "おまかせ";
+    }
+
+    static string PickDescription(PickKind kind, int i)
+    {
+        var list = NetCharacterList.Instance;
+        if (kind == PickKind.Stage)
+        {
+            var s = list.Stage(i);
+            return s != null ? s.description : "ステージは あとで ランダムに 決まります(当たったときに めくります)";
+        }
+        var c = list.Character(i);
+        if (c == null) return "";
         var lines = new List<string>();
         if (!string.IsNullOrEmpty(c.passiveName) || !string.IsNullOrEmpty(c.passiveText)) lines.Add($"パッシブ：{c.passiveName}　{c.passiveText}");
         if (!string.IsNullOrEmpty(c.specialName) || !string.IsNullOrEmpty(c.specialText)) lines.Add($"必殺技：{c.specialName}　{c.specialText}");
         return lines.Count > 0 ? string.Join("\n", lines) : "";
     }
 
-    void BuildPicker()
+    Picker BuildPicker(PickKind kind)
     {
-        m_picker = ToyKit.UIRounded("CharacterPicker", m_menu, kPanelColor, 28.0f);
-        ToyKit.Anchor(m_picker, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1320.0f, 860.0f));
-        m_picker.gameObject.AddComponent<Outline>().effectColor = ToyKit.Ink;
+        bool chara = kind == PickKind.Character;
+        var p = new Picker { kind = kind, columns = chara ? 5 : 6 };
+        int n = PickCount(kind);
+        // キャラは正方形の顔、ステージは横長のプレビュー
+        float cardW = chara ? 220.0f : 250.0f, cardH = chara ? 230.0f : 210.0f;
+        float gapX = cardW + 20.0f, gapY = cardH + 20.0f;
+        Vector2 iconSize = chara ? new Vector2(150.0f, 150.0f) : new Vector2(230.0f, 130.0f);
+        int rows = Mathf.Max(1, (n + p.columns - 1) / p.columns);
+        float width = Mathf.Max(1320.0f, p.columns * gapX + 80.0f);
+        float height = 210.0f + rows * gapY + 230.0f;
 
-        var title = Text("Title", m_picker, "キャラクター", 60.0f, Color.white, m_popMat);
+        p.root = ToyKit.UIRounded(chara ? "CharacterPicker" : "StagePicker", m_menu, kPanelColor, 28.0f);
+        ToyKit.Anchor(p.root, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(width, height));
+        p.root.gameObject.AddComponent<Outline>().effectColor = ToyKit.Ink;
+
+        var title = Text("Title", p.root, chara ? "キャラクター" : "ステージ", 60.0f, Color.white, m_popMat);
         ToyKit.Anchor(title.rectTransform, new Vector2(0.5f, 1.0f), new Vector2(0.0f, -60.0f), new Vector2(800.0f, 80.0f));
 
         var list = NetCharacterList.Instance;
-        int n = list != null ? list.Count : 0;
-        const float cardW = 220.0f, cardH = 230.0f, gapX = 240.0f, gapY = 250.0f;
         for (int i = 0; i < n; i++)
         {
-            int col = i % kPickColumns, row = i / kPickColumns;
-            var card = ToyKit.UIRounded($"Card{i}", m_picker, kItemColor, 20.0f);
-            ToyKit.Anchor(card, new Vector2(0.5f, 1.0f), new Vector2((col - (kPickColumns - 1) * 0.5f) * gapX, -250.0f - row * gapY), new Vector2(cardW, cardH));
-            var data = list.Character(i);
+            int col = i % p.columns, row = i / p.columns;
+            var card = ToyKit.UIRounded($"Card{i}", p.root, kItemColor, 20.0f);
+            ToyKit.Anchor(card, new Vector2(0.5f, 1.0f), new Vector2((col - (p.columns - 1) * 0.5f) * gapX, -130.0f - cardH * 0.5f - row * gapY), new Vector2(cardW, cardH));
 
             var iconRt = ToyKit.UIImage("Icon", card, Color.white);
-            ToyKit.Anchor(iconRt, new Vector2(0.5f, 1.0f), new Vector2(0.0f, -88.0f), new Vector2(150.0f, 150.0f));
+            ToyKit.Anchor(iconRt, new Vector2(0.5f, 1.0f), new Vector2(0.0f, -12.0f - iconSize.y * 0.5f), iconSize);
             var icon = iconRt.GetComponent<Image>();
             icon.preserveAspect = true;
+            Sprite sprite = chara ? (list.Character(i) != null ? list.Character(i).portrait : null) : (list.Stage(i) != null ? list.Stage(i).preview : null);
             TextMeshProUGUI letter = null;
-            if (data != null && data.portrait != null) icon.sprite = data.portrait;
+            if (sprite != null) icon.sprite = sprite;
             else
             {
-                // 顔の画像が無いキャラは、色と頭文字で仮に出す(キャラクターセレクトと同じ)
-                icon.color = data != null ? data.color : Color.gray;
-                letter = Text("Letter", iconRt, data != null && !string.IsNullOrEmpty(data.displayName) ? data.displayName.Substring(0, 1) : "?", 80.0f, Color.white, m_popMat);
+                // 画像が無いものは、色と頭文字で仮に出す(キャラクターセレクトと同じ。おまかせは「？」)
+                Color color = chara ? (list.Character(i) != null ? list.Character(i).color : Color.gray) : (list.Stage(i) != null ? list.Stage(i).color : kRandomColor);
+                icon.color = color;
+                string name0 = PickName(kind, i);
+                string mark = !chara && list.Stage(i) == null ? "？" : !string.IsNullOrEmpty(name0) ? name0.Substring(0, 1) : "?";
+                letter = Text("Letter", iconRt, mark, 80.0f, Color.white, m_popMat);
                 ToyKit.Stretch(letter.rectTransform);
             }
 
             var name = Text("Name", card, "", 32.0f, Color.white, m_letterMat);
-            name.enableAutoSizing = true; name.fontSizeMin = 20.0f; name.fontSizeMax = 32.0f;
+            name.enableAutoSizing = true; name.fontSizeMin = 18.0f; name.fontSizeMax = 32.0f;
             ToyKit.Anchor(name.rectTransform, new Vector2(0.5f, 0.0f), new Vector2(0.0f, 34.0f), new Vector2(cardW - 16.0f, 44.0f));
 
             var now = ToyKit.UIRounded("Now", card, ToyKit.Palette[1], 12.0f);
@@ -604,22 +706,24 @@ public class NetSessionMenu : MonoBehaviour
             var nowText = Text("Label", now, "いま", 26.0f, Color.white, m_popMat);
             ToyKit.Stretch(nowText.rectTransform);
 
-            m_cards.Add(new Card { bg = card.GetComponent<Image>(), icon = icon, letter = letter, name = name, now = now });
+            p.cards.Add(new Card { bg = card.GetComponent<Image>(), icon = icon, letter = letter, name = name, now = now });
         }
 
-        int rows = (n + kPickColumns - 1) / kPickColumns;
-        float descTop = -250.0f - (rows - 1) * gapY - cardH * 0.5f - 30.0f;
-        m_pickName = Text("SelName", m_picker, "", 44.0f, kSelectedColor, m_letterMat);
-        ToyKit.Anchor(m_pickName.rectTransform, new Vector2(0.5f, 1.0f), new Vector2(0.0f, descTop - 30.0f), new Vector2(1200.0f, 56.0f));
-        m_pickDesc = Text("SelDesc", m_picker, "", 28.0f, kPale, m_letterMat);
-        m_pickDesc.enableAutoSizing = true; m_pickDesc.fontSizeMin = 20.0f; m_pickDesc.fontSizeMax = 28.0f;
-        ToyKit.Anchor(m_pickDesc.rectTransform, new Vector2(0.5f, 1.0f), new Vector2(0.0f, descTop - 100.0f), new Vector2(1200.0f, 80.0f));
+        float descTop = -130.0f - rows * gapY;
+        p.name = Text("SelName", p.root, "", 44.0f, kSelectedColor, m_letterMat);
+        ToyKit.Anchor(p.name.rectTransform, new Vector2(0.5f, 1.0f), new Vector2(0.0f, descTop - 30.0f), new Vector2(width - 120.0f, 56.0f));
+        p.desc = Text("SelDesc", p.root, "", 28.0f, kPale, m_letterMat);
+        p.desc.enableAutoSizing = true; p.desc.fontSizeMin = 20.0f; p.desc.fontSizeMax = 28.0f;
+        ToyKit.Anchor(p.desc.rectTransform, new Vector2(0.5f, 1.0f), new Vector2(0.0f, descTop - 100.0f), new Vector2(width - 120.0f, 80.0f));
 
-        var hint = Text("Hint", m_picker, "←→↑↓：選ぶ　A：決定(すぐに 入れ替わります)　B：もどる", 28.0f, kSelectedColor, null);
+        var hint = Text("Hint", p.root, chara
+            ? "←→↑↓：選ぶ　A：決定(すぐに 入れ替わります)　B：もどる"
+            : "←→↑↓：選ぶ　A：決定(試合を はじめるときに みんなの ステージから 抽選します)　B：もどる", 28.0f, kSelectedColor, null);
         hint.enableAutoSizing = true; hint.fontSizeMin = 20.0f; hint.fontSizeMax = 28.0f;
-        ToyKit.Anchor(hint.rectTransform, new Vector2(0.5f, 0.0f), new Vector2(0.0f, 40.0f), new Vector2(1240.0f, 40.0f));
+        ToyKit.Anchor(hint.rectTransform, new Vector2(0.5f, 0.0f), new Vector2(0.0f, 40.0f), new Vector2(width - 80.0f, 40.0f));
 
-        m_picker.gameObject.SetActive(false);
+        p.root.gameObject.SetActive(false);
+        return p;
     }
 
     //========================================
@@ -798,7 +902,8 @@ public class NetSessionMenu : MonoBehaviour
             ToyKit.Stretch(m_confirmTexts[i].rectTransform);
         }
         m_confirm.gameObject.SetActive(false);
-        BuildPicker();
+        m_charPicker = BuildPicker(PickKind.Character);
+        m_stagePicker = BuildPicker(PickKind.Stage);
         m_menu.gameObject.SetActive(false);
         m_canvas.gameObject.SetActive(false);
     }

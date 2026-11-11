@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Nakahira;
 using UnityEngine;
 
-// ネット対戦で選べるキャラクターと、そのネット用プレハブ(Assets/suehara/Network/Characters/*_Net.prefab)の対応。
+// ネット対戦で選べるキャラクターと、そのネット用プレハブ(Assets/suehara/Network/Characters/*_Net.prefab)の対応。選べるステージの並びも持つ。
 // 中身はメニューの「Tools → ネット対戦 → キャラのネット用プレハブを作り直す」(NetCharacterBuilder)が作る。置き場所は Resources/NetCharacters.asset
 //  ・キャラの番号 = キャラクターセレクトの並び(SelectRoster.characters)の順。通信ではこの番号を送る
 //  ・ネット用プレハブが無いキャラ(専用のプレハブが無いキャラ)は、NetStages の Match に設定した基本のだるま(DarumaCharacter_Net)で出る
@@ -21,6 +21,8 @@ public class NetCharacterList : ScriptableObject
     }
 
     public List<Entry> entries = new List<Entry>();
+    [Tooltip("ネット対戦で選べるステージ(ステージセレクトと同じ SelectRoster.stages の並び。通信ではこの並びの番号を送る。NetCharacterList.None はおまかせ)")]
+    public List<StageData> stages = new List<StageData>();
 
     static NetCharacterList s_instance;
     // ホストで使う、プレハブをネット用に差し替えたキャラのデータ(番号ごと。シーンをまたいで使い回す)
@@ -45,6 +47,18 @@ public class NetCharacterList : ScriptableObject
         for (int i = 0; i < entries.Count; i++)
         {
             if (entries[i].character != null && entries[i].character.id == id) return i;
+        }
+        return None;
+    }
+
+    public StageData Stage(int index) => index >= 0 && index < stages.Count ? stages[index] : null;
+
+    public int StageIndexOf(string id)
+    {
+        if (string.IsNullOrEmpty(id)) return None;
+        for (int i = 0; i < stages.Count; i++)
+        {
+            if (stages[i] != null && stages[i].id == id) return i;
         }
         return None;
     }

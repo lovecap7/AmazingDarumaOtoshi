@@ -19,6 +19,8 @@ public class NetPadKeyboardInput : MonoBehaviour, IDarumaCommandSource
         if (!Application.isFocused) return default;
         // ネット対戦のメニュー(NetSessionMenu)を開いている間は動かさない
         if (NetSessionMenu.IsOpen) return default;
+        // ステージの抽選の演出を見ている間も動かさない
+        if (NetStageLottery.IsPlaying) return default;
 
         Vector2 stick = Vector2.zero;
         bool jump = false, sweep = false, shot = false;

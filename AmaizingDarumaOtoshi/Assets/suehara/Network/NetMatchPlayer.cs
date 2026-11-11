@@ -21,12 +21,14 @@ public class NetMatchPlayer : NetworkBehaviour
         public bool HasBody;
         public NetworkObjectReference Body;
         public byte Character;   // キャラの番号(NetCharacterList の並び。NetCharacterList.None なら基本のだるま)
+        public byte StageVote;   // 選んだステージの番号(NetCharacterList.stages の並び。NetCharacterList.None ならおまかせ)
 
         public void NetworkSerialize<T>(BufferSerializer<T> s) where T : IReaderWriter
         {
             s.SerializeValue(ref Ready);
             s.SerializeValue(ref Index);
             s.SerializeValue(ref Character);
+            s.SerializeValue(ref StageVote);
             s.SerializeValue(ref State);
             s.SerializeValue(ref Stocks);
             s.SerializeValue(ref Score);
@@ -45,7 +47,7 @@ public class NetMatchPlayer : NetworkBehaviour
         public bool Equals(Snapshot o) =>
             Ready == o.Ready && Index == o.Index && State == o.State && Stocks == o.Stocks && Score == o.Score &&
             Knocks == o.Knocks && Knocked == o.Knocked && KOs == o.KOs && Falls == o.Falls && SelfOuts == o.SelfOuts &&
-            Rank == o.Rank && Stack == o.Stack && RespawnLeft == o.RespawnLeft && Character == o.Character &&
+            Rank == o.Rank && Stack == o.Stack && RespawnLeft == o.RespawnLeft && Character == o.Character && StageVote == o.StageVote &&
             HasBody == o.HasBody && (!HasBody || Body.Equals(o.Body));
     }
 
@@ -80,6 +82,16 @@ public class NetMatchPlayer : NetworkBehaviour
     // いまのキャラの番号(NetCharacterList の並び。NetCharacterList.None なら基本のだるま)
     public int CharacterIndex => m_character;
 
+    // 選んだステージ(NetCharacterList.stages の番号。NetCharacterList.None ならおまかせ)。ホストが試合を始めるときに抽選する
+    int m_stageVote = NetCharacterList.None;
+    public int StageVote => m_stageVote;
+    const string kStageKey = "Net.Stage";
+    public static string SavedStageId
+    {
+        get => PlayerPrefs.GetString(kStageKey, "");
+        set => PlayerPrefs.SetString(kStageKey, value ?? "");
+    }
+
     public override void OnNetworkSpawn()
     {
         Player = gameObject.AddComponent<MatchPlayer>();
@@ -101,7 +113,33 @@ public class NetMatchPlayer : NetworkBehaviour
             var list = NetCharacterList.Instance;
             int saved = list != null ? list.IndexOf(SavedCharacterId) : NetCharacterList.None;
             if (saved != NetCharacterList.None && list.IsAvailable(saved)) RequestCharacter(saved);
+            int stage = list != null ? list.StageIndexOf(SavedStageId) : NetCharacterList.None;
+            if (stage != NetCharacterList.None) RequestStage(stage);
         }
+    }
+
+    //========================================
+    // ステージの選択(開始待ちの間だけ。ホストが試合を始めるときに、全員が選んだものから抽選する)
+    //========================================
+
+    // この PC の人: ステージを選ぶ(NetCharacterList.None ならおまかせ)
+    public void RequestStage(int index)
+    {
+        if (!IsOwner) return;
+        var list = NetCharacterList.Instance;
+        var stage = list != null ? list.Stage(index) : null;
+        SavedStageId = stage != null ? stage.id : "";
+        ChooseStageRpc((byte)(stage != null ? index : NetCharacterList.None));
+    }
+
+    [Rpc(SendTo.Server)]
+    void ChooseStageRpc(byte index, RpcParams rpc = default)
+    {
+        if (rpc.Receive.SenderClientId != OwnerClientId) return;
+        var list = NetCharacterList.Instance;
+        var net = NetMatch.Instance;
+        if (list == null || net == null || net.IsStarted || net.IsLotteryRunning) return;
+        m_stageVote = list.Stage(index) != null ? index : NetCharacterList.None;
     }
 
     //========================================
@@ -156,6 +194,7 @@ public class NetMatchPlayer : NetworkBehaviour
             Ready = true,
             Index = (byte)Index,
             Character = (byte)m_character,
+            StageVote = (byte)m_stageVote,
             State = (byte)p.State,
             Stocks = (sbyte)Mathf.Clamp(p.Stocks, sbyte.MinValue, sbyte.MaxValue),
             Score = (short)p.Score,
@@ -201,6 +240,8 @@ public class NetMatchPlayer : NetworkBehaviour
             match.NetClientAddPlayer(Player);
             m_registered = true;
         }
+
+        m_stageVote = s.StageVote;
 
         // キャラ(名前・顔のモデル。HUD・リザルト・頭のモデルの差し替えが使う)
         if (s.Character != m_character)

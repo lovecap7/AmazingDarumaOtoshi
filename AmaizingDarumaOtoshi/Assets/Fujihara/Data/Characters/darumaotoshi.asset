@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c8a751e747833b74c9fdf9b27cff5e69, type: 3}
-  m_Name: chara4
+  m_Name: darumaotoshi
   m_EditorClassIdentifier: Assembly-CSharp::CharacterData
   id: darumaotoshi
   displayName: "\u3060\u308B\u307E\u304A\u3068\u3057"

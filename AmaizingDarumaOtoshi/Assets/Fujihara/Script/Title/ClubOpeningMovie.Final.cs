@@ -397,6 +397,8 @@ public partial class ClubOpeningMovie
         // 主人公（託された紫のハンマー）と王者（銀の顔、黒いハンマー）
         fHero = CreateGPuppet(Red, true);
         fChamp = CreateGPuppet(ChampFace, false);
+        // 王者のハンマー：キャラのハンマー（いわだる）があればその色のまま。無いときは黒い頭・銀の柄にする
+        if (HammerModelFor(ChampFace) == null)
         foreach (var r in fChamp.hammer.GetComponentsInChildren<Renderer>(true))
             if (r.name == "HammerHead") r.sharedMaterial = ToyKit.Lit(new Color(0.1f, 0.1f, 0.12f), 0.85f);
             else if (r.name == "Handle") r.sharedMaterial = ToyKit.Lit(new Color(0.75f, 0.77f, 0.82f), 0.8f);
