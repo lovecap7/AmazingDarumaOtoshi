@@ -13,7 +13,7 @@ using UnityEngine;
 //  2. Variant に、基本のだるまのネット用プレハブ(DarumaCharacter_Net)と同じネット部品を、同じ設定で付ける
 //     (NetworkObject・NetworkTransform・NetworkRigidbody・NetworkDarumaCharacter・NetworkHammerView)
 //  3. Assets/DefaultNetworkPrefabs.asset に登録する(ネットで出せるようにする)
-//  4. 対応表 Resources/NetCharacters.asset(NetCharacterList)を SelectRoster の並びで作り直す
+//  4. 対応表 Resources/NetCharacters.asset(NetCharacterList)を SelectRoster の並びで作り直す(ステージの並びも入れる)
 // 元のプレハブ(Yurube さんなど)は変えない。キャラが増えた・プレハブが変わったら、もう一度実行する
 public static class NetCharacterBuilder
 {
@@ -57,6 +57,11 @@ public static class NetCharacterBuilder
             list.entries.Add(new NetCharacterList.Entry { character = data, netPrefab = net });
             log.Append($"{data.displayName}({data.id}) → {(net != null ? AssetDatabase.GetAssetPath(net) : "基本のだるま")}\n");
         }
+
+        // 選べるステージ(ステージセレクトと同じ並び)
+        list.stages.Clear();
+        foreach (var stage in roster.stages) if (stage != null) list.stages.Add(stage);
+        log.Append($"ステージ: {list.stages.Count}個\n");
 
         EditorUtility.SetDirty(list);
         EditorUtility.SetDirty(prefabsList);

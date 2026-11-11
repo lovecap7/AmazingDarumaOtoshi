@@ -434,6 +434,8 @@ public class NetConnectScreen : MonoBehaviour
     // さんか: キーボードで IP アドレスを入れる(文字は OnTextInput で受け取る)
     void UpdateJoin()
     {
+        // このウィンドウを選んでいるときだけ読む(Multiplayer Play Mode などで、裏の画面に入力が届かないように)
+        if (!Application.isFocused) return;
         var k = Keyboard.current;
         bool submit = (k != null && (k.enterKey.wasPressedThisFrame || k.numpadEnterKey.wasPressedThisFrame));
         bool cancel = (k != null && k.escapeKey.wasPressedThisFrame) || (Mouse.current != null && Mouse.current.rightButton.wasPressedThisFrame);
@@ -463,7 +465,7 @@ public class NetConnectScreen : MonoBehaviour
 
     void OnTextInput(char c)
     {
-        if (m_leaving || m_screen != Screen.Join || m_joinState != JoinState.Input) return;
+        if (m_leaving || m_screen != Screen.Join || m_joinState != JoinState.Input || !Application.isFocused) return;
         if (c == '\b')
         {
             if (m_address.Length > 0) { m_address = m_address.Substring(0, m_address.Length - 1); MenuSounds.Cursor(); }

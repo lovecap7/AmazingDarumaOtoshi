@@ -31,9 +31,14 @@ public static class MenuInput
     public static bool RightRepeat() => Repeat(Dir.Right);
     public static bool Repeat(Dir d, bool repeat) => repeat ? Repeat(d) : Pressed(d);
 
+    // ネット対戦用(suehara): このウィンドウが選ばれているときだけ入力を読む
+    // (同じ PC で複数の画面を動かす(Multiplayer Play Mode など)と、キーボード・コントローラーの入力が裏の画面にも届くため)
+    static bool Focused => Application.isFocused;
+
     // 押しているあいだ true
     public static bool Held(Dir d)
     {
+        if (!Focused) return false;
         var k = Keyboard.current;
         if (k != null)
         {
@@ -60,6 +65,7 @@ public static class MenuInput
 
     static bool Pressed(Dir d)
     {
+        if (!Focused) return false;
         var k = Keyboard.current;
         if (k != null)
         {
@@ -154,6 +160,7 @@ public static class MenuInput
     // Start ボタン / Enter（「決定して次へ」）
     public static bool Start()
     {
+        if (!Focused) return false;
         var k = Keyboard.current;
         if (k != null && (k.enterKey.wasPressedThisFrame || k.numpadEnterKey.wasPressedThisFrame)) return true;
         foreach (var g in Gamepad.all)
@@ -163,6 +170,7 @@ public static class MenuInput
 
     public static bool Submit()
     {
+        if (!Focused) return false;
         var k = Keyboard.current;
         if (k != null && (k.enterKey.wasPressedThisFrame || k.numpadEnterKey.wasPressedThisFrame || k.spaceKey.wasPressedThisFrame)) return true;
         foreach (var g in Gamepad.all)
@@ -172,6 +180,7 @@ public static class MenuInput
 
     public static bool Cancel()
     {
+        if (!Focused) return false;
         var k = Keyboard.current;
         if (k != null && (k.escapeKey.wasPressedThisFrame || k.backspaceKey.wasPressedThisFrame)) return true;
         foreach (var g in Gamepad.all)
@@ -184,6 +193,7 @@ public static class MenuInput
     // B（キャンセル）を押し続けているあいだ true（早送りなど）
     public static bool CancelHeld()
     {
+        if (!Focused) return false;
         var k = Keyboard.current;
         if (k != null && (k.escapeKey.isPressed || k.backspaceKey.isPressed)) return true;
         foreach (var g in Gamepad.all)
@@ -194,6 +204,7 @@ public static class MenuInput
 
     public static bool AnyClick()
     {
+        if (!Focused) return false;
         var m = Mouse.current;
         return m != null && m.leftButton.wasPressedThisFrame;
     }
@@ -201,6 +212,7 @@ public static class MenuInput
     // 実績一覧の並び替え（Q/E または LB/RB）
     public static bool SortPrev()
     {
+        if (!Focused) return false;
         var k = Keyboard.current;
         if (k != null && k.qKey.wasPressedThisFrame) return true;
         foreach (var g in Gamepad.all)
@@ -210,6 +222,7 @@ public static class MenuInput
 
     public static bool SortNext()
     {
+        if (!Focused) return false;
         var k = Keyboard.current;
         if (k != null && k.eKey.wasPressedThisFrame) return true;
         foreach (var g in Gamepad.all)
@@ -220,6 +233,7 @@ public static class MenuInput
     // 実績一覧の昇順／降順（X または Y 上ボタン）
     public static bool ToggleSortDirection()
     {
+        if (!Focused) return false;
         var k = Keyboard.current;
         if (k != null && (k.xKey.wasPressedThisFrame || k.cKey.wasPressedThisFrame)) return true;
         foreach (var g in Gamepad.all)

@@ -9,7 +9,7 @@ using UnityEngine;
 //  ・接続したら、シーンの Match(最初は非表示の DarumaMatch)に NetMatchDriver を付けて表示する
 //  ・ホスト      : 接続した人ごとに NetPlayer を出す(1人分は NetMatchPlayer)。ルール・時間・試合の始まりと終わり・お知らせを配る
 //  ・クライアント: 届いたルール・時間・結果・お知らせを DarumaMatch に入れる(HUD・カメラなどはいつもどおり DarumaMatch を読む)
-// 試合を始めるのはホスト(StartMatch。NetSessionMenu の「試合を はじめる」)。開始待ちの間に選んだルールは SetRules で配る。それまでは開始待ちで、自由に動ける
+// 試合を始めるのはホスト(NetSessionMenu の「試合を はじめる」→ StartWithLottery: 全員が選んだステージから抽選して切り替えてから StartMatch)。開始待ちの間に選んだルールは SetRules で配る。それまでは開始待ちで、自由に動ける
 // 試合が終わったらローカル(MatchResultRelay)と同じく、結果を ResultData に入れて全員でリザルト画面へ移り、
 // ホストの決定でこのシーンに戻る(NetSceneFlow / NetResultFlow)。シーンを読み直すので、次の試合はまた開始待ちから
 public class NetMatch : NetworkBehaviour
@@ -117,14 +117,17 @@ public class NetMatch : NetworkBehaviour
 
             NetworkManager.OnClientConnectedCallback += OnClientConnected;
             NetworkManager.OnClientDisconnectCallback += OnClientDisconnected;
-            if (NetworkManager.SceneManager != null) NetworkManager.SceneManager.OnLoadComplete += OnClientLoaded;
+            if (NetworkManager.SceneManager != null) NetworkManager.SceneManager.OnLoadEventCompleted += OnAllLoaded;
             // つながったままこのシーンへ移ってきたとき(接続画面・リザルトから)、ほかの人はまだシーンを読んでいる途中。
-            // いま1人分(NetPlayer)を出すと、その人の端末では読み込み中の前のシーンと一緒に消えて操作できなくなる。
-            // なので自分(ホスト)の分だけすぐ出し、ほかの人は読み終えたとき(OnClientLoaded)に出す
-            foreach (var id in NetworkManager.ConnectedClientsIds)
+            // いま1人分(NetPlayer)やキャラを出すと、その人の端末では読み込み中の前のシーンと一緒に消えてしまう
+            // (クライアントが操作できない・ホストのキャラが見えない・カメラがホストを映さない)。
+            // なので、ほかの人がいるときは、ホスト自身の分も含めて全員が読み終えてから(OnAllLoaded)まとめて出す
+            if (NetworkManager.ConnectedClientsIds.Count > 1)
             {
-                if (id == NetworkManager.LocalClientId) OnClientConnected(id);
+                m_waitingForLoad = true;
+                m_waitStart = Time.unscaledTime;
             }
+            else SpawnConnectedPlayers();
             return;
         }
 
@@ -152,7 +155,7 @@ public class NetMatch : NetworkBehaviour
         {
             NetworkManager.OnClientConnectedCallback -= OnClientConnected;
             NetworkManager.OnClientDisconnectCallback -= OnClientDisconnected;
-            if (NetworkManager.SceneManager != null) NetworkManager.SceneManager.OnLoadComplete -= OnClientLoaded;
+            if (NetworkManager.SceneManager != null) NetworkManager.SceneManager.OnLoadEventCompleted -= OnAllLoaded;
         }
         m_players.Clear();
         if (m_match == null) return;
@@ -183,9 +186,109 @@ public class NetMatch : NetworkBehaviour
         m_match.SetNetRules(rules);
     }
 
+    //========================================
+    // ステージの抽選(ホストが試合を始めるとき)
+    //========================================
+
+    readonly NetworkVariable<bool> m_lottery = new NetworkVariable<bool>();
+    MatchSetup.MatchRules m_lotteryRules;
+
+    // 抽選から試合が始まるまでの間(ルール・キャラ・ステージを変えられない)
+    public bool IsLotteryRunning => m_lottery.Value;
+
+    // ホスト: 全員が選んだステージ(おまかせはここで決める)から抽選し、決まったステージに切り替えてから試合を始める
+    // 1人だけ・全員が同じステージ(おまかせ以外)なら、キャラクターセレクトと同じく抽選の演出は出さずに決める
+    public void StartWithLottery(MatchSetup.MatchRules rules)
+    {
+        if (!IsServer || m_match == null || IsStarted || m_lottery.Value) return;
+        var list = NetCharacterList.Instance;
+        var switcher = FindAnyObjectByType<Nakagawa.StageSwitcher>(FindObjectsInactive.Include);
+
+        // 選べるステージ(試合のシーンにあるもの)。なければ今のステージのまま始める
+        var candidates = new List<int>();
+        for (int i = 0; list != null && switcher != null && i < list.stages.Count; i++)
+        {
+            if (list.Stage(i) != null && switcher.IndexOf(list.Stage(i).id) >= 0) candidates.Add(i);
+        }
+        var voters = new List<NetMatchPlayer>();
+        foreach (var p in m_players.Values) if (p != null) voters.Add(p);
+        voters.Sort((a, b) => a.Index.CompareTo(b.Index));
+        if (candidates.Count == 0 || voters.Count == 0)
+        {
+            StartMatch(rules);
+            return;
+        }
+
+        int n = voters.Count;
+        var players = new byte[n];
+        var stages = new byte[n];
+        var hidden = new bool[n];
+        for (int i = 0; i < n; i++)
+        {
+            int vote = voters[i].StageVote;
+            hidden[i] = !candidates.Contains(vote);
+            stages[i] = (byte)(hidden[i] ? candidates[UnityEngine.Random.Range(0, candidates.Count)] : vote);
+            players[i] = (byte)voters[i].Index;
+        }
+        int winner = UnityEngine.Random.Range(0, n);
+        bool same = true;
+        for (int i = 0; i < n; i++) same &= !hidden[i] && stages[i] == stages[0];
+
+        m_lottery.Value = true;
+        m_lotteryRules = rules;
+        if (n <= 1 || same) StartCoroutine(SwitchAndStart(stages[winner]));
+        else LotteryRpc(players, stages, hidden, (byte)winner);
+    }
+
+    // 全員(ホストも)で抽選の演出を出す。ホストは終わったらステージを切り替えて試合を始める
+    [Rpc(SendTo.Everyone)]
+    void LotteryRpc(byte[] players, byte[] stages, bool[] hidden, byte winner)
+    {
+        var list = NetCharacterList.Instance;
+        var cards = new List<NetStageLottery.Card>();
+        for (int i = 0; i < players.Length && i < stages.Length && i < hidden.Length; i++)
+        {
+            var p = FindPlayer(players[i]);
+            cards.Add(new NetStageLottery.Card
+            {
+                Label = p != null ? p.Label : $"{players[i] + 1}P",
+                Color = p != null ? p.Color : Color.gray,
+                Stage = list != null ? list.Stage(stages[i]) : null,
+                Hidden = hidden[i],
+            });
+        }
+        if (cards.Count == 0) return;
+        int won = Mathf.Clamp(winner, 0, stages.Length - 1);
+        Action done = null;
+        if (IsServer) done = () => { if (this != null && IsSpawned) StartCoroutine(SwitchAndStart(stages[won])); };
+        NetStageLottery.Play(cards, won, done);
+    }
+
+    // ホスト: 決まったステージに切り替え(全員のステージは NetStageSync が合わせる)、切り替え終わってから試合を始める
+    IEnumerator SwitchAndStart(int stage)
+    {
+        var list = NetCharacterList.Instance;
+        var switcher = FindAnyObjectByType<Nakagawa.StageSwitcher>(FindObjectsInactive.Include);
+        var data = list != null ? list.Stage(stage) : null;
+        int target = data != null && switcher != null ? switcher.IndexOf(data.id) : -1;
+        if (target >= 0 && target != switcher.CurrentIndex)
+        {
+            switcher.SwitchTo(target);
+            float limit = Time.unscaledTime + 5.0f;
+            while (switcher.CurrentIndex != target && Time.unscaledTime < limit) yield return null;
+            // キャラクターの出し直しが済むまで少し待つ
+            yield return null;
+            yield return null;
+        }
+        m_lottery.Value = false;
+        StartMatch(m_lotteryRules);
+    }
+
     private void Update()
     {
         if (!IsSpawned || m_match == null) return;
+        // 念のため: 読み終わりの知らせが来ないまま時間が過ぎたら、待たずに出す
+        if (IsServer && m_waitingForLoad && Time.unscaledTime - m_waitStart > kLoadWaitLimit) SpawnConnectedPlayers();
         if (IsServer) ServerUpdateClock();
         else ClientUpdateClock();
     }
@@ -215,12 +318,24 @@ public class NetMatch : NetworkBehaviour
         obj.SpawnAsPlayerObject(clientId, true);
     }
 
-    // ほかの人がこのシーンを読み終えた(接続画面・リザルトから一緒に移ってきたとき)
-    void OnClientLoaded(ulong clientId, string sceneName, UnityEngine.SceneManagement.LoadSceneMode mode)
+    // 全員の読み込みを待っている間(接続画面・リザルトから一緒に移ってきたとき)
+    bool m_waitingForLoad;
+    float m_waitStart;
+    // これ以上待っても読み終わらない人がいたら、待たずに出す(秒)
+    const float kLoadWaitLimit = 20.0f;
+
+    // 全員がこのシーンを読み終えた(読み込みが時間切れになった人がいても来る)
+    void OnAllLoaded(string sceneName, UnityEngine.SceneManagement.LoadSceneMode mode, List<ulong> completed, List<ulong> timedOut)
     {
-        if (sceneName != gameObject.scene.name) return;
-        if (!NetworkManager.ConnectedClients.ContainsKey(clientId)) return;
-        OnClientConnected(clientId);
+        if (!m_waitingForLoad || sceneName != gameObject.scene.name) return;
+        SpawnConnectedPlayers();
+    }
+
+    // つながっている人(ホストも)の1人分をまとめて出す
+    void SpawnConnectedPlayers()
+    {
+        m_waitingForLoad = false;
+        foreach (var id in NetworkManager.ConnectedClientsIds) OnClientConnected(id);
     }
 
     // 1人分(NetPlayer)は NGO が消し、そのとき NetMatchPlayer が試合から外す

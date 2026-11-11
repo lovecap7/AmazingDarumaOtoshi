@@ -66,7 +66,10 @@
 | `NetLobbyUI.cs` | NetStages の接続まわり。つないでいないときの中央の接続パネル（NetStages を直接開いたときの試験用。クリック操作）、切断したときの戻り（接続画面から来たときは接続画面へ）、NetSessionMenu を自動で付ける。リザルトから戻ったとき、シーンに入っている2つ目の NetworkManager を消す |
 | `NetSessionMenu.cs` | NetStages でつないでいる間の表示とメニュー（2026-11-04。クリックなし）。右上にいまの試合の設定・へやばんごう・人数。Start（+）/ Tab でメニュー（見た目は中川さんの PauseMenu と同じ）: ホストの開始待ちは「試合を はじめる / モード / ストック / 時間 / へやを かいさん / とじる」、試合中とさんかは「かいさん（ぬける）/ とじる」。ホストが変えたルールは `NetMatch.SetRules` ですぐ全員に配る。開いている間はキャラの入力（NetPadKeyboardInput）と、OnGUI で描く開発用の表示（StageSwitcher・TumikiImpactModeToggle・SpawnPointDebugView・StageCameraTuner・CharacterLabUI。OnGUI はどの UI よりも上に出るため）を止める。**Yurube さんの必殺技のゲージ・カットインも OnGUI なのでメニューの上に出る**（止めると必殺技が止まるのでそのまま）。ネット対戦は時間を止められないので、試合中に開いても試合は進む |
 | キャラ選択（2026-11-11） | メニュー（Start / Tab）の「キャラクター」から、だれでも自分のキャラを選べる（開始待ちの間だけ。試合中は「試合中は 変えられません」）。選ぶとその場で体が入れ替わる。選んだキャラは PlayerPrefs（`Net.Character`）に覚え、試合のシーンに入るたびにホストへ送る。だるきんぐは実績をすべて解除するまで選べない（キャラクターセレクトと同じ）。**必殺技は未対応のまま**（B-03） |
-| `NetCharacterList.cs`（`Resources/NetCharacters.asset`） | 選べるキャラ（SelectRoster の並び）とネット用プレハブの対応。通信ではこの並びの番号を送る。ホストは prefab をネット用に差し替えた CharacterData の複製を Entry.character に入れる（DarumaMatch はデータの prefab を出すため）。専用プレハブの無いキャラは基本のだるま |
+| ステージ選択（2026-11-11） | メニューの「ステージ」から、だれでも遊びたいステージ（11個。ステージセレクトと同じ SelectRoster.stages）か「おまかせ」を選ぶ（開始待ちの間だけ。選んでいない人はおまかせ）。選んだものは PlayerPrefs（`Net.Stage`）に覚える。ホストが「試合を はじめる」を押すと `NetMatch.StartWithLottery` が全員の票（おまかせはここでランダムに決める）から当たりを決め、全員の画面で抽選の演出（`NetStageLottery`。キャラクターセレクトの抽選と同じ見た目と流れ）を出し、ホストは終わったら StageSwitcher でそのステージに切り替えてから試合を始める。1人だけ・全員が同じステージなら演出なしで決める。抽選の間（`NetMatch.IsLotteryRunning`）は、ルール・キャラ・ステージを変えられず、キャラも動かない |
+| `FocusInputGuard.cs` | 起動時に自動で1つ作られる（シーンをまたいで残る）。このウィンドウが選ばれていない間は `EventSystem.sendNavigationEvents` を止める（メインメニューなど EventSystem で操作する画面に、Multiplayer Play Mode の 2P の入力が届かないように）。Fader が場面を移る間に止めたものは戻さない |
+| `NetStageLottery.cs` | ステージの抽選の演出（並び → 枠が巡って止まる → おまかせならめくる → 「〇〇に 決定！」）。演出の間は開発用の表示（OnGUI）を隠す（`NetSessionMenu.HideDevViews`） |
+| `NetCharacterList.cs`（`Resources/NetCharacters.asset`） | 選べるキャラ（SelectRoster の並び）とネット用プレハブの対応。選べるステージの並び（`stages`）も持つ。通信ではこの並びの番号を送る。ホストは prefab をネット用に差し替えた CharacterData の複製を Entry.character に入れる（DarumaMatch はデータの prefab を出すため）。専用プレハブの無いキャラは基本のだるま |
 | `Network/Characters/*_Net.prefab` | Yurube さんのキャラ7体のネット用 Variant。**メニューの「Tools → ネット対戦 → キャラのネット用プレハブを作り直す」（`Editor/NetCharacterBuilder.cs`）で作る**（DarumaCharacter_Net と同じネット部品を同じ設定で付け、DefaultNetworkPrefabs に登録し、NetCharacters.asset を作り直す）。キャラが増えた・プレハブが変わったら実行する |
 | `NetSceneFlow.cs` | ネットのシーン遷移（自動で1個作られ、シーンをまたいで残る）。ホストの `Load(scene)` で全員を暗くしてから NGO で切り替え、読み終わったら明るくする。リザルトで切断したら NetStages に戻す |
 | `NetResultFlow.cs` | 接続中にリザルト画面が読み込まれたら自動で付く。演出が終わったら画面自身のセレクト行きを止め（`done` / `leaving` をリフレクションで読み書き）、ホストの決定で NetStages に戻す。**ResultTowerScreen / ResultScreen のフィールド名が変わったら直す** |
@@ -111,6 +114,7 @@
 | `GimmickBurst` / `GimmickSound` / `BilliardFx.Shake` / `StageMessageUI.Show`（中川さん） | 先頭に2行: `Mute()` の範囲なら出さない、`Relay()` の範囲ならクライアントへ送る |
 | ステージ19: `BilliardBall` / `BilliardCue` / `BilliardTable` / `BilliardTiltGimmick` / `BilliardShuffleGimmick` / `BilliardFountainGimmick` / `BilliardPocketGimmick`（中川さん） | ホストの処理に `Relay()`。`INetGimmickState` で、玉（位置・転がる向き・大きさ・表示・軌跡）、キュー（構え・突く動き・狙いのガイド。クライアントでは動きを進めない）、玉が出る場所の印、傾き（経過時間・向き）、入れ替えの予告（入れ替えはホストだけ）、噴出のポケットの光を受け取る。`FindTable()`（クライアントで自分の台を探す） |
 | ステージ20: `RouletteGame` / `RouletteWheel` / `RouletteBall` / `RouletteBet` / `RouletteWeightRain` / `RouletteTumikiRain`（中川さん） | ホストの処理に `Relay()`。`INetGimmickState` で、ディーラーの手・電飾・音の進み、盤の角度（cos・sin で送る）・ポケットの予告と奈落（当たり判定も作り直す）、球、賭けた色と判定（置くときは `Mute()`）、重り・影、積み木の雨の輪を受け取る。降ってくる・噴き出す積み木は `Tumiki_Net` なので別に届く |
+| `Fujihara/Script/Common/MenuInput.cs`（藤原さん。2026-11-11、ユーザー了承済み） | 入力を読む関数すべての先頭で、このウィンドウが選ばれていなければ何も押されていないことにする（`Application.isFocused`）。Multiplayer Play Mode で 2P の入力がメインのエディターのメニュー（メインメニュー・接続画面など）にも届いていたため |
 | `Fujihara/Scene/MenuScene.unity`（藤原さん。了承済み） | MainMenu の `onlineSceneName` に `NetConnectScene` を入れた（この1か所だけ） |
 | `ProjectSettings/EditorBuildSettings.asset` | `suehara/NetConnectScene.unity` を追加 |
 | `Assets/DefaultNetworkPrefabs.asset` | Net Cube, Tumiki_Net, DarumaCharacter_Net, DarumaGhost_Net, NetPlayer の5件 |
@@ -143,6 +147,11 @@
 - 2026-11-09 直した不具合: クライアントだけ、部屋に入って最初の試合で操作できない（抜けて入り直すと操作できる）。
   接続画面から全員で NetStages へ移るとき、ホストが読み込みの途中で参加者の NetPlayer を出していたため、クライアントでは読み込み中の前のシーンと一緒に消えていた。
   → `NetMatch` は、ホスト自身の分だけすぐ出し、ほかの人は `SceneManager.OnLoadComplete`（その人が読み終えた）で出す。ユーザーが2台で確認済み。
+- 2026-11-11 直した不具合: 全員で NetStages へ移ったあと、クライアントの画面でホストのキャラが見えない（積んだ積み木だけ見える）・カメラがホストを映さない。
+  ホスト自身の NetPlayer とキャラも、クライアントが読み込んでいる途中に出していたため（上と同じ理由）。
+  → ほかの人と一緒に移ってきたときは、ホストの分も含めて全員が読み終えてから（`SceneManager.OnLoadEventCompleted`）まとめて出す（20秒待っても来なければ待たずに出す）。
+  **シーンを移る途中にホストが出した NetworkObject は、クライアントで消えることがある**。読み込み中に積み木の生成などで出したものも同じことが起きうる（未確認）。
+- Unity MCP は MPPM の 2P のエディターを一覧に出すことがあるが、宛先に指定してもメインのエディターに届く（2P は MCP から動かせない）。
 - 2026-11-09: ステージ19・20 のネット対応。ホストで動かして、全部品の状態の書き出しと読み込みの数が合うこと、
   キューで突く・球が止まるときのエフェクト・音・文字・揺れがクライアントへ送る流れに乗ることを確認（エラーなし）。
   2026-11-10: PC 2台でクライアント側の見た目も問題なし（ユーザーが確認）。
