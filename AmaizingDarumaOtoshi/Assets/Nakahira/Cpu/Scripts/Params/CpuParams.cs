@@ -256,6 +256,16 @@ namespace Nakahira
         [Tooltip("ゲージが満タンになったとき、撃ちどころを待たずにすぐ撃ってしまう確率")]
         [Range(0.0f, 1.0f)] public float SpecialRashChance = 0.0f;
 
+        [Header("必殺技:状態「必殺技」(撃てる所まで近づく。今はみだる)")]
+        [Tooltip("状態「必殺技」の点数(殴る・撃つより高く、逃げるより低い)")]
+        [Range(0.0f, 1.0f)] public float SpecialStateScore = 0.7f;
+        [Tooltip("この時間(秒)たっても撃てなければ、状態「必殺技」を終える(すぐまた入ってよい)")]
+        [Min(0.1f)] public float SpecialGiveUpTime = 5.0f;
+
+        [Header("必殺技:みだるのファンネル(積んでいた数に分裂して、近い敵から順に追う)")]
+        [Tooltip("一番近い敵がこの距離(m)以内で、間に壁がなければ、そちらへ向き直って撃つ(どの状態の最中でも)")]
+        [Min(0.0f)] public float FunnelRange = 8.0f;
+
         [Header("必殺技:きだるの黄金化(無敵＋速さ 1.5 倍)")]
         [Tooltip("攻めに行くの最中は、相手までの道の距離がこれ(m)以内になったら撃つ(殴るに入ったらすぐ撃つ)")]
         [Min(0.0f)] public float GoldenFireDistance = 8.0f;

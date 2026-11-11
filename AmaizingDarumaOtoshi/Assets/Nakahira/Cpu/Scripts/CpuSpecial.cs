@@ -50,15 +50,21 @@ namespace Nakahira
         // 撃ちどころを見逃したとき、引き直すまでの間隔(秒)
         const float kRenoticeInterval = 1.0f;
 
-        // あかだる(トロン):狙う相手・向き直っている最中か・狙う向き・狙いのぶれ(度。向き直り始めに一度だけ決める)
+        // 向き直り(あかだる・みだる):向き直っている最中か・狙う向き
+        // あかだる(トロン):狙う相手・狙いのぶれ(度。向き直り始めに一度だけ決める)
         MatchPlayer m_tronTarget;
-        bool m_tronAiming;
-        Vector3 m_tronAimDir;
+        bool m_aiming;
+        Vector3 m_aimDir;
         float m_tronAimError;
         // 向き直るときにスティックを倒す強さ(歩かないよう小さく)
         const float kAimInput = 0.05f;
         // 狙う向きとの差がこれ(度)以内になったら撃つ
         const float kTronFaceAngle = 4.0f;
+
+        // みだる(ファンネル):1 発目が向かう一番近い敵
+        MatchPlayer m_funnelTarget;
+        // 敵の方との差がこれ(度)以内になったら撃つ(分裂弾は 1 秒に 360° 曲がって追う)
+        const float kFunnelFaceAngle = 15.0f;
 
         // 撃つと決めた理由を Console に出す(テスト用)
         public static bool LogDecisions;
@@ -120,6 +126,8 @@ namespace Nakahira
             if (!m_rash && !Notice(c, ShouldActivate(c, current))) return false;
             // あかだる:狙う向きへ向き直ってから撃つ(トロンは押した瞬間の向きへ飛ぶ。すぐ撃ってしまうときは今の向きのまま)
             if (!m_rash && m_ability is AkadaruSpecial akadaru && !FacingTronAim(c, akadaru)) return false;
+            // みだる:一番近い敵の方へ向き直ってから撃つ(弾が曲がって追うので、あかだるより甘くてよい)
+            if (!m_rash && m_ability is MidaruSpecial && !FacingFunnelTarget(c)) return false;
             // 撃てない間(ハンマーを振っているなど)は、撃ちどころが続く間 毎フレーム試す
             if (!m_ability.TryActivate()) return false;
             m_wasFull = false;
@@ -154,15 +162,15 @@ namespace Nakahira
         {
             m_inChance = false;
             m_noticed = false;
-            m_tronAiming = false;
+            m_aiming = false;
         }
 
         // 撃つ向きへ向き直っている最中なら、状態が出した操作を置き換える(状態の Tick のあとに呼ぶ)
         // 狙う向きへスティックを少しだけ倒す(歩かずに向きだけ変える)。ハンマー・ジャンプは止める
         public void OverrideAim(ref DarumaCommand cmd)
         {
-            if (!m_tronAiming) return;
-            cmd.Move = new Vector2(m_tronAimDir.x, m_tronAimDir.z) * kAimInput;
+            if (!m_aiming) return;
+            cmd.Move = new Vector2(m_aimDir.x, m_aimDir.z) * kAimInput;
             cmd.Jump = false;
             cmd.Sweep = false;
             cmd.Shot = false;
@@ -202,7 +210,7 @@ namespace Nakahira
                 case HebidaruSpecial _: return true;   // 毒沼
                 case AkadaruSpecial _:  return TronChance(c);   // トロン(ビーム)
                 case DaruKingSpecial _: return true;   // エクスカリバー
-                case MidaruSpecial _:   return true;   // ファンネル
+                case MidaruSpecial _:   return FunnelChance(c);   // ファンネル
                 case KidaruSpecial _:   return KidaruChance(c, current);   // 黄金化
                 default:                return true;
             }
@@ -251,12 +259,12 @@ namespace Nakahira
         {
             CpuOpponent o = m_tronTarget != null ? c.Perception.Find(m_tronTarget) : null;
             if (o == null) return false;
-            if (!m_tronAiming)
+            if (!m_aiming)
             {
                 // 狙いのぶれは股抜きショットと同じ:集中度の割合が高いほど大きい
                 float error = Mathf.Lerp(c.Params.ShotAimError, c.Params.ShotAimErrorMax, c.LoadRatio);
                 m_tronAimError = Random.Range(-error, error);
-                m_tronAiming = true;
+                m_aiming = true;
             }
 
             // 弾が届く時刻の相手の位置(届く時間は予想した位置までの距離で求め直す)
@@ -271,11 +279,53 @@ namespace Nakahira
             Vector3 to = aim - pos;
             to.y = 0.0f;
             if (to.sqrMagnitude < 0.0001f) return false;
-            m_tronAimDir = Quaternion.AngleAxis(m_tronAimError, Vector3.up) * to.normalized;
+            m_aimDir = Quaternion.AngleAxis(m_tronAimError, Vector3.up) * to.normalized;
 
             Vector3 forward = c.Self.transform.forward;
             forward.y = 0.0f;
-            return Vector3.Angle(forward, m_tronAimDir) <= kTronFaceAngle;
+            return Vector3.Angle(forward, m_aimDir) <= kTronFaceAngle;
+        }
+
+        // 状態「必殺技」(撃てる所まで近づく)に入りたいか:ゲージが満タンで、近づかないと撃てないキャラ(今はみだる)
+        // 射程の外でも、満タンなら近づきに行く(撃ちどころを見逃していても入れる)
+        public bool WantsApproach(CpuContext c)
+        {
+            if (Disabled || m_gauge == null || !m_gauge.IsFull || c.StackCount <= 0) return false;
+            return m_ability is MidaruSpecial;
+        }
+
+        // みだる(ファンネル):どの状態の最中でも、一番近い敵(1 発目が向かう敵)が FunnelRange 以内で、間に壁がないとき
+        // (分裂弾は近い敵から順に割り振られる。一番近い敵が幽霊でなく無敵でもないことも見る)
+        private bool FunnelChance(CpuContext c)
+        {
+            m_funnelTarget = null;
+            if (c.StackCount <= 0) return false;
+            CpuOpponent nearest = null;
+            foreach (var o in c.Perception.Opponents)
+            {
+                if (o.IsGhost || o.Character == null) continue;
+                if (nearest == null || o.FlatDistance < nearest.FlatDistance) nearest = o;
+            }
+            if (nearest == null || nearest.IsInvincible) return false;
+            if (nearest.FlatDistance > c.Params.FunnelRange) return false;
+            if (CpuShotState.HasWall(c.Position, nearest.Position)) return false;
+            m_funnelTarget = nearest.Player;
+            return true;
+        }
+
+        // 一番近い敵の方へ向き直ったか
+        private bool FacingFunnelTarget(CpuContext c)
+        {
+            CpuOpponent o = m_funnelTarget != null ? c.Perception.Find(m_funnelTarget) : null;
+            if (o == null) return false;
+            Vector3 to = o.Position - c.Position;
+            to.y = 0.0f;
+            if (to.sqrMagnitude < 0.0001f) return true;
+            m_aiming = true;
+            m_aimDir = to.normalized;
+            Vector3 forward = c.Self.transform.forward;
+            forward.y = 0.0f;
+            return Vector3.Angle(forward, m_aimDir) <= kFunnelFaceAngle;
         }
 
         //========================================

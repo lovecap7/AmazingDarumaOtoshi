@@ -124,6 +124,9 @@ MonoBehaviour:
   SwordMargin: 1
   SpecialNoticeDelay: 1
   SpecialRashChance: 0.3
+  SpecialStateScore: 0.7
+  SpecialGiveUpTime: 5
+  FunnelRange: 8
   GoldenFireDistance: 8
   GoldenAttackScore: 0.7
   GoldenHazardMargin: 0.5

@@ -34,6 +34,8 @@ namespace Nakahira
         readonly CpuGhost m_ghost = new CpuGhost();
         readonly CpuHazardGuard m_hazardGuard = new CpuHazardGuard();
         readonly CpuSpecial m_special = new CpuSpecial();
+        // 状態「必殺技」(撃てる所まで近づく。CpuSpecial を使うので Awake で作る)
+        CpuSpecialState m_specialState;
         // 前のフレームで動かしていた幽霊(幽霊になり直したら考え直す)
         DarumaGhost m_lastGhost;
         CpuState[] m_states;
@@ -73,7 +75,8 @@ namespace Nakahira
 
         private void Awake()
         {
-            m_states = new CpuState[] { m_collect, m_flee, m_melee, m_shot, m_approach, m_wait };
+            m_specialState = new CpuSpecialState(m_special);
+            m_states = new CpuState[] { m_collect, m_flee, m_melee, m_shot, m_approach, m_wait, m_specialState };
             m_isEngagedWith = IsEngagedWith;
         }
 
@@ -84,6 +87,7 @@ namespace Nakahira
             if (m_current == m_melee) return m_melee.Target == player;
             if (m_current == m_shot) return m_shot.Target == player;
             if (m_current == m_approach) return m_approach.Target == player;
+            if (m_current == m_specialState) return m_specialState.Target == player;
             if (m_current == m_flee)
             {
                 foreach (var pursuer in m_flee.Pursuers)
