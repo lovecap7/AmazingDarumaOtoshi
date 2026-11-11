@@ -65,6 +65,9 @@
 | `NetGimmickSync.cs` | NetMatch と同じ GameObject（2026-11-09）。ホストだけが動かすギミック（ステージ19 ビリヤード・20 ルーレット。`INetGimmickState` を持つもの）の見た目をクライアントに見せる。**状態**: ホストが 0.05 秒ごとに、表示中のギミックの状態（数の並び）をまとめて送り、クライアントは 0.12 秒遅らせて前後の間を補間し、毎フレーム `ReadNetState` を呼ぶ。ギミックの見分けはシーンの中の並び（一番上は名前、その下は親からの順番）。**エフェクト・音・文字・揺れ**: ホストで `GimmickNet.Relay()` の範囲に出た `GimmickBurst.Play` / `GimmickSound.Play` / `BilliardFx.Shake` / `StageMessageUI.Show` を、そのままクライアントでも出す（エフェクトの設定は JSON で送る。材質は送らない。音は名前で探す） |
 | `NetLobbyUI.cs` | NetStages の接続まわり。つないでいないときの中央の接続パネル（NetStages を直接開いたときの試験用。クリック操作）、切断したときの戻り（接続画面から来たときは接続画面へ）、NetSessionMenu を自動で付ける。リザルトから戻ったとき、シーンに入っている2つ目の NetworkManager を消す |
 | `NetSessionMenu.cs` | NetStages でつないでいる間の表示とメニュー（2026-11-04。クリックなし）。右上にいまの試合の設定・へやばんごう・人数。Start（+）/ Tab でメニュー（見た目は中川さんの PauseMenu と同じ）: ホストの開始待ちは「試合を はじめる / モード / ストック / 時間 / へやを かいさん / とじる」、試合中とさんかは「かいさん（ぬける）/ とじる」。ホストが変えたルールは `NetMatch.SetRules` ですぐ全員に配る。開いている間はキャラの入力（NetPadKeyboardInput）と、OnGUI で描く開発用の表示（StageSwitcher・TumikiImpactModeToggle・SpawnPointDebugView・StageCameraTuner・CharacterLabUI。OnGUI はどの UI よりも上に出るため）を止める。**Yurube さんの必殺技のゲージ・カットインも OnGUI なのでメニューの上に出る**（止めると必殺技が止まるのでそのまま）。ネット対戦は時間を止められないので、試合中に開いても試合は進む |
+| キャラ選択（2026-11-11） | メニュー（Start / Tab）の「キャラクター」から、だれでも自分のキャラを選べる（開始待ちの間だけ。試合中は「試合中は 変えられません」）。選ぶとその場で体が入れ替わる。選んだキャラは PlayerPrefs（`Net.Character`）に覚え、試合のシーンに入るたびにホストへ送る。だるきんぐは実績をすべて解除するまで選べない（キャラクターセレクトと同じ）。**必殺技は未対応のまま**（B-03） |
+| `NetCharacterList.cs`（`Resources/NetCharacters.asset`） | 選べるキャラ（SelectRoster の並び）とネット用プレハブの対応。通信ではこの並びの番号を送る。ホストは prefab をネット用に差し替えた CharacterData の複製を Entry.character に入れる（DarumaMatch はデータの prefab を出すため）。専用プレハブの無いキャラは基本のだるま |
+| `Network/Characters/*_Net.prefab` | Yurube さんのキャラ7体のネット用 Variant。**メニューの「Tools → ネット対戦 → キャラのネット用プレハブを作り直す」（`Editor/NetCharacterBuilder.cs`）で作る**（DarumaCharacter_Net と同じネット部品を同じ設定で付け、DefaultNetworkPrefabs に登録し、NetCharacters.asset を作り直す）。キャラが増えた・プレハブが変わったら実行する |
 | `NetSceneFlow.cs` | ネットのシーン遷移（自動で1個作られ、シーンをまたいで残る）。ホストの `Load(scene)` で全員を暗くしてから NGO で切り替え、読み終わったら明るくする。リザルトで切断したら NetStages に戻す |
 | `NetResultFlow.cs` | 接続中にリザルト画面が読み込まれたら自動で付く。演出が終わったら画面自身のセレクト行きを止め（`done` / `leaving` をリフレクションで読み書き）、ホストの決定で NetStages に戻す。**ResultTowerScreen / ResultScreen のフィールド名が変わったら直す** |
 | `DarumaCharacter_Net.prefab` | キャラのネット用 Variant。NetworkObject, NetworkTransform, NetworkRigidbody, NetworkDarumaCharacter, NetworkHammerView |
@@ -96,7 +99,7 @@
 ### 他の人のスクリプトに足したもの（どれも `ネット対戦用(suehara)` の目印付き。ローカルの動きは変わらない）
 | ファイル（作成者） | 追加 |
 |---|---|
-| `Nakahira/Player/Scripts/DarumaMatch.cs`（中平さん） | ネットの試合の分岐（上の「しくみ」）。`IsNetworked` / `IsNetClient` / `IsNetWaiting`、`SetNetRules`、`AddNetPlayer` / `RemoveNetPlayer` / `BeginNetMatch`、`NetClient〜`。試合中に相手が抜けて1人になったら残った人の勝ち（ストック・ゴースト）。その場でやり直す分岐は 11/03 に消した |
+| `Nakahira/Player/Scripts/DarumaMatch.cs`（中平さん） | ネットの試合の分岐（上の「しくみ」）。`NetRespawnPlayer`（2026-11-11。ユーザー了承済み。開始待ちの間にキャラを変えた人の体を出し直す）。`IsNetworked` / `IsNetClient` / `IsNetWaiting`、`SetNetRules`、`AddNetPlayer` / `RemoveNetPlayer` / `BeginNetMatch`、`NetClient〜`。試合中に相手が抜けて1人になったら残った人の勝ち（ストック・ゴースト）。その場でやり直す分岐は 11/03 に消した |
 | `Fujihara/Script/Game/MatchPlayer.cs`（藤原さん） | `NetStackCount`、`ResetForMatch`（再戦）、`NetApply` / `NetSetBody`（クライアントで値を入れる） |
 | `Nakahira/Player/Scripts/DarumaHammer.cs`（中平さん） | `ViewOnly`, `PlayVisual(bool shot)`（前回） |
 | `Nakagawa/Scripts/Stage/StageSwitcher.cs`（中川さん） | `SwitchStarting` / `StageApplied(int)` / `StageCount` / `ShowStage(int)`（前回） |
@@ -188,7 +191,7 @@ NetStages を直接開いて試すとき:
     エフェクト・音は `GimmickNet.Relay()` の範囲で出す（`Nakagawa/Scripts/Gimmicks/Common/GimmickNet.cs` の説明を参照）
 - ヒットストップの揺れ・カメラの揺れ・効果音（A-09, C-06。MatchAudio は Match を後から表示するので付かない）
 - `Time.timeScale` を使う演出（EliminationCinematic）: ホストだけスローになり、ホストの物理も遅くなる（B-11）
-- 新キャラ7体（Yurube/Prefabs: Akadaru, Aodaru, DaruKing, Hebi, Iwa, Kidaru, Midaru）は Variant ではない独立プレハブ。ネット用がない
+- 新キャラ7体のネット用 Variant は 2026-11-11 に作った（キャラ選択）。ただしパッシブ・必殺技のスクリプトはクライアントの表示用の体でも動いたまま（クライアントだけで何かを出す・動かすものがあれば止める必要がある。未確認）
 - **必殺技は各キャラの Special スクリプトが `Keyboard.current`（L）/ `Gamepad.current`（Y）を直接読んでいる**。
   DarumaCommand を通らないので、クライアントから出せない＆ホストの入力で他人の必殺技が出る恐れ。
   → DarumaCommand に Special を足して命令経由にするのが本筋（Yurube さんと相談。B-03）

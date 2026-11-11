@@ -20,11 +20,13 @@ public class NetMatchPlayer : NetworkBehaviour
         public float RespawnLeft;
         public bool HasBody;
         public NetworkObjectReference Body;
+        public byte Character;   // キャラの番号(NetCharacterList の並び。NetCharacterList.None なら基本のだるま)
 
         public void NetworkSerialize<T>(BufferSerializer<T> s) where T : IReaderWriter
         {
             s.SerializeValue(ref Ready);
             s.SerializeValue(ref Index);
+            s.SerializeValue(ref Character);
             s.SerializeValue(ref State);
             s.SerializeValue(ref Stocks);
             s.SerializeValue(ref Score);
@@ -43,7 +45,7 @@ public class NetMatchPlayer : NetworkBehaviour
         public bool Equals(Snapshot o) =>
             Ready == o.Ready && Index == o.Index && State == o.State && Stocks == o.Stocks && Score == o.Score &&
             Knocks == o.Knocks && Knocked == o.Knocked && KOs == o.KOs && Falls == o.Falls && SelfOuts == o.SelfOuts &&
-            Rank == o.Rank && Stack == o.Stack && RespawnLeft == o.RespawnLeft &&
+            Rank == o.Rank && Stack == o.Stack && RespawnLeft == o.RespawnLeft && Character == o.Character &&
             HasBody == o.HasBody && (!HasBody || Body.Equals(o.Body));
     }
 
@@ -53,21 +55,81 @@ public class NetMatchPlayer : NetworkBehaviour
     public int Index { get; set; }
     public MatchPlayer Player { get; private set; }
     bool m_registered;
+    // いまのキャラの番号(ホストが決めて配る)
+    int m_character = NetCharacterList.None;
+
+    // この PC の人が選んだキャラ(シーンを移っても・次に起動しても覚えておく)
+    const string kCharacterKey = "Net.Character";
+    public static string SavedCharacterId
+    {
+        get => PlayerPrefs.GetString(kCharacterKey, "");
+        set => PlayerPrefs.SetString(kCharacterKey, value ?? "");
+    }
+
+    // この PC の人の1人分(なければ null)
+    public static NetMatchPlayer Local
+    {
+        get
+        {
+            var nm = NetworkManager.Singleton;
+            var obj = nm != null && nm.IsListening ? nm.LocalClient?.PlayerObject : null;
+            return obj != null ? obj.GetComponent<NetMatchPlayer>() : null;
+        }
+    }
+
+    // いまのキャラの番号(NetCharacterList の並び。NetCharacterList.None なら基本のだるま)
+    public int CharacterIndex => m_character;
 
     public override void OnNetworkSpawn()
     {
         Player = gameObject.AddComponent<MatchPlayer>();
-        if (!IsServer) return;
-
-        var match = DarumaMatch.Current;
-        if (match == null)
+        if (IsServer)
         {
-            Debug.LogError("[NetMatchPlayer] DarumaMatch がありません");
-            return;
+            var match = DarumaMatch.Current;
+            if (match == null) Debug.LogError("[NetMatchPlayer] DarumaMatch がありません");
+            else
+            {
+                var entry = new MatchSetup.Entry { playerIndex = Index, deviceName = "Net" };
+                match.AddNetPlayer(Player, entry, GetComponent<NetworkCommandSource>());
+                m_registered = true;
+            }
         }
-        var entry = new MatchSetup.Entry { playerIndex = Index, deviceName = "Net" };
-        match.AddNetPlayer(Player, entry, GetComponent<NetworkCommandSource>());
-        m_registered = true;
+
+        // 前に選んだキャラをホストに伝える(試合のシーンに入るたびに NetPlayer は作り直されるので、そのたびに送る)
+        if (IsOwner)
+        {
+            var list = NetCharacterList.Instance;
+            int saved = list != null ? list.IndexOf(SavedCharacterId) : NetCharacterList.None;
+            if (saved != NetCharacterList.None && list.IsAvailable(saved)) RequestCharacter(saved);
+        }
+    }
+
+    //========================================
+    // キャラの選択(開始待ちの間だけ変えられる)
+    //========================================
+
+    // この PC の人: キャラを選ぶ(ホストに頼む。選べたら体が入れ替わる)
+    public void RequestCharacter(int index)
+    {
+        if (!IsOwner) return;
+        var list = NetCharacterList.Instance;
+        if (list != null && list.Character(index) != null) SavedCharacterId = list.Character(index).id;
+        ChooseCharacterRpc((byte)Mathf.Clamp(index, 0, NetCharacterList.None));
+    }
+
+    [Rpc(SendTo.Server)]
+    void ChooseCharacterRpc(byte index, RpcParams rpc = default)
+    {
+        // 持ち主からの頼みだけ受ける
+        if (rpc.Receive.SenderClientId != OwnerClientId) return;
+        var list = NetCharacterList.Instance;
+        var match = DarumaMatch.Current;
+        if (list == null || match == null || !m_registered || !match.IsNetWaiting) return;
+        var data = list.HostData(index);
+        if (data == null || index == m_character) return;
+        m_character = index;
+        Player.Entry.character = data;
+        match.NetRespawnPlayer(Player);
     }
 
     public override void OnNetworkDespawn()
@@ -93,6 +155,7 @@ public class NetMatchPlayer : NetworkBehaviour
         {
             Ready = true,
             Index = (byte)Index,
+            Character = (byte)m_character,
             State = (byte)p.State,
             Stocks = (sbyte)Mathf.Clamp(p.Stocks, sbyte.MinValue, sbyte.MaxValue),
             Score = (short)p.Score,
@@ -137,6 +200,14 @@ public class NetMatchPlayer : NetworkBehaviour
             Player.Setup(entry, DarumaMatch.ColorFor(entry), null, -1);
             match.NetClientAddPlayer(Player);
             m_registered = true;
+        }
+
+        // キャラ(名前・顔のモデル。HUD・リザルト・頭のモデルの差し替えが使う)
+        if (s.Character != m_character)
+        {
+            m_character = s.Character;
+            var list = NetCharacterList.Instance;
+            Player.Entry.character = list != null ? list.Character(m_character) : null;
         }
 
         Player.NetApply(s.Stocks, s.Score, s.Knocks, s.Knocked, s.KOs, s.Falls, s.SelfOuts, s.Rank, s.Stack, s.RespawnLeft);
