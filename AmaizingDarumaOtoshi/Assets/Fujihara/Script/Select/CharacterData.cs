@@ -19,8 +19,8 @@ public class CharacterData : ScriptableObject
     [Tooltip("キャラのハンマーのモデル（Model/Hammer/hammer_<id>.fbx）。試合・タイトル・ムービーで、このキャラが持つハンマーになる（空なら共通のハンマー）")]
     public GameObject hammerModel;
 
-    // セレクト画面・ずかんのアイコンの背景。どのキャラも灰色（だるまの色が映えるように。color は使わない）
-    public static readonly Color IconBackground = new Color(0.66f, 0.66f, 0.68f);
+    // セレクト画面・ずかんのアイコンの背景。どのキャラも薄い水色（だるまの色が映えるように。color は使わない）
+    public static readonly Color IconBackground = new Color(0.78f, 0.9f, 0.98f);
     public Color IconColor => IconBackground;
     [Tooltip("ゲーム本編で生成するプレハブ（未設定でも可）")]
     public GameObject prefab;

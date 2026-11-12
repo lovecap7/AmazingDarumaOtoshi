@@ -29,6 +29,8 @@ namespace Nakahira
         // 打ち返し:ハンマーが当たる高さ(足元からの積み木の中心の高さ)の範囲
         const float kReturnMinHeight = -0.35f;
         const float kReturnMaxHeight = 0.85f;
+        // チーム戦:打ち返した弾の通り道に味方がいないか調べる長さ(m)
+        const float kReturnAllyCheckLength = 12.0f;
         // ジャンプ:弾の上面より、この高さ(m)だけ余裕を見る
         const float kJumpMargin = 0.05f;
         // 反応したあと、この時間(秒)は反応の最中として扱う(空中で弾の通り道に留まる)
@@ -300,6 +302,8 @@ namespace Nakahira
         {
             if (t.TReach < 0.0f || c.Self.Hammer.IsBusy) return false;
             if (t.Center < kReturnMinHeight || t.Center > kReturnMaxHeight) return false;
+            // チーム戦:打ち返す向き(弾が来た方)に味方がいたら打ち返さない(ジャンプで避ける・乗るに任せる)
+            if (c.AllyInLine(c.Position, block.transform.position - c.Position, kReturnAllyCheckLength)) return false;
             float bearing = Bearing(c, block.transform.position);
             float turn = Mathf.Abs(bearing) > kReturnMaxBearing ? kTurnTime : 0.0f;
             float aimBearing = turn > 0.0f ? Mathf.Sign(bearing) * kReturnTurnBearing : bearing;

@@ -295,6 +295,12 @@ namespace Nakahira
         [Tooltip("線の中心から左右この距離(m)以内に 2 人(1 対 1 なら 1 人)入ったら、ため中に確定する。撃ち始めは線の太さ全体で数える")]
         [Min(0.0f)] public float ExcaliburConfirmHalfWidth = 0.8f;
 
+        [Header("チーム戦:味方と離れる(味方はいないものとして動くので、同じ敵を追って重なりやすい)")]
+        [Tooltip("歩いているとき、この距離(m)以内に味方がいたら、味方から離れる向きへ歩く向きをずらす")]
+        [Min(0.0f)] public float AllySpacing = 3.0f;
+        [Tooltip("離れる向きを混ぜる強さ(味方に重なっているとき、歩く向きにこの重みで足す。近いほど強く、AllySpacing で 0)")]
+        [Min(0.0f)] public float AllySpacingWeight = 1.0f;
+
         [Header("必殺技:あおだるの六腕(暗転返し・とっさの六腕)")]
         [Tooltip("暗転返し:みだるのファンネルのカットイン中に六腕で返す確率(余裕(1 − 集中度の割合)を掛けて使う)")]
         [Range(0.0f, 1.0f)] public float BlackoutCounterChance = 0.6f;
@@ -302,8 +308,8 @@ namespace Nakahira
         [Min(0.0f)] public float BlackoutCounterDelay = 0.3f;
         [Tooltip("暗転返し:みだるが「明らかに近い」とみなす差(m)。みだるから見て、自分がほかの敵よりこれ以上近い")]
         [Min(0.0f)] public float BlackoutNearMargin = 2.0f;
-        [Tooltip("とっさの六腕:撃ってから効き始めるまでの時間(秒。六腕の出現 0.25 秒＋余裕)。これより早く当たる弾には撃たない")]
-        [Min(0.0f)] public float ArmsLeadTime = 0.3f;
+        [Tooltip("とっさの六腕:撃ってから効き始めるまでの時間(秒。六腕は押した瞬間に効くので、物理の 1〜2 ステップ分の余裕だけ)。これより早く当たる弾には撃たない")]
+        [Min(0.0f)] public float ArmsLeadTime = 0.05f;
         [Tooltip("とっさの六腕:弾が 1 発でも撃つ「追い込まれた」ときの段数(この段数以下)")]
         [Min(0)] public int ArmsPanicStack = 1;
         [Tooltip("とっさの六腕:弾が 1 発でも撃つ「追い込まれた」ときの集中度の割合(これ以上)")]

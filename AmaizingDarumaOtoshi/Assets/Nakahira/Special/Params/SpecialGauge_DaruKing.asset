@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9d4c95d8c6d05be45853a83e71b1a969, type: 3}
+  m_Name: SpecialGauge_DaruKing
+  m_EditorClassIdentifier: Assembly-CSharp::Nakahira.SpecialGaugeParams
+  MaxPoints: 40
+  RideHarmfulBlock: 25
+  ReturnBlock: 20
+  DirectHit: 15
+  StackBlock: 10
+  NearEnemyDistance: 5
+  NearEnemyPerSecond: 3
+  MoveMinSpeed: 1
+  MovePerSecond: 1.5
+  DeathBonusRatio: 0.15
+  HudPrefab: {fileID: 1037141153545406122, guid: 1a7ee67dda81ad141b44c2e3620cb2f1, type: 3}

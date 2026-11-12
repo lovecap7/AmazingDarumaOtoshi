@@ -36,7 +36,8 @@ Fujihara=メニュー・セレクト・リザルト・音 / Yurube=キャラ・�
   Input System 1.20.0 / URP 17.6.0 / AI Navigation / Timeline / MCP for Unity（`com.coplaydev.unity-mcp`）。
 - `Assets/` のフォルダ（担当者は上の一覧のとおり。追加分のみ書く）:
   - `Inoue/` … 井上。初期の試作（`Script/Player.cs`・`InoueTestScene.unity`・マテリアル）。
-  - `Shitaka/` … サブフォルダなしで直下に置いている（`*Behavior.cs`・`BlockController.cs`・`ShitakaScene.unity` など）。
+  - `Shitaka/` … スクリプトは `script/` の中（`*Behavior.cs`・`BlockController.cs`・`CollectorPassive.cs` など）。
+    `ShitakaScene.unity`・マテリアルは直下。
   - `Scenes/SampleScene.unity`・`TutorialInfo/`・`TextMesh Pro/` … Unity の初期・標準のもの。
 - ビルドに入っているシーン（順番どおり）:
   `Fujihara/Scene/` の Title → Menu → Result → ResultTower → Select → MatchCheck、

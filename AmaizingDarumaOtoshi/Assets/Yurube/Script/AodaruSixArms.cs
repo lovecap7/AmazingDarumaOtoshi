@@ -330,10 +330,10 @@ namespace Yurube
             // ネット対戦用(suehara): 積み木をはじくのはホストだけ(クライアントは見た目だけ)
             if (SpecialNet.IsClient) return;
 
-            // 出現し終わってから、消え始めるまでだけ判定を出す
-            float activeFrom = Mathf.Max(0.01f, m_introTime);
-            float activeTo = activeFrom + m_duration;
-            if (m_elapsed < activeFrom || m_elapsed > activeTo) return;
+            // 発動した瞬間(出現の演出中も)から、消え始めるまで判定を出す
+            // (2026-11-12 中平: 前は出現し終わる 0.25 秒後からだった。ゆるべさんと「押した瞬間に効いてよい」と決めた)
+            float activeTo = Mathf.Max(0.01f, m_introTime) + m_duration;
+            if (m_elapsed > activeTo) return;
 
             Vector3 center = m_character.transform.position + Vector3.up * 0.5f;
             int count = Physics.OverlapSphereNonAlloc(center, m_knockRadius, m_overlaps, ~0, QueryTriggerInteraction.Ignore);

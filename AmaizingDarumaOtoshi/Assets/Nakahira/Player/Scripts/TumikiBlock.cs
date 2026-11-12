@@ -116,6 +116,23 @@ namespace Nakahira
         bool m_isSuspended;           // 一時的に止めている(ワープの移動中など)
         Vector3 m_suspendedVelocity;  // 止めたときの物理の速度(解除すると戻す)
 
+        // 壁(ReflectWall)にめり込んだら外へ戻す
+        // (ほとんど丸ごと壁に入った積み木は、物理の押し戻しでは出られずに止まってしまうため)
+        static readonly Collider[] s_wallOverlaps = new Collider[16];
+        // これより深くめり込んでいたら戻す(m)。壁に触れているだけ・物理のわずかな重なりは見逃す
+        const float kWallOverlapTolerance = 0.1f;
+        // 空いた場所を探す刻みと範囲(m)。この距離ずつ外へ広げ、輪の上も同じ間隔で調べる
+        const float kFreeSearchStep = 0.1f;
+        const float kFreeSearchRadius = 3.0f;
+        // 空いた場所が見つからなかったとき、次に探すまでの時間(毎ステップ探して重くならないように)
+        const float kFreeSearchRetryTime = 0.5f;
+        float m_freeSearchCooldown;
+        // 飛んでいる積み木は、この時間めり込んだままなら戻す(秒。それまでは物理の跳ね返りに任せる)
+        const float kFlyingEmbedGraceTime = 0.1f;
+        float m_wallEmbeddedTime;
+        // テスト用: false にすると壁から戻さない(押し戻しがある・ないで比べる)
+        public static bool ResolveWallOverlapEnabled = true;
+
         // 一時的に衝突を無視している相手
         readonly List<Collider> m_ignored = new List<Collider>();
         float m_ignoreTimer;
@@ -214,6 +231,9 @@ namespace Nakahira
                 Consume();
                 return;
             }
+
+            if (m_freeSearchCooldown > 0.0f) m_freeSearchCooldown -= Time.fixedDeltaTime;
+            ResolveWallOverlap(false, false);
 
             // ヒットストップ中はスロー(弾かれた直後はほぼその場に留まり、明けると本来の速さで飛び出す)
             float timeScale = m_hitStop.TimeScale;
@@ -826,6 +846,84 @@ namespace Nakahira
             m_rb.constraints = RigidbodyConstraints.FreezeRotation;
             // 無敵点滅中に外れた場合でも見えるようにする
             foreach (var r in GetComponentsInChildren<Renderer>()) r.enabled = true;
+            // 崩れて物理に戻った瞬間に壁の中なら、物理が動く前に外へ出す
+            // (直前に Transform で置き直していることがあるので、Rigidbody ではなく Transform の位置で調べる)
+            m_freeSearchCooldown = 0.0f;
+            ResolveWallOverlap(true);
+        }
+
+        //========================================
+        // 壁にめり込まないようにする
+        //========================================
+
+        // 壁にめり込んでいたら、一番近い空いた場所へすぐ移す(速さ・飛ぶ向きはそのまま)
+        // ステージの範囲内にいるときは範囲内の場所だけを探す(外壁の外側へ抜けないように)
+        // useTransform: Rigidbody ではなく Transform の位置で調べる
+        // immediate: false なら、飛んでいる積み木はしばらく物理の跳ね返りに任せる
+        //   (速い弾は壁に一瞬入ってから跳ね返る。そこで移すと当たった判定が消えて跳ね返らず、壁に沿って滑ってしまうため)
+        private void ResolveWallOverlap(bool useTransform = false, bool immediate = true)
+        {
+            if (!ResolveWallOverlapEnabled) return;
+            if (CurrentState == State.Stacked || m_isConsumed || m_isBreaking || m_isSuspended) { m_wallEmbeddedTime = 0.0f; return; }
+            if (m_rb.isKinematic || !m_collider.enabled || m_freeSearchCooldown > 0.0f) return;
+
+            Vector3 pos = useTransform ? transform.position : m_rb.position;
+            Quaternion rot = useTransform ? transform.rotation : m_rb.rotation;
+            if (WallPenetration(pos, rot) <= kWallOverlapTolerance)
+            {
+                m_wallEmbeddedTime = 0.0f;
+                return;
+            }
+            if (!immediate && CurrentState == State.Flying)
+            {
+                m_wallEmbeddedTime += Time.fixedDeltaTime;
+                if (m_wallEmbeddedTime < kFlyingEmbedGraceTime) return;
+            }
+            m_wallEmbeddedTime = 0.0f;
+
+            StageArea area = DarumaMatch.Current != null ? DarumaMatch.Current.StageArea : null;
+            if (area != null && !IsInArea(area, pos)) area = null;
+
+            for (float d = kFreeSearchStep; d <= kFreeSearchRadius + 0.0001f; d += kFreeSearchStep)
+            {
+                int count = Mathf.Max(8, Mathf.CeilToInt(2.0f * Mathf.PI * d / kFreeSearchStep));
+                for (int i = 0; i < count; i++)
+                {
+                    float a = 2.0f * Mathf.PI * i / count;
+                    Vector3 p = pos + new Vector3(Mathf.Cos(a), 0.0f, Mathf.Sin(a)) * d;
+                    if (area != null && !IsInArea(area, p)) continue;
+                    if (WallPenetration(p, rot) > 0.0f) continue;
+                    m_rb.position = p;
+                    transform.position = p;
+                    return;
+                }
+            }
+            m_freeSearchCooldown = kFreeSearchRetryTime;
+        }
+
+        // 積み木が丸ごとステージの範囲内にあるか
+        private static bool IsInArea(StageArea area, Vector3 pos)
+        {
+            Vector3 c = area.Clamp(pos, kRadius);
+            return Mathf.Abs(c.x - pos.x) < 0.001f && Mathf.Abs(c.z - pos.z) < 0.001f;
+        }
+
+        // pos・rot に置いたとき、壁(ReflectWall)にめり込む一番深い距離(めり込まなければ 0)
+        private float WallPenetration(Vector3 pos, Quaternion rot)
+        {
+            Vector3 half = new Vector3(kRadius, kHeight * 0.5f, kRadius);
+            int count = Physics.OverlapBoxNonAlloc(pos, half, s_wallOverlaps, rot, ~0, QueryTriggerInteraction.Ignore);
+            float deepest = 0.0f;
+            for (int i = 0; i < count; i++)
+            {
+                Collider wall = s_wallOverlaps[i];
+                if (wall == m_collider || wall.GetComponentInParent<ReflectWall>() == null) continue;
+                if (Physics.ComputePenetration(m_collider, pos, rot, wall, wall.transform.position, wall.transform.rotation, out _, out float dist))
+                {
+                    deepest = Mathf.Max(deepest, dist);
+                }
+            }
+            return deepest;
         }
 
         private void IgnoreTemporarily(Collider col)

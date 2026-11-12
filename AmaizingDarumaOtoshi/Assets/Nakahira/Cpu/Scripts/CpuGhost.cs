@@ -601,6 +601,8 @@ namespace Nakahira
             foreach (var mp in match.Players)
             {
                 if (mp == null || mp == self || !mp.IsAlive) continue;
+                // チーム戦:味方を殴っても復活できない(ダメージにならない)ので狙わない
+                if (match.AreTeammates(self, mp)) continue;
                 if (IsValidTarget(mp.Character)) m_survivors.Add(mp.Character);
             }
         }

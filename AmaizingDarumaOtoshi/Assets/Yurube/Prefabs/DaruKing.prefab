@@ -587,6 +587,7 @@ MonoBehaviour:
   m_sweepStartYaw: 110
   m_sweepEndYaw: -110
   m_sweepHeight: 0.25
+  m_sweepRoll: 90
   m_hammerHalfWidth: 0.2
   m_hitHeightRange: 0.6
   m_maxReturnAngle: 60
@@ -747,7 +748,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0a13560a26218d46964d9c9f251e1ee6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Yurube.SpecialGauge
-  m_blocksToFill: 2
+  m_params: {fileID: 11400000, guid: cc01662c2c2c43e418a7b7aa4d0b4c00, type: 2}
 --- !u!114 &5182239471364050852
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -764,11 +765,11 @@ MonoBehaviour:
   m_chargeDuration: 2
   m_anyButtonMinTime: 0.15
   m_attackLength: 14
-  m_attackWidth: 3.2
-  m_effectDuration: 1
   m_useStageLength: 1
   m_stageOvershoot: 2
   m_fallbackStageLength: 60
+  m_attackWidth: 3.2
+  m_effectDuration: 1
   m_invincibleExtra: 0.35
   m_rainbowSpeed: 0.5
   m_rainbowEmission: 1.5

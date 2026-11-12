@@ -349,7 +349,6 @@ MonoBehaviour:
   afterimageDelay: 0.25
   afterimageLifetime: 1.5
   afterimageAlpha: 0.4
-  afterimageMaterial: {fileID: 0}
   teleportGhostMaterial: {fileID: 0}
   rehitIgnoreTime: 0.2
 --- !u!54 &264285117
@@ -754,7 +753,7 @@ MonoBehaviour:
   speed: 20
   deceleration: 0.2
   stopThreshold: 1
-  behaviorType: 12
+  behaviorType: 16
   hebiTurnSpeed: 60
   homingStartTurnSpeed: 270
   homingGuidanceDuration: 1.5
@@ -786,7 +785,6 @@ MonoBehaviour:
   afterimageDelay: 0.25
   afterimageLifetime: 5
   afterimageAlpha: 0.8
-  afterimageMaterial: {fileID: 2100000, guid: e66b435ce7a0b10448d491ed177705cd, type: 2}
   teleportGhostMaterial: {fileID: 2100000, guid: e66b435ce7a0b10448d491ed177705cd, type: 2}
   rehitIgnoreTime: 0.2
 --- !u!65 &557762078
@@ -1064,7 +1062,6 @@ MonoBehaviour:
   afterimageDelay: 0.25
   afterimageLifetime: 1.5
   afterimageAlpha: 0.4
-  afterimageMaterial: {fileID: 0}
   teleportGhostMaterial: {fileID: 0}
   rehitIgnoreTime: 0.2
 --- !u!54 &759035617
@@ -1363,7 +1360,6 @@ MonoBehaviour:
   afterimageDelay: 0.25
   afterimageLifetime: 1.5
   afterimageAlpha: 0.4
-  afterimageMaterial: {fileID: 2100000, guid: 694999f496ccb0e4dacf48b247c3a537, type: 2}
   teleportGhostMaterial: {fileID: 0}
   rehitIgnoreTime: 0.2
 --- !u!65 &792966896
@@ -1489,7 +1485,6 @@ MonoBehaviour:
   afterimageDelay: 0.25
   afterimageLifetime: 1.5
   afterimageAlpha: 0.4
-  afterimageMaterial: {fileID: 0}
   teleportGhostMaterial: {fileID: 0}
   rehitIgnoreTime: 0.2
 --- !u!54 &803537026
@@ -1695,7 +1690,6 @@ MonoBehaviour:
   afterimageDelay: 0.25
   afterimageLifetime: 1.5
   afterimageAlpha: 0.4
-  afterimageMaterial: {fileID: 0}
   teleportGhostMaterial: {fileID: 0}
   rehitIgnoreTime: 0.2
 --- !u!54 &1032551247
@@ -1901,7 +1895,6 @@ MonoBehaviour:
   afterimageDelay: 0.25
   afterimageLifetime: 1.5
   afterimageAlpha: 0.4
-  afterimageMaterial: {fileID: 0}
   teleportGhostMaterial: {fileID: 0}
   rehitIgnoreTime: 0.2
 --- !u!54 &1076914364
@@ -2107,7 +2100,6 @@ MonoBehaviour:
   afterimageDelay: 0.25
   afterimageLifetime: 1.5
   afterimageAlpha: 0.4
-  afterimageMaterial: {fileID: 0}
   teleportGhostMaterial: {fileID: 0}
   rehitIgnoreTime: 0.2
 --- !u!54 &1098038425
@@ -2405,7 +2397,6 @@ MonoBehaviour:
   afterimageDelay: 0.25
   afterimageLifetime: 1.5
   afterimageAlpha: 0.4
-  afterimageMaterial: {fileID: 0}
   teleportGhostMaterial: {fileID: 0}
   rehitIgnoreTime: 0.2
 --- !u!65 &1141642620
@@ -2927,7 +2918,6 @@ MonoBehaviour:
   afterimageDelay: 0.25
   afterimageLifetime: 1.5
   afterimageAlpha: 0.4
-  afterimageMaterial: {fileID: 2100000, guid: e66b435ce7a0b10448d491ed177705cd, type: 2}
   teleportGhostMaterial: {fileID: 2100000, guid: e66b435ce7a0b10448d491ed177705cd, type: 2}
   rehitIgnoreTime: 0.2
 --- !u!54 &1536202398
@@ -3285,7 +3275,6 @@ MonoBehaviour:
   afterimageDelay: 0.25
   afterimageLifetime: 1.5
   afterimageAlpha: 0.4
-  afterimageMaterial: {fileID: 0}
   teleportGhostMaterial: {fileID: 0}
   rehitIgnoreTime: 0.2
 --- !u!54 &1796746307
@@ -3584,7 +3573,6 @@ MonoBehaviour:
   afterimageDelay: 0.25
   afterimageLifetime: 1.5
   afterimageAlpha: 0.4
-  afterimageMaterial: {fileID: 2100000, guid: ce69d863759820d4ba8bb07f1adadfda, type: 2}
   teleportGhostMaterial: {fileID: 0}
   rehitIgnoreTime: 0.2
 --- !u!65 &2023414662
