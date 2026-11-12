@@ -47,10 +47,10 @@ public class TumikiRollTransition : ISceneTransition
     public float spacingX = 0.5f;            // 横の間隔（直径に対する割合）
     // 転がる速さ（画面の縦幅 / 秒）。入ってくるときと抜けるときは速く、全面が埋まっている間は止める。
     // 埋まっている間（シーンの読み込み・有効化・GC が走る間）に動いていると、その重さがカクつきとして見えるため。
-    public float speedFast = 2.5f;
+    public float speedFast = 3.0f;
     public float speedSlow = 0f;
-    public float speedEase = 0.4f;           // 速さを切り替える時間（秒。easeInCubic）
-    public float minHold = 0.35f;            // 埋まって止まってから抜け始めるまでの最短の時間
+    public float speedEase = 0.2f;           // 速さを切り替える時間（秒。easeInCubic）
+    public float minHold = 0.15f;            // 埋まって止まってから抜け始めるまでの最短の時間
     // 段の色（上から）。段の数はこの色の数で、画面の縦幅をちょうど等分して並べる
     public Color[] rowColors =
     {
@@ -62,6 +62,33 @@ public class TumikiRollTransition : ISceneTransition
         new Color(0.25f, 0.32f, 0.70f),   // 藍
         new Color(0.58f, 0.36f, 0.76f),   // 紫
     };
+
+    // ---- 調整用（TumikiRollTransitionTuner から使う） ----
+    // 今 Fader に入っている演出（入っていなければ null）
+    public static TumikiRollTransition Current => Fader.Transition as TumikiRollTransition;
+
+    // 転がっている途中か
+    public bool IsPlaying => state != State.Idle;
+
+    // 厚み・段の色を変えたら呼ぶ。メッシュは次に転がし始めるときに作り直す（転がっている途中は変えない）
+    public void MarkMeshesDirty() => meshesDirty = true;
+
+    // 調整できる値を src からまるごと写す（既定値に戻すときは new TumikiRollTransition() を渡す）
+    public void CopyTuning(TumikiRollTransition src)
+    {
+        diameterPerScreen = src.diameterPerScreen;
+        thickness = src.thickness;
+        yaw = src.yaw;
+        spacingX = src.spacingX;
+        speedFast = src.speedFast;
+        speedSlow = src.speedSlow;
+        speedEase = src.speedEase;
+        minHold = src.minHold;
+        rowColors = (Color[])src.rowColors.Clone();
+        MarkMeshesDirty();
+    }
+
+    bool meshesDirty;
 
     static readonly Vector3 StageOrigin = new Vector3(0f, -20000f, 0f);
 
@@ -210,6 +237,14 @@ public class TumikiRollTransition : ISceneTransition
         halfH = 0.5f / Mathf.Max(0.05f, diameterPerScreen);   // 直径 1 が画面の縦幅の diameterPerScreen 倍
         halfW = halfH * aspect;
         cam.orthographicSize = halfH;
+        if (meshesDirty && bodyMeshes != null)
+        {
+            // 調整で厚み・色が変わった：古いメッシュを捨てて作り直す
+            foreach (var m in bodyMeshes) if (m != null) Object.Destroy(m);
+            foreach (var m in patternMeshes) if (m != null) Object.Destroy(m);
+            bodyMeshes = patternMeshes = null;
+        }
+        meshesDirty = false;
         if (bodyMeshes == null) BuildMeshes();
 
         // 段（色の数。画面の縦幅を等分）× 列（先頭から後ろへ、等間隔）。ばらつき無しで縦横にそろえる
