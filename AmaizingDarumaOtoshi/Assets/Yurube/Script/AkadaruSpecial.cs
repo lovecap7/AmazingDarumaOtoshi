@@ -38,6 +38,10 @@ namespace Yurube
         // CPU 用(中平): 必殺技の積み木の速さ(m/s。狙いの先読みに使う)
         public float Speed => m_speed;
 
+        // 必殺技ゲージ用(中平): 発動してから残像ビームが残っている間(この間はゲージが溜まらない)
+        float m_activeUntil = -1.0f;
+        public bool IsActive => Time.time < m_activeUntil;
+
         private void Awake()
         {
             m_character = GetComponent<DarumaCharacter>();
@@ -83,6 +87,7 @@ namespace Yurube
             var block = m_character.Stack.RemoveAt(0);
             if (block == null) return false;
             m_gauge.Consume();
+            m_activeUntil = Time.time + m_trailDuration;   // 必殺技ゲージ用(中平)
 
             Vector3 direction = m_character.transform.forward;
             Vector3 center = m_character.transform.position + Vector3.up * (TumikiBlock.kHeight * 0.5f);

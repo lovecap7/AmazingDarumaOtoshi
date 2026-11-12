@@ -95,6 +95,24 @@ namespace Nakagawa
             if (m_canvas != null) Destroy(m_canvas.gameObject);
         }
 
+        // 必殺技ゲージ用(中平): その人のパネルの位置(画面下の中央から。1920x1080 基準)・大きさ・いまの濃さを読む
+        // パネルの真上にゲージを置き、近くに物があるときの半透明にも合わせるため。読むだけで表示は変えない
+        public bool TryGetPanel(MatchPlayer player, out Vector2 position, out Vector2 size, out float alpha)
+        {
+            foreach (var p in m_panels)
+            {
+                if (p.Player != player || p.Root == null) continue;
+                position = p.Root.anchoredPosition;
+                size = p.Root.sizeDelta;
+                alpha = p.Group != null ? p.Group.alpha : 1.0f;
+                return true;
+            }
+            position = Vector2.zero;
+            size = m_panelSize;
+            alpha = 1.0f;
+            return false;
+        }
+
         private void LateUpdate()
         {
             if (m_match == null || m_canvas == null) return;
@@ -277,12 +295,20 @@ namespace Nakagawa
             p.Group = p.Root.gameObject.AddComponent<CanvasGroup>();
             p.Group.blocksRaycasts = false;
 
-            // 名札(プレイヤーの色)
+            // 名札(プレイヤーの色)。ストーリー中は「1P」ではなく、だるまの名前を出す
+            bool storyNames = MatchSetup.StoryNames;
             var tag = ToyKit.UIImage("Tag", p.Root, player.Color);
-            ToyKit.Anchor(tag, new Vector2(0.0f, 1.0f), new Vector2(52.0f, -24.0f), new Vector2(88.0f, 36.0f));
+            ToyKit.Anchor(tag, new Vector2(0.0f, 1.0f), new Vector2(storyNames ? 64.0f : 52.0f, -24.0f),
+                new Vector2(storyNames ? 120.0f : 88.0f, 36.0f));
             tag.gameObject.AddComponent<Outline>().effectColor = ToyKit.Ink;
             p.Label = Text("Label", tag, player.Label, 26.0f, Color.white, m_letterMat);
             ToyKit.Stretch(p.Label.rectTransform);
+            if (storyNames)
+            {
+                p.Label.enableAutoSizing = true;
+                p.Label.fontSizeMin = 14.0f;
+                p.Label.fontSizeMax = 26.0f;
+            }
 
             // 顔(あれば)とキャラ名
             var data = player.CharacterData;
@@ -300,6 +326,8 @@ namespace Nakagawa
             p.Name.enableAutoSizing = true;
             p.Name.fontSizeMin = 10.0f;
             p.Name.fontSizeMax = 18.0f;
+            // ストーリーでは名札が名前なので、下のキャラ名は重複するため隠す
+            if (storyNames) p.Name.gameObject.SetActive(false);
 
             // 大きな数
             p.Main = Text("Main", p.Root, "", 56.0f, Color.white, m_popMat);

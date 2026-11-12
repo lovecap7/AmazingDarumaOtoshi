@@ -58,13 +58,16 @@ namespace Nakahira
         public readonly bool WasHarmful;
         // 拾う直前の積み木の速さ
         public readonly float Speed;
+        // 拾って段が増えたか(上限で古い段がこぼれた・パッシブで外された「入れ替え」なら false)
+        public readonly bool StackGrew;
 
-        public TumikiPickupInfo(DarumaCharacter character, TumikiBlock block, bool wasHarmful, float speed)
+        public TumikiPickupInfo(DarumaCharacter character, TumikiBlock block, bool wasHarmful, float speed, bool stackGrew = true)
         {
             Character = character;
             Block = block;
             WasHarmful = wasHarmful;
             Speed = speed;
+            StackGrew = stackGrew;
         }
     }
 
@@ -423,9 +426,12 @@ namespace Nakahira
             if (m_isEliminated || !m_isFallingInAir) return false;
             if (block.CurrentState == TumikiBlock.State.Stacked) return false;
 
-            var info = new TumikiPickupInfo(this, block, block.IsHarmful, block.HorizontalVelocity.magnitude);
+            bool wasHarmful = block.IsHarmful;
+            float speed = block.HorizontalVelocity.magnitude;
+            int countBefore = m_stack.Count;
             Pickup(block);
-            AnyPickedUp?.Invoke(info);
+            // パッシブ(だるきんぐの上限など)が段の変化に反応して外した分も含めて、段が増えたかを見る
+            AnyPickedUp?.Invoke(new TumikiPickupInfo(this, block, wasHarmful, speed, m_stack.Count > countBefore));
             // 同じステップで複数の積み木に触れても1つだけ拾う
             m_isFallingInAir = false;
             return true;
@@ -584,6 +590,8 @@ namespace Nakahira
         //========================================
 
         public bool CanBeAffected => !m_isEliminated && !m_isSuspended;
+        // 脱落したか(必殺技ゲージなどが読む)
+        public bool IsEliminated => m_isEliminated;
 
         public void AddCarryVelocity(Vector3 velocity)
         {

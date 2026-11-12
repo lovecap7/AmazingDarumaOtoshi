@@ -63,7 +63,7 @@ public class SelectTexts
     public string easeLabel = "使いやすさ";
     [Tooltip("ランダム・まだ選んでいないときに★の代わりに出す字")]
     public string easeUnknown = "？";
-    public string join = "A / Start で参加";
+    public string join = "ボタンかスティックで参加";
     public string typeNone = "なし";
     public string typeCpu = "CPU";
     public string typePlayer = "プレイヤー";
@@ -101,7 +101,7 @@ public class SelectTexts
     [Header("下のヒント")]
     public string hintMode = "←→：モードを選ぶ　A / Start：決定　B：メニューへ";
     public string hintRule = "↑↓ / A：項目を選ぶ　←→：切り替え　Start：キャラクターセレクトへ　B：モードセレクトへ";
-    public string hintCharacter = "A：参加・選ぶ・CPUのコインをつかむ　B：取り消し・抜ける　Start：次へ";
+    public string hintCharacter = "ボタン・スティック：参加　A：選ぶ・CPUのコインをつかむ　B：取り消し・抜ける　Start：次へ";
     [Tooltip("ローカル：{0}：えらぶ人（1P など）")]
     public string hintStageLocal = "A：決定　B：キャラクターセレクトへ　右スティック（IJKL）：ステージを見回す　えらべるのは {0} だけ";
     public string hintStageVote = "A：投票　B：取り消し（投票していなければキャラクターセレクトへ）　全員が投票したら抽選！";

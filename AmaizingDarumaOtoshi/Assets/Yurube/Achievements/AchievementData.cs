@@ -47,6 +47,10 @@ namespace Yurube.Achievements
         public Color RarityColor => AchievementRarityInfo.ColorOf(Definition.rarity);
         // 特別実績か（レアリティ別の集計には入れない）
         public bool IsSpecial => Definition.special;
+        // 解除できるモード
+        public AchievementMode Mode => Definition.mode;
+        // 章クリア実績の章ID
+        public string StoryChapter => Definition.storyChapter;
         // 非公開実績か（未解除の間は中身を隠す）
         public bool IsSecret => Definition.secret;
         // 画面に出すレアリティ名・色。特別実績は「特別」として扱う

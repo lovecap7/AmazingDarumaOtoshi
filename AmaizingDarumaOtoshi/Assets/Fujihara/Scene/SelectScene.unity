@@ -220,15 +220,6 @@ MonoBehaviour:
   roster: {fileID: 11400000, guid: 0aaf3a65396bc1940a8bcd03c495c9f0, type: 2}
   stageColumns: 10
   stageVote: 0
-  characterList:
-  - {fileID: 11400000, guid: 7ffcf080adad0f64380e6846824a2978, type: 2}
-  - {fileID: 11400000, guid: 9fc5324d816f46cb80cbe99a1d9c3a1a, type: 2}
-  - {fileID: 11400000, guid: 9588c7355b504c679a28f0edc20286ae, type: 2}
-  - {fileID: 11400000, guid: e43cc62756685ffd67cfbe3f5daee82e, type: 2}
-  - {fileID: 11400000, guid: 2b5708eb758d4e6cba69b6f25708a191, type: 2}
-  - {fileID: 11400000, guid: 880980730b0e8834b8ebf9e6632fbe19, type: 2}
-  - {fileID: 11400000, guid: 1f06724f149cbe7e579c84eb0b14933a, type: 2}
-  - {fileID: 11400000, guid: 131e300f47642b649a73e705bc310b6e, type: 2}
   characterColumns: 4
   characterRows: 2
   showRandomCharacter: 1
@@ -275,7 +266,7 @@ MonoBehaviour:
     chooseCharacter: "\u3048\u3089\u3093\u3067\u306D"
     easeLabel: "\u4F7F\u3044\u3084\u3059\u3055"
     easeUnknown: "\uFF1F"
-    join: "A / Start \u3067\u53C2\u52A0"
+    join: "\u30DC\u30BF\u30F3\u304B\u30B9\u30C6\u30A3\u30C3\u30AF\u3067\u53C2\u52A0"
     typeNone: "\u306A\u3057"
     typeCpu: CPU
     typePlayer: "\u30D7\u30EC\u30A4\u30E4\u30FC"
@@ -300,7 +291,7 @@ MonoBehaviour:
     decided: "\u6C7A\u5B9A\uFF01\u3000{0}"
     hintMode: "\u2190\u2192\uFF1A\u30E2\u30FC\u30C9\u3092\u9078\u3076\u3000A / Start\uFF1A\u6C7A\u5B9A\u3000B\uFF1A\u30E1\u30CB\u30E5\u30FC\u3078"
     hintRule: "\u2191\u2193 / A\uFF1A\u9805\u76EE\u3092\u9078\u3076\u3000\u2190\u2192\uFF1A\u5207\u308A\u66FF\u3048\u3000Start\uFF1A\u30AD\u30E3\u30E9\u30AF\u30BF\u30FC\u30BB\u30EC\u30AF\u30C8\u3078\u3000B\uFF1A\u30E2\u30FC\u30C9\u30BB\u30EC\u30AF\u30C8\u3078"
-    hintCharacter: "A\uFF1A\u53C2\u52A0\u30FB\u9078\u3076\u30FBCPU\u306E\u30B3\u30A4\u30F3\u3092\u3064\u304B\u3080\u3000B\uFF1A\u53D6\u308A\u6D88\u3057\u30FB\u629C\u3051\u308B\u3000Start\uFF1A\u6B21\u3078"
+    hintCharacter: "\u30DC\u30BF\u30F3\u30FB\u30B9\u30C6\u30A3\u30C3\u30AF\uFF1A\u53C2\u52A0\u3000A\uFF1A\u9078\u3076\u30FBCPU\u306E\u30B3\u30A4\u30F3\u3092\u3064\u304B\u3080\u3000B\uFF1A\u53D6\u308A\u6D88\u3057\u30FB\u629C\u3051\u308B\u3000Start\uFF1A\u6B21\u3078"
     hintStageLocal: "A\uFF1A\u6C7A\u5B9A\u3000B\uFF1A\u30AD\u30E3\u30E9\u30AF\u30BF\u30FC\u30BB\u30EC\u30AF\u30C8\u3078\u3000\u53F3\u30B9\u30C6\u30A3\u30C3\u30AF\uFF08IJKL\uFF09\uFF1A\u30B9\u30C6\u30FC\u30B8\u3092\u898B\u56DE\u3059\u3000\u3048\u3089\u3079\u308B\u306E\u306F {0} \u3060\u3051"
     hintStageVote: "A\uFF1A\u6295\u7968\u3000B\uFF1A\u53D6\u308A\u6D88\u3057\uFF08\u6295\u7968\u3057\u3066\u3044\u306A\u3051\u308C\u3070\u30AD\u30E3\u30E9\u30AF\u30BF\u30FC\u30BB\u30EC\u30AF\u30C8\u3078\uFF09\u3000\u5168\u54E1\u304C\u6295\u7968\u3057\u305F\u3089\u62BD\u9078\uFF01"
   maxPlayers: 4

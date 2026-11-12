@@ -172,6 +172,8 @@ namespace Nakahira
 
             // 必殺技を撃つ向きへ向き直っている最中(あかだる)は、状態の動きを置き換える
             m_special.OverrideAim(ref cmd);
+            // チーム戦:歩いているとき、近くの味方から離れる向きへずらす(積むの最中は、積み木へ跳ぶ狙いを崩さないよう除く)
+            if (m_current != m_collect) CpuAllySpacing.Apply(m_context, ref cmd);
             // 移動床の乗り降り:乗り場で待つ・乗っている間は移動を置き換える
             m_ride.Apply(m_context, m_current != null ? m_current.Route : null, ref cmd);
             // 危ない場所(隕石の予告円・ビーム・エクスカリバー)から出る・入らない(乗り降り中は隕石から出るだけ)

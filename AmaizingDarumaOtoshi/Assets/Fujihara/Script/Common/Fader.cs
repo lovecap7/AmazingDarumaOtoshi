@@ -75,6 +75,37 @@ public class Fader : MonoBehaviour
         instance.StartCoroutine(instance.Run(sceneName));
     }
 
+    // 遷移演出の調整用(Nakagawa)：シーンは切り替えずに、fromScene → toScene の演出だけを試しに流す。
+    // 隠したあと holdTime 秒そのまま見せてから明ける。演出が無い・この組み合わせで使わない・遷移中なら false
+    // （黒いフェードは試さない。演出の調整用で、ローカルプレイの遷移の動きには関わらない）
+    public static bool PreviewTransition(string fromScene, string toScene, float holdTime = 0.5f)
+    {
+        if (instance == null || instance.busy) return false;
+        var t = instance.Current();
+        if (t == null || !t.Plays(fromScene, toScene)) return false;
+        instance.StartCoroutine(instance.RunPreview(t, holdTime));
+        return true;
+    }
+
+    IEnumerator RunPreview(ISceneTransition t, float holdTime)
+    {
+        busy = true;
+        bool navWas = EventSystem.current == null || EventSystem.current.sendNavigationEvents;
+        if (EventSystem.current != null) EventSystem.current.sendNavigationEvents = false;
+
+        BlackVisible(false);
+        m_blackAlpha = 0f;
+        group.alpha = 1f;
+        group.blocksRaycasts = true;
+        yield return t.Cover();
+        for (float w = 0f; w < holdTime; w += Time.unscaledDeltaTime) yield return null;
+        yield return t.Reveal();
+        group.blocksRaycasts = false;
+
+        if (EventSystem.current != null) EventSystem.current.sendNavigationEvents = navWas;
+        busy = false;
+    }
+
     void Awake()
     {
         // 画面全体を覆う黒い画像を、コードで作る

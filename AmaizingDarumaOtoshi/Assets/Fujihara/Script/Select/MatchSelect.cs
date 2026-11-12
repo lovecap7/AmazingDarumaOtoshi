@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.Controls;
 using UnityEngine.UI;
 
 // モードセレクト → ルールセレクト → キャラクターセレクト → ステージセレクト → ステージ抽選。
@@ -49,6 +50,9 @@ public class MatchSelect : MonoBehaviour
     [SerializeField, Range(1, 20)] int stageColumns = 7;
     [Tooltip("オン：全員が投票して抽選で決める（オンライン用）。オフ：1P だけがえらび、左に動かせるプレビューが出る（ローカル）")]
     [SerializeField] bool stageVote = false;
+
+    [Tooltip("画面の右下に操作説明（A：決定 など）を出す。枠と重なって邪魔なので今はオフ")]
+    [SerializeField] bool showHint = false;
 
     [Header("キャラクターセレクトの並べ方（並び順は SelectRoster の Character Order。ずかんと同じ）")]
     [Tooltip("横に並べるマスの数（列）。例：4 なら「赤 青 緑 黄 ／ 岩 蛇 …」、3 なら「赤 青 緑 ／ 黄 岩 蛇 …」")]
@@ -148,6 +152,7 @@ public class MatchSelect : MonoBehaviour
         public Vector2 move;
         public Vector2 look;        // ステージのプレビューを見回す（右スティック / IJKL）
         public bool a, b, start;
+        public bool join;           // 参加の合図：B・Select 以外のボタンを押した、またはスティック・十字キーを倒した（スマブラと同じ）
     }
 
     // 1人分（プレイヤーまたは CPU）。番号・機器・選んだキャラ・投票したステージを必ずここにまとめて持つ
@@ -244,6 +249,7 @@ public class MatchSelect : MonoBehaviour
     RectTransform canvas, modeRoot, ruleRoot, charRoot, stageRoot, lotteryRoot, cursorLayer, readyBanner;
     CanvasGroup modeGroup, ruleGroup, charGroup, stageGroup, readyGroup, lotteryGroup;
     TextMeshProUGUI hint, stageStatus, stageDescription, needMoreText, ruleSummary, ruleHeader;
+    RectTransform ruleSummaryBg;
     Image fade;
     Material letterMat, popMat;
     float readyAmount;
@@ -641,18 +647,20 @@ public class MatchSelect : MonoBehaviour
         phase = Phase.Character;
         phaseFrame = Time.frameCount;
         ruleSummary.text = RuleSummaryText();
+        // 札の幅を文字に合わせる（左右に余白）
+        ruleSummaryBg.sizeDelta = new Vector2(Mathf.Min(ruleSummary.GetPreferredValues(ruleSummary.text).x + 56f, 1100f), ruleSummaryBg.sizeDelta.y);
         Debug.Log(ruleSummary.text);
     }
 
     // ---------------- キャラクターセレクト ----------------
     void UpdateCharacterSelect(float dt)
     {
-        // 参加していない機器で A / Start が押されたら参加
+        // 参加していない機器で、B 以外のボタンを押すかスティックを倒したら参加（スマブラと同じ）
         foreach (var device in Devices())
         {
             if (FindPlayer(device) != null) continue;
             var s = Read(device);
-            if (s.a || s.start) { MenuSounds.Decide(); Join(device); }
+            if (s.a || s.start || s.join) { MenuSounds.Decide(); Join(device); }
             else if (s.b && HumanCount() == 0) { MenuSounds.Cancel(); GoToRuleSelect(); return; }
         }
 
@@ -1570,6 +1578,14 @@ public class MatchSelect : MonoBehaviour
             s.a = g.buttonSouth.wasPressedThisFrame;
             s.b = g.buttonEast.wasPressedThisFrame;
             s.start = g.startButton.wasPressedThisFrame;
+            // 参加：B（戻る）と Select 以外のボタンを押す、またはスティック・十字キーをしっかり倒す（少しのぶれでは参加しない）
+            s.join = m.magnitude > 0.6f || look.magnitude > 0.6f;
+            if (!s.join)
+                foreach (var c in g.allControls)
+                {
+                    if (c is ButtonControl bc && bc != g.buttonEast && bc != g.selectButton && !bc.synthetic && bc.wasPressedThisFrame)
+                    { s.join = true; break; }
+                }
         }
         else if (device is Keyboard k)
         {
@@ -1580,6 +1596,8 @@ public class MatchSelect : MonoBehaviour
             s.start = k.enterKey.wasPressedThisFrame || k.numpadEnterKey.wasPressedThisFrame;
             s.a = k.spaceKey.wasPressedThisFrame || k.zKey.wasPressedThisFrame || s.start;
             s.b = k.escapeKey.wasPressedThisFrame || k.xKey.wasPressedThisFrame || k.backspaceKey.wasPressedThisFrame;
+            // 参加：移動キーを押す、または B（Esc・X・BackSpace）以外のキーを押す
+            s.join = s.move != Vector2.zero || (k.anyKey.wasPressedThisFrame && !s.b);
         }
         return s;
     }
@@ -1719,10 +1737,18 @@ public class MatchSelect : MonoBehaviour
         Header(charRoot, texts.characterHeader, ToyKit.Palette[0]);
 
         // 決めたルール（右上）
-        ruleSummary = ToyKit.UIText("RuleSummary", charRoot, font, "", 32f, ToyKit.Ink);
-        ruleSummary.alignment = TextAlignmentOptions.Right;
-        ruleSummary.rectTransform.pivot = new Vector2(1f, 1f);
-        ToyKit.Anchor(ruleSummary.rectTransform, new Vector2(1f, 1f), new Vector2(-50f, -60f), new Vector2(900f, 50f));
+        // 右上のルール：背景がにぎやかでも読めるよう、白い角丸の札に乗せる（札の幅は文字に合わせる。GoToCharacterSelect）
+        ruleSummaryBg = ToyKit.UIImage("RuleSummaryBg", charRoot, new Color(1f, 1f, 1f, 0.94f), uiSprite);
+        ruleSummaryBg.GetComponent<Image>().pixelsPerUnitMultiplier = 0.4f;
+        // 高さは個人戦／チーム戦のボタン（中心が上から 85）とそろえる
+        ruleSummaryBg.pivot = new Vector2(1f, 0.5f);
+        ToyKit.Anchor(ruleSummaryBg, new Vector2(1f, 1f), new Vector2(-40f, -85f), new Vector2(700f, 64f));
+        var rsOl = ruleSummaryBg.gameObject.AddComponent<Outline>(); rsOl.effectColor = ToyKit.Ink; rsOl.effectDistance = new Vector2(3f, -3f);
+        ruleSummary = ToyKit.UIText("RuleSummary", ruleSummaryBg, font, "", 34f, ToyKit.Ink);
+        ruleSummary.fontStyle = FontStyles.Bold;
+        ruleSummary.alignment = TextAlignmentOptions.Center;
+        ruleSummary.textWrappingMode = TextWrappingModes.NoWrap;
+        ToyKit.Stretch(ruleSummary.rectTransform);
 
         // 個人戦／チーム戦の切り替えボタン（上の真ん中。カーソルで押す）
         battleButton = ToyKit.UIImage("BattleMode", charRoot, Color.white, uiSprite);
@@ -1739,7 +1765,8 @@ public class MatchSelect : MonoBehaviour
         // 並べるキャラ：SelectRoster の characterOrder（空なら全キャラ）の順。ずかんも同じ順
         var characters = Yurube.Achievements.AchievementRewards.AvailableCharacters(roster.OrderedCharacters());
         int count = characters.Count + (showRandomCharacter ? 1 : 0);   // 最後にランダム
-        var grid = GridLayout(count, characterColumns, new Vector2(1760f, 430f), new Vector2(205f, 205f), 16f, 350f,
+        // 一番上の行は、左上の「キャラクターセレクト」の見出しと重ならない高さから（上端が画面の中心から 310）
+        var grid = GridLayout(count, characterColumns, new Vector2(1760f, 430f), new Vector2(205f, 205f), 16f, 310f,
                               characterRows > 0 ? characterRows : 0, centerLastCharacterRow, characterRows > 0 || !centerLastCharacterRow);
         for (int i = 0; i < count; i++)
         {
@@ -1864,6 +1891,7 @@ public class MatchSelect : MonoBehaviour
         hint.alignment = TextAlignmentOptions.Right;
         hint.rectTransform.pivot = new Vector2(1f, 0f);
         ToyKit.Anchor(hint.rectTransform, new Vector2(1f, 0f), new Vector2(-40f, 14f), new Vector2(1840f, 40f));
+        hint.gameObject.SetActive(showHint);   // 下の操作説明（今は出さない）
 
         fade = ToyKit.UIImage("Fade", canvas, Color.white).GetComponent<Image>();
         ToyKit.Stretch(fade.rectTransform);

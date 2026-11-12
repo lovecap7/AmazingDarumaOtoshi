@@ -19,6 +19,12 @@ public static class MatchSetup
     // CPU の強さの段階数（セレクトで 1〜この数を選ぶ）
     public const int MaxCpuLevel = 3;
 
+    // ストーリー用(Yurube): 画面の名札を「1P」「CPU」ではなく、だるまの名前で出す
+    public static bool StoryNames;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetStatics() => StoryNames = false;
+
     public class Entry
     {
         public int playerIndex;         // 0 = 1P, 1 = 2P, ...
@@ -28,14 +34,19 @@ public static class MatchSetup
         public string deviceName;
         public CharacterData character;
         public int cpuNumber;           // CPU が複数いるときの番号（1〜）。CPU が1人だけなら 0
+        // この人だけストック数を変えたいとき（0 ならルールのストック数）。ストーリーのチュートリアル用
+        public int stocks;
         // チーム戦のチーム（0 = 赤、1 = 青、2 = 緑、3 = 黄）。個人戦なら -1
         // 同じチームどうしかは MatchSetup.SameTeam(a, b) で調べる（個人戦では自分以外みんな敵）
         public int team = -1;
 
         public InputDevice Device => isCpu ? null : InputSystem.GetDeviceById(deviceId);
         public string PlayerLabel => (playerIndex + 1) + "P";
-        // 画面に出す名前：「1P」、CPU は「CPU」（複数いるときは「CPU1」「CPU2」）
-        public string DisplayLabel => !isCpu ? PlayerLabel : cpuNumber > 0 ? "CPU" + cpuNumber : "CPU";
+        // 画面に出す名前：「1P」、CPU は「CPU」（複数いるときは「CPU1」「CPU2」）。
+        // ストーリー中は、だるまの名前（きだる／みだる）にする。
+        public string DisplayLabel => StoryNames && character != null
+            ? character.displayName
+            : !isCpu ? PlayerLabel : cpuNumber > 0 ? "CPU" + cpuNumber : "CPU";
     }
 
     // 試合のモード

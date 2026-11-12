@@ -21,6 +21,29 @@ namespace Nakahira
         public bool IsPlayful => StackCount >= Params.PlayfulStack;
         public Vector3 Position => Self.transform.position;
 
+        // 味方の体と、飛ばした積み木が当たるとみなす中心同士の距離に足す余裕(m)
+        const float kAllyLineMargin = 0.2f;
+
+        // from から dir の向きへ length(m)まで飛ばした積み木が、チーム戦の味方に当たりそうか(まっすぐ飛ぶとして)
+        // 股抜きショット・弾く・打ち返し・必殺技の弾(ファンネル・トロン)を撃つ前に見る。味方がいれば撃たない(設計メモ 9)
+        public bool AllyInLine(Vector3 from, Vector3 dir, float length)
+        {
+            dir.y = 0.0f;
+            if (dir.sqrMagnitude < 0.0001f) return false;
+            dir.Normalize();
+            float hit = DarumaCharacter.kBodyRadius + TumikiBlock.kRadius + kAllyLineMargin;
+            foreach (var ally in Perception.Allies)
+            {
+                if (ally == null) continue;
+                Vector3 d = ally.transform.position - from;
+                d.y = 0.0f;
+                float along = Vector3.Dot(d, dir);
+                if (along < 0.0f || along > length + hit) continue;
+                if ((d - dir * along).sqrMagnitude <= hit * hit) return true;
+            }
+            return false;
+        }
+
         // 積める段数の上限(だるきんぐは 2 段。ほかのキャラは上限なし)
         public int StackLimit => m_kingPassive != null ? m_kingPassive.MaxStack : int.MaxValue;
         // 上限まで積んでいる(だるきんぐの 2 段)。これ以上拾わない(積む・殴りながら積む・逃げながら拾う・ジャンプ乗りをしない)

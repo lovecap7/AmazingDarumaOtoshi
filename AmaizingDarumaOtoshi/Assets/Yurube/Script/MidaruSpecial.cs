@@ -37,6 +37,10 @@ namespace Yurube
         DarumaCharacter m_character;
         SpecialGauge m_gauge;
 
+        // 必殺技ゲージ用(中平): 発動してから分裂弾が追いかけ終わるまで(この間はゲージが溜まらない)
+        float m_activeUntil = -1.0f;
+        public bool IsActive => Time.time < m_activeUntil;
+
         private void Awake()
         {
             m_character = GetComponent<DarumaCharacter>();
@@ -82,6 +86,7 @@ namespace Yurube
             var block = m_character.Stack.RemoveAt(0);
             if (block == null) return false;
             m_gauge.Consume();
+            m_activeUntil = Time.time + m_homingDelay + m_homingDuration;   // 必殺技ゲージ用(中平)
 
             Vector3 direction = m_character.transform.forward;
             Vector3 center = m_character.transform.position + Vector3.up * (TumikiBlock.kHeight * 0.5f);

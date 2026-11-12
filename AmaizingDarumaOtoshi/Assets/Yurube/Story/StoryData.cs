@@ -53,6 +53,12 @@ namespace Yurube.Story
         public int stocks = 1;
         public float timeLimit;         // 0 なら時間制限なし
         public bool cpuSpecial = true;  // CPU の必殺技を使ってよいか（チュートリアルでは false 推奨）
+        // 必殺技の覚醒イベントを出す章か（序章だけ true）
+        public bool awakening;
+        // 必殺技ゲージを最初から見せるか。序章は false（覚醒の瞬間まで隠す）
+        public bool gaugeFromStart = true;
+        // チュートリアル用の難易度（0 なら通常）。CPU だけに効く
+        public int cpuBlockLimit;
     }
 
     // 新聞（1枚絵）
@@ -62,7 +68,8 @@ namespace Yurube.Story
         public string header = "だるま新聞";
         public string headline;         // 見出し
         public string body;             // 本文（空でもよい）
-        public string image;            // 画像（Resources のパス。空なら枠だけ）
+        public string image;            // 画像（Resources のパス。空なら新聞用の絵を作る）
+        public string caption;          // 写真のキャプション（空なら出さない）
     }
 
     // 章1つ分
@@ -85,6 +92,8 @@ namespace Yurube.Story
         public List<TutorialStep> tutorial = new List<TutorialStep>();
         // チュートリアルのあと、試合を始める前の一言
         public List<StoryLine> matchStart = new List<StoryLine>();
+        // 必殺技の覚醒イベント（初回だけ。対戦中の小窓で出す）
+        public List<StoryLine> awakening = new List<StoryLine>();
         // 対戦中に一度だけ出す掛け合い（CPUが攻撃したときなど）
         public List<StoryLine> cpuTaunts = new List<StoryLine>();
         // 初回だけ出す掛け合い（黄色い積み木を積んで増えたとき）
@@ -171,5 +180,14 @@ namespace Yurube.Story
             if (doll != null) doll.transform.localRotation = Quaternion.Euler(0f, 0f, 12f);
             Debug.Log("[Story] だるま人形が カタ、と揺れた");
         }
+    }
+
+    // 画面に出す操作説明。ストーリー内のカットシーン・会話・実績で同じ表記を使う。
+    // 割り当てもここを見れば分かるように、文言はこの1か所だけに書く。
+    public static class StoryText
+    {
+        public const string Advance = "A：つぎへ";
+        public const string Skip = "B：スキップ";
+        public const string Hint = Advance + "　" + Skip;
     }
 }
