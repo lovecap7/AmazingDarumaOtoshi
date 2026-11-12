@@ -21,7 +21,7 @@ public class BlockController : MonoBehaviour
     public event Action OnFlightEnded;
 
     // テスト用：インスペクターで挙動を選べるようにする
-    public enum BehaviorType { Normal, Iwa,HebiLeft, HebiRight, UnBreak,Homing,Ziguzagu,Grow,Bomb, Magnet,Fade, Boomerang, Gravity, Accelerat, Funnel, Afterimage, Teleport, Mirage }
+    public enum BehaviorType { Normal, Iwa,HebiLeft, HebiRight, UnBreak,Homing,Ziguzagu,Grow,Bomb, Magnet,Fade, Boomerang, Gravity, Accelerat, Funnel, Afterimage, Teleport, Mirage, Collector }
     [SerializeField] BehaviorType behaviorType = BehaviorType.Normal;
     [SerializeField] float hebiTurnSpeed = 60.0f; // テスト用：へびだるの曲がる強さ(度/秒)。大きいほど急カーブになる
     [SerializeField] float homingStartTurnSpeed = 270.0f;  // テスト用：ホーミング発射直後の旋回速度(度/秒)
@@ -54,7 +54,8 @@ public class BlockController : MonoBehaviour
     [SerializeField] float afterimageDelay = 0.25f;     // テスト用：本体より何秒遅れるか
     [SerializeField] float afterimageLifetime = 1.5f;   // テスト用：残像が消えるまでの時間(秒)
     [SerializeField] float afterimageAlpha = 0.4f;      // テスト用：残像の濃さ
-    [SerializeField] Material afterimageMaterial;       // テスト用：残像用の半透明マテリアル(未設定だと本体のマテリアルを複製する)
+    
+    Material afterimageMaterial;       // テスト用：残像用の半透明マテリアル(未設定だと本体のマテリアルを複製する)
 
     int funnelCount = 5;               // テスト用：分裂後の総数。本来はプレイヤーが管理している積み木の数を渡す
     float funnelSpacing = 2.4f;        // テスト用：分身を左右に並べる間隔(積み木の幅に対する倍率)
@@ -78,6 +79,12 @@ public class BlockController : MonoBehaviour
     float cloneLifetime = 4.0f;   // テスト用：分身が消えるまでの時間(秒)
     float cloneSpacing = 1.5f;    // テスト用：分身を並べる間隔(積み木の幅に対する倍率)
     float cloneTint = 0.15f;  // テスト用：分身をどれだけ暗くするか(0で本体と同じ見た目)
+
+    float collectorRange = 5.0f;            // テスト用:引き寄せる範囲(半径)
+    float collectorStrength = 30.0f;        // テスト用:引き寄せる加速度
+    float collectorEdgeRatio = 0.4f;        // テスト用:範囲の端での強さ(近くを1とした割合)
+    float collectorCollectDistance = 0.8f;  // テスト用:回収する距離
+    float collectorFlyingPullRatio = 0.3f;  // テスト用:飛んでいる積み木への引力の割合
 
     public bool isFlying {  get; private set; } // 現在飛行中かどうか trueの場合は攻撃判定が発生する
 
@@ -154,6 +161,7 @@ public class BlockController : MonoBehaviour
             case BehaviorType.Afterimage: return new AfterimageBehavior(this, afterimageDelay, afterimageLifetime, afterimageAlpha, afterimageMaterial);
             case BehaviorType.Teleport:return new TeleportBehavior(this, teleportDistance, teleportMaxUses,0.1f, 1.5f, teleportWindUp, teleportGhostLifetime, 
                                                                    teleportGhostAlpha, teleportGhostMaterial, teleportGhostExpand, teleportTrailSpacing);
+            case BehaviorType.Collector:return new CollectorBehavior(this, collectorRange, collectorStrength,collectorEdgeRatio, collectorCollectDistance, collectorFlyingPullRatio);
             case BehaviorType.Mirage: return new MirageBehavior(this, cloneCount, cloneLifetime, cloneSpacing, cloneTint);
             case BehaviorType.Normal:
             default: return new NormalBehavior();
