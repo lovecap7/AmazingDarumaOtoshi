@@ -290450,6 +290450,7 @@ MonoBehaviour:
   m_reviveTravelTime: 0.7
   m_startCountdown: 3
   m_countdownInDirectPlay: 0
+  m_friendlyFire: 0
 --- !u!4 &1218044442
 Transform:
   m_ObjectHideFlags: 0

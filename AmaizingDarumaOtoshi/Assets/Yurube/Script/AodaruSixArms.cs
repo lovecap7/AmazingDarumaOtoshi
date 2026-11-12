@@ -28,8 +28,9 @@ namespace Yurube
         [SerializeField] float m_knockSpeed = 24.0f;
         [Tooltip("1方向あたりの判定の広さ(度、半分)")]
         [SerializeField] float m_sectorHalfAngle = 60.0f;
-        [Tooltip("同じ積み木を続けてはじかない間隔(秒)")]
+        [Tooltip("(使っていない。2026-11-12 中平: 近づいている間は何度でもはじくようにした)")]
         [SerializeField] float m_knockInterval = 0.5f;
+        public float KnockInterval => m_knockInterval;
 
         // 3方向(120度ずつ)
         static readonly float[] kSectorOffsets = { 0.0f, 120.0f, 240.0f };
@@ -53,7 +54,6 @@ namespace Yurube
         readonly List<Transform> m_defaultTransforms = new List<Transform>(2);
         readonly List<Vector3> m_defaultScales = new List<Vector3>(2);
 
-        readonly Collider[] m_overlaps = new Collider[32];
         readonly Dictionary<TumikiBlock, float> m_lastKnockTimes = new Dictionary<TumikiBlock, float>();
 
         public void Initialize(DarumaCharacter character, float duration, float baseYaw,
@@ -335,31 +335,66 @@ namespace Yurube
             float activeTo = Mathf.Max(0.01f, m_introTime) + m_duration;
             if (m_elapsed > activeTo) return;
 
-            Vector3 center = m_character.transform.position + Vector3.up * 0.5f;
-            int count = Physics.OverlapSphereNonAlloc(center, m_knockRadius, m_overlaps, ~0, QueryTriggerInteraction.Ignore);
+            // 2026-11-12 中平: 撃ち漏らしを減らすため判定を強くした(ゆるべさん了承済みの「押した瞬間に効く」と合わせて)
+            //  ・物理の重なり(上限 32 個で、床・壁・自分の段で埋まると弾が数に入らなかった)ではなく、積み木の一覧から飛んでいるものだけ調べる
+            //  ・高さは足元からタワーのてっぺんまで全部(前は足元 +0.5m を中心にした球で、高い段や段差の上の弾が外れていた)
+            //  ・近づいているかは自分の動きも含めて見る(横を滑る弾に自分から歩いて当たると素通りしていた)
+            //  ・体のすぐそばまで来た弾は、離れていくもの(自分の撃った弾など)以外はかならずはじく
+            //  ・同じ積み木を 0.5 秒はじかない決まりはやめた(壁で跳ね返って戻ってきた弾が素通りしていた)。近づいている間は何度でもはじく
+            Vector3 feet = m_character.transform.position;
+            float towerHeight = m_character.Stack != null ? m_character.Stack.Height : 1.0f;
+            float bottom = feet.y - TumikiBlock.kHeight;
+            float top = feet.y + towerHeight + TumikiBlock.kHeight;
+            Vector3 selfVelocity = m_character.HorizontalVelocity;
+            float radiusSqr = m_knockRadius * m_knockRadius;
 
-            for (int i = 0; i < count; i++)
+            var blocks = TumikiBlock.All;
+            for (int i = blocks.Count - 1; i >= 0; i--)
             {
-                var block = m_overlaps[i].GetComponentInParent<TumikiBlock>();
-                if (block == null) continue;
-                if (block.CurrentState != TumikiBlock.State.Flying) continue;
+                var block = blocks[i];
+                if (block == null || block.CurrentState != TumikiBlock.State.Flying) continue;
 
-                Vector3 toBlock = block.transform.position - center;
+                Vector3 pos = block.transform.position;
+                if (pos.y < bottom || pos.y > top) continue;
+
+                Vector3 toBlock = pos - feet;
                 toBlock.y = 0.0f;
-                if (toBlock.sqrMagnitude < 0.0001f) continue;
+                float distSqr = toBlock.sqrMagnitude;
+                if (distSqr > radiusSqr) continue;
 
-                // 近づいてくる積み木だけをはじき返す(自分の撃った弾は対象外)
-                Vector3 toPlayer = -toBlock;
-                if (Vector3.Dot(block.HorizontalVelocity, toPlayer.normalized) <= 0.1f) continue;
+                // 自分から見た弾の動き(自分が動いて弾に近づくのも「近づいてくる」に入れる)
+                Vector3 relative = block.HorizontalVelocity - selfVelocity;
+                Vector3 outward = distSqr > 0.0001f ? toBlock / Mathf.Sqrt(distSqr) : FallbackOutward(relative);
+                float closing = -Vector3.Dot(relative, outward);
 
-                float angle = Mathf.Atan2(toBlock.x, toBlock.z) * Mathf.Rad2Deg;
+                bool close = distSqr < kCloseDistance * kCloseDistance;
+                if (closing <= kMinClosingSpeed && !(close && closing > -kMinClosingSpeed)) continue;
+
+                float angle = Mathf.Atan2(outward.x, outward.z) * Mathf.Rad2Deg;
                 if (!InAnySector(angle)) continue;
 
-                if (m_lastKnockTimes.TryGetValue(block, out float last) && Time.time - last < m_knockInterval) continue;
+                // 同じ物理ステップで二度はじかない
+                if (m_lastKnockTimes.TryGetValue(block, out float last) && Time.time - last < kRepeatGuard) continue;
 
-                block.Launch(toBlock.normalized, m_knockSpeed, m_character);
+                block.Launch(outward, m_knockSpeed, m_character);
                 m_lastKnockTimes[block] = Time.time;
             }
+        }
+
+        // この距離(体の中心から水平に)より内側に来た弾は、離れていくもの以外かならずはじく
+        const float kCloseDistance = 1.5f;
+        // これより速く近づいてくる弾をはじく(m/s)
+        const float kMinClosingSpeed = 0.1f;
+        // 同じ積み木を続けてはじかない最小の間隔(秒。同じステップの二重はじき防止だけ)
+        const float kRepeatGuard = 0.05f;
+
+        // 弾が真上・真下にいるとき: 来た向きへ返す(動いていなければあおだるの正面へ)
+        Vector3 FallbackOutward(Vector3 relative)
+        {
+            if (relative.sqrMagnitude > 0.0001f) return -relative.normalized;
+            Vector3 f = m_character.transform.forward;
+            f.y = 0.0f;
+            return f.sqrMagnitude > 0.0001f ? f.normalized : Vector3.forward;
         }
 
         bool InAnySector(float angle)
