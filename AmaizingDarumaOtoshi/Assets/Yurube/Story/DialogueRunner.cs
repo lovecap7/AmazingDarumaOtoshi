@@ -14,7 +14,7 @@ namespace Yurube.Story
     // 操作説明は画面右下に「A：つぎへ　B：スキップ」を出す（ほかの画面と同じ場所）。
     public class DialogueRunner : MonoBehaviour
     {
-        const string HintText = "A：つぎへ　B：スキップ";
+        const string HintText = StoryText.Hint;
 
         // 文字送りの速さ（1秒あたりの文字数）。インスペクターで変えられる
         [SerializeField, Min(1f)] float m_charsPerSecond = 34f;
@@ -29,10 +29,14 @@ namespace Yurube.Story
         TMP_FontAsset m_font;
         RectTransform m_root, m_bigPanel, m_smallPanel, m_newsPanel, m_objectivePanel, m_koPanel;
         Image m_dim, m_portrait, m_koDim, m_portraitFace;
+        Image m_smallPortrait, m_smallFace;
         TextMeshProUGUI m_bigName, m_bigText, m_smallName, m_smallText, m_hint;
+        RectTransform m_hintPlate;
         TextMeshProUGUI m_newsHeader, m_newsHeadline, m_newsBody;
         TextMeshProUGUI m_objectiveName, m_objectiveText, m_koMain, m_koSub;
         Image m_newsImage;
+        TextMeshProUGUI m_newsCaption;
+        GameObject m_newsCaptionBg;
         CanvasGroup m_bigGroup, m_smallGroup, m_newsGroup, m_objectiveGroup, m_koGroup, m_hintGroup;
         bool m_skipped;
         bool m_smallShowing;
@@ -83,6 +87,7 @@ namespace Yurube.Story
             var hintPlate = ToyKit.UIRounded("HintPlate", m_root, new Color(0.05f, 0.04f, 0.03f, 0.78f), 16f);
             hintPlate.pivot = new Vector2(1f, 0f);
             ToyKit.Anchor(hintPlate, new Vector2(1f, 0f), new Vector2(-32f, 30f), new Vector2(560f, 56f));
+            m_hintPlate = hintPlate;
             hintPlate.gameObject.AddComponent<Outline>().effectColor = new Color(1f, 1f, 1f, 0.18f);
             m_hintGroup = hintPlate.gameObject.AddComponent<CanvasGroup>();
             m_hint = ToyKit.UIText("Hint", hintPlate, m_font, HintText, 30f, Color.white);
@@ -90,6 +95,9 @@ namespace Yurube.Story
             m_hint.rectTransform.offsetMin = new Vector2(14f, 0f);
             m_hint.rectTransform.offsetMax = new Vector2(-14f, 0f);
             m_hint.alignment = TextAlignmentOptions.Right;
+            m_hint.ForceMeshUpdate();
+            // 文字の幅に合わせて背景を縮める（背景だけが大きくならないように）
+            m_hintPlate.sizeDelta = new Vector2(Mathf.Clamp(m_hint.preferredWidth + 30f, 280f, 560f), 56f);
             m_hintGroup.alpha = 0f;
             hintPlate.gameObject.SetActive(false);
         }
@@ -228,8 +236,22 @@ namespace Yurube.Story
             m_smallPanel = panel;
             m_smallGroup = panel.gameObject.AddComponent<CanvasGroup>();
 
+            // 顔アイコン（対戦中の掛け合いでも、誰が話しているか分かるように）
+            var portrait = ToyKit.UIRounded("Portrait", panel, Color.white, 999f);
+            ToyKit.Anchor(portrait, new Vector2(0f, 0.5f), new Vector2(88f, 0f), new Vector2(118f, 118f));
+            portrait.gameObject.AddComponent<Outline>().effectColor = Ink;
+            portrait.gameObject.AddComponent<Mask>().showMaskGraphic = true;
+            m_smallPortrait = portrait.GetComponent<Image>();
+            var face = ToyKit.UIImage("Face", portrait, Color.white);
+            ToyKit.Stretch(face);
+            face.offsetMin = new Vector2(4f, 4f);
+            face.offsetMax = new Vector2(-4f, -4f);
+            m_smallFace = face.GetComponent<Image>();
+            m_smallFace.preserveAspect = true;
+            m_smallFace.enabled = false;
+
             var plate = ToyKit.UIRounded("Plate", panel, ToyKit.Palette[3], 14f);
-            ToyKit.Anchor(plate, new Vector2(0f, 1f), new Vector2(150f, -26f), new Vector2(260f, 44f));
+            ToyKit.Anchor(plate, new Vector2(0f, 1f), new Vector2(300f, -26f), new Vector2(260f, 44f));
             m_smallName = ToyKit.UIText("Name", plate, m_font, "", 26f, Color.white);
             m_smallName.fontStyle = FontStyles.Bold;
             m_smallName.enableAutoSizing = true;
@@ -246,8 +268,8 @@ namespace Yurube.Story
             var textRect = m_smallText.rectTransform;
             textRect.anchorMin = textRect.anchorMax = new Vector2(0f, 1f);
             textRect.pivot = new Vector2(0f, 1f);
-            textRect.anchoredPosition = new Vector2(40f, -70f);
-            textRect.sizeDelta = new Vector2(1260f, 86f);
+            textRect.anchoredPosition = new Vector2(185f, -70f);
+            textRect.sizeDelta = new Vector2(1120f, 86f);
 
             m_smallGroup.alpha = 0f;
             panel.gameObject.SetActive(false);
@@ -285,10 +307,22 @@ namespace Yurube.Story
             headRect.anchoredPosition = new Vector2(60f, -120f);
             headRect.sizeDelta = new Vector2(1180f, 130f);
 
-            // 1枚絵（空なら枠だけ）
+            // 1枚絵（空なら新聞用の絵を作る）
             var frame = ToyKit.UIRounded("Image", panel, new Color(0.88f, 0.84f, 0.78f, 1f), 10f);
             ToyKit.Anchor(frame, new Vector2(0.5f, 1f), new Vector2(0f, -430f), new Vector2(1180f, 320f));
             m_newsImage = frame.GetComponent<Image>();
+
+            // 写真のキャプション（画像の下端に重ねる）
+            var captionBg = ToyKit.UIImage("CaptionBg", panel, new Color(0.07f, 0.06f, 0.05f, 0.72f));
+            captionBg.pivot = new Vector2(0f, 1f);
+            ToyKit.Anchor(captionBg, new Vector2(0f, 1f), new Vector2(66f, -552f), new Vector2(320f, 34f));
+            m_newsCaptionBg = captionBg.gameObject;
+            m_newsCaption = ToyKit.UIText("Caption", panel, m_font, "", 24f, Color.white);
+            m_newsCaption.alignment = TextAlignmentOptions.Left;
+            m_newsCaption.rectTransform.pivot = new Vector2(0f, 1f);
+            ToyKit.Anchor(m_newsCaption.rectTransform, new Vector2(0f, 1f), new Vector2(80f, -556f), new Vector2(300f, 30f));
+            m_newsCaptionBg.SetActive(false);
+            m_newsCaption.gameObject.SetActive(false);
 
             m_newsBody = ToyKit.UIText("Body", panel, m_font, "", 30f, Ink);
             m_newsBody.alignment = TextAlignmentOptions.TopLeft;
@@ -327,6 +361,9 @@ namespace Yurube.Story
             m_smallPanel.gameObject.SetActive(false);
             m_hintGroup.gameObject.SetActive(true);
             m_hintGroup.alpha = 1f;
+            // フェードインの前に最初の行を入れておく（空のウィンドウが一瞬出ないように）
+            var first = FirstLine(lines);
+            if (first != null) PrepareLine(chapter, first, true);
             yield return Fade(m_dim, 0f, m_dimAlpha, 0.2f);
             yield return FadeGroup(m_bigGroup, 0f, 1f, 0.15f);
 
@@ -426,7 +463,7 @@ namespace Yurube.Story
 
         // 小さいウィンドウ（対戦中の説明）。対戦の操作ボタン（Aジャンプ・Bショットなど）で
         // 消えないように、入力では閉じず、文字数に応じた時間で自動的に閉じる。
-        public IEnumerator PlaySmall(string speakerId, string text, StoryChapter chapter)
+        public IEnumerator PlaySmall(string speakerId, string text, StoryChapter chapter, float secondsOverride = -1f)
         {
             if (string.IsNullOrEmpty(text)) yield break;
             Build();
@@ -441,7 +478,9 @@ namespace Yurube.Story
             yield return FadeGroup(m_smallGroup, m_smallGroup.alpha, 1f, 0.12f);
 
             // 読み終わるくらいの時間だけ出す（短い台詞でも最低 m_smallSeconds）
-            float seconds = Mathf.Clamp(m_smallSeconds + text.Length * 0.05f, m_smallSeconds, 9f);
+            float seconds = secondsOverride > 0f
+                ? secondsOverride
+                : Mathf.Clamp(m_smallSeconds + text.Length * 0.05f, m_smallSeconds, 9f);
             float time = 0f;
             while (time < seconds)
             {
@@ -469,13 +508,29 @@ namespace Yurube.Story
             m_newsHeadline.text = paper.headline;
             m_newsBody.text = paper.body;
 
+            // 画像が指定されていなければ、新聞用のイラストをコードで描く
             Sprite art = string.IsNullOrEmpty(paper.image) ? null : Resources.Load<Sprite>(paper.image);
+            if (art == null) art = StoryNewspaperArt.Create();
             m_newsImage.sprite = art;
-            m_newsImage.color = art != null ? Color.white : new Color(0.88f, 0.84f, 0.78f, 1f);
-            m_newsImage.type = art != null ? Image.Type.Simple : Image.Type.Sliced;
-            m_newsImage.preserveAspect = art != null;
+            m_newsImage.color = Color.white;
+            m_newsImage.type = Image.Type.Simple;
+            m_newsImage.preserveAspect = true;
+
+            bool hasCaption = !string.IsNullOrEmpty(paper.caption);
+            m_newsCaption.text = hasCaption ? paper.caption : "";
+            m_newsCaption.gameObject.SetActive(hasCaption);
+            m_newsCaptionBg.SetActive(hasCaption);
 
             m_newsPanel.gameObject.SetActive(true);
+            if (hasCaption)
+            {
+                // キャプションの文字幅に帯を合わせる（左端が画面外に出ないようにする）
+                m_newsCaption.ForceMeshUpdate();
+                float captionWidth = Mathf.Clamp(m_newsCaption.preferredWidth + 36f, 220f, 1080f);
+                ((RectTransform)m_newsCaptionBg.transform).sizeDelta = new Vector2(captionWidth, 34f);
+                m_newsCaption.rectTransform.sizeDelta = new Vector2(captionWidth - 20f, 30f);
+            }
+
             m_hintGroup.gameObject.SetActive(true);
             m_hintGroup.alpha = 1f;
             bool gaugeWasSuppressed = SpecialGaugeHUD.Suppressed;
@@ -503,7 +558,18 @@ namespace Yurube.Story
         // 1行の表示（文字送り）
         //========================================
 
-        IEnumerator ShowLine(StoryChapter chapter, StoryLine line, bool big)
+        static StoryLine FirstLine(IList<StoryLine> lines)
+        {
+            if (lines == null) return null;
+            foreach (var line in lines)
+            {
+                if (line != null) return line;
+            }
+            return null;
+        }
+
+        // 文字送りを始める前の状態にする（フェードイン中に空のウィンドウを見せないため）
+        void PrepareLine(StoryChapter chapter, StoryLine line, bool big)
         {
             bool direction = line.direction || string.IsNullOrEmpty(line.speaker);
             ApplySpeaker(chapter, line.speaker, big);
@@ -515,6 +581,12 @@ namespace Yurube.Story
             text.color = direction ? new Color(Ink.r, Ink.g, Ink.b, 0.75f) : Ink;
             text.maxVisibleCharacters = 0;
             text.ForceMeshUpdate();
+        }
+
+        IEnumerator ShowLine(StoryChapter chapter, StoryLine line, bool big)
+        {
+            PrepareLine(chapter, line, big);
+            var text = big ? m_bigText : m_smallText;
 
             // 演出イベント（行を出した瞬間）
             if (!string.IsNullOrEmpty(line.eventId)) StoryData.PlayEvent(line.eventId);
@@ -554,6 +626,7 @@ namespace Yurube.Story
                 m_bigName.text = name;
                 var plate = m_bigName.transform.parent.GetComponent<Image>();
                 plate.gameObject.SetActive(!direction);
+                plate.color = direction ? new Color(color.r, color.g, color.b, 0.5f) : color;
 
                 var sprite = direction ? null : StoryData.Portrait(chapter, speakerId);
                 if (m_portraitFace != null)
@@ -575,6 +648,25 @@ namespace Yurube.Story
                 m_smallName.text = name;
                 var plate = m_smallName.transform.parent.GetComponent<Image>();
                 plate.gameObject.SetActive(!direction);
+                plate.color = direction ? new Color(color.r, color.g, color.b, 0.5f) : color;
+
+                var sprite = direction ? null : StoryData.Portrait(chapter, speakerId);
+                if (m_smallFace != null)
+                {
+                    m_smallFace.enabled = sprite != null;
+                    if (sprite != null)
+                    {
+                        m_smallFace.sprite = sprite;
+                        m_smallFace.color = Color.white;
+                        m_smallFace.preserveAspect = true;
+                    }
+                }
+                if (m_smallPortrait != null)
+                {
+                    m_smallPortrait.color = sprite != null
+                        ? new Color(0.92f, 0.88f, 0.8f)
+                        : direction ? new Color(color.r, color.g, color.b, 0.35f) : color;
+                }
             }
         }
 

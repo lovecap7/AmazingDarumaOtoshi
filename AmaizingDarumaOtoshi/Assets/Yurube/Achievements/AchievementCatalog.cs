@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Yurube.Achievements
 {
-    // 実績の一覧（39個）。
+    // 実績の一覧（40個）。
     // 実績を増やすときは CreateDefaults() に1行足すだけでよい。判定は AchievementMetric を見て
     // AchievementManager が共通で行うので、ほかのコードを直す必要はない。
     // ID はセーブに残るので、一度出したら変えない（変えると解除済みが消える）。
@@ -29,6 +29,7 @@ namespace Yurube.Achievements
                 case AchievementCategory.Attack: return "攻撃";
                 case AchievementCategory.Chain: return "連鎖";
                 case AchievementCategory.Stack: return "積み木";
+                case AchievementCategory.Story: return "ストーリー";
                 default: return "挑戦";
             }
         }
@@ -41,6 +42,7 @@ namespace Yurube.Achievements
             AchievementCategory.Chain,
             AchievementCategory.Stack,
             AchievementCategory.Challenge,
+            AchievementCategory.Story,
         };
 
         // 実績IDから決まった内容を探す（ラボやデバッグ用）
@@ -240,7 +242,7 @@ namespace Yurube.Achievements
                 new AchievementDefinition("opportunist", "漁夫の利",
                     "弱ったところに、すかさず一撃。勝てば官軍！",
                     AchievementCategory.Attack, "他プレイヤーの攻撃を受けた直後（3秒以内）の相手を撃破する", AchievementMetric.OpportunistKO, 1,
-                    AchievementRarity.Silver),
+                    AchievementRarity.Silver, mode: AchievementMode.Versus),
 
                 new AchievementDefinition("hit_500", "素振り五百回",
                     "通算500発命中。千の道のりも、半分まで来た。",
@@ -255,7 +257,7 @@ namespace Yurube.Achievements
                 new AchievementDefinition("multi_ko", "一網打尽",
                     "一撃で二人まとめて。会場が、どっと沸いた。",
                     AchievementCategory.Chain, "1回の攻撃・連鎖で2人以上を同時に撃破する", AchievementMetric.MultiKOBest, 2,
-                    AchievementRarity.Platinum),
+                    AchievementRarity.Platinum, mode: AchievementMode.Versus),
 
                 new AchievementDefinition("no_damage_win", "無傷の王者",
                     "かすり傷ひとつなし。あなたの前に、道はなかった。",
@@ -275,6 +277,13 @@ namespace Yurube.Achievements
                     AchievementRarity.Gold, false, true,
                     "瞬きしたら、もう終わっている。そんな試合を狙ってみよう。",
                     0, 30),
+
+                // ---- ストーリー専用（2026/11/12 追加） ----
+                // 第1章以降の章クリア実績は、storyChapter を変えた定義をここに足すだけで追加できる。
+                new AchievementDefinition("story_prologue", "はじまりは、おにぎり",
+                    "序章をクリア。おにぎりと根性で、部活の第一歩。",
+                    AchievementCategory.Story, "序章をクリアする（だるま新聞まで見る）", AchievementMetric.StoryChapterCleared, 1,
+                    AchievementRarity.Bronze, mode: AchievementMode.Story, storyChapter: "prologue"),
             };
             return list;
         }

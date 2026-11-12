@@ -18,6 +18,12 @@ namespace Nakahira
 
         public int Count => m_blocks.Count;
         public int MaxCount => m_maxCount;
+
+        // ストーリー用(Yurube): チュートリアルのCPUだけ、積み木の上限を下げる
+        public void SetMaxCount(int max)
+        {
+            m_maxCount = Mathf.Max(1, max);
+        }
         public float HeadRadius => m_headRadius;
         // 頭(王冠などの飾りを乗せる位置を読む。未設定なら null)
         public Transform Head => m_head;

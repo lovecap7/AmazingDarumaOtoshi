@@ -12,16 +12,27 @@ namespace Yurube
         // OnGUI はオーバーレイのキャンバスより手前に描かれるため、そのままだと会話ウィンドウの上にゲージが出てしまう。
         public static bool Suppressed;
 
+        // ストーリー用(Yurube): 序章の覚醒イベントまではゲージ自体を見せない。
+        // 第1章以降・通常対戦は最初から true。
+        public static bool Visible = true;
+
         static GUIStyle s_nameStyle;
         static GUIStyle s_statusStyle;
         static GUIStyle s_readyStyle;
         static bool s_stylesReady;
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetStatics()
+        {
+            Suppressed = false;
+            Visible = true;
+        }
+
         public static void Draw(SpecialGauge gauge, DarumaCharacter character, string statusOverride = null)
         {
             if (gauge == null || character == null || DarumaMatch.Current == null) return;
-            // ストーリーの会話中は描かない（会話より手前に出てしまうため）
-            if (Suppressed) return;
+            // ストーリーの会話中・演出中は描かない（会話より手前に出てしまうため）
+            if (Suppressed || !Visible) return;
 
             // シーン遷移の黒フェードはキャンバスより手前にあるが、OnGUI はそのさらに手前に描かれる。
             // そのままだとリザルトへ移る黒画面の上にゲージだけ残ってしまうので、黒の濃さに合わせて一緒に消す。
@@ -68,7 +79,7 @@ namespace Yurube
             const float panelSpacing = 24.0f;
             const float panelBottom = 120.0f;
             const float width = 300.0f;
-            // 「READY! [L / Y]」が1行に収まり、文字の上端が切れない高さ
+            // 「READY! [Y]」が1行に収まり、文字の上端が切れない高さ
             const float height = 50.0f;
 
             Matrix4x4 oldMatrix = GUI.matrix;
@@ -115,9 +126,9 @@ namespace Yurube
             GUI.DrawTexture(new Rect(x, y, 2.0f, height), Texture2D.whiteTexture);
             GUI.DrawTexture(new Rect(x + width - 2.0f, y, 2.0f, height), Texture2D.whiteTexture);
 
-            // 名前
+            // 名前（部訓「一撃入魂」から、入魂ゲージと呼ぶ）
             GUI.color = WithFade(Color.white);
-            string name = $"P{me.Index + 1} SPECIAL";
+            string name = "入魂ゲージ";
             GUI.Label(new Rect(x + 10.0f, y + 3.0f, 125.0f, 24.0f), name, s_nameStyle);
 
             // 状態表示
@@ -125,7 +136,7 @@ namespace Yurube
             if (!string.IsNullOrEmpty(statusOverride))
                 status = statusOverride;
             else if (full)
-                status = "READY!  [L / Y]";
+                status = "READY!  [Y]";
             else
                 status = $"{gauge.Blocks}/{gauge.BlocksToFill}";
 

@@ -11,11 +11,20 @@ namespace Yurube
     {
         // ストーリー用(Yurube): 会話中など、必殺技を受け付けない
         public static bool Suspended;
+        // ストーリー用(Yurube): 序章の覚醒イベントまで、きだるは必殺技を出せない
+        public static bool StoryLocked;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetStatics()
+        {
+            Suspended = false;
+            StoryLocked = false;
+        }
 
         public static bool WasPressed(DarumaCharacter character)
         {
             if (character == null) return false;
-            if (Suspended) return false;
+            if (Suspended || StoryLocked) return false;
             // ポーズ中は必殺技を出さない（ポーズ画面の後ろで発動してしまうため）
             if (DarumaMatch.Current != null && DarumaMatch.Current.IsPaused) return false;
 
@@ -90,7 +99,7 @@ namespace Yurube
         public static bool WasAnyActionPressed(DarumaCharacter character)
         {
             if (character == null) return false;
-            if (Suspended) return false;
+            if (Suspended || StoryLocked) return false;
             if (DarumaMatch.Current != null && DarumaMatch.Current.IsPaused) return false;
 
             if (DarumaMatch.Current != null)
