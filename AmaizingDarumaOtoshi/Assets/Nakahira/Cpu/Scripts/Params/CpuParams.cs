@@ -308,8 +308,8 @@ namespace Nakahira
         [Min(0.0f)] public float BlackoutCounterDelay = 0.3f;
         [Tooltip("暗転返し:みだるが「明らかに近い」とみなす差(m)。みだるから見て、自分がほかの敵よりこれ以上近い")]
         [Min(0.0f)] public float BlackoutNearMargin = 2.0f;
-        [Tooltip("とっさの六腕:撃ってから効き始めるまでの時間(秒。六腕の出現 0.25 秒＋余裕)。これより早く当たる弾には撃たない")]
-        [Min(0.0f)] public float ArmsLeadTime = 0.3f;
+        [Tooltip("とっさの六腕:撃ってから効き始めるまでの時間(秒。六腕は押した瞬間に効くので、物理の 1〜2 ステップ分の余裕だけ)。これより早く当たる弾には撃たない")]
+        [Min(0.0f)] public float ArmsLeadTime = 0.05f;
         [Tooltip("とっさの六腕:弾が 1 発でも撃つ「追い込まれた」ときの段数(この段数以下)")]
         [Min(0)] public int ArmsPanicStack = 1;
         [Tooltip("とっさの六腕:弾が 1 発でも撃つ「追い込まれた」ときの集中度の割合(これ以上)")]

@@ -141,7 +141,7 @@ MonoBehaviour:
   BlackoutCounterChance: 0.35
   BlackoutCounterDelay: 0.6
   BlackoutNearMargin: 2
-  ArmsLeadTime: 0.3
+  ArmsLeadTime: 0.05
   ArmsPanicStack: 1
   ArmsPanicLoad: 0.8
   JumpDistanceError: 0.2
