@@ -222,7 +222,7 @@ namespace Yurube.Lab
 
             GUILayout.Space(6.0f);
             GUILayout.Label("必殺技", m_section);
-            GUILayout.Label($"ゲージ: {gauge.Blocks}/{gauge.BlocksToFill}" + (gauge.IsFull ? "  READY" : ""), m_label);
+            GUILayout.Label($"ゲージ: {gauge.Percent}%" + (gauge.IsFull ? "  READY" : ""), m_label);
             if (GUILayout.Button("ゲージ満タン", m_button)) gauge.Fill();
 
             bool hasHitboxView = character.GetComponent<AkadaruSpecial>() != null

@@ -95,6 +95,24 @@ namespace Nakagawa
             if (m_canvas != null) Destroy(m_canvas.gameObject);
         }
 
+        // 必殺技ゲージ用(中平): その人のパネルの位置(画面下の中央から。1920x1080 基準)・大きさ・いまの濃さを読む
+        // パネルの真上にゲージを置き、近くに物があるときの半透明にも合わせるため。読むだけで表示は変えない
+        public bool TryGetPanel(MatchPlayer player, out Vector2 position, out Vector2 size, out float alpha)
+        {
+            foreach (var p in m_panels)
+            {
+                if (p.Player != player || p.Root == null) continue;
+                position = p.Root.anchoredPosition;
+                size = p.Root.sizeDelta;
+                alpha = p.Group != null ? p.Group.alpha : 1.0f;
+                return true;
+            }
+            position = Vector2.zero;
+            size = m_panelSize;
+            alpha = 1.0f;
+            return false;
+        }
+
         private void LateUpdate()
         {
             if (m_match == null || m_canvas == null) return;

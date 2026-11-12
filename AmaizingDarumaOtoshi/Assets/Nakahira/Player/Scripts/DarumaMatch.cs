@@ -368,6 +368,7 @@ namespace Nakahira
             }
             Time.timeScale = PlaySpeed;
             if (m_countdownInDirectPlay) BeginCountdown();
+            m_specialGaugeCarry.Clear();
             Started?.Invoke();
         }
 
@@ -442,6 +443,7 @@ namespace Nakahira
             Debug.Log("[DarumaMatch] " + MatchSetup.Describe());
             Time.timeScale = PlaySpeed;
             BeginCountdown();
+            m_specialGaugeCarry.Clear();
             Started?.Invoke();
         }
 
@@ -1072,6 +1074,7 @@ namespace Nakahira
             SpawnAllAtStart();
             BeginCountdown();
             Debug.Log($"[DarumaMatch] ネット対戦の試合開始 ({m_players.Count}人 / {Rules.ModeName})");
+            m_specialGaugeCarry.Clear();
             Started?.Invoke();
         }
 
@@ -1101,6 +1104,7 @@ namespace Nakahira
         internal void NetClientStarted()
         {
             Result = null;
+            m_specialGaugeCarry.Clear();
             Started?.Invoke();
         }
 
@@ -1251,6 +1255,37 @@ namespace Nakahira
             if (m_friendlyFire || !Rules.teams) return false;
             // MatchSetup.SameTeam は同じ人どうしでも true を返すので、別の人であることも確かめる
             return a != null && b != null && a != b && MatchSetup.SameTeam(a.Index, b.Index);
+        }
+
+        //========================================
+        // 必殺技ゲージの引き継ぎ
+        //========================================
+
+        // やられた人のゲージ(溜まり具合 + おまけ)を、次に出る体まで預かる。試合が始まるたびに空にする
+        readonly Dictionary<MatchPlayer, float> m_specialGaugeCarry = new Dictionary<MatchPlayer, float>();
+
+        public void StoreSpecialGaugeCarry(MatchPlayer p, float points)
+        {
+            if (p != null) m_specialGaugeCarry[p] = points;
+        }
+
+        // 預かっている分を受け取る(受け取ったら消す)
+        public bool TakeSpecialGaugeCarry(MatchPlayer p, out float points)
+        {
+            if (p != null && m_specialGaugeCarry.TryGetValue(p, out points))
+            {
+                m_specialGaugeCarry.Remove(p);
+                return true;
+            }
+            points = 0.0f;
+            return false;
+        }
+
+        // 預かっている分を見る(体がない間の表示用。消さない)
+        public bool PeekSpecialGaugeCarry(MatchPlayer p, out float points)
+        {
+            points = 0.0f;
+            return p != null && m_specialGaugeCarry.TryGetValue(p, out points);
         }
 
         //========================================
