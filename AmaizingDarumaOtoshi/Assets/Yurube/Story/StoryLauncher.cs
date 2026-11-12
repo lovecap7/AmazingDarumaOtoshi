@@ -22,6 +22,8 @@ namespace Yurube.Story
             var chapter = StoryData.Load(chapterId);
             if (chapter == null) return;
 
+            // 画面の名札を「1P」「CPU」ではなく、だるまの名前で出す
+            MatchSetup.StoryNames = true;
             StorySession.Begin(chapter);
 
             var entries = new List<MatchSetup.Entry>();
@@ -47,6 +49,7 @@ namespace Yurube.Story
                     deviceName = "CPU",
                     character = FindCharacter(cpu.character),
                     cpuNumber = cpuCount > 1 ? i + 1 : 0,
+                    stocks = Mathf.Max(0, cpu.stocks),
                 });
             }
 

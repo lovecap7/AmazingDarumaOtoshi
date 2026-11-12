@@ -30,6 +30,17 @@ namespace Nakagawa
             public float Top;              // 上面の高さ
         }
 
+        // 多角形の柱の床(六角形の氷のタイルなど。RegisterPrism で登録)。上から見た形(凸多角形の組・ワールドの XZ)と上面・底面の高さ
+        struct PrismFloor
+        {
+            public Vector2[][] Polygons;
+            public float Top, Bottom;
+            public bool Active;
+        }
+
+        static readonly List<PrismFloor> s_prisms = new List<PrismFloor>();
+        static readonly Dictionary<EntityId, int> s_prismIndex = new Dictionary<EntityId, int>();
+
         static readonly List<FloorBox> s_floors = new List<FloorBox>();
         static readonly Dictionary<EntityId, int> s_floorIndex = new Dictionary<EntityId, int>();
         static bool s_dirty = true;
@@ -52,6 +63,8 @@ namespace Nakagawa
             s_staticCount = 0;
             s_movingStep = -1.0f;
             s_movingFrame = -1;
+            s_prisms.Clear();
+            s_prismIndex.Clear();
             if (s_hooked)
             {
                 Physics.ContactModifyEvent -= OnContactModify;
@@ -91,6 +104,38 @@ namespace Nakagawa
         public static void UnregisterMoving(BoxCollider box)
         {
             s_moving.Remove(box);
+        }
+
+        // 多角形の柱の床(メッシュの当たり判定。動かない物)を、継ぎ目を調べる床に加える
+        // polygons: 上から見た形(凸多角形の組。ワールドの X と Z)。top / bottom: 上面・底面の高さ
+        // 隣り合った柱の床どうし・箱の床との継ぎ目(外から見えない側面)に、積み木が引っかからないようにする
+        public static void RegisterPrism(Collider collider, IReadOnlyList<Vector2[]> polygons, float top, float bottom)
+        {
+            if (collider == null || polygons == null) return;
+            var floor = new PrismFloor { Polygons = new Vector2[polygons.Count][], Top = top, Bottom = bottom, Active = true };
+            for (int i = 0; i < polygons.Count; i++) floor.Polygons[i] = polygons[i];
+            EntityId id = collider.GetEntityId();
+            if (s_prismIndex.TryGetValue(id, out int index)) s_prisms[index] = floor;
+            else
+            {
+                s_prismIndex[id] = s_prisms.Count;
+                s_prisms.Add(floor);
+            }
+        }
+
+        // 柱の床を一時的に外す・戻す(崩れて落ちた氷のタイルなど)
+        public static void SetPrismActive(Collider collider, bool active)
+        {
+            if (collider == null || !s_prismIndex.TryGetValue(collider.GetEntityId(), out int index)) return;
+            var floor = s_prisms[index];
+            floor.Active = active;
+            s_prisms[index] = floor;
+        }
+
+        public static void UnregisterPrism(Collider collider)
+        {
+            if (collider == null) return;
+            SetPrismActive(collider, false);
         }
 
         // 物理の更新の前(FixedUpdate)にメインスレッドから呼ぶ。必要なら床の一覧を作り直す(動く床は毎回写し直す)
@@ -172,26 +217,69 @@ namespace Nakagawa
             for (int p = 0; p < pairs.Length; p++)
             {
                 var pair = pairs[p];
-                int floor;
-                if (!s_floorIndex.TryGetValue(pair.otherColliderEntityId, out floor)
-                    && !s_floorIndex.TryGetValue(pair.colliderEntityId, out floor)) continue;
+                int floor = -1, prism = -1;
+                float top;
+                if (s_floorIndex.TryGetValue(pair.otherColliderEntityId, out floor)
+                    || s_floorIndex.TryGetValue(pair.colliderEntityId, out floor)) top = s_floors[floor].Top;
+                else if (s_prismIndex.TryGetValue(pair.otherColliderEntityId, out prism)
+                    || s_prismIndex.TryGetValue(pair.colliderEntityId, out prism))
+                {
+                    floor = -1;
+                    if (!s_prisms[prism].Active) continue;
+                    top = s_prisms[prism].Top;
+                }
+                else continue;
 
-                float top = s_floors[floor].Top;
                 for (int i = 0; i < pair.contactCount; i++)
                 {
                     if (Mathf.Abs(pair.GetNormal(i).y) >= kSideNormalY) continue;
                     Vector3 point = pair.GetPoint(i);
                     // 触れている箱の上面が接触点より十分高い(扇風機の台など背の高い物の側面)なら継ぎ目ではない
                     if (top - point.y > kMaxSeamDepth) continue;
-                    if (IsInsideOtherFloor(point, floor)) pair.IgnoreContact(i);
+                    if (IsInsideOtherFloor(point, floor, prism)) pair.IgnoreContact(i);
                 }
                 pairs[p] = pair;
             }
         }
 
-        // 接触点が、触れている床以外の床の中に埋まっているか・その床の面に接しているか(外から見えない側面か)
-        static bool IsInsideOtherFloor(Vector3 point, int exclude)
+        // 点が凸多角形の中(辺から margin だけ外まで含む)か。多角形の向き(時計回り・反時計回り)は問わない
+        static bool InPolygon(Vector2[] poly, Vector2 p, float margin)
         {
+            int n = poly.Length;
+            if (n < 3) return false;
+            // 向き(面積の符号)
+            float area = 0.0f;
+            for (int i = 0; i < n; i++)
+            {
+                Vector2 a = poly[i], b = poly[(i + 1) % n];
+                area += a.x * b.y - b.x * a.y;
+            }
+            float sign = area >= 0.0f ? 1.0f : -1.0f;
+            for (int i = 0; i < n; i++)
+            {
+                Vector2 a = poly[i], b = poly[(i + 1) % n];
+                Vector2 d = b - a;
+                float len = d.magnitude;
+                if (len < 0.0001f) continue;
+                // 内側が正になる、辺からの距離
+                float dist = sign * (d.x * (p.y - a.y) - d.y * (p.x - a.x)) / len;
+                if (dist < -margin) return false;
+            }
+            return true;
+        }
+
+        // 接触点が、触れている床以外の床の中に埋まっているか・その床の面に接しているか(外から見えない側面か)
+        // exclude / excludePrism: 触れている箱の床・柱の床の番号(なければ -1)
+        static bool IsInsideOtherFloor(Vector3 point, int exclude, int excludePrism = -1)
+        {
+            var xz = new Vector2(point.x, point.z);
+            for (int i = 0; i < s_prisms.Count; i++)
+            {
+                if (i == excludePrism) continue;
+                PrismFloor f = s_prisms[i];
+                if (!f.Active || point.y > f.Top + kTopTolerance || point.y < f.Bottom) continue;
+                foreach (var poly in f.Polygons) if (InPolygon(poly, xz, -kInsideInset)) return true;
+            }
             for (int i = 0; i < s_floors.Count; i++)
             {
                 if (i == exclude) continue;

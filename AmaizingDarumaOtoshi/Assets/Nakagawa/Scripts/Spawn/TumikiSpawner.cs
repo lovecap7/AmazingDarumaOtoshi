@@ -28,6 +28,8 @@ namespace Nakagawa
         [SerializeField] int m_maxBlocksOnBoard = 30;
         // 開始から最初の生成までの時間
         [SerializeField] float m_firstDelay = 3.0f;
+        // 生成の間隔(パターンで決まる間隔)に掛ける倍率。1 なら設定どおり。ステージの別の供給元(サンドバッグなど)が主のときは大きくして生成を減らす
+        [SerializeField, Min(0.1f)] float m_intervalScale = 1.0f;
         // 試合が終わったら生成をやめる(未設定なら止めない)
         [SerializeField] DarumaMatch m_match;
         [SerializeField] bool m_log = true;
@@ -184,7 +186,7 @@ namespace Nakagawa
             if (m_needsScan) ScanAreas();
             TumikiSpawnPattern pattern = NextPattern;
             m_patternIndex = (m_patternIndex + 1) % m_patterns.Length;
-            m_timer = pattern.RollInterval();
+            m_timer = pattern.RollInterval() * m_intervalScale;
 
             // 盤面の上限・生成する数・エリアの最小排出量は、今ステージにいる人数に合わせる
             float scale = PlayerScale;

@@ -69,6 +69,8 @@ namespace Nakagawa
         private void OnGUI()
         {
             if (!m_showLabel) return;
+            // ストーリー用(Yurube): デバッグ用の表示はエディタと Development Build だけにする
+            if (!Application.isEditor && !Debug.isDebugBuild) return;
             var style = new GUIStyle(GUI.skin.box) { fontSize = 18, alignment = TextAnchor.MiddleLeft };
             GUI.Box(new Rect(10, 50, 420, 34), $" 積み木の衝突: {Current.Name}  [{m_key}]", style);
         }

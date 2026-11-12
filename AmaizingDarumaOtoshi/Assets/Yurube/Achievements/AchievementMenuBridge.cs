@@ -70,7 +70,10 @@ namespace Yurube.Achievements
             foreach (var data in AchievementManager.All)
             {
                 // 一覧には名前だけを出し、解除条件とポエムは右の詳細カードに出す
-                var entry = new AchievementBook.Entry(data.Name, data.ConditionText, data.IsUnlocked);
+                string condition = data.Mode == AchievementMode.Story
+                    ? "【ストーリー】" + data.ConditionText
+                    : data.ConditionText;
+                var entry = new AchievementBook.Entry(data.Name, condition, data.IsUnlocked);
                 entry.id = data.Id;
                 entry.number = data.Number;
                 entry.secret = data.IsSecret;
@@ -79,7 +82,7 @@ namespace Yurube.Achievements
                 entry.unlockedAt = data.UnlockedAt;
                 entry.obtainedText = data.UnlockedText;
                 entry.poem = data.Poem;
-                entry.condition = data.ConditionText;
+                entry.condition = condition;
                 // シークレット実績は、しきい値に達するまで伏せ、達したらヒントを1つだけ出す
                 entry.hint = AchievementHints.TextOf(data);
                 entry.progress = data.Progress;

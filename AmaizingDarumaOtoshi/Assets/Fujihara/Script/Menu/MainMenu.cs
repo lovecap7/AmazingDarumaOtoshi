@@ -78,7 +78,7 @@ public class MainMenu : MonoBehaviour
     {
         new MenuItem(ItemKind.Battle, "たたかう", "だるまを積んで、飛ばして、\n最後の一人を落とせ！",
                      "だるまを叩き合って、相手の頭を落とせば勝ち！\nローカルかオンラインで遊べます。", -0.4f),
-        new MenuItem(ItemKind.Story, "ストーリーモード", "部活の物語を\nあそぶ", "章ごとの練習試合と会話をあそびます。", -0.35f),
+        new MenuItem(ItemKind.Story, "ものがたり", "部活の物語を\nあそぶ", "章ごとの練習試合と会話をあそびます。", -0.35f),
         new MenuItem(ItemKind.Settings, "せってい", "", "音量と画面の設定を変更します。", -0.3f),
         new MenuItem(ItemKind.Book, "ずかん", "キャラクターの\n性能を見る", "キャラクターの名前・パッシブ・必殺技が見られます。", -0.2f),
         new MenuItem(ItemKind.Achievements, "じっせき", "これまでの\nきろくを 見る", "集めた実績が見られます。", -0.1f),
@@ -440,6 +440,9 @@ public class MainMenu : MonoBehaviour
         space.rotation = Quaternion.Euler(0f, -viewYaw, 0f);
 
         cam = ToyKit.CreateCamera();
+        // ストーリー用(Yurube): 前のシーンのカメラ設定（ビューポート・アスペクト）を持ち越さない
+        cam.rect = new Rect(0f, 0f, 1f, 1f);
+        cam.ResetAspect();
         ToyKit.CreateLights();
         post = ToyKit.CreatePostProcess(0.35f);
         ToyKit.CreateEnvironment(blockMesh);

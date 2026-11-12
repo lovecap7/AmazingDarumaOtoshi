@@ -5,9 +5,9 @@
   "sceneName": "AllStages",
   "playerCharacter": "kidaru",
   "clearKey": "Story.Clear.prologue",
-  "rules": { "mode": "Stock", "stocks": 3, "timeLimit": 0, "cpuSpecial": false },
+  "rules": { "mode": "Stock", "stocks": 3, "timeLimit": 0, "cpuSpecial": false, "awakening": true, "gaugeFromStart": false, "cpuBlockLimit": 6 },
   "cpu": [
-    { "character": "midaru", "level": 1 }
+    { "character": "midaru", "level": 1, "stocks": 2 }
   ],
   "speakers": [
     { "id": "akadaru", "name": "あかだる", "color": "#E8544B" },
@@ -16,7 +16,7 @@
     { "id": "kidaru", "name": "きだる", "color": "#E8C64B" }
   ],
   "before": [
-    { "speaker": "", "direction": true, "text": "（春。部室。ホワイトボードには「練習メニュー：素振り1000回／積み上げ100段／走り込み！」とある）" },
+    { "speaker": "", "direction": true, "text": "（部室。ホワイトボードには「練習メニュー：素振り1000回／積み上げ100段／走り込み！」とある）" },
     { "speaker": "kidaru", "text": "あの、ここがだるま落とし部ですか？ おにぎりが出るって聞いて来ました！" },
     { "speaker": "akadaru", "text": "おにぎり……？ まあいい！ ようこそ、七転高校だるま落とし部へ！ オレは主将のあかだるだ！" },
     { "speaker": "aodaru", "text": "……副主将。あおだる" },
@@ -32,12 +32,18 @@
   ],
   "tutorial": [
     { "speaker": "midaru", "text": "まずは基本から。左スティックで歩いて、Aボタンでジャンプです", "condition": "MoveAndJump", "count": 1 },
-    { "speaker": "midaru", "text": "そこに落ちている積み木。近づいて拾うと、頭に積めます。積んだ分がそのまま体力です", "condition": "Stack", "count": 1 },
+    { "speaker": "midaru", "text": "そこに落ちている積み木。近づいて拾うと、頭に積めます。積み木は、攻撃を受け止める『鎧』です", "condition": "Stack", "count": 1 },
     { "speaker": "midaru", "text": "Xボタンでハンマー、Bボタンで積み木を飛ばせます。どちらか一度、やってみましょう", "condition": "Attack", "count": 1 },
-    { "speaker": "midaru", "text": "積み木が0のときに攻撃されると、そのまま落ちてしまいます。10個まで積めますが、増えるほど動きは遅くなります", "condition": "DialogueDone" }
+    { "speaker": "midaru", "text": "積み木が0のときに攻撃されると、そのまま落ちてしまいます。10個まで積めますが、増えるほど動きは遅くなります", "condition": "DialogueDone" },
+    { "speaker": "midaru", "text": "落ちても、ストックが残っていれば復活できます。ストックは3つ。相手のストックを0にしたら勝ちです", "condition": "DialogueDone" }
   ],
   "matchStart": [
     { "speaker": "midaru", "text": "では……私と一試合、やりましょう。手加減はしませんよ" }
+  ],
+  "awakening": [
+    { "speaker": "midaru", "text": "……発動条件を満たしています。入部1日目で？（眼鏡をクイッ）" },
+    { "speaker": "kidaru", "text": "えっ、ぼく、いま何を……？ 力がわいてきます！" },
+    { "speaker": "akadaru", "text": "それが、部の奥義だ！ 追い詰められた者の気合が呼ぶんだ！" }
   ],
   "yellowExtra": [
     { "speaker": "kidaru", "text": "あっ、増えた！" },
@@ -63,6 +69,7 @@
     "header": "だるま新聞",
     "headline": "新入部員きだる、入部の決め手は『おにぎり』",
     "body": "七転高校だるま落とし部に、新しい部員が入った。入部の決め手は部費の0.8%で用意されるおにぎりだという。主将のあかだるは「根性がある」と太鼓判を押した。",
-    "image": ""
+    "image": "",
+    "caption": "新入部員 きだる（1年）"
   }
 }

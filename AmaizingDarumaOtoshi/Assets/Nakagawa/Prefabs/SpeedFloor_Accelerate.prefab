@@ -409,6 +409,10 @@ MonoBehaviour:
     ShockwaveColor: {r: 0.1, g: 0.85, b: 0.8, a: 1}
     ShockwaveRadius: 1
     ShockwaveTime: 0.4
+  m_patternColorA: {r: 1, g: 0.88, b: 0.1, a: 1}
+  m_patternColorB: {r: 0, g: 0, b: 0, a: 0}
+  m_patternCycle: 0.5
+  m_patternAlpha: 1
 --- !u!1 &7893122169249491845
 GameObject:
   m_ObjectHideFlags: 0
