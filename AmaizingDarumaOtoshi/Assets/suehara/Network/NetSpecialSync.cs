@@ -20,10 +20,39 @@ public class NetSpecialSync : NetworkBehaviour
             SpecialNet.Sender = Send;
             SpecialNet.NetSpecialPressed = p => Source(p) != null && Source(p).ConsumeSpecial();
             SpecialNet.NetAnyActionPressed = p => Source(p) != null && Source(p).ConsumeAnyAction();
+            SpecialNet.NetInstantiateBlock = InstantiateNetBlock;
             return;
         }
         SpecialNet.NetBlockFlying = b => b != null && b.TryGetComponent<NetworkTumiki>(out var t) && t.IsSpawned ? t.IsFlying : (bool?)null;
         SpecialNet.NetBlockSpeed = b => b != null && b.TryGetComponent<NetworkTumiki>(out var t) && t.IsSpawned ? t.Speed : (float?)null;
+        SpecialNet.NetCountColor = (c, color) => c != null && c.TryGetComponent<NetworkDarumaCharacter>(out var n) && n.IsSpawned ? n.ColorCount(color) : (int?)null;
+    }
+
+    // ホスト: パッシブが作る積み木(きだるの黄色など)を、ネット用の同じ積み木(<名前>_Net)で作ってすぐ配る。
+    // 積む前に配らないと、配ったときに NetworkRigidbody が物理を戻して、積んだ積み木が落ちてしまう
+    GameObject InstantiateNetBlock(GameObject prefab, Vector3 position, Quaternion rotation)
+    {
+        GameObject netPrefab = prefab.GetComponent<NetworkObject>() != null ? prefab : FindNetPrefab(prefab.name + "_Net");
+        if (netPrefab == null)
+        {
+            Debug.LogWarning($"[NetSpecialSync] ネット用の積み木が見つかりません: {prefab.name}_Net");
+            return null;
+        }
+        var go = Instantiate(netPrefab, position, rotation);
+        go.name = netPrefab.name;
+        go.GetComponent<NetworkObject>().Spawn(true);
+        return go;
+    }
+
+    static GameObject FindNetPrefab(string name)
+    {
+        var nm = NetworkManager.Singleton;
+        if (nm == null) return null;
+        foreach (var p in nm.NetworkConfig.Prefabs.Prefabs)
+        {
+            if (p.Prefab != null && p.Prefab.name == name) return p.Prefab;
+        }
+        return null;
     }
 
     public override void OnNetworkDespawn()
@@ -33,6 +62,8 @@ public class NetSpecialSync : NetworkBehaviour
         SpecialNet.NetAnyActionPressed = null;
         SpecialNet.NetBlockFlying = null;
         SpecialNet.NetBlockSpeed = null;
+        SpecialNet.NetCountColor = null;
+        SpecialNet.NetInstantiateBlock = null;
     }
 
     // ネット対戦の人の入力(1人分 NetPlayer の NetworkCommandSource)

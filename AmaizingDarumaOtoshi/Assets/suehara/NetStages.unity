@@ -358250,6 +358250,7 @@ GameObject:
   - component: {fileID: 1498755687}
   - component: {fileID: 1498755686}
   - component: {fileID: 1498755691}
+  - component: {fileID: 1498755692}
   m_Layer: 0
   m_Name: NetMatch
   m_TagString: Untagged
@@ -358354,6 +358355,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6d12dbf9e80b9364da90ffe44e6032e7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NetSpecialSync
+  ShowTopMostFoldoutHeaderGroup: 1
+--- !u!114 &1498755692
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1498755685}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bb5cbe459782ba24e8bdc5158fc6a8b8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NetEliminationSync
   ShowTopMostFoldoutHeaderGroup: 1
 --- !u!1 &1499203381
 GameObject:

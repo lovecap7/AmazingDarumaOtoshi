@@ -47,6 +47,7 @@ namespace Yurube
         void Trim()
         {
             if (m_character == null || m_character.Stack == null) return;
+            if (SpecialNet.IsClient) return;   // ネット対戦用(suehara): 積み木を落とすのはホストだけ(消えた積み木はそのまま届く)
 
             bool trimmed = false;
             while (m_character.Stack.Count > m_maxStack)

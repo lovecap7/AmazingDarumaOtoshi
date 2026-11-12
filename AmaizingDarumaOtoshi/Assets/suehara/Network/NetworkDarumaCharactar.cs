@@ -21,6 +21,9 @@ public class NetworkDarumaCharacter : NetworkBehaviour
     readonly NetworkVariable<byte> m_stackCount = new NetworkVariable<byte>();
     readonly NetworkVariable<float> m_invincible = new NetworkVariable<float>();
     readonly NetworkVariable<byte> m_gauge = new NetworkVariable<byte>();
+    // 積んでいる積み木の色ごとの数(4ビットずつ。赤・青・緑・黄)。パッシブの見た目が読む(あおだるの風など。Yurube.SpecialNet.CountColor)
+    readonly NetworkVariable<ushort> m_colors = new NetworkVariable<ushort>();
+    static readonly TumikiColor[] kColors = { TumikiColor.Red, TumikiColor.Blue, TumikiColor.Green, TumikiColor.Yellow };
 
     DarumaCharacter m_character;
     DarumaStack m_stack;
@@ -94,6 +97,20 @@ public class NetworkDarumaCharacter : NetworkBehaviour
         }
 
         if (m_specialGauge != null && m_gauge.Value != (byte)m_specialGauge.Blocks) m_gauge.Value = (byte)m_specialGauge.Blocks;
+
+        if (m_stack != null)
+        {
+            int packed = 0;
+            for (int i = 0; i < kColors.Length; i++) packed |= Mathf.Min(m_stack.CountColor(kColors[i]), 15) << (i * 4);
+            if (m_colors.Value != (ushort)packed) m_colors.Value = (ushort)packed;
+        }
+    }
+
+    // クライアント: ホストのキャラクターが積んでいるその色の積み木の数
+    public int ColorCount(TumikiColor color)
+    {
+        int i = System.Array.IndexOf(kColors, color);
+        return i < 0 ? 0 : (m_colors.Value >> (i * 4)) & 15;
     }
 
     // DarumaCharacter.UpdateInvincible と同じ: 残り時間を減らし、その間は点滅する

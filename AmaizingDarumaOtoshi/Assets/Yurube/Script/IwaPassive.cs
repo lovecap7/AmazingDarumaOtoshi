@@ -9,7 +9,7 @@ namespace Yurube
     // IwaBlock を付ける(積み木側のスクリプトやハンマーには手を入れない)。
     [DefaultExecutionOrder(-50)]
     [RequireComponent(typeof(DarumaCharacter))]
-    public class IwaPassive : MonoBehaviour
+    public class IwaPassive : MonoBehaviour, INetSpecial
     {
         [Tooltip("岩化する積み木を探す範囲(m)")]
         [SerializeField] float m_searchRadius = 3.0f;
@@ -28,6 +28,8 @@ namespace Yurube
         private void FixedUpdate()
         {
             if (m_character == null || !m_character.CanBeAffected) return;
+            // ネット対戦用(suehara): クライアントはホストからの知らせ(NetReceive)で見た目だけ付ける
+            if (SpecialNet.IsClient) return;
 
             Vector3 center = m_character.transform.position + Vector3.up * 0.5f;
             int count = Physics.OverlapSphereNonAlloc(center, m_searchRadius, m_overlaps, ~0, QueryTriggerInteraction.Ignore);
@@ -44,12 +46,32 @@ namespace Yurube
                 if (iwa != null && iwa.ConsumedLaunch) continue;
                 if (iwa == null) iwa = block.gameObject.AddComponent<IwaBlock>();
                 iwa.Begin(m_logIwa);
+                // ネット対戦用(suehara): クライアントでも同じ岩の見た目を付ける
+                Vector3 dir = block.Direction;
+                SpecialNet.Send(m_character, this, kNetIwa, new[] { dir.x, dir.z, block.Speed }, new[] { block });
                 if (!m_reportedPassive)
                 {
                     m_reportedPassive = true;
                     AchievementEvents.RaisePassiveTriggered(m_character);
                 }
             }
+        }
+
+        //========================================
+        // ネット対戦用(suehara): クライアントで、ホストと同じ岩の見た目を付ける(壊す・壊れるはホストが決める)
+        //========================================
+
+        const int kNetIwa = 0;
+
+        public void NetReceive(int ev, float[] v, TumikiBlock[] blocks)
+        {
+            if (ev != kNetIwa || v.Length < 3 || blocks.Length < 1 || blocks[0] == null) return;
+            var block = blocks[0];
+            SpecialNet.MarkLaunched(block, new Vector3(v[0], 0.0f, v[1]), v[2]);
+
+            var iwa = block.GetComponent<IwaBlock>();
+            if (iwa == null) iwa = block.gameObject.AddComponent<IwaBlock>();
+            iwa.BeginNetVisual();
         }
     }
 }

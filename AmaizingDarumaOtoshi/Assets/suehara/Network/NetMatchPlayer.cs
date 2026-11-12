@@ -67,6 +67,9 @@ public class NetMatchPlayer : NetworkBehaviour
     // 同じ部屋にいる間(試合 → リザルト → ロビー)は覚えておき、部屋に入るたび(ResetChoices)にあかだる・おまかせへ戻す
     public static string SavedCharacterId { get; private set; } = DefaultCharacterId;
     public static string SavedStageId { get; private set; } = "";
+    // キャラを「ランダム」にしたときの SavedCharacterId(試合のシーンに入るたびに、この PC で選べるキャラから選び直す)
+    const string RandomCharacterId = "*random";
+    public static bool IsRandomCharacter => SavedCharacterId == RandomCharacterId;
 
     // 部屋に入る(ホストになる・さんかする)ときに呼ぶ
     public static void ResetChoices()
@@ -125,8 +128,12 @@ public class NetMatchPlayer : NetworkBehaviour
         if (IsOwner)
         {
             var list = NetCharacterList.Instance;
-            int saved = list != null ? list.IndexOf(SavedCharacterId) : NetCharacterList.None;
-            if (saved != NetCharacterList.None && list.IsAvailable(saved)) RequestCharacter(saved);
+            if (IsRandomCharacter) RequestRandomCharacter();
+            else
+            {
+                int saved = list != null ? list.IndexOf(SavedCharacterId) : NetCharacterList.None;
+                if (saved != NetCharacterList.None && list.IsAvailable(saved)) RequestCharacter(saved);
+            }
             int stage = list != null ? list.StageIndexOf(SavedStageId) : NetCharacterList.None;
             if (stage != NetCharacterList.None) RequestStage(stage);
         }
@@ -167,6 +174,22 @@ public class NetMatchPlayer : NetworkBehaviour
         var list = NetCharacterList.Instance;
         if (list != null && list.Character(index) != null) SavedCharacterId = list.Character(index).id;
         ChooseCharacterRpc((byte)Mathf.Clamp(index, 0, NetCharacterList.None));
+    }
+
+    // この PC の人: キャラをランダムにする(キャラクターセレクトの「ランダム」と同じく、この PC で選べるキャラから1人)
+    public void RequestRandomCharacter()
+    {
+        if (!IsOwner) return;
+        var list = NetCharacterList.Instance;
+        if (list == null) return;
+        var choices = new System.Collections.Generic.List<int>();
+        for (int i = 0; i < list.Count; i++)
+        {
+            if (list.Character(i) != null && list.IsAvailable(i)) choices.Add(i);
+        }
+        if (choices.Count == 0) return;
+        SavedCharacterId = RandomCharacterId;
+        ChooseCharacterRpc((byte)choices[UnityEngine.Random.Range(0, choices.Count)]);
     }
 
     [Rpc(SendTo.Server)]

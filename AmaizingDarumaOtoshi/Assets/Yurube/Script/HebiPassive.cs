@@ -62,6 +62,7 @@ namespace Yurube
             if (!m_pendingShot) return;
             m_pendingShot = false;
             if (m_character == null) return;
+            if (SpecialNet.IsClient) return;   // ネット対戦用(suehara): 蛇行はホストで動かす(動きはそのまま届く)
 
             var block = FindShotBlock();
             if (block == null) return;

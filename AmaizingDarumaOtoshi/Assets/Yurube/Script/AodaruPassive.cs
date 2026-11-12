@@ -49,6 +49,7 @@ namespace Yurube
         private void Update()
         {
             if (m_character == null || !m_logMoveSpeed) return;
+            if (SpecialNet.IsClient) return;   // ネット対戦用(suehara): 速さはホストが決める
 
             int blue = CountBlue();
             float speed = TargetSpeed(blue);
@@ -65,6 +66,8 @@ namespace Yurube
             // 停止中(ワープ・カウントダウン等)は DarumaCharacter 側が倍率を消費しないので、
             // ここで掛けると復帰時に溜まって爆発する。動ける状態のときだけ掛ける。
             if (m_character == null || !m_character.CanBeAffected) return;
+            // ネット対戦用(suehara): クライアントのキャラクターは止めてあるので、倍率を積まない(ホストで速くなった動きが届く)
+            if (SpecialNet.IsClient) return;
 
             int blue = CountBlue();
             if (!m_reportedPassive && blue > 0)
