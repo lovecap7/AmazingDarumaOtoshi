@@ -33,8 +33,10 @@ namespace Yurube.Story
         bool m_koRunning;
         bool m_matchRunning;
         bool m_awakeningRunning;
+        bool m_stageMode;
         float m_matchStartTime;
-        readonly HashSet<string> m_taunted = new HashSet<string>();
+        float m_nextIncomingCheck;
+        bool m_incomingBlock;
 
         // チュートリアルから使う
         public MatchPlayer Player => m_player;
@@ -49,6 +51,7 @@ namespace Yurube.Story
             get
             {
                 var settings = StorySettings.Instance;
+                if (settings != null && settings.OverrideCpuBlockLimit > 0) return settings.OverrideCpuBlockLimit;
                 if (settings != null && settings.TutorialCpuBlockLimit > 0) return settings.TutorialCpuBlockLimit;
                 return m_chapter != null && m_chapter.rules != null ? m_chapter.rules.cpuBlockLimit : 0;
             }
@@ -91,6 +94,7 @@ namespace Yurube.Story
             m_match = DarumaMatch.Current;
             m_chapter = StorySession.Chapter;
             if (m_match == null || m_chapter == null) { enabled = false; return; }
+            m_stageMode = m_chapter.cutscene != null && !string.IsNullOrEmpty(m_chapter.cutscene.type);
 
             PauseMenu.StoryMode = true;
             AchievementManager.StoryMode = true;
@@ -114,7 +118,9 @@ namespace Yurube.Story
             m_match.Finished += OnFinished;
             m_match.PlayerKO += OnPlayerKO;
             m_match.PlayerRespawned += OnPlayerRespawned;
+            m_match.PlayerOut += OnPlayerOut;
             HookYellowExtra();
+            HookReflectEvents();
             StartCoroutine(RunStory());
         }
 
@@ -125,8 +131,11 @@ namespace Yurube.Story
                 m_match.Finished -= OnFinished;
                 m_match.PlayerKO -= OnPlayerKO;
                 m_match.PlayerRespawned -= OnPlayerRespawned;
+                m_match.PlayerOut -= OnPlayerOut;
             }
             KidaruPassive.ExtraAdded -= OnYellowExtra;
+            DarumaHammer.Hit -= OnHammerHit;
+            IwaBlock.WallBroken -= OnIwaWallBroken;
             if (m_movie != null) Destroy(m_movie.gameObject);
 
             // ポーズメニューからタイトルへ戻った等：ストーリーを中断し、次の試合に影響を残さない
@@ -313,11 +322,12 @@ namespace Yurube.Story
                 while (m_match == null || !m_match.CanPause) yield return null;
                 SetCountdownHidden(true);
                 SetStoryPaused(true);
-                // 背景を部室のムービーにして、オープニング → 会話
+                // 背景をムービーにして、カットシーン → 会話
                 m_dialogue.SetDimAlpha(0.3f);
                 // ムービー中は OnGUI のゲージが映像の上に出てしまうので止める
                 SpecialGaugeHUD.Suppressed = true;
-                yield return m_movie.PlayOpening();
+                if (m_stageMode) yield return m_movie.PlayStageIntro(m_chapter);
+                else yield return m_movie.PlayOpening();
                 yield return m_dialogue.PlayBig(m_chapter, m_chapter.before);
                 StorySession.MarkIntroPlayed();
                 m_dialogue.SetDimAlpha(0.62f);
@@ -390,15 +400,178 @@ namespace Yurube.Story
             {
                 if (p != null && p.Character == cpu && p.CharacterData != null) { speaker = p.CharacterData.id; break; }
             }
-            if (string.IsNullOrEmpty(speaker) || m_taunted.Contains(speaker)) return;
+            // 同じ掛け合いは一度だけ（リトライでも繰り返さない）
+            string eventKey = m_chapter.id + ".taunt." + speaker;
+            if (string.IsNullOrEmpty(speaker) || StorySession.HasEvent(eventKey)) return;
 
             foreach (var line in m_chapter.cpuTaunts)
             {
                 if (line == null || line.speaker != speaker) continue;
-                m_taunted.Add(speaker);
+                StorySession.MarkEvent(eventKey);
                 m_dialogue.StartCoroutine(m_dialogue.PlaySmall(line.speaker, line.text, m_chapter));
                 break;
             }
+        }
+
+        //========================================
+        // 初回だけの掛け合い（第1章）
+        //========================================
+
+        void HookReflectEvents()
+        {
+            DarumaHammer.Hit += OnHammerHit;
+            IwaBlock.WallBroken += OnIwaWallBroken;
+        }
+
+        // プレイヤーが飛んできた積み木を打ち返した（初回だけ台詞）
+        void OnHammerHit(HammerHitInfo info)
+        {
+            if (m_finishedHandled || info.ReturnCount <= 0) return;
+            if (m_player == null || m_player.Character == null) return;
+            if (!ReferenceEquals(info.Owner, m_player.Character)) return;
+            NotifyReflectSuccess();
+        }
+
+        public void NotifyReflectSuccess()
+        {
+            if (m_chapter == null || m_dialogue == null) return;
+            string key = m_chapter.id + ".reflect";
+            if (StorySession.HasEvent(key)) return;
+            StorySession.MarkEvent(key);
+            if (m_chapter.reflectFirst != null && m_chapter.reflectFirst.Count > 0)
+                StartCoroutine(PlayLines(m_chapter.reflectFirst));
+        }
+
+        // いわだるの積み木が壁で砕けた（初回だけ台詞）
+        void OnIwaWallBroken(IDarumaAttacker owner)
+        {
+            if (m_finishedHandled || m_chapter == null) return;
+            var iwa = FindCpu("iwadaru");
+            if (iwa == null || iwa.Character == null || !ReferenceEquals(owner, iwa.Character)) return;
+
+            string key = m_chapter.id + ".wall";
+            if (StorySession.HasEvent(key)) return;
+            StorySession.MarkEvent(key);
+            if (m_chapter.wallBreakFirst != null && m_chapter.wallBreakFirst.Count > 0)
+                StartCoroutine(PlayLines(m_chapter.wallBreakFirst));
+        }
+
+        MatchPlayer FindCpu(string characterId)
+        {
+            if (m_match == null || string.IsNullOrEmpty(characterId)) return null;
+            foreach (var p in m_match.Players)
+            {
+                if (p != null && p.IsCpu && p.CharacterData != null && p.CharacterData.id == characterId) return p;
+            }
+            return null;
+        }
+
+        //========================================
+        // 詰まり防止：プレイヤーへ向かう積み木が来ないときに、いわだるの積み木を飛ばす
+        //========================================
+
+        // プレイヤーへ向かっている攻撃判定のある積み木があるか（0.1秒ごとに数える）
+        public bool HasIncomingBlockToPlayer()
+        {
+            if (Time.unscaledTime < m_nextIncomingCheck) return m_incomingBlock;
+            m_nextIncomingCheck = Time.unscaledTime + 0.1f;
+            m_incomingBlock = ScanIncomingBlock();
+            return m_incomingBlock;
+        }
+
+        bool ScanIncomingBlock()
+        {
+            if (m_player == null || m_player.Character == null) return true;   // 判定できないときは補助しない
+            Vector3 playerPos = m_player.Character.transform.position;
+            var blocks = UnityEngine.Object.FindObjectsByType<TumikiBlock>();
+            foreach (var block in blocks)
+            {
+                if (block == null || block.CurrentState != TumikiBlock.State.Flying) continue;
+                if (!block.IsHarmful) continue;
+                if (ReferenceEquals(block.Owner, m_player.Character)) continue;
+
+                Vector3 to = playerPos - block.transform.position;
+                to.y = 0f;
+                float distance = to.magnitude;
+                if (distance < 0.5f || distance > 25f) continue;
+                if (Vector3.Dot(block.Direction, to / distance) > 0.35f) return true;
+            }
+            return false;
+        }
+
+        // いわだるの積み木（無ければ転がっている積み木）を、いわだるの前からプレイヤーへ飛ばす。
+        // 積み木の生成・発射は既存の仕組み（DarumaStack.RemoveAt / TumikiBlock.Launch）をそのまま使う。
+        public void FireReflectAssist()
+        {
+            if (m_player == null || m_player.Character == null) return;
+            var iwa = FindCpu("iwadaru");
+            if (iwa == null || iwa.Character == null)
+            {
+                FireNeutralAssist();
+                return;
+            }
+
+            Vector3 from = iwa.Character.transform.position;
+            Vector3 to = m_player.Character.transform.position;
+            Vector3 dir = to - from;
+            dir.y = 0f;
+            if (dir.sqrMagnitude < 0.01f) dir = iwa.Character.transform.forward;
+            dir.Normalize();
+
+            TumikiBlock block = null;
+            if (iwa.Character.Stack.Count > 0) block = iwa.Character.Stack.RemoveAt(0);
+            else block = FindLooseBlock(from);
+            if (block == null) return;
+
+            Vector3 pos = from + dir * (DarumaCharacter.kBodyRadius + TumikiBlock.kRadius + 0.2f)
+                + Vector3.up * (TumikiBlock.kHeight * 0.5f);
+            block.transform.position = pos;
+            block.transform.rotation = Quaternion.LookRotation(dir);
+            block.Launch(dir, AssistSpeed, iwa.Character);
+            Debug.Log("[Story] 打ち返しの補助：いわだるの積み木をプレイヤーへ飛ばしました", this);
+        }
+
+        // いわだるが落ちている（復活待ちなど）ときの保険。転がっている積み木を player の前方から飛ばす
+        void FireNeutralAssist()
+        {
+            Vector3 playerPos = m_player.Character.transform.position;
+            Vector3 forward = m_player.Character.transform.forward;
+            forward.y = 0f;
+            if (forward.sqrMagnitude < 0.01f) forward = Vector3.forward;
+            forward.Normalize();
+            Vector3 from = playerPos + forward * 8f;
+            var block = FindLooseBlock(from);
+            if (block == null) return;
+            Vector3 dir = playerPos - from;
+            dir.y = 0f;
+            dir.Normalize();
+            block.transform.position = from + Vector3.up * (TumikiBlock.kHeight * 0.5f);
+            block.transform.rotation = Quaternion.LookRotation(dir);
+            block.Launch(dir, AssistSpeed, null);
+            Debug.Log("[Story] 打ち返しの補助（いわだる不在）：積み木をプレイヤーへ飛ばしました", this);
+        }
+
+        float AssistSpeed
+        {
+            get
+            {
+                var settings = StorySettings.Instance;
+                return settings != null ? settings.ReflectAssistSpeed : 18f;
+            }
+        }
+
+        static TumikiBlock FindLooseBlock(Vector3 near)
+        {
+            var blocks = UnityEngine.Object.FindObjectsByType<TumikiBlock>();
+            TumikiBlock best = null;
+            float bestDistance = float.MaxValue;
+            foreach (var block in blocks)
+            {
+                if (block == null || block.CurrentState != TumikiBlock.State.Loose) continue;
+                float distance = (block.transform.position - near).sqrMagnitude;
+                if (distance < bestDistance) { bestDistance = distance; best = block; }
+            }
+            return best;
         }
 
         IEnumerator PlayLines(List<StoryLine> lines)
@@ -430,6 +603,21 @@ namespace Yurube.Story
             yield return m_dialogue.PlayKoFlash("やられた！", $"のこり {Mathf.Max(0, m_player.Stocks)} ストック");
             SetStoryPaused(false);
             m_koRunning = false;
+        }
+
+        // プレイヤーが脱落した（4人戦ではCPU同士の試合が続いてしまうので、ここでストーリーの敗北にする）
+        void OnPlayerOut(MatchPlayer player)
+        {
+            if (m_finishedHandled || player == null || player != m_player) return;
+            m_finishedHandled = true;
+            // その場で試合を止めて、敗北の台詞 → リトライへ
+            if (m_dialogue != null) m_dialogue.HideObjective();
+            SetStoryPaused(true);
+            // 試合は止めるが、敗北の台詞の音は鳴らす
+            AudioListener.pause = false;
+            SpecialGaugeHUD.Suppressed = true;
+            SpecialInput.StoryLocked = true;
+            StartCoroutine(Defeat());
         }
 
         //========================================
@@ -473,10 +661,11 @@ namespace Yurube.Story
             var presenter = AchievementResultPresenter.Create(canvas, PresentationSettings.DefaultFont);
             yield return presenter.Play();
 
-            // 会話（後）：部室の夕方のムービーを背景に
+            // 会話（後）：部室（第1章以降はステージ）の夕方のムービーを背景に
             m_dialogue.SetDimAlpha(0.3f);
             m_movie.SetBlack();
-            m_movie.ShowConversation(true);
+            if (m_stageMode) m_movie.ShowStageConversation(true);
+            else m_movie.ShowConversation(true);
             yield return m_movie.FadeIn(0.6f);
             yield return m_dialogue.PlayBig(m_chapter, m_chapter.after);
 

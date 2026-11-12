@@ -36,6 +36,8 @@ public static class MatchSetup
         public int cpuNumber;           // CPU が複数いるときの番号（1〜）。CPU が1人だけなら 0
         // この人だけストック数を変えたいとき（0 ならルールのストック数）。ストーリーのチュートリアル用
         public int stocks;
+        // ストーリー用(Yurube): 同じキャラでも章ごとに名札を変える（例：巌高校 選手A）。空ならキャラの名前
+        public string displayNameOverride;
         // チーム戦のチーム（0 = 赤、1 = 青、2 = 緑、3 = 黄）。個人戦なら -1
         // 同じチームどうしかは MatchSetup.SameTeam(a, b) で調べる（個人戦では自分以外みんな敵）
         public int team = -1;
@@ -43,9 +45,9 @@ public static class MatchSetup
         public InputDevice Device => isCpu ? null : InputSystem.GetDeviceById(deviceId);
         public string PlayerLabel => (playerIndex + 1) + "P";
         // 画面に出す名前：「1P」、CPU は「CPU」（複数いるときは「CPU1」「CPU2」）。
-        // ストーリー中は、だるまの名前（きだる／みだる）にする。
+        // ストーリー中は、だるまの名前（きだる／みだる）。displayNameOverride があればそちらを優先
         public string DisplayLabel => StoryNames && character != null
-            ? character.displayName
+            ? (!string.IsNullOrEmpty(displayNameOverride) ? displayNameOverride : character.displayName)
             : !isCpu ? PlayerLabel : cpuNumber > 0 ? "CPU" + cpuNumber : "CPU";
     }
 

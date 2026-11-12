@@ -1,0 +1,110 @@
+{
+  "id": "chapter1",
+  "order": 1,
+  "requiredChapter": "prologue",
+  "title": "第1章「窓ガラスと走り込み」",
+  "stageId": "Stage23",
+  "sceneName": "AllStages",
+  "playerCharacter": "aodaru",
+  "clearKey": "Story.Clear.chapter1",
+  "rules": {
+    "mode": "Stock",
+    "stocks": 3,
+    "timeLimit": 0,
+    "cpuSpecial": false,
+    "awakening": false,
+    "gaugeFromStart": true,
+    "cpuBlockLimit": 0
+  },
+  "cpu": [
+    { "character": "iwadaru", "level": 2, "stocks": 2 },
+    { "character": "hebidaru", "level": 1, "stocks": 2, "displayName": "巌高校 選手A" },
+    { "character": "daruking", "level": 1, "stocks": 2, "displayName": "巌高校 選手B" }
+  ],
+  "speakers": [
+    { "id": "akadaru", "name": "あかだる", "color": "#E8544B" },
+    { "id": "aodaru", "name": "あおだる", "color": "#4B8BE8" },
+    { "id": "midaru", "name": "みだる", "color": "#4BA85A" },
+    { "id": "kidaru", "name": "きだる", "color": "#E8C64B" },
+    { "id": "iwadaru", "name": "いわだる", "color": "#80786B" }
+  ],
+  "cutscene": {
+    "type": "stage",
+    "caption": "夏 ― 地区大会 決勝",
+    "runner": "aodaru",
+    "rival": "iwadaru",
+    "shots": [
+      { "view": "wide", "seconds": 3.2 },
+      { "view": "runner", "seconds": 4.6 },
+      { "view": "rival", "seconds": 3.0 }
+    ]
+  },
+  "before": [
+    { "speaker": "", "direction": true, "text": "（夏。地区大会会場のグラウンド。あおが黙々と走っている）" },
+    { "speaker": "akadaru", "text": "決勝の相手は巌高校だ。主将のいわだるは、積み木を壊さずに突っ込んでくるぞ" },
+    { "speaker": "midaru", "text": "いわだるの積み木は、他の積み木に当たっても壊れません。むしろ相手の積み木を壊します。ただし、壁に当たると砕けます。データ上、確実です" },
+    { "speaker": "aodaru", "text": "……俺は、飛ばすのが苦手だ" },
+    { "speaker": "akadaru", "text": "わかってる。だから、打ち返せ" },
+    { "speaker": "aodaru", "text": "……窓の時と同じか" },
+    { "speaker": "akadaru", "text": "窓はもう直しただろ" },
+    { "speaker": "aodaru", "text": "……自腹でな" },
+    { "speaker": "kidaru", "text": "あおせんぱい、窓ってなんですか？" },
+    { "speaker": "aodaru", "text": "……走ってくる" },
+    { "speaker": "", "direction": true, "text": "（対戦前、フィールドで）" },
+    { "speaker": "iwadaru", "text": "ガハハ！ 来たな、七転の副主将！ 走り込みの噂は聞いてるぞ！" },
+    { "speaker": "aodaru", "text": "……ああ" },
+    { "speaker": "iwadaru", "text": "オレ様が壁になってやる！ 泣いて謝れ！" },
+    { "speaker": "aodaru", "text": "……壁なら、越える" }
+  ],
+  "tutorial": [
+    {
+      "speaker": "midaru",
+      "text": "飛んでくる積み木は、ハンマーで打ち返せます。打ち返すほど速くなりますよ",
+      "condition": "DialogueDone"
+    },
+    {
+      "speaker": "midaru",
+      "text": "X：ハンマー　飛んでくる積み木に、ハンマーを合わせよう",
+      "condition": "Reflect",
+      "count": 1,
+      "cpu": "iwadaru"
+    }
+  ],
+  "matchStart": [],
+  "matchStartNotice": "地区大会 決勝、開始！",
+  "reflectFirst": [
+    { "speaker": "midaru", "text": "打ち返し成功です。計算通りですね" }
+  ],
+  "wallBreakFirst": [
+    { "speaker": "iwadaru", "text": "ぐぬぅっ！？" }
+  ],
+  "cpuTaunts": [
+    { "speaker": "iwadaru", "text": "どけぇ！ オレ様が通る！" }
+  ],
+  "defeat": [
+    { "speaker": "iwadaru", "text": "ガハハ！ 頑丈なのがオレ様だ！" },
+    { "speaker": "aodaru", "text": "……まだ、走れる" }
+  ],
+  "after": [
+    { "speaker": "iwadaru", "text": "ぐぬぬ……負けただと！？ 飛ばすのが苦手なくせに、なぜ強い！" },
+    { "speaker": "aodaru", "text": "……苦手だ。だから、走る" },
+    { "speaker": "iwadaru", "text": "……去年、オレ様は壁に砕けて負けた。べ、別に悔しくないがな！" },
+    { "speaker": "aodaru", "text": "……壁は、避けて走ればいい" },
+    { "speaker": "iwadaru", "text": "避ける、か。曲がるのは性に合わんが……！" },
+    { "speaker": "aodaru", "text": "……一緒に走るか" },
+    { "speaker": "iwadaru", "text": "ガハハ！ 明日、朝五時だ！ 遅れたら承知せんぞ！" },
+    { "speaker": "kidaru", "text": "やったー！ 地区大会優勝ですー！" },
+    { "speaker": "", "direction": true, "text": "（祝勝ムードのなか、いわが小声で）" },
+    { "speaker": "iwadaru", "text": "……去年の準決勝、オレ様の前に突然壁が現れた。会場にそんな壁はなかったはずだ" },
+    { "speaker": "midaru", "text": "会場図面を確認しました。該当の壁は、記録にありません" },
+    { "speaker": "aodaru", "text": "……誰かが、置いたのか" },
+    { "speaker": "iwadaru", "text": "ガハハ！ まあいい！ 次に出たら、オレ様が砕いてやる！" }
+  ],
+  "newspaper": {
+    "header": "だるま新聞",
+    "headline": "だるま落とし部 チーム一丸 快進撃！ 地区大会優勝",
+    "body": "七転高校だるま落とし部が、地区大会決勝を制した。副主将のあおだるは「……走った。それだけだ」と語り、主将のあかだるは「チーム一丸の勝利だ！」と胸を張った。",
+    "image": "",
+    "caption": "地区大会 決勝 七転高校だるま落とし部"
+  }
+}

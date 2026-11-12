@@ -32,6 +32,9 @@ namespace Yurube
         // この発射で岩化したか(同じ積み木を何度も拾い直さないためのフラグ)
         public bool ConsumedLaunch { get; private set; }
 
+        // ストーリー用(Yurube): 岩の積み木が壁で砕けたことを外へ知らせる（初回の台詞用）
+        public static event System.Action<IDarumaAttacker> WallBroken;
+
         private void Awake()
         {
             m_block = GetComponent<TumikiBlock>();
@@ -167,6 +170,7 @@ namespace Yurube
             m_active = false;
             enabled = false;
             if (m_logIwa) Debug.Log("[いわだる] 岩の積み木が壁に当たって壊れた", this);
+            WallBroken?.Invoke(m_block.Owner);
             m_block.Break(m_block.Direction * m_block.Speed, 0.0f, 0.0f);
         }
 

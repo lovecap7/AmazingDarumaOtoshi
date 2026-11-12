@@ -14,6 +14,8 @@ namespace Yurube.Story
     //  ・ゲームを止めている間も動くように、時間はすべて unscaled
     //  ・A / B でオープニングを飛ばせる
     // セットはプリミティブとランタイムで作ったテクスチャだけで組む（外部アセット不要）。
+    // キャラクターの Update より後に走らせて、走るポーズが上書きされないようにする
+    [DefaultExecutionOrder(1000)]
     public class StoryMovie : MonoBehaviour
     {
         // セットの場所（ゲームのステージから遠く離す）
@@ -51,6 +53,14 @@ namespace Yurube.Story
         bool m_built, m_visible, m_skipped, m_sunset;
         bool m_opening, m_advance;
         float m_time;
+
+        // 第1章以降：実際のステージを撮るカットシーン
+        bool m_stageMode;
+        Transform m_runner;
+        Vector3 m_runnerHome, m_runnerA, m_runnerB;
+        Quaternion m_runnerHomeRot;
+        float m_runnerStart, m_runnerDuration;
+        bool m_runnerActive;
 
         // 台本（タイトルのムービーと同じ書き方）
         System.Func<float, Vector3> m_camPos, m_camLook;
@@ -101,6 +111,7 @@ namespace Yurube.Story
 
         void OnDestroy()
         {
+            RestoreRunner();
             if (m_camera != null) m_camera.targetTexture = null;
             RenderTexture.active = null;
             if (m_rt != null)
@@ -263,6 +274,8 @@ namespace Yurube.Story
         //========================================
 
         Vector3 P(float x, float y, float z) => SetOrigin + new Vector3(x, y, z);
+        // ステージを撮るときは、部室のセットではなくワールド座標をそのまま使う
+        Vector3 W(float x, float y, float z) => new Vector3(x, y, z);
 
         Transform Box(string name, Vector3 pos, Vector3 size, Material mat, float yaw = 0f)
         {
@@ -661,6 +674,8 @@ namespace Yurube.Story
 
         public void Hide()
         {
+            RestoreRunner();
+            m_stageMode = false;
             m_visible = false;
             m_opening = false;
             m_advance = false;
@@ -682,6 +697,7 @@ namespace Yurube.Story
         public void ShowConversation(bool sunset)
         {
             Show();
+            m_stageMode = false;
             m_opening = false;
             m_advance = false;
             m_baseScale = 1f;
@@ -787,6 +803,7 @@ namespace Yurube.Story
             m_advance = false;
             m_baseScale = 1f;
             m_opening = true;
+            m_stageMode = false;
             Show();
             m_fadeGroup.alpha = 1f;
             SetCaption(false);
@@ -855,6 +872,235 @@ namespace Yurube.Story
             ShowConversation(false);
             yield return FadeTo(0f, 0.6f);
             m_skipped = false;
+        }
+
+        //========================================
+        // 実際のステージを撮るカットシーン（第1章以降）
+        //========================================
+
+        // 章データの cutscene.shots を順に撮る。A：つぎへ／B：スキップは序章と同じ。
+        public IEnumerator PlayStageIntro(StoryChapter chapter)
+        {
+            if (chapter == null || chapter.cutscene == null || string.IsNullOrEmpty(chapter.cutscene.type))
+            {
+                yield return PlayOpening();
+                yield break;
+            }
+
+            m_time = 0f;
+            m_shift = 0f;
+            m_skipped = false;
+            m_advance = false;
+            m_baseScale = 1f;
+            m_opening = true;
+            m_stageMode = true;
+            Show();
+            m_camera.clearFlags = CameraClearFlags.Skybox;
+            m_camera.farClipPlane = 120f;
+            m_fadeGroup.alpha = 1f;
+            SetCaption(false);
+            SetTitle(false);
+            SetHint(true);
+            SetMemory(false);
+            SetCinema(false);
+            SetCaptionText(chapter.cutscene.caption);
+
+            // フェードインの前から、最初のカットにしておく（原点の映像を見せない）
+            SetStageWide();
+            yield return FadeTo(0f, 0.5f);
+            SetCaption(!string.IsNullOrEmpty(chapter.cutscene.caption));
+
+            var shots = chapter.cutscene.shots;
+            if (shots == null || shots.Count == 0)
+            {
+                SetStageWide();
+                yield return Hold(3.0f);
+                if (!m_skipped) { BeginRunner(chapter, 4.5f); SetStageRunner(); yield return Hold(4.5f); }
+                if (!m_skipped) { SetStageRival(chapter); yield return Hold(3.0f); }
+            }
+            else
+            {
+                foreach (var shot in shots)
+                {
+                    if (shot == null) continue;
+                    switch (shot.view)
+                    {
+                        case "runner":
+                            BeginRunner(chapter, shot.seconds);
+                            SetStageRunner();
+                            break;
+                        case "rival":
+                            SetStageRival(chapter);
+                            break;
+                        default:
+                            SetStageWide();
+                            break;
+                    }
+                    yield return Hold(Mathf.Max(0.5f, shot.seconds));
+                    if (m_skipped) break;
+                }
+            }
+
+            SetCaption(false);
+            if (!m_skipped)
+            {
+                SetCinema(true);
+                yield return FadeTo(0.65f, 0.5f);
+                var card = (RectTransform)m_titleGroup.transform;
+                card.localScale = Vector3.one * 1.06f;
+                SetTitle(true);
+                yield return Tween(0.8f, u => card.localScale = Vector3.one * Mathf.Lerp(1.06f, 1f, u));
+                yield return Hold(1.4f);
+                SetTitle(false);
+            }
+
+            yield return FinishStageIntro();
+        }
+
+        IEnumerator FinishStageIntro()
+        {
+            m_opening = false;
+            SetHint(false);
+            SetCaption(false);
+            SetTitle(false);
+            SetMemory(false);
+            SetCinema(false);
+            m_baseScale = 1f;
+            m_advance = false;
+            RestoreRunner();
+            yield return FadeTo(1f, 0.35f);
+            ShowStageConversation(false);
+            yield return FadeTo(0f, 0.6f);
+            m_skipped = false;
+        }
+
+        // 会話の背景にする（実際のステージをゆっくり寄る）
+        public void ShowStageConversation(bool after)
+        {
+            Show();
+            m_stageMode = true;
+            m_opening = false;
+            m_advance = false;
+            m_baseScale = 1f;
+            m_camera.clearFlags = CameraClearFlags.Skybox;
+            m_camera.farClipPlane = 120f;
+            m_sunset = after;
+            SetCinema(true);
+            SetCaption(false);
+            SetTitle(false);
+            SetHint(false);
+
+            if (after)
+            {
+                // 祝勝：少し引いて、夕方の色
+                SetShot(lt => W(0.5f, 4.8f, -9.5f), lt => W(0f, 1.2f, 0f), 44f);
+            }
+            else
+            {
+                // 対戦前：フィールドを見渡す（南の壁の内側から）
+                SetShot(lt => W(0.3f + 0.15f * Mathf.Sin(lt * 0.1f), 3.4f, -8.8f),
+                        lt => W(0f, 1.1f, 0f), 40f);
+            }
+        }
+
+        public void SetCaptionText(string text)
+        {
+            if (m_caption != null) m_caption.text = text ?? "";
+        }
+
+        void SetStageWide()
+        {
+            // スタンドの中に入り込まないよう、競技場の内側から見下ろす
+            SetShot(lt => W(0f, 15f, -8f), lt => W(0f, 1.2f, 0f), 50f);
+        }
+
+        void SetStageRunner()
+        {
+            Transform runner = m_runner;
+            if (runner == null) { SetStageWide(); return; }
+            SetShot(lt => runner.position + new Vector3(0f, 1.35f, -3.4f),
+                    lt => runner.position + new Vector3(0f, 0.7f, 0f), 38f);
+        }
+
+        void SetStageRival(StoryChapter chapter)
+        {
+            var rival = FindPlayer(chapter.cutscene != null ? chapter.cutscene.rival : null);
+            if (rival == null || rival.Character == null) rival = FindFirstCpu();
+            Vector3 target = rival != null && rival.Character != null
+                ? rival.Character.transform.position
+                : W(0f, 0f, 0f);
+            // ステージの外（壁の向こう）から撮らないように、中央寄りに寄せる
+            Vector3 inward = W(0f, 0f, 0f) - target;
+            inward.y = 0f;
+            if (inward.sqrMagnitude < 0.01f) inward = Vector3.forward;
+            inward.Normalize();
+            Vector3 cameraPos = target + inward * 3.2f + Vector3.up * 1.5f;
+            SetShot(lt => cameraPos, lt => target + new Vector3(0f, 0.8f, 0f), 36f);
+        }
+
+        // 走る人を、実際のキャラクターで走路に出す（終わったら元の位置へ戻す）
+        void BeginRunner(StoryChapter chapter, float seconds)
+        {
+            RestoreRunner();
+            string id = chapter.cutscene != null && !string.IsNullOrEmpty(chapter.cutscene.runner)
+                ? chapter.cutscene.runner : chapter.playerCharacter;
+            var player = FindPlayer(id);
+            if (player == null || player.Character == null) return;
+
+            m_runner = player.Character.transform;
+            m_runnerHome = m_runner.position;
+            m_runnerHomeRot = m_runner.rotation;
+            m_runnerA = new Vector3(-12f, m_runnerHome.y, -5.5f);
+            m_runnerB = new Vector3(12f, m_runnerHome.y, -5.5f);
+            m_runner.position = m_runnerA;
+            m_runner.rotation = Quaternion.LookRotation(Vector3.right);
+            m_runnerStart = m_time;
+            m_runnerDuration = Mathf.Max(1f, seconds);
+            m_runnerActive = true;
+        }
+
+        void AnimateStage()
+        {
+            if (!m_runnerActive || m_runner == null) return;
+            float u = Mathf.Clamp01((m_time - m_runnerStart) / m_runnerDuration);
+            Vector3 pos = Vector3.Lerp(m_runnerA, m_runnerB, u);
+            pos.y += Mathf.Abs(Mathf.Sin(u * Mathf.PI * 8f)) * 0.06f;
+            m_runner.position = pos;
+            m_runner.rotation = Quaternion.LookRotation(Vector3.right);
+            if (u >= 1f) m_runnerActive = false;
+        }
+
+        void RestoreRunner()
+        {
+            if (m_runner != null)
+            {
+                m_runner.position = m_runnerHome;
+                m_runner.rotation = m_runnerHomeRot;
+            }
+            m_runner = null;
+            m_runnerActive = false;
+        }
+
+        static MatchPlayer FindPlayer(string characterId)
+        {
+            var match = Nakahira.DarumaMatch.Current;
+            if (match == null || string.IsNullOrEmpty(characterId)) return null;
+            foreach (var p in match.Players)
+            {
+                if (p != null && p.CharacterData != null && p.CharacterData.id == characterId) return p;
+            }
+            return null;
+        }
+
+        static MatchPlayer FindFirstCpu()
+        {
+            var match = Nakahira.DarumaMatch.Current;
+            if (match == null) return null;
+            foreach (var p in match.Players)
+            {
+                if (p != null && p.IsCpu) return p;
+            }
+            return null;
         }
 
         //========================================
@@ -956,6 +1202,7 @@ namespace Yurube.Story
             }
 
             AnimateMembers();
+            if (m_stageMode) AnimateStage();
 
             if (m_camera == null || m_camPos == null) return;
             float lt = m_time - m_shotStart;

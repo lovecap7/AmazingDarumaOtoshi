@@ -1,5 +1,7 @@
 {
   "id": "prologue",
+  "order": 0,
+  "requiredChapter": "",
   "title": "序章「はじまりは、おにぎり」",
   "stageId": "DebugStage31",
   "sceneName": "AllStages",

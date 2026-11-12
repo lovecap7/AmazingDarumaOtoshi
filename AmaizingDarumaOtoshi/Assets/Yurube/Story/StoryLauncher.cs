@@ -22,9 +22,20 @@ namespace Yurube.Story
             var chapter = StoryData.Load(chapterId);
             if (chapter == null) return;
 
+            // 解放条件を満たしていなければ始めない（章選択のロックと同じ判定）
+            if (!StoryProgress.IsUnlocked(chapter))
+            {
+                Debug.LogWarning("[Story] まだ解放されていません: " + chapterId
+                    + "（" + chapter.requiredChapter + " をクリアで解放）");
+                return;
+            }
+
             // 画面の名札を「1P」「CPU」ではなく、だるまの名前で出す
             MatchSetup.StoryNames = true;
             StorySession.Begin(chapter);
+
+            var settings = StorySettings.Instance;
+            int cpuLevelOverride = settings != null ? settings.OverrideCpuLevel : 0;
 
             var entries = new List<MatchSetup.Entry>();
             entries.Add(new MatchSetup.Entry
@@ -41,22 +52,27 @@ namespace Yurube.Story
             {
                 var cpu = chapter.cpu[i];
                 if (cpu == null) continue;
+                int level = cpu.level <= 0 ? 1 : cpu.level;
+                if (cpuLevelOverride > 0) level = cpuLevelOverride;
                 entries.Add(new MatchSetup.Entry
                 {
                     playerIndex = i + 1,
                     isCpu = true,
-                    cpuLevel = Mathf.Clamp(cpu.level <= 0 ? 1 : cpu.level, 1, MatchSetup.MaxCpuLevel),
+                    cpuLevel = Mathf.Clamp(level, 1, MatchSetup.MaxCpuLevel),
                     deviceName = "CPU",
                     character = FindCharacter(cpu.character),
                     cpuNumber = cpuCount > 1 ? i + 1 : 0,
                     stocks = Mathf.Max(0, cpu.stocks),
+                    displayNameOverride = cpu.displayName,
                 });
             }
 
-            // ルール（章データで変えられる）
+            // ルール（章データで変えられる。Inspector の上書きが優先）
             var rules = MatchSetup.Rules;
             rules.mode = ParseMode(chapter.rules);
-            rules.stocks = Mathf.Max(1, chapter.rules.stocks);
+            rules.stocks = settings != null && settings.OverrideStocks > 0
+                ? settings.OverrideStocks
+                : Mathf.Max(1, chapter.rules.stocks);
             rules.stockTimeLimit = rules.mode == MatchSetup.MatchMode.Stock ? Mathf.Max(0f, chapter.rules.timeLimit) : 0f;
             rules.timeLength = rules.mode == MatchSetup.MatchMode.Time ? Mathf.Max(30f, chapter.rules.timeLimit) : 120f;
             rules.ghostTimeLimit = rules.mode == MatchSetup.MatchMode.Ghost ? Mathf.Max(0f, chapter.rules.timeLimit) : 0f;

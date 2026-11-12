@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Yurube.Story
@@ -12,6 +13,13 @@ namespace Yurube.Story
         {
             if (string.IsNullOrEmpty(chapterId)) return false;
             return PlayerPrefs.GetInt(KeyPrefix + chapterId, 0) == 1;
+        }
+
+        // 章が遊べるか（解放条件の章をクリア済みか）
+        public static bool IsUnlocked(StoryChapter chapter)
+        {
+            if (chapter == null) return false;
+            return string.IsNullOrEmpty(chapter.requiredChapter) || IsCleared(chapter.requiredChapter);
         }
 
         // 章クリアを記録する（新聞まで見終わったとき）
@@ -47,8 +55,23 @@ namespace Yurube.Story
         public static bool YellowExtraPlayed { get; set; }
         // 必殺技の覚醒イベントを終えたか（リトライでも保持する）
         public static bool AwakeningDone { get; set; }
+        // 試合前の一言（matchStart）を出したか。リトライでは繰り返さない
+        public static bool MatchStartPlayed { get; set; }
         // 敗北した回数（デバッグ表示用）
         public static int RetryCount { get; private set; }
+
+        // 初回だけの演出を覚えておく（章ID + 種類）
+        static readonly HashSet<string> s_events = new HashSet<string>();
+
+        public static bool HasEvent(string key)
+        {
+            return !string.IsNullOrEmpty(key) && s_events.Contains(key);
+        }
+
+        public static void MarkEvent(string key)
+        {
+            if (!string.IsNullOrEmpty(key)) s_events.Add(key);
+        }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         static void ResetStatics()
@@ -58,7 +81,9 @@ namespace Yurube.Story
             TutorialStep = 0;
             YellowExtraPlayed = false;
             AwakeningDone = false;
+            MatchStartPlayed = false;
             RetryCount = 0;
+            s_events.Clear();
         }
 
         // 章を始める（最初から）
@@ -69,7 +94,9 @@ namespace Yurube.Story
             TutorialStep = 0;
             YellowExtraPlayed = false;
             AwakeningDone = false;
+            MatchStartPlayed = false;
             RetryCount = 0;
+            s_events.Clear();
         }
 
         public static void MarkIntroPlayed() => IntroPlayed = true;
