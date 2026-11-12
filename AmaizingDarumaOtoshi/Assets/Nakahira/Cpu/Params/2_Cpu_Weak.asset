@@ -136,6 +136,8 @@ MonoBehaviour:
   GoldenHazardMargin: 0.5
   TronRange: 12
   ExcaliburConfirmHalfWidth: 0.8
+  AllySpacing: 3
+  AllySpacingWeight: 1
   BlackoutCounterChance: 0.1
   BlackoutCounterDelay: 1
   BlackoutNearMargin: 2

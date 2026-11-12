@@ -1242,10 +1242,15 @@ namespace Nakahira
         public bool IsFriendly(IDarumaAttacker attacker, DarumaCharacter victim)
         {
             if (m_friendlyFire || !Rules.teams) return false;
-            var a = PlayerOf(attacker);
-            var v = PlayerOf(victim);
+            return AreTeammates(PlayerOf(attacker), PlayerOf(victim));
+        }
+
+        // 2 人が味方どうしか(チーム戦で、別の人で、同じチーム。味方にも当たる設定なら false)。CPU も使う
+        public bool AreTeammates(MatchPlayer a, MatchPlayer b)
+        {
+            if (m_friendlyFire || !Rules.teams) return false;
             // MatchSetup.SameTeam は同じ人どうしでも true を返すので、別の人であることも確かめる
-            return a != null && v != null && a != v && MatchSetup.SameTeam(a.Index, v.Index);
+            return a != null && b != null && a != b && MatchSetup.SameTeam(a.Index, b.Index);
         }
 
         //========================================

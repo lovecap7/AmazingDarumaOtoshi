@@ -51,16 +51,21 @@ namespace Nakahira
 
         readonly Dictionary<MatchPlayer, CpuOpponent> m_known = new Dictionary<MatchPlayer, CpuOpponent>();
         readonly List<CpuOpponent> m_opponents = new List<CpuOpponent>();
+        readonly List<DarumaCharacter> m_allies = new List<DarumaCharacter>();
         NavMeshPath m_path;
         float m_pathTimer;
 
         // 体がある相手(生存者・幽霊)。復活待ち・脱落した人は含まない
+        // チーム戦の味方は含まない(どの状態の判断でも、いないものとして扱う。設計メモ 9)
         public IReadOnlyList<CpuOpponent> Opponents => m_opponents;
+        // チーム戦の味方の生存者の体(撃つ弾が味方に当たらないかを調べるためだけに使う)
+        public IReadOnlyList<DarumaCharacter> Allies => m_allies;
 
         public void Update(CpuContext c)
         {
             if (m_path == null) m_path = new NavMeshPath();
             m_opponents.Clear();
+            m_allies.Clear();
             var match = DarumaMatch.Current;
             if (match == null) return;
 
@@ -72,6 +77,12 @@ namespace Nakahira
             foreach (var p in match.Players)
             {
                 if (p == null || p == c.Player || p.Body == null || p.Body == c.Self.transform) continue;
+                // チーム戦の味方は相手に入れない(生存者の体だけ覚えておく)
+                if (match.AreTeammates(c.Player, p))
+                {
+                    if (p.Character != null) m_allies.Add(p.Character);
+                    continue;
+                }
                 if (!m_known.TryGetValue(p, out var o))
                 {
                     o = new CpuOpponent(p);
