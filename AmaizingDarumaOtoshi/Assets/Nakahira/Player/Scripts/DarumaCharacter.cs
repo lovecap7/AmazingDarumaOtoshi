@@ -123,6 +123,7 @@ namespace Nakahira
         bool m_isEliminated;
         float m_invincibleTimer;
         readonly RaycastHit[] m_groundHits = new RaycastHit[8];
+        readonly RaycastHit[] m_wallHits = new RaycastHit[8];
 
         // ギミックからの影響(IGimmickAffectable)
         Vector3 m_carryVelocity;      // 次のステップで上乗せする運搬速度
@@ -450,8 +451,8 @@ namespace Nakahira
             TumikiBlock overflow = m_stack.AddBottom(block);
             if (overflow != null)
             {
-                // 一番古い段(頭の下)が後ろにこぼれる
-                overflow.transform.position -= transform.forward * (kBodyRadius + TumikiBlock.kRadius + 0.1f);
+                // 一番古い段(頭の下)が後ろにこぼれる(後ろが壁なら壁の手前まで)
+                overflow.transform.position = PlaceBlockBeforeWall(overflow.transform.position, -transform.forward, kBodyRadius + TumikiBlock.kRadius + 0.1f);
                 var rb = overflow.GetComponent<Rigidbody>();
                 rb.linearVelocity = -transform.forward * 2.0f + Vector3.up * 1.0f;
             }
@@ -500,12 +501,33 @@ namespace Nakahira
             }
 
             knocked = m_stack.RemoveAt(0);
-            knocked.transform.position = m_rb.position
-                + dir * (kBodyRadius + TumikiBlock.kRadius + 0.05f)
-                + Vector3.up * (TumikiBlock.kHeight * 0.5f);
+            // 叩かれた向きの、胴体に重ならない所から飛び出す(壁際で壁の方へ叩かれたら、壁の手前まで。壁の中に出ないように)
+            knocked.transform.position = PlaceBlockBeforeWall(m_rb.position + Vector3.up * (TumikiBlock.kHeight * 0.5f),
+                dir, kBodyRadius + TumikiBlock.kRadius + 0.05f);
             knocked.Launch(dir, speed, attacker, this);
             RaiseDamaged();
             return true;
+        }
+
+        // 積み木を from から dir へ distance だけ動かした位置。途中に壁(ReflectWall)があれば壁の手前で止める
+        private Vector3 PlaceBlockBeforeWall(Vector3 from, Vector3 dir, float distance)
+        {
+            dir.y = 0.0f;
+            if (dir.sqrMagnitude < 0.0001f) return from;
+            dir.Normalize();
+
+            // 積み木より少し小さい箱を飛ばす(壁際に立っていても、始めから壁に重ならない大きさ)
+            float r = TumikiBlock.kRadius - 0.06f;
+            Vector3 half = new Vector3(r, TumikiBlock.kHeight * 0.4f, r);
+            int count = Physics.BoxCastNonAlloc(from, half, dir, m_wallHits, Quaternion.LookRotation(dir), distance, ~0, QueryTriggerInteraction.Ignore);
+            float nearest = distance;
+            for (int i = 0; i < count; i++)
+            {
+                RaycastHit hit = m_wallHits[i];
+                if (hit.collider.GetComponentInParent<ReflectWall>() == null) continue;
+                nearest = Mathf.Min(nearest, Mathf.Max(0.0f, hit.distance - 0.01f));
+            }
+            return from + dir * nearest;
         }
 
         // 飛んできた積み木が当たった。当てた積み木を消滅させるならtrue
