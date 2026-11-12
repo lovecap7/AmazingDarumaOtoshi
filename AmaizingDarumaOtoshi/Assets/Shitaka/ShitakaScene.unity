@@ -753,7 +753,7 @@ MonoBehaviour:
   speed: 20
   deceleration: 0.2
   stopThreshold: 1
-  behaviorType: 16
+  behaviorType: 18
   hebiTurnSpeed: 60
   homingStartTurnSpeed: 270
   homingGuidanceDuration: 1.5

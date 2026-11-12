@@ -11,6 +11,15 @@ namespace Yurube.Achievements
         Chain,      // 連鎖
         Stack,      // 積み木
         Challenge,  // 挑戦
+        Story,      // ストーリー
+    }
+
+    // 実績を解除できるモード。既定は「両方」
+    public enum AchievementMode
+    {
+        Both,     // 対戦でもストーリーでも解除できる
+        Versus,   // 対戦でのみ解除できる（人数条件など）
+        Story,    // ストーリーでのみ解除できる
     }
 
     // 実績の解除条件の種類。
@@ -44,6 +53,7 @@ namespace Yurube.Achievements
         NoDamageWin,          // 一度も被弾せずに勝利した回数（累計）
         HammerMiss,           // ハンマーを空振りした回数（累計）
         QuickWin,             // 試合開始から一定時間以内に勝利した回数（累計）
+        StoryChapterCleared,  // 指定した章をクリアしたか（storyChapter と組み合わせる）
     }
 
     // 実績1つ分の「決まった内容」。進捗や解除状態は AchievementData が持つ。
@@ -80,6 +90,12 @@ namespace Yurube.Achievements
         [Tooltip("非公開実績。未解除の間は名前・説明・条件・アイコンを隠す")]
         public bool secret;
 
+        [Tooltip("解除できるモード（既定は両方）")]
+        public AchievementMode mode = AchievementMode.Both;
+
+        [Tooltip("章クリア実績の章ID（StoryChapterCleared のときだけ使う）")]
+        public string storyChapter;
+
         [Tooltip("通知・一覧に出すアイコン（未設定ならカテゴリーの色で代用）")]
         public Sprite icon;
 
@@ -103,7 +119,9 @@ namespace Yurube.Achievements
                                      AchievementRarity rarity = AchievementRarity.Bronze,
                                      bool special = false, bool secret = false,
                                      string hint = null,
-                                     int hintAtProgress = 0, int hintAtMatches = 0)
+                                     int hintAtProgress = 0, int hintAtMatches = 0,
+                                     AchievementMode mode = AchievementMode.Both,
+                                     string storyChapter = null)
         {
             this.id = id;
             this.name = name;
@@ -118,6 +136,8 @@ namespace Yurube.Achievements
             this.hint = hint;
             this.hintAtProgress = hintAtProgress;
             this.hintAtMatches = hintAtMatches;
+            this.mode = mode;
+            this.storyChapter = storyChapter;
         }
 
         public string CategoryName => AchievementCatalog.CategoryName(category);

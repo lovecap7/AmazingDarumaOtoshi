@@ -79,7 +79,8 @@ namespace Nakahira
             }
 
             Sync(match);
-            bool hidden = SpecialGaugeHUD.Suppressed;
+            // ストーリー用(Yurube): 序章の覚醒前はゲージ自体を出さない(通常対戦は Visible が常に true)
+            bool hidden = SpecialGaugeHUD.Suppressed || !SpecialGaugeHUD.Visible;
             int index = 0;
             int count = m_entries.Count;
             foreach (var e in m_entries)

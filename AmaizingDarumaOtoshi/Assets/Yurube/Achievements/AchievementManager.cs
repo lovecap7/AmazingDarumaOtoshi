@@ -21,6 +21,10 @@ namespace Yurube.Achievements
 
         static readonly List<AchievementData> s_all = new List<AchievementData>();
         static readonly Dictionary<AchievementMetric, int> s_counters = new Dictionary<AchievementMetric, int>();
+        // 対戦専用の実績用。ストーリー中の出来事を混ぜないように別に数える
+        static readonly Dictionary<AchievementMetric, int> s_versusCounters = new Dictionary<AchievementMetric, int>();
+        // クリア済みのストーリー章（章クリア実績用）
+        static readonly HashSet<string> s_clearedStoryChapters = new HashSet<string>();
         static readonly HashSet<string> s_usedCharacters = new HashSet<string>();
         static string s_storageKey = NormalStorageKey;
         static bool s_ready;
@@ -28,6 +32,10 @@ namespace Yurube.Achievements
         static bool s_refreshingMeta;
         // いまの連勝数（敗北で0。引き分けでは維持）
         static int s_winStreak;
+
+        // ストーリーの試合中か（StoryMatchDirector が切り替える）。
+        // 対戦専用の実績をストーリーで解除しないために使う
+        public static bool StoryMode;
 
         // 実績を解除した（通知・メニューの更新用）
         public static event Action<AchievementData> Unlocked;
@@ -86,11 +94,14 @@ namespace Yurube.Achievements
         {
             s_all.Clear();
             s_counters.Clear();
+            s_versusCounters.Clear();
+            s_clearedStoryChapters.Clear();
             s_usedCharacters.Clear();
             s_storageKey = NormalStorageKey;
             s_ready = false;
             s_refreshingMeta = false;
             s_winStreak = 0;
+            StoryMode = false;
             Unlocked = null;
             Changed = null;
         }
@@ -200,7 +211,15 @@ namespace Yurube.Achievements
 
             s_counters.TryGetValue(metric, out int current);
             // 連鎖・積み上げは「一番よい記録」、それ以外は累計
-            s_counters[metric] = IsBest(metric) ? Mathf.Max(current, value) : current + value;
+            int next = IsBest(metric) ? Mathf.Max(current, value) : current + value;
+            s_counters[metric] = next;
+
+            // 対戦専用の実績用は、ストーリー中の出来事を数えない
+            if (!StoryMode)
+            {
+                s_versusCounters.TryGetValue(metric, out int versus);
+                s_versusCounters[metric] = IsBest(metric) ? Mathf.Max(versus, value) : versus + value;
+            }
             Refresh(metric);
         }
 
@@ -210,6 +229,7 @@ namespace Yurube.Achievements
             if (string.IsNullOrEmpty(characterId)) return;
             if (!s_usedCharacters.Add(characterId)) return;
             s_counters[AchievementMetric.CharacterUsedDistinct] = s_usedCharacters.Count;
+            if (!StoryMode) s_versusCounters[AchievementMetric.CharacterUsedDistinct] = s_usedCharacters.Count;
             Refresh(AchievementMetric.CharacterUsedDistinct);
         }
 
@@ -229,13 +249,48 @@ namespace Yurube.Achievements
             return value;
         }
 
+        // その実績の進捗に使う数。対戦専用は専用カウンター、章クリアはクリア済みの章から決める
+        static int CountFor(AchievementData data)
+        {
+            var metric = data.Definition.metric;
+            if (metric == AchievementMetric.StoryChapterCleared)
+                return !string.IsNullOrEmpty(data.StoryChapter) && s_clearedStoryChapters.Contains(data.StoryChapter) ? 1 : 0;
+            if (data.Mode == AchievementMode.Versus)
+            {
+                s_versusCounters.TryGetValue(metric, out int value);
+                return value;
+            }
+            return CountOf(metric);
+        }
+
+        // 章クリアを記録する（新聞まで見終わったときに StoryMatchDirector から呼ぶ）
+        public static void ReportStoryCleared(string chapterId)
+        {
+            Initialize();
+            if (string.IsNullOrEmpty(chapterId)) return;
+            bool changed = s_clearedStoryChapters.Add(chapterId);
+            foreach (var data in s_all)
+            {
+                if (data.Definition.metric != AchievementMetric.StoryChapterCleared) continue;
+                if (data.StoryChapter != chapterId) continue;
+                data.Progress = 1;
+                changed = true;
+                if (!data.IsUnlocked) Unlock(data);
+            }
+            if (changed)
+            {
+                Save();
+                Changed?.Invoke();
+            }
+        }
+
         // 数えた種類の実績だけ、進捗と解除を見直す
         static void Refresh(AchievementMetric metric)
         {
-            int count = CountOf(metric);
             foreach (var data in s_all)
             {
                 if (data.Definition.metric != metric) continue;
+                int count = CountFor(data);
                 data.Progress = Mathf.Min(count, Mathf.Max(1, data.Target));
                 if (!data.IsUnlocked && data.Target > 0 && count >= data.Target) Unlock(data);
             }
@@ -248,7 +303,7 @@ namespace Yurube.Achievements
             {
                 // メタ実績（ほかの実績から決まるもの）は RefreshMetaAchievements で数える
                 if (IsMetaMetric(data.Definition.metric)) continue;
-                data.Progress = Mathf.Min(CountOf(data.Definition.metric), Mathf.Max(1, data.Target));
+                data.Progress = Mathf.Min(CountFor(data), Mathf.Max(1, data.Target));
             }
             RefreshMetaAchievements();
             Changed?.Invoke();
@@ -332,6 +387,10 @@ namespace Yurube.Achievements
         static void Unlock(AchievementData data)
         {
             if (data.IsUnlocked) return;
+            // モード制限：対戦専用はストーリー中に解除しない。ストーリー専用はストーリー外で解除しない
+            if (data.Mode == AchievementMode.Versus && StoryMode) return;
+            if (data.Mode == AchievementMode.Story && !StoryMode
+                && data.Definition.metric != AchievementMetric.StoryChapterCleared) return;
             data.IsUnlocked = true;
             // 解除した瞬間に日時を確定して保存する（表示するときに日時を入れ直さない）
             data.UnlockedAt = DateTime.UtcNow;
@@ -455,6 +514,8 @@ namespace Yurube.Achievements
             public List<string> unlocked = new List<string>();
             public List<string> unlockedAt = new List<string>();
             public List<string> counters = new List<string>();
+            public List<string> versusCounters = new List<string>();
+            public List<string> storyChapters = new List<string>();
             public List<string> characters = new List<string>();
             public int winStreak;
             // リザルトで見せた実績のID。notifyVersion が 0 の古いセーブ（この項目が無い）は、
@@ -481,6 +542,14 @@ namespace Yurube.Achievements
             foreach (var pair in s_counters)
             {
                 blob.counters.Add((int)pair.Key + "=" + pair.Value);
+            }
+            foreach (var pair in s_versusCounters)
+            {
+                blob.versusCounters.Add((int)pair.Key + "=" + pair.Value);
+            }
+            foreach (var chapter in s_clearedStoryChapters)
+            {
+                blob.storyChapters.Add(chapter);
             }
             foreach (var id in s_usedCharacters)
             {
@@ -514,6 +583,34 @@ namespace Yurube.Achievements
                             {
                                 s_counters[(AchievementMetric)metric] = Mathf.Max(0, value);
                             }
+                        }
+                    }
+                    if (blob.versusCounters != null)
+                    {
+                        foreach (var line in blob.versusCounters)
+                        {
+                            int split = line.IndexOf('=');
+                            if (split <= 0) continue;
+                            if (int.TryParse(line.Substring(0, split), out int metric) &&
+                                int.TryParse(line.Substring(split + 1), out int value))
+                            {
+                                s_versusCounters[(AchievementMetric)metric] = Mathf.Max(0, value);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // 対戦専用のカウンターが無い古いセーブ：今までの進捗をそのまま引き継ぐ
+                        foreach (var pair in s_counters)
+                        {
+                            s_versusCounters[pair.Key] = pair.Value;
+                        }
+                    }
+                    if (blob.storyChapters != null)
+                    {
+                        foreach (var chapter in blob.storyChapters)
+                        {
+                            if (!string.IsNullOrEmpty(chapter)) s_clearedStoryChapters.Add(chapter);
                         }
                     }
                     if (blob.characters != null)
@@ -582,6 +679,8 @@ namespace Yurube.Achievements
         static void ResetState()
         {
             s_counters.Clear();
+            s_versusCounters.Clear();
+            s_clearedStoryChapters.Clear();
             s_usedCharacters.Clear();
             s_winStreak = 0;
             foreach (var data in s_all)
@@ -631,6 +730,8 @@ namespace Yurube.Achievements
         {
             Initialize();
             s_counters.Clear();
+            s_versusCounters.Clear();
+            s_clearedStoryChapters.Clear();
             s_usedCharacters.Clear();
             s_winStreak = 0;
             RefreshAll();

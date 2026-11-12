@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 using UnityEngine.UI;
 
@@ -29,6 +30,7 @@ namespace Yurube.Story
         RectTransform m_canvas;
         RawImage m_view;
         CanvasGroup m_fadeGroup, m_titleGroup, m_captionGroup, m_hintGroup;
+        RectTransform m_hintPlate;
         TextMeshProUGUI m_titleMain, m_titleSub, m_caption;
 
         Material m_wallMat, m_floorMat, m_woodMat, m_whiteMat, m_inkMat;
@@ -46,8 +48,23 @@ namespace Yurube.Story
         }
         readonly List<Member> m_members = new List<Member>();
 
-        bool m_built, m_visible, m_conversation, m_skipped, m_sunset;
-        float m_time, m_conversationStart;
+        bool m_built, m_visible, m_skipped, m_sunset;
+        bool m_opening, m_advance;
+        float m_time;
+
+        // 台本（タイトルのムービーと同じ書き方）
+        System.Func<float, Vector3> m_camPos, m_camLook;
+        float m_shotStart, m_shotFov = 42f;
+        float m_shift, m_baseScale = 1f;
+        float m_camShake, m_fovPunch;
+
+        // ポストプロセス（回想・シネマ調）
+        Volume m_volume;
+        VolumeProfile m_profile;
+        ColorAdjustments m_ca;
+        Vignette m_vig;
+        Bloom m_bloom;
+        bool m_memory, m_cinema;
 
         //========================================
         // 作る
@@ -77,12 +94,15 @@ namespace Yurube.Story
             BuildLights();
             BuildDust();
             BuildCamera();
+            BuildPost();
             BuildScreen();
             Hide();
         }
 
         void OnDestroy()
         {
+            if (m_camera != null) m_camera.targetTexture = null;
+            RenderTexture.active = null;
             if (m_rt != null)
             {
                 m_rt.Release();
@@ -91,6 +111,8 @@ namespace Yurube.Story
             if (m_root != null) Destroy(m_root.gameObject);
             if (m_camera != null) Destroy(m_camera.gameObject);
             if (m_screen != null) Destroy(m_screen);
+            if (m_volume != null) Destroy(m_volume.gameObject);
+            if (m_profile != null) Destroy(m_profile);
         }
 
         //========================================
@@ -293,17 +315,19 @@ namespace Yurube.Story
 
         void BuildProps()
         {
-            // 白板（左の壁）
+            // 白板（左の壁）。練習メニューを書いておく
             Box("BoardFrame", new Vector3(-5.87f, 2.55f, 0.3f), new Vector3(0.05f, 2.0f, 3.8f), m_inkMat);
             Box("Board", new Vector3(-5.83f, 2.55f, 0.3f), new Vector3(0.06f, 1.9f, 3.6f), m_whiteMat);
-            var blue = Unlit(new Color(0.16f, 0.32f, 0.75f));
-            var red = Unlit(new Color(0.82f, 0.16f, 0.12f));
-            for (int i = 0; i < 6; i++)
-            {
-                float len = 1.1f + (i * 0.37f) % 1.4f;
-                Box("BoardLine" + i, new Vector3(-5.79f, 3.25f - i * 0.27f, -1.0f + (i % 2) * 0.3f),
-                    new Vector3(0.01f, 0.035f, len), i == 0 ? red : blue);
-            }
+            // TMPの3D文字はfontSize 1 ≈ 0.1m なので、白板に読める大きさにするには3前後必要
+            var boardText = TitleDressingKit.Text(m_root, PresentationSettings.DefaultFont,
+                "練習メニュー\n素振り1000回\n積み上げ100段\n走り込み！",
+                new Vector3(-5.79f, 2.55f, 0.3f), new Vector2(3.35f, 1.62f), 3.0f,
+                new Color(0.1f, 0.11f, 0.18f), new Color(0.1f, 0.11f, 0.18f), 0.01f, 0f);
+            boardText.transform.localPosition = new Vector3(-5.79f, 2.55f, 0.3f);
+            boardText.transform.localRotation = Quaternion.Euler(0f, -90f, 0f);
+            boardText.textWrappingMode = TextWrappingModes.Normal;
+            boardText.alignment = TextAlignmentOptions.TopLeft;
+            boardText.lineSpacing = 8f;
 
             // 部旗（奥の壁）
             Box("Banner", new Vector3(-1.5f, 3.55f, 4.84f), new Vector3(1.1f, 2.2f, 0.04f), Unlit(new Color(0.78f, 0.14f, 0.12f)));
@@ -508,7 +532,33 @@ namespace Yurube.Story
 
             var data = go.GetComponent<UniversalAdditionalCameraData>();
             if (data == null) data = go.AddComponent<UniversalAdditionalCameraData>();
-            data.renderPostProcessing = false;
+            data.renderPostProcessing = true;
+        }
+
+        // ムービーのためだけの Volume（回想のセピア・タイトルのシネマ調）。
+        // 使わないときは GameObject ごと消しておくので、試合中の見た目には影響しない。
+        void BuildPost()
+        {
+            var go = new GameObject("StoryMoviePost");
+            m_volume = go.AddComponent<Volume>();
+            m_volume.isGlobal = true;
+            m_volume.priority = 1000f;
+
+            m_profile = ScriptableObject.CreateInstance<VolumeProfile>();
+            m_ca = m_profile.Add<ColorAdjustments>(true);
+            m_vig = m_profile.Add<Vignette>(true);
+            m_bloom = m_profile.Add<Bloom>(true);
+
+            m_ca.postExposure.overrideState = true;
+            m_ca.contrast.overrideState = true;
+            m_ca.saturation.overrideState = true;
+            m_ca.colorFilter.overrideState = true;
+            m_vig.intensity.overrideState = true;
+            m_vig.color.overrideState = true;
+            m_bloom.intensity.overrideState = true;
+
+            m_volume.sharedProfile = m_profile;
+            go.SetActive(false);
         }
 
         void BuildScreen()
@@ -549,16 +599,20 @@ namespace Yurube.Story
             ToyKit.Anchor(m_caption.rectTransform, new Vector2(0f, 0f), new Vector2(64f, 112f), new Vector2(1000f, 44f));
             m_captionGroup = m_caption.gameObject.AddComponent<CanvasGroup>();
 
-            // スキップの案内
+            // スキップの案内（会話・実績と同じ表記）
             var hintPlate = ToyKit.UIRounded("MovieHint", m_canvas, new Color(0.05f, 0.04f, 0.03f, 0.72f), 14f);
             hintPlate.pivot = new Vector2(1f, 0f);
-            ToyKit.Anchor(hintPlate, new Vector2(1f, 0f), new Vector2(-32f, 112f), new Vector2(300f, 50f));
+            ToyKit.Anchor(hintPlate, new Vector2(1f, 0f), new Vector2(-32f, 112f), new Vector2(540f, 50f));
+            m_hintPlate = hintPlate;
             m_hintGroup = hintPlate.gameObject.AddComponent<CanvasGroup>();
-            var hint = ToyKit.UIText("Text", hintPlate, font, "A：スキップ", 26f, Color.white);
+            var hint = ToyKit.UIText("Text", hintPlate, font, StoryText.Hint, 24f, Color.white);
             ToyKit.Stretch(hint.rectTransform);
             hint.alignment = TextAlignmentOptions.Right;
             hint.rectTransform.offsetMin = new Vector2(12f, 0f);
             hint.rectTransform.offsetMax = new Vector2(-12f, 0f);
+            hint.ForceMeshUpdate();
+            // 文字の幅に合わせて背景を縮める
+            m_hintPlate.sizeDelta = new Vector2(Mathf.Clamp(hint.preferredWidth + 28f, 260f, 540f), 50f);
 
             // タイトル
             var cardGo = new GameObject("TitleCard", typeof(RectTransform));
@@ -608,9 +662,15 @@ namespace Yurube.Story
         public void Hide()
         {
             m_visible = false;
-            m_conversation = false;
+            m_opening = false;
+            m_advance = false;
+            m_baseScale = 1f;
+            SetMemory(false);
+            SetCinema(false);
             if (m_screen != null) m_screen.SetActive(false);
             if (m_camera != null) m_camera.enabled = false;
+            // 画面に直接描いていないことを保証する（撮影用の RenderTexture はそのまま）
+            RenderTexture.active = null;
         }
 
         public void SetBlack()
@@ -622,12 +682,20 @@ namespace Yurube.Story
         public void ShowConversation(bool sunset)
         {
             Show();
-            m_conversation = true;
-            m_conversationStart = m_time;
+            m_opening = false;
+            m_advance = false;
+            m_baseScale = 1f;
             SetSunset(sunset);
+            SetCinema(true);
             SetCaption(false);
             SetTitle(false);
             SetHint(false);
+
+            // 会話中は、部員たちを写したまま、ゆっくり深呼吸するようにカメラを動かす
+            SetShot(
+                lt => P(0.1f + 0.09f * Mathf.Sin(lt * 0.11f), 1.85f, -4.6f + 0.05f * Mathf.Sin(lt * 0.07f)),
+                lt => P(0f, 0.55f, 2.2f),
+                42f);
         }
 
         public IEnumerator FadeIn(float duration)
@@ -644,7 +712,7 @@ namespace Yurube.Story
         {
             if (m_fadeGroup == null) yield break;
             float from = m_fadeGroup.alpha;
-            for (float t = 0f; t < 1f; t += Time.unscaledDeltaTime / Mathf.Max(0.01f, duration))
+            for (float t = 0f; t < 1f; t += RealDt / Mathf.Max(0.01f, duration))
             {
                 m_fadeGroup.alpha = Mathf.Lerp(from, target, Mathf.Clamp01(t));
                 yield return null;
@@ -652,85 +720,188 @@ namespace Yurube.Story
             m_fadeGroup.alpha = target;
         }
 
-        // オープニング（A / B で飛ばせる）
-        public IEnumerator PlayOpening()
+        //========================================
+        // 台本（タイトルのムービーと同じ書き方）
+        //========================================
+
+        float RealDt => Time.unscaledDeltaTime;
+
+        // カットのカメラ。lt（カット開始からの経過）を受け取って位置・注視点を返す
+        void SetShot(System.Func<float, Vector3> pos, System.Func<float, Vector3> look, float fov)
         {
-            m_time = 0f;
-            m_skipped = false;
-            m_conversation = false;
-            Show();
-            m_fadeGroup.alpha = 1f;
-            SetCaption(false);
-            SetTitle(false);
-            SetHint(true);
-            yield return FadeTo(0f, 0.5f);
-            SetCaption(true);
+            m_camPos = pos;
+            m_camLook = look;
+            m_shotStart = m_time;
+            m_shotFov = fov;
+        }
 
-            // 1. 部室の全景
-            yield return Shot(4.0f, () => P(0f, 1.95f, -4.7f + m_time * 0.10f), () => P(0f, 0.55f, 2.4f), 42f);
-            if (m_skipped) { yield return FinishOpening(); yield break; }
+        // A：つぎへ（次のカットへ進む）
+        IEnumerator At(float time)
+        {
+            while (m_time < time + m_shift && !m_skipped && !m_advance) yield return null;
+            m_advance = false;
+        }
 
-            // 2. 窓と、片目のだるま
-            yield return Shot(4.0f, () => P(1.1f, 2.05f, 1.9f + (m_time - 4f) * 0.05f), () => P(2.3f, 2.0f, 4.8f), 34f);
-            if (m_skipped) { yield return FinishOpening(); yield break; }
-
-            // 3. 白板と練習メニュー
-            yield return Shot(4.0f, () => P(-2.5f + (m_time - 8f) * 0.06f, 2.15f, 1.9f), () => P(-5.7f, 2.45f, 0.4f), 38f);
-            if (m_skipped) { yield return FinishOpening(); yield break; }
-
-            // 4. 部員たち → 暗転 → タイトル
-            SetCaption(false);
-            yield return Shot(3.4f, () => P(0.1f, 1.8f, -4.3f + (m_time - 12f) * 0.02f), () => P(0f, 0.5f, 2.2f), 42f);
-            yield return FadeTo(1f, 0.5f);
-            SetTitle(true);
-            yield return Hold(2.2f);
-            SetTitle(false);
-            ShowConversation(false);
-            yield return FadeTo(0f, 0.6f);
+        IEnumerator Tween(float duration, System.Action<float> step)
+        {
+            float start = m_time;
+            while (m_time < start + duration && !m_skipped && !m_advance)
+            {
+                step(Mathf.Clamp01((m_time - start) / duration));
+                yield return null;
+            }
+            if (!m_skipped && !m_advance) step(1f);
+            m_advance = false;
         }
 
         IEnumerator Hold(float seconds)
         {
             float end = m_time + seconds;
-            while (m_time < end)
+            while (m_time < end && !m_skipped && !m_advance) yield return null;
+            m_advance = false;
+        }
+
+        // 台本の時計だけを遅くする（ゲームの Time.timeScale は触らない：会話中は 0 のため）
+        IEnumerator SlowMo(float scale, float holdReal)
+        {
+            m_baseScale = scale;
+            for (float t = 0f; t < holdReal; t += Time.unscaledDeltaTime)
             {
-                if (MenuInput.Submit() || MenuInput.Cancel() || MenuInput.AnyClick()) yield break;
+                if (!m_opening) yield break;
                 yield return null;
             }
+            for (float t = 0f; t < 0.3f; t += Time.unscaledDeltaTime)
+            {
+                m_baseScale = Mathf.Lerp(scale, 1f, t / 0.3f);
+                yield return null;
+            }
+            m_baseScale = 1f;
+        }
+
+        // オープニング（A：つぎへ / B：スキップ）
+        public IEnumerator PlayOpening()
+        {
+            m_time = 0f;
+            m_shift = 0f;
+            m_skipped = false;
+            m_advance = false;
+            m_baseScale = 1f;
+            m_opening = true;
+            Show();
+            m_fadeGroup.alpha = 1f;
+            SetCaption(false);
+            SetTitle(false);
+            SetHint(true);
+            SetMemory(false);
+            SetCinema(false);
+            // フェードインの前から、最初のカットのカメラにしておく（原点の映像を見せない）
+            SetShot(lt => P(0f, 2.0f - lt * 0.05f, -4.8f + lt * 0.15f), lt => P(0f, 0.65f, 2.4f), 44f);
+            yield return FadeTo(0f, 0.5f);
+            SetCaption(true);
+
+            // 1. 部室の全景
+            yield return At(4.0f);
+            if (m_skipped) { yield return FinishOpening(); yield break; }
+
+            // 2. 窓と、片目のだるま
+            SetShot(lt => P(1.0f, 2.15f, 1.6f + lt * 0.12f), lt => P(2.3f, 2.05f, 4.8f), 36f);
+            yield return At(8.0f);
+            if (m_skipped) { yield return FinishOpening(); yield break; }
+
+            // 3. 回想：片目のだるま（セピア・スロー）
+            SetMemory(true);
+            m_camShake = 0.12f;
+            StartCoroutine(SlowMo(0.35f, 1.0f));
+            SetShot(lt => P(2.65f, 1.76f, 3.55f - lt * 0.05f), lt => P(2.65f, 1.64f, 4.5f), 28f);
+            yield return At(11.2f);
+            SetMemory(false);
+            if (m_skipped) { yield return FinishOpening(); yield break; }
+
+            // 4. 白板と練習メニュー
+            SetShot(lt => P(-2.4f - lt * 0.05f, 2.2f, 1.8f), lt => P(-5.7f, 2.5f, 0.4f), 38f);
+            yield return At(15.2f);
+            if (m_skipped) { yield return FinishOpening(); yield break; }
+
+            // 5. 部員たち → 暗転 → タイトル
+            SetCaption(false);
+            SetCinema(true);
+            SetShot(lt => P(0.1f, 1.85f - lt * 0.03f, -4.4f + lt * 0.12f), lt => P(0f, 0.5f, 2.2f), 43f);
+            yield return At(19.4f);
+            if (m_skipped) { yield return FinishOpening(); yield break; }
+
+            yield return FadeTo(0.65f, 0.5f);
+            var card = (RectTransform)m_titleGroup.transform;
+            card.localScale = Vector3.one * 1.06f;
+            SetTitle(true);
+            yield return Tween(0.8f, u => card.localScale = Vector3.one * Mathf.Lerp(1.06f, 1f, u));
+            yield return Hold(1.4f);
+            SetTitle(false);
+            if (m_skipped) { yield return FinishOpening(); yield break; }
+
+            yield return FinishOpening();
         }
 
         IEnumerator FinishOpening()
         {
+            m_opening = false;
+            SetHint(false);
             SetCaption(false);
             SetTitle(false);
-            SetHint(false);
-            yield return FadeTo(1f, 0.3f);
+            SetMemory(false);
+            SetCinema(false);
+            m_baseScale = 1f;
+            m_advance = false;
+            yield return FadeTo(1f, 0.35f);
             ShowConversation(false);
-            yield return FadeTo(0f, 0.3f);
+            yield return FadeTo(0f, 0.6f);
+            m_skipped = false;
         }
 
-        IEnumerator Shot(float duration, System.Func<Vector3> pos, System.Func<Vector3> look, float fov)
+        //========================================
+        // ポストプロセス（回想・シネマ調）
+        //========================================
+
+        void SetMemory(bool on)
         {
-            float end = m_time + duration;
-            while (m_time < end && m_visible)
+            m_memory = on;
+            ApplyLook();
+        }
+
+        void SetCinema(bool on)
+        {
+            m_cinema = on;
+            ApplyLook();
+        }
+
+        void ApplyLook()
+        {
+            if (m_volume == null || m_ca == null) return;
+            bool on = m_memory || m_cinema;
+            if (m_volume.gameObject.activeSelf != on) m_volume.gameObject.SetActive(on);
+            if (!on) return;
+
+            if (m_memory)
             {
-                if (MenuInput.Submit() || MenuInput.Cancel() || MenuInput.AnyClick())
-                {
-                    m_skipped = true;
-                    yield break;
-                }
-                ApplyCamera(pos(), look(), fov);
-                yield return null;
+                // セピア：彩度を落として暖色の膜、周辺を暗く、光をにじませる
+                m_ca.saturation.value = -55f;
+                m_ca.contrast.value = -5f;
+                m_ca.postExposure.value = 0.2f;
+                m_ca.colorFilter.value = new Color(1f, 0.78f, 0.5f);
+                m_vig.intensity.value = 0.45f;
+                m_vig.color.value = new Color(0.25f, 0.15f, 0.08f);
+                m_bloom.intensity.value = 0.8f;
             }
-        }
-
-        void ApplyCamera(Vector3 pos, Vector3 look, float fov)
-        {
-            if (m_camera == null) return;
-            m_camera.transform.position = pos;
-            Vector3 dir = look - pos;
-            if (dir.sqrMagnitude > 0.0001f) m_camera.transform.rotation = Quaternion.LookRotation(dir);
-            m_camera.fieldOfView = fov;
+            else
+            {
+                // シネマ調：少しコントラストを上げて、周辺を軽く落とす
+                m_ca.saturation.value = -8f;
+                m_ca.contrast.value = 6f;
+                m_ca.postExposure.value = 0.05f;
+                m_ca.colorFilter.value = m_sunset ? new Color(1f, 0.84f, 0.68f) : Color.white;
+                m_vig.intensity.value = 0.32f;
+                m_vig.color.value = new Color(0.12f, 0.08f, 0.06f);
+                m_bloom.intensity.value = 0.35f;
+            }
         }
 
         void SetSunset(bool on)
@@ -746,6 +917,7 @@ namespace Yurube.Story
             if (m_fill != null) m_fill.intensity = on ? 4f : 6f;
             if (m_sunPatch != null)
                 m_sunPatch.sharedMaterial.SetColor("_BaseColor", on ? new Color(1f, 0.7f, 0.4f, 0.4f) : new Color(1f, 0.86f, 0.6f, 0.34f));
+            if (m_cinema) ApplyLook();
         }
 
         void SetCaption(bool on)
@@ -755,7 +927,9 @@ namespace Yurube.Story
 
         void SetTitle(bool on)
         {
-            if (m_titleGroup != null) m_titleGroup.alpha = on ? 1f : 0f;
+            if (m_titleGroup == null) return;
+            if (on) m_titleGroup.transform.SetAsLastSibling();   // 暗転より手前に出す
+            m_titleGroup.alpha = on ? 1f : 0f;
         }
 
         void SetHint(bool on)
@@ -766,15 +940,37 @@ namespace Yurube.Story
         void Update()
         {
             if (!m_visible) return;
-            m_time += Time.unscaledDeltaTime;
-            AnimateMembers();
-            if (m_conversation)
+
+            // ゲームを止めていても動くように unscaled。スローはこの時計にだけ掛ける
+            m_time += Time.unscaledDeltaTime * m_baseScale;
+
+            if (m_opening)
             {
-                float t = m_time - m_conversationStart;
-                var pos = P(0.1f + 0.09f * Mathf.Sin(t * 0.11f), 1.85f, -4.6f + 0.05f * Mathf.Sin(t * 0.07f));
-                var look = P(0f, 0.55f, 2.2f);
-                ApplyCamera(pos, look, 42f + 1.2f * Mathf.Sin(t * 0.05f));
+                // B：スキップ（ムービー全体）／A：つぎへ（次のカット）
+                if (MenuInput.Cancel()) m_skipped = true;
+                if (MenuInput.Submit() || MenuInput.Start() || MenuInput.AnyClick()) m_advance = true;
             }
+            else
+            {
+                m_advance = false;
+            }
+
+            AnimateMembers();
+
+            if (m_camera == null || m_camPos == null) return;
+            float lt = m_time - m_shotStart;
+            m_camShake = Mathf.MoveTowards(m_camShake, 0f, Time.unscaledDeltaTime * 2f);
+            var shake = Random.insideUnitSphere * m_camShake * 0.15f;
+            var pos = m_camPos(lt) + shake;
+            var look = m_camLook(lt) + shake * 0.5f;
+            Vector3 dir = look - pos;
+            if (dir.sqrMagnitude > 0.0001f)
+            {
+                m_camera.transform.position = pos;
+                m_camera.transform.rotation = Quaternion.LookRotation(dir);
+            }
+            m_fovPunch = Mathf.MoveTowards(m_fovPunch, 0f, Time.unscaledDeltaTime * 45f);
+            m_camera.fieldOfView = Mathf.Max(1f, m_shotFov - m_fovPunch);
         }
     }
 }

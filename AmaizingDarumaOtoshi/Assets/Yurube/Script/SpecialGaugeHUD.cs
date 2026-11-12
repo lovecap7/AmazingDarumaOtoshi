@@ -1,4 +1,5 @@
 using Nakahira;
+using UnityEngine;
 
 namespace Yurube
 {
@@ -9,6 +10,18 @@ namespace Yurube
     {
         // ストーリー用(Yurube): 会話中は描かない。SpecialGaugeHud が読む
         public static bool Suppressed;
+
+        // ストーリー用(Yurube): 序章の覚醒イベントまではゲージ自体を見せない。
+        // 第1章以降・通常対戦は最初から true。SpecialGaugeHud が読む
+        public static bool Visible = true;
+
+        // ドメインの再読み込みをしない設定でも、前の再生のフラグが残らないようにする
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetStatics()
+        {
+            Suppressed = false;
+            Visible = true;
+        }
 
         public static void Draw(SpecialGauge gauge, DarumaCharacter character, string statusOverride = null)
         {

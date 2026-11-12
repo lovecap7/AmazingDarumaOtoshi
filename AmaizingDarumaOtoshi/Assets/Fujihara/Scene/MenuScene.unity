@@ -229,7 +229,7 @@ MonoBehaviour:
     hammerOffset: {x: 0, y: -0.4, z: 0}
     titleInPanel: 1
   - kind: 8
-    label: "\u30B9\u30C8\u30FC\u30EA\u30FC\u30E2\u30FC\u30C9"
+    label: "\u3082\u306E\u304C\u305F\u308A"
     description: "\u90E8\u6D3B\u306E\u7269\u8A9E\u3092\n\u3042\u305D\u3076"
     help: "\u7AE0\u3054\u3068\u306E\u7DF4\u7FD2\u8A66\u5408\u3068\u4F1A\u8A71\u3092\u3042\u305D\u3073\u307E\u3059\u3002"
     hammerOffset: {x: 0, y: -0.35, z: 0}

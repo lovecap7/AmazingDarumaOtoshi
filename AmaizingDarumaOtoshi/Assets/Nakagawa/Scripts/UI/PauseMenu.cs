@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Nakahira;
 using TMPro;
 using UnityEngine;
@@ -18,8 +19,17 @@ namespace Nakagawa
         // ストーリー用(Yurube): 会話中はポーズ画面を出さない。
         // ストーリーの会話も DarumaMatch.Pause で試合を止めているので、そのときだけ画面を閉じておく。
         public static bool SuppressForStory;
+        // ストーリー用(Yurube): ストーリーの試合中か。項目を「再開／ストーリーを中断する」に変える
+        public static bool StoryMode;
 
-        enum Item { Resume, RuleSelect, Title }
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetStatics()
+        {
+            SuppressForStory = false;
+            StoryMode = false;
+        }
+
+        enum Item { Resume, RuleSelect, Title, StoryQuit }
 
         [Header("操作")]
         [SerializeField] Key m_keyboardPauseKey = Key.Tab;
@@ -27,6 +37,8 @@ namespace Nakagawa
         [Header("シーン")]
         [SerializeField] string m_selectSceneName = "SelectScene";
         [SerializeField] string m_titleSceneName = "TitleScene";
+        // ストーリーを中断したときの戻り先
+        [SerializeField] string m_storySceneName = "MenuScene";
 
         [Header("見た目(1920x1080 基準)")]
         [SerializeField] int m_sortingOrder = 40;
@@ -46,6 +58,8 @@ namespace Nakagawa
         TextMeshProUGUI m_tagText, m_confirmText;
         Image[] m_items, m_confirmItems;
         TextMeshProUGUI[] m_itemTexts, m_confirmTexts;
+        readonly List<Item> m_itemKinds = new List<Item>();
+        readonly List<string> m_itemNames = new List<string>();
         TMP_FontAsset m_font;
         Material m_letterMat, m_popMat;
 
@@ -54,6 +68,7 @@ namespace Nakagawa
         int m_index;
         int m_confirmIndex;
         bool m_confirming;
+        bool m_openConfirm;
         int m_openFrame;
         float m_openTime;
 
@@ -103,18 +118,21 @@ namespace Nakagawa
             foreach (var g in Gamepad.all)
             {
                 if (g.startButton.wasPressedThisFrame && TryPause(g)) return;
+                // ストーリー用(Yurube): Select でも中断メニューを開く
+                if (StoryMode && g.selectButton.wasPressedThisFrame && TryPause(g, confirm: true)) return;
             }
             var k = Keyboard.current;
             if (k != null && m_keyboardPauseKey != Key.None && k[m_keyboardPauseKey].wasPressedThisFrame) TryPause(k);
         }
 
         // 試合に出ている人の機器だけがポーズできる
-        private bool TryPause(InputDevice device)
+        private bool TryPause(InputDevice device, bool confirm = false)
         {
             var player = m_match.FindPlayer(device);
             if (player == null) return false;
             if (!m_match.Pause(player)) return false;
             m_device = device;
+            m_openConfirm = confirm;
             return true;
         }
 
@@ -127,10 +145,23 @@ namespace Nakagawa
             Color color = by != null ? by.Color : m_unknownPlayerColor;
             m_tag.color = color;
             m_tagText.text = by != null ? by.Label : "？";
-            m_index = (int)Item.Resume;
+            m_index = 0;
             m_confirming = false;
             m_openFrame = Time.frameCount;
             m_openTime = Time.unscaledTime;
+            // ストーリー用(Yurube): Select で開いたときは、そのまま中断の確認を出す
+            if (m_openConfirm && StoryMode)
+            {
+                int quit = m_itemKinds.IndexOf(Item.StoryQuit);
+                if (quit >= 0)
+                {
+                    m_index = quit;
+                    m_confirming = true;
+                    m_confirmIndex = 1;
+                    m_confirmText.text = "ストーリーを中断しますか？\n<size=70%>いまの試合は終わります</size>";
+                }
+            }
+            m_openConfirm = false;
             m_canvas.gameObject.SetActive(true);
             MenuSounds.Decide();
         }
@@ -148,7 +179,7 @@ namespace Nakagawa
                 }
                 if (PressedSubmit())
                 {
-                    if (m_confirmIndex == 0) Leave((Item)m_index);
+                    if (m_confirmIndex == 0) Leave(m_itemKinds[m_index]);
                     else CloseConfirm();
                 }
                 else if (PressedCancel()) CloseConfirm();
@@ -159,17 +190,20 @@ namespace Nakagawa
             if (Pressed(Dir.Down)) Move(1);
             if (PressedStart() || PressedCancel()) { Resume(); return; }
             if (!PressedSubmit()) return;
-            if (m_index == (int)Item.Resume) { Resume(); return; }
+            var selected = m_itemKinds[m_index];
+            if (selected == Item.Resume) { Resume(); return; }
             // 再開以外は確かめる(最初は「いいえ」)
             m_confirming = true;
             m_confirmIndex = 1;
-            m_confirmText.text = kItemNames[m_index] + "？\n<size=70%>いまの試合は終わります</size>";
+            m_confirmText.text = selected == Item.StoryQuit
+                ? "ストーリーを中断しますか？\n<size=70%>いまの試合は終わります</size>"
+                : m_itemNames[m_index] + "？\n<size=70%>いまの試合は終わります</size>";
             MenuSounds.Decide();
         }
 
         private void Move(int delta)
         {
-            m_index = (m_index + delta + kItemNames.Length) % kItemNames.Length;
+            m_index = (m_index + delta + m_itemKinds.Count) % m_itemKinds.Count;
             MenuSounds.Cursor();
         }
 
@@ -189,7 +223,13 @@ namespace Nakagawa
         private void Leave(Item item)
         {
             MenuSounds.Decide();
-            if (item == Item.RuleSelect)
+            if (item == Item.StoryQuit)
+            {
+                // ストーリーを中断してメインメニューへ（後始末は StoryMatchDirector.OnDestroy）
+                MatchSetup.Clear();
+                m_match.LeaveTo(m_storySceneName);
+            }
+            else if (item == Item.RuleSelect)
             {
                 MatchSelect.NextStartScreen = MatchSelect.StartScreen.Rule;
                 m_match.LeaveTo(m_selectSceneName);
@@ -304,14 +344,33 @@ namespace Nakagawa
             var title = Text("Title", m_panel, "ポーズ", 64.0f, Color.white, m_popMat);
             ToyKit.Anchor(title.rectTransform, new Vector2(0.5f, 1.0f), new Vector2(0.0f, -90.0f), new Vector2(560.0f, 80.0f));
 
-            m_items = new Image[kItemNames.Length];
-            m_itemTexts = new TextMeshProUGUI[kItemNames.Length];
-            for (int i = 0; i < kItemNames.Length; i++)
+            m_itemKinds.Clear();
+            m_itemNames.Clear();
+            // ストーリー用(Yurube): ストーリー中は「ルール選択に戻る」を出さず、中断だけにする
+            if (StoryMode)
+            {
+                m_itemKinds.Add(Item.Resume);
+                m_itemNames.Add("再開");
+                m_itemKinds.Add(Item.StoryQuit);
+                m_itemNames.Add("ストーリーを中断する");
+            }
+            else
+            {
+                for (int i = 0; i < kItemNames.Length; i++)
+                {
+                    m_itemKinds.Add((Item)i);
+                    m_itemNames.Add(kItemNames[i]);
+                }
+            }
+
+            m_items = new Image[m_itemKinds.Count];
+            m_itemTexts = new TextMeshProUGUI[m_itemKinds.Count];
+            for (int i = 0; i < m_itemKinds.Count; i++)
             {
                 var item = ToyKit.UIRounded($"Item{i}", m_panel, m_itemColor, 20.0f);
                 ToyKit.Anchor(item, new Vector2(0.5f, 1.0f), new Vector2(0.0f, -190.0f - i * 92.0f), new Vector2(480.0f, 76.0f));
                 m_items[i] = item.GetComponent<Image>();
-                m_itemTexts[i] = Text("Text", item, kItemNames[i], 36.0f, Color.white, m_letterMat);
+                m_itemTexts[i] = Text("Text", item, m_itemNames[i], 36.0f, Color.white, m_letterMat);
                 ToyKit.Stretch(m_itemTexts[i].rectTransform);
             }
 

@@ -119,6 +119,11 @@ namespace Nakahira
 
         public static Color ColorFor(MatchSetup.Entry e) => e.isCpu ? CpuColor : PlayerColors[e.playerIndex % PlayerColors.Length];
 
+        // ストック数。Entry に個別の指定があればそれを優先する（ストーリーのチュートリアル用）
+        int StocksFor(MatchSetup.Entry entry) =>
+            Mode != MatchSetup.MatchMode.Stock ? -1
+            : Mathf.Max(1, entry != null && entry.stocks > 0 ? entry.stocks : Rules.stocks);
+
         // 直接再生の試合をやり直す直前(ステージをまとめたシーンで、今のステージを覚えておく等)
         public static event Action BeforeRestart;
 
@@ -343,7 +348,7 @@ namespace Nakahira
                     cpuNumber = m_dummyCount > 1 ? i + 1 : 0,
                 };
                 var p = new GameObject().AddComponent<MatchPlayer>();
-                p.Setup(entry, ColorFor(entry), null, Mode == MatchSetup.MatchMode.Stock ? Mathf.Max(1, Rules.stocks) : -1);
+                p.Setup(entry, ColorFor(entry), null, StocksFor(entry));
                 p.name += "_Dummy";
                 m_players.Add(p);
                 SpawnMatchCharacter(p, InitialSpawnPoint(m_players.Count - 1), false);
@@ -362,7 +367,7 @@ namespace Nakahira
                 var cpu = go.AddComponent<DarumaCpu>();
                 cpu.Params = m_cpuParams;
                 var p = go.AddComponent<MatchPlayer>();
-                p.Setup(entry, ColorFor(entry), cpu, Mode == MatchSetup.MatchMode.Stock ? Mathf.Max(1, Rules.stocks) : -1);
+                p.Setup(entry, ColorFor(entry), cpu, StocksFor(entry));
                 m_players.Add(p);
                 SpawnMatchCharacter(p, InitialSpawnPoint(m_players.Count - 1), false);
             }
@@ -391,7 +396,7 @@ namespace Nakahira
             };
 
             var p = player.gameObject.AddComponent<MatchPlayer>();
-            p.Setup(entry, ColorFor(entry), player.GetComponent<IDarumaCommandSource>(), Mode == MatchSetup.MatchMode.Stock ? Mathf.Max(1, Rules.stocks) : -1);
+            p.Setup(entry, ColorFor(entry), player.GetComponent<IDarumaCommandSource>(), StocksFor(entry));
             player.OnRegistered(this, p);
             m_players.Add(p);
             SpawnMatchCharacter(p, FarthestSpawnPoint(p), false);
@@ -517,7 +522,7 @@ namespace Nakahira
             }
 
             var p = go.AddComponent<MatchPlayer>();
-            p.Setup(e, ColorFor(e), source, Mode == MatchSetup.MatchMode.Stock ? Mathf.Max(1, Rules.stocks) : -1);
+            p.Setup(e, ColorFor(e), source, StocksFor(e));
             return p;
         }
 
@@ -995,7 +1000,7 @@ namespace Nakahira
         public void AddNetPlayer(MatchPlayer p, MatchSetup.Entry entry, IDarumaCommandSource source)
         {
             if (m_net == null || m_players.Contains(p)) return;
-            p.Setup(entry, ColorFor(entry), source, Mode == MatchSetup.MatchMode.Stock ? Mathf.Max(1, Rules.stocks) : -1);
+            p.Setup(entry, ColorFor(entry), source, StocksFor(entry));
             m_players.Add(p);
             m_players.Sort((a, b) => a.Index.CompareTo(b.Index));
             SpawnMatchCharacter(p, FarthestSpawnPoint(p), false);

@@ -1,3 +1,4 @@
+using System;
 using Nakahira;
 using UnityEngine;
 using Yurube.Achievements;
@@ -20,6 +21,12 @@ namespace Yurube
         int m_lastYellow;
         bool m_adding;
         bool m_reportedPassive;
+
+        // ストーリー用(Yurube): 黄色の追加分が積まれた（「あっ、増えた！」の初回判定に使う）
+        public static event Action<DarumaCharacter> ExtraAdded;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetStatics() => ExtraAdded = null;
 
         private void Awake()
         {
@@ -71,6 +78,7 @@ namespace Yurube
             m_lastYellow = CountYellow();
 
             if (m_logExtra) Debug.Log($"[きだる] 黄色を積んだので1個追加 (合計 {stack.Count}段)");
+            ExtraAdded?.Invoke(m_character);
             if (!m_reportedPassive)
             {
                 m_reportedPassive = true;

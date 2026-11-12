@@ -17,7 +17,7 @@ namespace Yurube.Achievements
     public class AchievementResultPresenter : MonoBehaviour
     {
         // 右下の操作説明（リザルト画面の「A：つぎへ」と同じ位置・大きさ）
-        const string HintText = "A：つぎへ　B：スキップ";
+        const string HintText = Yurube.Story.StoryText.Hint;
 
         // カードの大きさと、右端からの位置（リザルト画面の UI と同じ 1920×1080 の座標）
         const float CardW = 820f, CardH = 520f;
@@ -369,29 +369,18 @@ namespace Yurube.Achievements
             int total = Mathf.Max(1, AchievementManager.All.Count);
             int to = AchievementManager.UnlockedCount;
             int from = Mathf.Clamp(to - shownCount, 0, to);
-            // ゲージと一緒に、右側の数も from から to まで増えていく
-            SetProgressText(from, from, total);
+            // 最初から「更新前 → 更新後」を出す（一瞬「12/39 → 12/39」にならないように）
+            SetProgressText(from, to, total);
 
             m_progressGroup.alpha = 0f;
             SetGauge((float)from / total);
             yield return FadeGroup(m_progressGroup, 0f, 1f, 0.2f);
 
-            int last = from;
             for (float t = 0f; t < 1f; t += Time.unscaledDeltaTime / Mathf.Max(0.2f, ProgressSeconds))
             {
                 float u = Mathf.Clamp01(t);
                 float eased = Mathf.SmoothStep(0f, 1f, u);
                 SetGauge(Mathf.Lerp((float)from / total, (float)to / total, eased));
-                // 数字は1つずつ増える（増えた瞬間に少しだけ弾ませる）
-                int count = Mathf.RoundToInt(Mathf.Lerp(from, to, eased));
-                if (count != last)
-                {
-                    last = count;
-                    SetProgressText(from, count, total);
-                    m_progressLabel.rectTransform.localScale = Vector3.one * 1.06f;
-                }
-                m_progressLabel.rectTransform.localScale = Vector3.MoveTowards(
-                    m_progressLabel.rectTransform.localScale, Vector3.one, Time.unscaledDeltaTime * 0.6f);
                 yield return null;
             }
             SetGauge((float)to / total);
