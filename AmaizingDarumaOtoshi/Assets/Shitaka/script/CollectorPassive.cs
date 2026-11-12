@@ -8,6 +8,9 @@ public class CollectorPassive : MonoBehaviour
 {
     BlockController owner;
     Collider myCollider;
+    Rigidbody ownerRb;
+    float originalMass;                 // :元の質量
+    const float HeavyMultiplier = 10f;  // 止まっている間の質量の倍率
     float range;
     float strength;         // 引き寄せる加速度
     float edgeRatio;        // 範囲の端での強さ(本体のすぐ近くを1とした割合)
@@ -35,6 +38,8 @@ public class CollectorPassive : MonoBehaviour
         p.edgeRatio = edgeRatio;
         p.collectDistance = collectDistance;
         p.flyingPullRatio = flyingPullRatio;
+        p.ownerRb = owner.GetComponent<Rigidbody>();
+        p.originalMass = p.ownerRb.mass;
         return p;
     }
 
@@ -42,20 +47,23 @@ public class CollectorPassive : MonoBehaviour
 
     void FixedUpdate()
     {
-        // テスト用:1秒に1回だけログを出す
-        bool log = Time.time >= debugNextLogTime;
-        if (log) debugNextLogTime = Time.time + 1f;
-
         if (owner == null)
         {
-            if (log) Debug.Log("[Collector] ownerがnull", this);
+            //if (log) Debug.Log("[Collector] ownerがnull", this);
             return;
+        }
+
+        // 止まっている間だけ重くして、押されても動きにくくする。
+        // 飛行中は元の質量に戻すので、打ち出しの挙動は変わらない
+        if (ownerRb != null)
+        {
+            ownerRb.mass = owner.isFlying ? originalMass : originalMass * HeavyMultiplier;
         }
 
         // 本体が飛んでいる間は働かない
         if (owner.isFlying)
         {
-            if (log) Debug.Log("[Collector] 本体が飛行中のため停止", this);
+            //if (log) Debug.Log("[Collector] 本体が飛行中のため停止", this);
             return;
         }
 
@@ -63,7 +71,7 @@ public class CollectorPassive : MonoBehaviour
         var handled = new HashSet<BlockController>();
         var cols = Physics.OverlapSphere(center, range);
 
-        if (log) Debug.Log($"[Collector] 範囲内のコライダー数: {cols.Length} range={range} strength={strength}", this);
+        //if (log) Debug.Log($"[Collector] 範囲内のコライダー数: {cols.Length} range={range} strength={strength}", this);
 
         foreach (var col in cols)
         {
@@ -80,7 +88,7 @@ public class CollectorPassive : MonoBehaviour
             float dyDiff = Mathf.Abs(col.bounds.center.y - myCollider.bounds.center.y);
             if (dyDiff > col.bounds.extents.y)
             {
-                if (log) Debug.Log($"[Collector] 高さ判定で除外: {col.name} dy={dyDiff} 許容={col.bounds.extents.y}", this);
+                //if (log) Debug.Log($"[Collector] 高さ判定で除外: {col.name} dy={dyDiff} 許容={col.bounds.extents.y}", this);
                 continue;
             }
 
@@ -91,7 +99,7 @@ public class CollectorPassive : MonoBehaviour
             Vector3 dir = toCenter / dist;
             float falloff = Falloff(dist);
 
-            if (log) Debug.Log($"[Collector] 対象: {col.name} dist={dist:F2} falloff={falloff:F2} rb={(col.attachedRigidbody != null)} flying={block.isFlying}", this);
+            //if (log) Debug.Log($"[Collector] 対象: {col.name} dist={dist:F2} falloff={falloff:F2} rb={(col.attachedRigidbody != null)} flying={block.isFlying}", this);
 
             if (block.isFlying)
             {
