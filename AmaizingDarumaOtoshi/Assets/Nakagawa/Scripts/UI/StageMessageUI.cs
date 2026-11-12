@@ -27,6 +27,7 @@ namespace Nakagawa
             public float Time, Duration;
             public float Y;
             public float Height;
+            public int Id;
         }
 
         static StageMessageUI s_instance;
@@ -36,19 +37,32 @@ namespace Nakagawa
         readonly List<Message> m_messages = new List<Message>();
 
         // 文章を画面に出す。size: 文字の大きさの倍率、duration: 出しておく時間(秒)
-        public static void Show(string text, Color color, float size = 1.0f, float duration = 2.0f)
+        // 戻り値: 出した文章の番号(Hide で途中で消すのに使う。出さなかったら 0)
+        public static int Show(string text, Color color, float size = 1.0f, float duration = 2.0f)
         {
-            if (string.IsNullOrEmpty(text)) return;
+            if (string.IsNullOrEmpty(text)) return 0;
             // ネット対戦用(suehara): クライアントで二重に出さない / ホストで出した文章をクライアントにも送る(GimmickNet)
-            if (GimmickNet.Muted) return;
+            if (GimmickNet.Muted) return 0;
             if (GimmickNet.Relaying) GimmickNet.MessageSent?.Invoke(text, color, size, duration);
             if (s_instance == null)
             {
                 var go = new GameObject("StageMessageUI");
                 s_instance = go.AddComponent<StageMessageUI>();
             }
-            s_instance.Add(text, color, size, duration);
+            return s_instance.Add(text, color, size, duration);
         }
+
+        // Show で出した文章を、待たずに消す(すぐに消え始める)。もう消えていれば何もしない
+        public static void Hide(int id)
+        {
+            if (id == 0 || s_instance == null) return;
+            foreach (var m in s_instance.m_messages)
+            {
+                if (m.Id == id) m.Duration = Mathf.Min(m.Duration, m.Time + kFadeTime);
+            }
+        }
+
+        static int s_nextId;
 
         private void Awake()
         {
@@ -64,7 +78,7 @@ namespace Nakagawa
             if (m_letterMat != null) Destroy(m_letterMat);
         }
 
-        void Add(string text, Color color, float size, float duration)
+        int Add(string text, Color color, float size, float duration)
         {
             // 多すぎたら一番古いものを消す
             while (m_messages.Count >= kMaxMessages)
@@ -98,9 +112,10 @@ namespace Nakagawa
             bar.sizeDelta = new Vector2(14.0f, 0.0f);
             bar.anchoredPosition = new Vector2(22.0f, 0.0f);
 
-            var m = new Message { Root = root, Group = group, Duration = Mathf.Max(0.5f, duration), Y = -kTopOffset + 30.0f, Height = boxSize.y };
+            var m = new Message { Root = root, Group = group, Duration = Mathf.Max(0.5f, duration), Y = -kTopOffset + 30.0f, Height = boxSize.y, Id = ++s_nextId };
             m_messages.Insert(0, m);
             Layout(true);
+            return m.Id;
         }
 
         private void Update()

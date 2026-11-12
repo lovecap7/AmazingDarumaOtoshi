@@ -157,6 +157,8 @@ namespace Nakahira
         public float MoveSpeed => Mathf.Max(m_minMoveSpeed, m_baseMoveSpeed - m_stack.Count * m_speedLossPerBlock);
         public JumpParams JumpParams => m_jumpParams;
         public DarumaHammer Hammer => m_hammer;
+        // ステージのギミック用(Nakagawa): 今の操作命令の供給元(読むだけ)。止めている間(SetSuspended)にギミックが入力を読むのに使う
+        public IDarumaCommandSource CommandSource => m_commandSource;
         // ヒットストップ中は1未満(移動・落下・ハンマーがスローになる)
         public float LocalTimeScale => Mathf.Max(0.01f, m_hitStop.TimeScale);
 

@@ -1,0 +1,686 @@
+using System;
+using UnityEngine;
+
+namespace Nakahira
+{
+    // ギミック(風・バンパー・回転台・重力エリア等)から影響を受けるもの
+    // ギミックは影響を毎ステップ要求し直す。要求は溜めておき、受ける側の次のFixedUpdateでまとめて反映する
+    // (新しいギミックはこれらの組み合わせで作れるので、キャラクター・積み木側を変更する必要はない)
+    public interface IGimmickAffectable
+    {
+        Rigidbody Rigidbody { get; }
+        // 影響を受けられる状態か(積まれている積み木・脱落済みなどはfalse)
+        bool CanBeAffected { get; }
+        // 足場ごと運ぶ(回転台など)。今の移動方向・速さはそのままに、このステップだけ足場の動きを加算する
+        // 溜め込まれず、要求をやめると足場の動きの分だけ止まる
+        void AddCarryVelocity(Vector3 velocity);
+        // 足場ごと回す(回転台など)。このステップで足場が水平に回った角度(度。上から見て時計回りが正)
+        // 向きをどう扱うかは受ける側が決める(積み木は向きと進む方向が回る。プレイヤーは入力で向きを決めるので回らない)
+        void AddCarryRotation(float yawDegrees);
+        // 力を加える(加速度 m/s²。風など)。今の速度に加算され続け、慣性が残る
+        void AddForce(Vector3 acceleration);
+        // はじく(瞬間的に速度を与える)
+        void AddKnockback(Vector3 velocity);
+        // このステップの重力の倍率。複数のギミックから要求されたら一番小さい値を使う
+        void RequestGravityScale(float scale);
+        // 今の水平方向の速度(加速床などが速さを調べるのに使う。キャラクターは速さの倍率を掛ける前の速度)
+        Vector3 HorizontalVelocity { get; }
+        // このステップの水平の速さの倍率(加速床・減速床など)。向きはそのまま。複数のギミックから要求されたら掛け合わせる
+        // 積み木は速さそのものが変わって残る。キャラクターは移動入力で毎ステップ速さが決まるので、このステップの速度にだけ掛かる
+        void RequestSpeedScale(float scale);
+        // 瞬間移動する(ワープなど)。速さはそのままで、向きと進む方向を水平に yawDegrees だけ回す(上から見て時計回りが正)
+        void Teleport(Vector3 position, float yawDegrees);
+        // ヒットストップ(このものだけスローになり、見た目が震える)
+        void StartHitStop(float duration, float timeScale, float shake);
+        // 一時的にその場で止め、当たり判定をなくす(ワープで移動している間など)。止めている間は CanBeAffected が false になる
+        // 速さ・向き・状態(飛んでいる・攻撃判定・持ち主)は保ち、解除すると止めた時の続きから動く
+        void SetSuspended(bool suspended);
+    }
+
+    // 脱落の原因(演出・ルールの分岐用)
+    public enum EliminationCause
+    {
+        Other,
+        // 奈落に落ちた
+        Fall,
+        // 飛んできた積み木が頭に当たった
+        Projectile,
+        // 首だけのときにハンマーで叩かれた
+        Hammer,
+    }
+
+    // 積み木に上から乗って拾ったときの情報(DarumaCharacter.AnyPickedUp)
+    public readonly struct TumikiPickupInfo
+    {
+        public readonly DarumaCharacter Character;
+        public readonly TumikiBlock Block;
+        // 拾う直前に攻撃判定があったか(飛んできた積み木を踏んで止めた)
+        public readonly bool WasHarmful;
+        // 拾う直前の積み木の速さ
+        public readonly float Speed;
+        // 拾って段が増えたか(上限で古い段がこぼれた・パッシブで外された「入れ替え」なら false)
+        public readonly bool StackGrew;
+
+        public TumikiPickupInfo(DarumaCharacter character, TumikiBlock block, bool wasHarmful, float speed, bool stackGrew = true)
+        {
+            Character = character;
+            Block = block;
+            WasHarmful = wasHarmful;
+            Speed = speed;
+            StackGrew = stackGrew;
+        }
+    }
+
+    // 生存キャラクター(だるま)。移動・ジャンプ・積み木の取得・被弾・脱落を担当する
+    // 操作は IDarumaCommandSource(同じGameObjectに付いていれば自動取得、SetCommandSourceで差し替え可)
+    // または ApplyCommand で渡す
+    [RequireComponent(typeof(Rigidbody), typeof(CapsuleCollider), typeof(HitStop))]
+    public class DarumaCharacter : MonoBehaviour, IDarumaAttacker, IGimmickAffectable
+    {
+        [Header("移動")]
+        [SerializeField] float m_baseMoveSpeed = 6.0f;
+        // 1段積むごとに遅くなる量
+        [SerializeField] float m_speedLossPerBlock = 0.3f;
+        [SerializeField] float m_minMoveSpeed = 2.5f;
+        [SerializeField] float m_turnSpeed = 15.0f;
+
+        [Header("ジャンプ")]
+        // 高さ・滞空・落下(ScriptableObjectから毎回読む)。重力もここから計算したキャラクター専用のものを使う
+        [SerializeField] JumpParams m_jumpParams;
+        [SerializeField] LayerMask m_groundMask = ~0;
+
+        [Header("脱落")]
+        // これより下に落ちたら奈落に落ちたとみなして脱落
+        [SerializeField] float m_killY = -5.0f;
+        // 無敵中の点滅間隔
+        [SerializeField] float m_blinkInterval = 0.1f;
+
+        [Header("ギミック")]
+        // はじかれた・力で押された速度が減衰する速さ(大きいほどすぐ止まる。一定の力を受け続けると 力/この値 の速さで流される)
+        [SerializeField] float m_knockbackDamping = 5.0f;
+
+        [Header("参照")]
+        [SerializeField] DarumaStack m_stack;
+        [SerializeField] DarumaHammer m_hammer;
+
+        // 胴体の半径
+        public const float kBodyRadius = 0.45f;
+
+        Rigidbody m_rb;
+        CapsuleCollider m_body;
+        HitStop m_hitStop;
+        IDarumaCommandSource m_commandSource;
+        // 前のステップの本来の速度(時間の倍率・外からの速度を掛ける前)と、実際に Rigidbody に渡した速度
+        // 次のステップでは「本来の速度 + 物理(衝突・押し戻し)で変わった分」から計算する
+        // (渡した速度を時間の倍率で割り戻すと、ヒットストップ中の押し戻しまで 1/倍率 に増えて真上に飛んでしまうため)
+        Vector3 m_lastVelocity;
+        Vector3 m_lastAppliedVelocity;
+        // 前のステップの時間の倍率
+        float m_lastTimeScale = 1.0f;
+
+        Vector3 m_moveDirection; // ワールド空間の移動方向(XZ)
+        bool m_jumpRequested;
+        bool m_isGrounded;
+        // 物理計算の直前に空中で落下中だったか(衝突の通知時点では落下速度が打ち消されているため記録しておく)
+        bool m_isFallingInAir;
+        bool m_isEliminated;
+        float m_invincibleTimer;
+        readonly RaycastHit[] m_groundHits = new RaycastHit[8];
+        readonly RaycastHit[] m_wallHits = new RaycastHit[8];
+
+        // ギミックからの影響(IGimmickAffectable)
+        Vector3 m_carryVelocity;      // 次のステップで上乗せする運搬速度
+        Vector3 m_knockback;          // はじかれた・力で押された水平方向の速度(減衰する)
+        Vector3 m_force;              // 次のステップで加える力(加速度)
+        float m_knockbackUp;          // はじかれた上向きの速度(次のステップで1回だけ反映)
+        float m_gravityScale = 1.0f;  // 次のステップの重力の倍率
+        float m_speedScale = 1.0f;    // 次のステップの水平の速さの倍率
+        Vector3 m_baseHorizontal;     // 前のステップの、速さの倍率を掛ける前の水平の速度
+        bool m_isSuspended;           // 一時的に止めている(ワープの移動中など)
+        Vector3 m_suspendedVelocity;  // 止めたときの速度(解除すると戻す)
+
+        public DarumaStack Stack => m_stack;
+        public Collider Body => m_body;
+        public Rigidbody Rigidbody => m_rb;
+        public bool IsGrounded => m_isGrounded;
+        // 必殺技中など、移動だけを受け付ける状態
+        public bool MovementOnly { get; set; }
+        // 方向入力での旋回は許可しつつ、並進移動だけを止める(だるきんぐの照準詠唱など)
+        public bool MovementLocked { get; set; }
+        // 毒などのデバフ: 移動入力の左右前後を反転する(攻撃・カメラ操作は反転しない)
+        public bool MovementInverted { get; set; }
+        // 毒などのデバフ: 水平移動速度の倍率(1で通常)
+        public float MoveSpeedMultiplier { get; set; } = 1.0f;
+        // 股抜きショットを始められるか。地上にいて、先に押されたジャンプが実行待ちでないこと
+        public bool CanStartShot => m_isGrounded && !m_jumpRequested;
+        public bool IsInvincible => m_invincibleTimer > 0.0f;
+        public float MoveSpeed => Mathf.Max(m_minMoveSpeed, m_baseMoveSpeed - m_stack.Count * m_speedLossPerBlock);
+        public JumpParams JumpParams => m_jumpParams;
+        public DarumaHammer Hammer => m_hammer;
+        // ヒットストップ中は1未満(移動・落下・ハンマーがスローになる)
+        public float LocalTimeScale => Mathf.Max(0.01f, m_hitStop.TimeScale);
+
+        // 脱落した(この直後にGameObjectは破棄される)
+        public event Action<DarumaCharacter> Eliminated;
+        // いずれかのキャラクターが脱落した(カメラの揺れ・効果音など、個々のキャラクターを知らない演出用)
+        public static event Action<DarumaCharacter> AnyEliminated;
+        // いずれかのキャラクターが積み木に上から乗って拾った(成功エフェクトなどの演出用)
+        public static event Action<TumikiPickupInfo> AnyPickedUp;
+        // 攻撃(ハンマー・飛んできた積み木)で積み木を崩された(脱落したときは来ない。脱落は Eliminated)。王冠を落とすなどの演出用
+        public event Action<DarumaCharacter> Damaged;
+        // いずれかのキャラクターが攻撃で積み木を崩された
+        public static event Action<DarumaCharacter> AnyDamaged;
+
+        // ドメインの再読み込みをしない設定では、前の再生で登録されたまま残った受け取り手が呼ばれ続けるので、再生のたびに空にする
+        // (受け取る側はシーンの読み込み時(OnEnable など)に登録し直す)
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetStatics()
+        {
+            AnyEliminated = null;
+            AnyPickedUp = null;
+            AnyDamaged = null;
+        }
+
+        private void RaiseDamaged()
+        {
+            Damaged?.Invoke(this);
+            AnyDamaged?.Invoke(this);
+        }
+        // 脱落の原因(脱落していなければOther)
+        public EliminationCause EliminationCause { get; private set; }
+        // 攻撃(積み木・ハンマー)で脱落したか
+        public bool IsEliminatedByAttack => EliminationCause == EliminationCause.Projectile || EliminationCause == EliminationCause.Hammer;
+        // 脱落したときに吹き飛んだ向き(演出用。単位ベクトル)
+        //  落下・原因不明: 真上 / ハンマー: 叩いた相手からやられた側への向き / 積み木: 当たった積み木の進む向き
+        public Vector3 EliminationDirection { get; private set; } = Vector3.up;
+        // 脱落した位置(撃墜演出を出す位置)。落下は場外判定(m_killY の高さ)に触れた位置
+        public Vector3 EliminationPosition { get; private set; }
+        // 場外判定の高さ(これより下に落ちたら脱落)
+        public float KillY => m_killY;
+        // 他の生存者にダメージを与えた
+        public event Action<DarumaCharacter> DealtDamage;
+        // ストーリー用(Yurube): 操作命令を受け取った（チュートリアルの判定用。挙動は変えない）
+        public event Action<DarumaCommand> CommandReceived;
+
+        private void Awake()
+        {
+            m_rb = GetComponent<Rigidbody>();
+            // 重力はJumpParamsから計算して自前で掛ける
+            m_rb.useGravity = false;
+            m_body = GetComponent<CapsuleCollider>();
+            m_hitStop = GetComponent<HitStop>();
+            m_commandSource = GetComponent<IDarumaCommandSource>();
+            m_stack.Changed += UpdateBodyCollider;
+            UpdateBodyCollider();
+        }
+
+        private void Update()
+        {
+            // 止めている間は操作も受け付けない
+            if (m_commandSource != null && !m_isSuspended)
+            {
+                ApplyCommand(m_commandSource.ReadCommand());
+            }
+            UpdateInvincible();
+        }
+
+        // 操作命令の供給元を差し替える(人間⇔AIの切り替え、回線切断時のAI引き継ぎ等)。nullで操作なし
+        public void SetCommandSource(IDarumaCommandSource source)
+        {
+            m_commandSource = source;
+            // 前の供給元の入力が残らないようにする
+            m_moveDirection = Vector3.zero;
+            m_jumpRequested = false;
+        }
+
+        // 操作命令を受け取る(将来ネットワークから受け取る場合もここを使う)
+        public void ApplyCommand(in DarumaCommand command)
+        {
+            // ストーリー用(Yurube): チュートリアルの「移動・ジャンプ・攻撃をした」判定に使う。
+            // 受け取った命令をそのまま流すだけで、動きは変えない。
+            CommandReceived?.Invoke(command);
+
+            Vector2 move = Vector2.ClampMagnitude(command.Move, 1.0f);
+            if (MovementInverted) move = -move;
+            m_moveDirection = new Vector3(move.x, 0.0f, move.y);
+            if (command.Jump && !MovementOnly) m_jumpRequested = true;
+            if (command.Sweep && !MovementOnly) m_hammer.TrySweep();
+            if (command.Shot && !MovementOnly && m_hammer.TryShot()) FaceMoveDirection();
+        }
+
+        // 振り向きの途中でも、スティックの方向へ即座に向きを合わせる(ニュートラルなら今の向きのまま)
+        private void FaceMoveDirection()
+        {
+            if (m_moveDirection.sqrMagnitude <= 0.0001f) return;
+            Quaternion target = Quaternion.LookRotation(m_moveDirection, Vector3.up);
+            m_rb.rotation = target;
+            transform.rotation = target;
+        }
+
+        private void FixedUpdate()
+        {
+            if (m_isSuspended) return;
+
+            // 奈落に落ちた
+            if (m_rb.position.y < m_killY)
+            {
+                // 場外判定に触れた位置(1ステップで判定の高さを通り過ぎた分は、判定の高さに戻す)
+                Vector3 outPos = m_rb.position;
+                outPos.y = m_killY;
+                Eliminate(EliminationCause.Fall, Vector3.up, outPos);
+                return;
+            }
+
+            m_isGrounded = CheckGrounded();
+
+            // 本来の速度で計算し、最後に時間の倍率を掛けてRigidbodyに渡す(ヒットストップ中はスローになる)
+            float timeScale = LocalTimeScale;
+            float dt = Time.fixedDeltaTime * timeScale;
+            // 物理で変わった分(押し戻し・衝突)は割り戻さずにそのまま足す
+            Vector3 contact = m_rb.linearVelocity - m_lastAppliedVelocity;
+            Vector3 v = m_lastVelocity + contact;
+            // スロー中は、衝突で上下の動きを止めることはできても、新しく勢いを足すことはできない
+            // (重なった積み木などの押し戻しが毎ステップたまり、明けた瞬間に真上へ飛ぶのを防ぐ)
+            if (m_lastTimeScale < 1.0f) v.y = SlowContactVertical(m_lastVelocity.y, contact.y, m_lastTimeScale);
+
+            UpdateMove(ref v, dt);
+            UpdateGravity(ref v, dt);
+            UpdateJump(ref v);
+            Vector3 external = UpdateExternal(ref v, dt);
+            m_lastVelocity = v;
+
+            // 速さの倍率は水平方向にだけ、このステップの速度に掛ける(次のステップでは移動入力・外からの速度から計算し直す)
+            Vector3 total = v + external;
+            m_baseHorizontal = new Vector3(total.x, 0.0f, total.z);
+            total.x *= m_speedScale;
+            total.z *= m_speedScale;
+            m_speedScale = 1.0f;
+
+            m_rb.linearVelocity = total * timeScale;
+            m_lastAppliedVelocity = m_rb.linearVelocity;
+            m_lastTimeScale = timeScale;
+
+            // 地上でも自前の重力で速度は負になるので、空中にいることも条件にする
+            m_isFallingInAir = !m_isGrounded && v.y < 0.0f;
+        }
+
+        // スロー中に衝突で変わった上下の速度を、本来の速度に直す
+        // 落下を止める(着地)・上昇を止める(天井)ことはできるが、止まった先の逆向きの勢いは残さない
+        private static float SlowContactVertical(float lastVy, float contactVy, float timeScale)
+        {
+            float vy = lastVy + contactVy / timeScale;
+            if (contactVy > 0.0f) return Mathf.Min(vy, Mathf.Max(lastVy, 0.0f));
+            if (contactVy < 0.0f) return Mathf.Max(vy, Mathf.Min(lastVy, 0.0f));
+            return lastVy;
+        }
+
+        // 上昇中は通常の重力、落下中は倍率を掛けた重力
+        private void UpdateGravity(ref Vector3 v, float dt)
+        {
+            float gravity = m_jumpParams.Gravity * m_gravityScale;
+            if (v.y < 0.0f) gravity *= m_jumpParams.FallGravityMultiplier;
+            v.y -= gravity * dt;
+            m_gravityScale = 1.0f;
+        }
+
+        // ギミックからの影響を反映し、このステップだけ上乗せする速度を返す
+        // (移動入力で毎ステップ上書きされる水平速度とは別に持ち、次のステップの最初に取り除く)
+        private Vector3 UpdateExternal(ref Vector3 v, float dt)
+        {
+            if (m_knockbackUp > 0.0f)
+            {
+                v.y = Mathf.Max(v.y, m_knockbackUp);
+                m_isGrounded = false;
+                m_knockbackUp = 0.0f;
+            }
+
+            // 力は水平方向を慣性として溜め(移動入力とは別に持つ)、上下方向は今の速度に加える
+            m_knockback += new Vector3(m_force.x, 0.0f, m_force.z) * dt;
+            v.y += m_force.y * dt;
+            m_force = Vector3.zero;
+
+            Vector3 external = m_carryVelocity + m_knockback;
+            m_carryVelocity = Vector3.zero;
+            m_knockback *= Mathf.Exp(-m_knockbackDamping * dt);
+            if (m_knockback.sqrMagnitude < 0.01f) m_knockback = Vector3.zero;
+
+            return external;
+        }
+
+        private void UpdateMove(ref Vector3 v, float dt)
+        {
+            Vector3 moveDir = m_moveDirection;
+            Vector3 horizontal = MovementLocked
+                ? Vector3.zero
+                : moveDir * MoveSpeed * Mathf.Max(0.0f, MoveSpeedMultiplier);
+            v.x = horizontal.x;
+            v.z = horizontal.z;
+
+            // ハンマーを振っている間は向きを固定(打ち返しの方向がブレないように)
+            // ただし股抜きショットは弾が出るまで向きを変えて狙える
+            bool canTurn = !m_hammer.IsBusy || m_hammer.IsAimingShot;
+            if (moveDir.sqrMagnitude > 0.0001f && canTurn)
+            {
+                Quaternion target = Quaternion.LookRotation(moveDir, Vector3.up);
+                m_rb.MoveRotation(Quaternion.Slerp(m_rb.rotation, target, m_turnSpeed * dt));
+            }
+        }
+
+        private void UpdateJump(ref Vector3 v)
+        {
+            if (!m_jumpRequested) return;
+            // ヒットストップ中に押されたジャンプは、明けてから反映する
+            if (m_hitStop.IsActive) return;
+            m_jumpRequested = false;
+            if (!m_isGrounded) return;
+            // 股抜きショットを振っている間はジャンプできない(空中で弾が出ないように)
+            if (m_hammer.IsShooting) return;
+
+            v.y = m_jumpParams.JumpSpeed;
+            // 次の接地判定を待たずに空中扱いにする(直後のショットを防ぐ)
+            m_isGrounded = false;
+        }
+
+        private bool CheckGrounded()
+        {
+            if (m_rb.linearVelocity.y > 0.1f) return false;
+
+            Vector3 origin = m_rb.position + Vector3.up * (kBodyRadius + 0.05f);
+            int count = Physics.SphereCastNonAlloc(origin, kBodyRadius * 0.9f, Vector3.down, m_groundHits,
+                0.15f, m_groundMask, QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < count; i++)
+            {
+                Collider col = m_groundHits[i].collider;
+                if (col.attachedRigidbody == m_rb) continue;
+                // 積み木は地面扱いしない(真下に来た積み木で接地扱いになると、踏んで拾う判定が外れるため)
+                if (col.GetComponentInParent<TumikiBlock>() != null) continue;
+                return true;
+            }
+            return false;
+        }
+
+        // タワーの高さに合わせて当たり判定を伸縮
+        private void UpdateBodyCollider()
+        {
+            float height = m_stack.Height;
+            m_body.radius = kBodyRadius;
+            m_body.height = height;
+            m_body.center = new Vector3(0.0f, height * 0.5f, 0.0f);
+        }
+
+        //========================================
+        // 積み木を拾う(上に乗る)
+        //========================================
+
+        private void OnCollisionEnter(Collision collision)
+        {
+            var block = collision.collider.GetComponentInParent<TumikiBlock>();
+            if (block != null) TryPickupFromAbove(block);
+        }
+
+        // 空中で落下中に触れた積み木を拾う(踏んだ扱い)。飛んでいる積み木もどんな速さでも拾え、被弾しない
+        // 速い積み木でも拾いやすいよう、当たった場所は問わない
+        // 衝突はキャラクター側・積み木側のどちらからも通知されるため、両方から呼ばれても1回だけ拾う
+        public bool TryPickupFromAbove(TumikiBlock block)
+        {
+            if (m_isEliminated || !m_isFallingInAir) return false;
+            if (block.CurrentState == TumikiBlock.State.Stacked) return false;
+
+            bool wasHarmful = block.IsHarmful;
+            float speed = block.HorizontalVelocity.magnitude;
+            int countBefore = m_stack.Count;
+            Pickup(block);
+            // パッシブ(だるきんぐの上限など)が段の変化に反応して外した分も含めて、段が増えたかを見る
+            AnyPickedUp?.Invoke(new TumikiPickupInfo(this, block, wasHarmful, speed, m_stack.Count > countBefore));
+            // 同じステップで複数の積み木に触れても1つだけ拾う
+            m_isFallingInAir = false;
+            return true;
+        }
+
+        private void Pickup(TumikiBlock block)
+        {
+            // 足元を積み木の底に合わせる
+            Vector3 p = block.transform.position;
+            p.y -= TumikiBlock.kHeight * 0.5f;
+            Vector3 delta = p - m_rb.position;
+            m_rb.position = p;
+            transform.position = p;
+            // 頭と既存の段は見た目上その場に残す(めり込んでから迫り上がるのを防ぐ)
+            m_stack.KeepVisualsInPlace(delta);
+            Vector3 v = m_rb.linearVelocity;
+            v.y = 0.0f;
+            m_rb.linearVelocity = v;
+            // 本来の速度の上下も止める(ヒットストップ中に拾っても落下の勢いが残らないように)
+            m_lastVelocity.y = 0.0f;
+            m_lastAppliedVelocity.y = 0.0f;
+
+            TumikiBlock overflow = m_stack.AddBottom(block);
+            if (overflow != null)
+            {
+                // 一番古い段(頭の下)が後ろにこぼれる(後ろが壁なら壁の手前まで)
+                overflow.transform.position = PlaceBlockBeforeWall(overflow.transform.position, -transform.forward, kBodyRadius + TumikiBlock.kRadius + 0.1f);
+                var rb = overflow.GetComponent<Rigidbody>();
+                rb.linearVelocity = -transform.forward * 2.0f + Vector3.up * 1.0f;
+            }
+        }
+
+        //========================================
+        // 攻撃を与える
+        //========================================
+
+        public void OnDealtDamage()
+        {
+            DealtDamage?.Invoke(this);
+        }
+
+        public void StartHitStop(float duration, float timeScale, float shake)
+        {
+            m_hitStop.Begin(duration, timeScale, shake);
+        }
+
+        //========================================
+        // 攻撃を受ける
+        //========================================
+
+        // ハンマーで最下段を弾き飛ばされた。ダメージを受けたらtrue
+        // knocked: 弾になった積み木(首だけで脱落した場合や無敵中はnull)
+        public bool KnockBottom(Vector3 dir, float speed, IDarumaAttacker attacker, out TumikiBlock knocked)
+        {
+            knocked = null;
+            if (IsInvincible || m_isEliminated) return false;
+
+            dir.y = 0.0f;
+            dir.Normalize();
+
+            if (m_stack.Count == 0)
+            {
+                // 首だけ。叩いた相手からこちらへの向きに吹き飛ぶ(相手が分からなければ叩かれた向き)
+                Vector3 away = dir;
+                if (attacker != null && attacker.Body != null)
+                {
+                    Vector3 d = transform.position - attacker.Body.transform.position;
+                    d.y = 0.0f;
+                    if (d.sqrMagnitude > 0.0001f) away = d.normalized;
+                }
+                Eliminate(EliminationCause.Hammer, away, transform.position);
+                return true;
+            }
+
+            knocked = m_stack.RemoveAt(0);
+            // 叩かれた向きの、胴体に重ならない所から飛び出す(壁際で壁の方へ叩かれたら、壁の手前まで。壁の中に出ないように)
+            knocked.transform.position = PlaceBlockBeforeWall(m_rb.position + Vector3.up * (TumikiBlock.kHeight * 0.5f),
+                dir, kBodyRadius + TumikiBlock.kRadius + 0.05f);
+            knocked.Launch(dir, speed, attacker, this);
+            RaiseDamaged();
+            return true;
+        }
+
+        // 積み木を from から dir へ distance だけ動かした位置。途中に壁(ReflectWall)があれば壁の手前で止める
+        private Vector3 PlaceBlockBeforeWall(Vector3 from, Vector3 dir, float distance)
+        {
+            dir.y = 0.0f;
+            if (dir.sqrMagnitude < 0.0001f) return from;
+            dir.Normalize();
+
+            // 積み木より少し小さい箱を飛ばす(壁際に立っていても、始めから壁に重ならない大きさ)
+            float r = TumikiBlock.kRadius - 0.06f;
+            Vector3 half = new Vector3(r, TumikiBlock.kHeight * 0.4f, r);
+            int count = Physics.BoxCastNonAlloc(from, half, dir, m_wallHits, Quaternion.LookRotation(dir), distance, ~0, QueryTriggerInteraction.Ignore);
+            float nearest = distance;
+            for (int i = 0; i < count; i++)
+            {
+                RaycastHit hit = m_wallHits[i];
+                if (hit.collider.GetComponentInParent<ReflectWall>() == null) continue;
+                nearest = Mathf.Min(nearest, Mathf.Max(0.0f, hit.distance - 0.01f));
+            }
+            return from + dir * nearest;
+        }
+
+        // 飛んできた積み木が当たった。当てた積み木を消滅させるならtrue
+        // damaged: ダメージを受けたか(無敵中はfalse)
+        public bool ReceiveProjectile(TumikiBlock projectile, Vector3 hitPoint, out bool damaged)
+        {
+            damaged = false;
+            if (m_isEliminated) return false;
+            // 無敵中は当たった積み木が崩れるだけ
+            if (IsInvincible) return true;
+
+            damaged = true;
+            int index = m_stack.IndexFromHeight(hitPoint.y - m_rb.position.y);
+            if (index >= m_stack.Count)
+            {
+                // 頭に当たった。当たった積み木の進む向きに吹き飛ぶ
+                Eliminate(EliminationCause.Projectile, projectile.Direction, transform.position);
+                return true;
+            }
+
+            // 手ごたえ: 自分と抜けた段も、当たった積み木の速さに応じてヒットストップ
+            projectile.GetImpactHitStop(out float duration, out float timeScale, out float shake);
+            StartHitStop(duration, timeScale, shake);
+
+            // 当たった段が抜けて、当たった角度に応じた速さで飛ぶ(連鎖)。ヒットストップが明けてから飛び出す
+            TumikiBlock block = m_stack.RemoveAt(index);
+            block.StartHitStop(duration, timeScale, shake);
+            projectile.ComputeImpact(block.transform.position, out Vector3 dir, out float speed);
+            block.Push(dir, speed, projectile.Owner, projectile.ReturnCount, this);
+            RaiseDamaged();
+            return true;
+        }
+
+        // 脱落。とりあえずキャラクターを消すだけ(演出は今後)
+        public void Eliminate() => Eliminate(EliminationCause.Other);
+
+        public void Eliminate(EliminationCause cause) => Eliminate(cause, Vector3.up, transform.position);
+
+        // direction: 吹き飛んだ向き(撃墜演出の向き) / position: 撃墜演出を出す位置
+        public void Eliminate(EliminationCause cause, Vector3 direction, Vector3 position)
+        {
+            if (m_isEliminated) return;
+            m_isEliminated = true;
+            EliminationCause = cause;
+            EliminationDirection = direction.sqrMagnitude > 0.0001f ? direction.normalized : Vector3.up;
+            EliminationPosition = position;
+            Eliminated?.Invoke(this);
+            AnyEliminated?.Invoke(this);
+            Destroy(gameObject);
+        }
+
+        //========================================
+        // ギミックからの影響(IGimmickAffectable)
+        //========================================
+
+        public bool CanBeAffected => !m_isEliminated && !m_isSuspended;
+        // 脱落したか(必殺技ゲージなどが読む)
+        public bool IsEliminated => m_isEliminated;
+
+        public void AddCarryVelocity(Vector3 velocity)
+        {
+            m_carryVelocity += velocity;
+        }
+
+        // 向きは移動入力で決める(止まっているときに照準が流れないように)ので、足場が回っても向きは変えない
+        public void AddCarryRotation(float yawDegrees)
+        {
+        }
+
+        public void AddForce(Vector3 acceleration)
+        {
+            m_force += acceleration;
+        }
+
+        public void AddKnockback(Vector3 velocity)
+        {
+            m_knockback += new Vector3(velocity.x, 0.0f, velocity.z);
+            m_knockbackUp = Mathf.Max(m_knockbackUp, velocity.y);
+        }
+
+        public void RequestGravityScale(float scale)
+        {
+            m_gravityScale = Mathf.Min(m_gravityScale, scale);
+        }
+
+        public Vector3 HorizontalVelocity => m_baseHorizontal;
+
+        public void RequestSpeedScale(float scale)
+        {
+            m_speedScale *= Mathf.Max(0.0f, scale);
+        }
+
+        // 積まれた段・頭は子なので一緒に移動する
+        public void Teleport(Vector3 position, float yawDegrees)
+        {
+            if (m_isEliminated) return;
+            m_rb.position = position;
+            transform.position = position;
+            if (yawDegrees == 0.0f) return;
+
+            Quaternion turn = Quaternion.Euler(0.0f, yawDegrees, 0.0f);
+            Quaternion rotation = turn * m_rb.rotation;
+            m_rb.rotation = rotation;
+            transform.rotation = rotation;
+            m_knockback = turn * m_knockback;
+            if (m_isSuspended) m_suspendedVelocity = turn * m_suspendedVelocity;
+            else m_rb.linearVelocity = turn * m_rb.linearVelocity;
+        }
+
+        // 止めている間は動かない物として扱い(当たり判定なし)、解除すると止めたときの速度で動き出す
+        public void SetSuspended(bool suspended)
+        {
+            if (m_isEliminated || m_isSuspended == suspended) return;
+            m_isSuspended = suspended;
+            if (suspended)
+            {
+                m_suspendedVelocity = m_rb.linearVelocity;
+                m_rb.linearVelocity = Vector3.zero;
+                m_body.enabled = false;
+                m_rb.isKinematic = true;
+                return;
+            }
+            m_rb.isKinematic = false;
+            m_body.enabled = true;
+            m_rb.linearVelocity = m_suspendedVelocity;
+        }
+
+        //========================================
+        // 無敵
+        //========================================
+
+        public void SetInvincible(float seconds)
+        {
+            m_invincibleTimer = seconds;
+        }
+
+        private void UpdateInvincible()
+        {
+            if (m_invincibleTimer <= 0.0f) return;
+
+            m_invincibleTimer -= Time.deltaTime;
+            bool visible = m_invincibleTimer <= 0.0f
+                || Mathf.FloorToInt(m_invincibleTimer / m_blinkInterval) % 2 == 0;
+            foreach (var r in GetComponentsInChildren<Renderer>())
+            {
+                r.enabled = visible;
+            }
+        }
+    }
+}

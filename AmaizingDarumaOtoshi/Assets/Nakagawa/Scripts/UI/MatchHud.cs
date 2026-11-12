@@ -16,9 +16,26 @@ namespace Nakagawa
     // 開始のカウントダウン(StartCountdownView)とポーズ画面(PauseMenu)を自動で付ける
     // プレイヤーや積み木がパネルの近くに映っているときは、パネルを半透明にして見えるようにする
     // 途中参加(直接再生)した人のパネルもその場で増える
+    // ステージのギミックが、各プレイヤーのパネルに自分の表示を足すための入口(麻雀卓の手持ちの牌など)
+    //  ・MatchHud.AddExtra で登録すると、毎フレーム全員分のパネルについて UpdatePanelExtra が呼ばれる
+    //  ・足した表示(panel の子)は登録した側が作り、要らなくなったら(RemoveExtra のあと)自分で消す
+    public interface IMatchHudPanelExtra
+    {
+        void UpdatePanelExtra(MatchPlayer player, RectTransform panel);
+    }
+
     [RequireComponent(typeof(DarumaMatch))]
     public class MatchHud : MonoBehaviour
     {
+        static readonly List<IMatchHudPanelExtra> s_extras = new List<IMatchHudPanelExtra>();
+
+        public static void AddExtra(IMatchHudPanelExtra extra)
+        {
+            if (extra != null && !s_extras.Contains(extra)) s_extras.Add(extra);
+        }
+
+        public static void RemoveExtra(IMatchHudPanelExtra extra) => s_extras.Remove(extra);
+
         [Header("配置(1920x1080 基準)")]
         [SerializeField] Vector2 m_panelSize = new Vector2(300.0f, 128.0f);
         [SerializeField] float m_spacing = 24.0f;
@@ -122,6 +139,11 @@ namespace Nakagawa
             foreach (var p in m_panels)
             {
                 UpdatePanel(p, dt);
+                for (int i = s_extras.Count - 1; i >= 0; i--)
+                {
+                    if (s_extras[i] == null || s_extras[i] is Object o && o == null) s_extras.RemoveAt(i);
+                    else s_extras[i].UpdatePanelExtra(p.Player, p.Root);
+                }
                 float target = m_fadeWhenOccluding && IsOccluded(p) ? m_occludedAlpha : 1.0f;
                 p.Occlusion = Mathf.MoveTowards(p.Occlusion, target, dt * m_fadeSpeed);
                 p.Group.alpha *= p.Occlusion;
