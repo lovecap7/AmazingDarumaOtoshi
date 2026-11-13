@@ -49,6 +49,22 @@ namespace Nakahira
         public enum ScoreReason { Knock, Knocked, KO, SelfOut }
         public enum FinishReason { LastOneStanding, TimeUp }
 
+        // 直接再生で出す人の種類(人・CPU・操作なしのダミー)
+        public enum DirectSlotKind { Player, Cpu, Dummy }
+
+        // 直接再生で出す 1 人分(セレクト画面で決める内容の代わり)
+        [Serializable]
+        public class DirectSlot
+        {
+            public DirectSlotKind kind = DirectSlotKind.Cpu;
+            [Tooltip("空なら、上の「直接再生:キャラクター」(それも空なら MatchSettings)のキャラ")]
+            public CharacterData character;
+            [Tooltip("CPU の強さ(1 よわい・2 ふつう・3 つよい)")]
+            [Range(1, MatchSetup.MaxCpuLevel)] public int cpuLevel = MatchSetup.MaxCpuLevel;
+            [Tooltip("チーム戦のチーム(0 赤・1 青・2 緑・3 黄)。ルールのチーム戦がオンのときだけ使う")]
+            [Range(0, MatchSetup.TeamCount - 1)] public int team;
+        }
+
         public class MatchResult
         {
             public FinishReason Reason;
@@ -77,6 +93,22 @@ namespace Nakahira
         // 時間制限(秒)。0 = なし(タイムでは 0 のとき 120 秒)
         [SerializeField, Min(0.0f)] float m_directTimeLimit = 0.0f;
         [SerializeField] int m_maxPlayers = 4;
+        // チーム戦(チームは下の「出る人」の team。出る人を使わないときは、みんな個人)
+        [SerializeField] bool m_directTeams = false;
+        [Tooltip("タイムの点数:相手の積み木を崩した")]
+        [SerializeField] int m_directKnockPoints = 1;
+        [Tooltip("タイムの点数:自分の積み木を崩された")]
+        [SerializeField] int m_directKnockedPoints = -1;
+        [Tooltip("タイムの点数:相手の顔を飛ばした")]
+        [SerializeField] int m_directHeadPoints = 1;
+        [Tooltip("タイムの点数:相手なしでやられた(自分から場外に落ちた など)")]
+        [SerializeField] int m_directSelfOutPoints = -1;
+
+        [Header("直接再生:出る人(セレクトの代わり)")]
+        [Tooltip("オンにすると、下の並びのとおり最初から全員を出す(下の「デバッグ」のダミー・CPU の数と、ボタンを押した人の途中参加は使わない)")]
+        [SerializeField] bool m_useDirectSlots = false;
+        // 上から 1 人目・2 人目…(m_maxPlayers 人まで)。人は、つながっているコントローラーを上から順に割り当てる(足りなければキーボード、それもなければ操作なし)
+        [SerializeField] List<DirectSlot> m_directSlots = new List<DirectSlot>();
 
         [Header("直接再生:デバッグ")]
         // 開始時に置く操作なしのダミープレイヤーの数
@@ -237,7 +269,8 @@ namespace Nakahira
             IsConfigured = m_net == null && MatchSetup.Players.Count > 0;
             m_rules = IsConfigured ? MatchSetup.Rules : DirectRules();
             m_timeLimit = Rules.TimeLimit;
-            if ((IsConfigured || m_net != null) && m_inputManager != null)
+            // 直接再生で「出る人」を決めてあるときも、ボタンを押した人の途中参加は止める
+            if ((IsConfigured || m_net != null || UsesDirectSlots) && m_inputManager != null)
             {
                 m_inputManager.DisableJoining();
                 m_inputManager.enabled = false;
@@ -255,9 +288,17 @@ namespace Nakahira
                 stockTimeLimit = m_directTimeLimit,
                 ghostTimeLimit = m_directTimeLimit,
                 timeLength = m_directTimeLimit > 0.0f ? m_directTimeLimit : 120.0f,
+                knockPoints = m_directKnockPoints,
+                knockedPoints = m_directKnockedPoints,
+                headPoints = m_directHeadPoints,
+                selfOutPoints = m_directSelfOutPoints,
+                teams = m_directTeams && UsesDirectSlots,
             };
             return rules;
         }
+
+        // 直接再生で、インスペクターの「出る人」の並びで始めるか
+        bool UsesDirectSlots => !IsConfigured && m_net == null && m_useDirectSlots && m_directSlots != null && m_directSlots.Count > 0;
 
         private void OnDestroy()
         {
@@ -338,6 +379,11 @@ namespace Nakahira
         // 最初からいるダミー(操作なし)を出して、試合を始める。人はボタンを押して途中から参加する(Register)
         private void StartDirect()
         {
+            if (UsesDirectSlots)
+            {
+                StartDirectSlots();
+                return;
+            }
             for (int i = 0; i < m_dummyCount && m_players.Count < m_maxPlayers; i++)
             {
                 var entry = new MatchSetup.Entry
@@ -371,6 +417,69 @@ namespace Nakahira
                 m_players.Add(p);
                 SpawnMatchCharacter(p, InitialSpawnPoint(m_players.Count - 1), false);
             }
+            Time.timeScale = PlaySpeed;
+            if (m_countdownInDirectPlay) BeginCountdown();
+            m_specialGaugeCarry.Clear();
+            Started?.Invoke();
+        }
+
+        // インスペクターの「出る人」の並びのとおり、最初から全員を出して始める(セレクトから始めた試合と同じ出し方。終わったら同じシーンをやり直す)
+        //  ・人:つながっているゲームパッドを上から順に割り当てる。足りなければキーボード(1 人だけ)、それもなければ操作なし
+        //  ・CPU:強さに合う CpuParams(MatchSettings)。ダミー:操作なし(最初から積み木を積んでおく)
+        private void StartDirectSlots()
+        {
+            int cpuTotal = 0;
+            foreach (var s in m_directSlots) if (s != null && s.kind != DirectSlotKind.Player) cpuTotal++;
+            // 番号(playerIndex)はセレクトと同じく並びの何番目か(人も CPU も通し番号。名札は 1P・3P のようになる)
+            int cpus = 0, pad = 0;
+            bool keyboardUsed = false;
+            var sb = new System.Text.StringBuilder("[DarumaMatch] 直接再生(出る人):");
+            foreach (var s in m_directSlots)
+            {
+                if (s == null || m_players.Count >= m_maxPlayers) continue;
+                var entry = new MatchSetup.Entry
+                {
+                    playerIndex = m_players.Count,
+                    isCpu = s.kind != DirectSlotKind.Player,
+                    cpuLevel = s.cpuLevel,
+                    character = s.character,
+                    team = Rules.teams ? s.team : -1,
+                };
+                if (s.kind == DirectSlotKind.Player)
+                {
+                    InputDevice device = null;
+                    if (pad < Gamepad.all.Count) device = Gamepad.all[pad++];
+                    else if (!keyboardUsed && Keyboard.current != null) { device = Keyboard.current; keyboardUsed = true; }
+                    entry.deviceId = device != null ? device.deviceId : -1;
+                    entry.deviceName = device != null ? device.displayName : "";
+                }
+                else
+                {
+                    cpus++;
+                    entry.cpuNumber = cpuTotal > 1 ? cpus : 0;
+                    entry.deviceName = s.kind == DirectSlotKind.Dummy ? "Dummy" : "CPU";
+                }
+
+                MatchPlayer p;
+                if (s.kind == DirectSlotKind.Dummy)
+                {
+                    p = new GameObject().AddComponent<MatchPlayer>();
+                    p.Setup(entry, ColorFor(entry), null, StocksFor(entry));
+                    p.name += "_Dummy";
+                }
+                else p = CreatePlayer(entry);
+                m_players.Add(p);
+                SpawnMatchCharacter(p, InitialSpawnPoint(m_players.Count - 1), false);
+                if (s.kind == DirectSlotKind.Dummy) StackDebugBlocks(p.Character);
+
+                sb.Append("  ").Append(p.Label).Append(' ').Append(entry.character != null ? entry.character.displayName : "-")
+                  .Append(" (").Append(s.kind == DirectSlotKind.Player ? (entry.deviceName != "" ? entry.deviceName : "操作なし")
+                                     : s.kind == DirectSlotKind.Dummy ? "ダミー" : "CPU Lv" + entry.cpuLevel)
+                  .Append(entry.team >= 0 ? " " + MatchSetup.TeamNames[entry.team % MatchSetup.TeamCount] + "チーム" : "").Append(')');
+            }
+            sb.Append("  ").Append(Rules.teams ? "チーム戦" : "個人戦").Append("  モード：").Append(Rules.ModeName);
+            Debug.Log(sb.ToString());
+
             Time.timeScale = PlaySpeed;
             if (m_countdownInDirectPlay) BeginCountdown();
             m_specialGaugeCarry.Clear();
@@ -1258,8 +1367,9 @@ namespace Nakahira
         public bool AreTeammates(MatchPlayer a, MatchPlayer b)
         {
             if (m_friendlyFire || !Rules.teams) return false;
-            // MatchSetup.SameTeam は同じ人どうしでも true を返すので、別の人であることも確かめる
-            return a != null && b != null && a != b && MatchSetup.SameTeam(a.Index, b.Index);
+            // 別の人で、同じチーム。チームは 1 人ずつの Entry を見る(直接再生の「出る人」は MatchSetup に入らないため。セレクトからでも同じ結果)
+            return a != null && b != null && a != b && a.Entry != null && b.Entry != null
+                && a.Entry.team >= 0 && a.Entry.team == b.Entry.team;
         }
 
         //========================================
