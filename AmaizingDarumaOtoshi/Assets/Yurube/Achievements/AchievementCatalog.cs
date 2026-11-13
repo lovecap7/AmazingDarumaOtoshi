@@ -284,6 +284,11 @@ namespace Yurube.Achievements
                     "序章をクリア。おにぎりと根性で、部活の第一歩。",
                     AchievementCategory.Story, "序章をクリアする（だるま新聞まで見る）", AchievementMetric.StoryChapterCleared, 1,
                     AchievementRarity.Bronze, mode: AchievementMode.Story, storyChapter: "prologue"),
+
+                new AchievementDefinition("story_chapter1", "窓ガラスと走り込み",
+                    "第1章をクリア。走り込みの先に、地区大会優勝があった。",
+                    AchievementCategory.Story, "第1章をクリアする（だるま新聞まで見る）", AchievementMetric.StoryChapterCleared, 1,
+                    AchievementRarity.Silver, mode: AchievementMode.Story, storyChapter: "chapter1"),
             };
             return list;
         }

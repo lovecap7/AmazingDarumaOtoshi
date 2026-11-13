@@ -17,3 +17,8 @@ MonoBehaviour:
   m_dimAlpha: 0.62
   m_awakeningSeconds: 90
   m_tutorialCpuBlockLimit: 0
+  m_reflectAssistSeconds: 20
+  m_reflectAssistSpeed: 18
+  m_overrideStocks: 0
+  m_overrideCpuLevel: 0
+  m_overrideCpuBlockLimit: 0

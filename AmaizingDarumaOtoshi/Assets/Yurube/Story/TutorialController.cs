@@ -24,7 +24,10 @@ namespace Yurube.Story
         DarumaCharacter m_hooked;
         bool m_moved, m_jumped, m_attacked;
         int m_startStack;
-        bool m_cpusIdle;
+        bool m_reflected;
+        float m_reflectIdle;
+        readonly Dictionary<MatchPlayer, bool> m_cpuIdle = new Dictionary<MatchPlayer, bool>();
+        readonly Dictionary<MatchPlayer, DarumaCharacter> m_cpuBodies = new Dictionary<MatchPlayer, DarumaCharacter>();
 
         public void Setup(StoryChapter chapter, DialogueRunner dialogue, StoryMatchDirector director, DarumaMatch match)
         {
@@ -35,9 +38,28 @@ namespace Yurube.Story
             m_player = director != null ? director.Player : null;
         }
 
+        void OnEnable()
+        {
+            DarumaHammer.Hit += OnHammerHit;
+        }
+
+        void OnDisable()
+        {
+            DarumaHammer.Hit -= OnHammerHit;
+        }
+
         void OnDestroy()
         {
             Unhook();
+        }
+
+        // プレイヤーが飛んできた積み木を打ち返した
+        void OnHammerHit(HammerHitInfo info)
+        {
+            if (info.ReturnCount <= 0) return;
+            if (m_player == null || m_player.Character == null) return;
+            if (!ReferenceEquals(info.Owner, m_player.Character)) return;
+            m_reflected = true;
         }
 
         void Hook()
@@ -84,62 +106,120 @@ namespace Yurube.Story
                 var line = new StoryLine { speaker = step.speaker, text = step.text };
                 yield return m_dialogue.PlayBig(m_chapter, new List<StoryLine> { line });
                 m_director.SetStoryPaused(false);
-                StorySession.TutorialStep = i + 1;
 
                 if (condition == "DialogueDone")
                 {
+                    StorySession.TutorialStep = i + 1;
                     yield return new WaitForSecondsRealtime(0.25f);
                     continue;
                 }
 
+                // このステップの間だけ動かすCPU（第1章の打ち返しは、いわだるだけ動かす）
+                SetCpusForStep(step);
+
                 // 実際にやってもらう。できるまで次の説明には進まない
                 m_dialogue.ShowObjective(m_chapter, step.speaker, step.text);
                 yield return WaitCondition(condition, Mathf.Max(1, step.count));
+                // 操作をやり終えてから「済み」にする（途中で負けたら、このステップからやり直す）
+                StorySession.TutorialStep = i + 1;
                 m_dialogue.HideObjective();
+                SetCpusIdle(true);
                 yield return new WaitForSecondsRealtime(0.2f);
             }
 
-            // 締めの一言 → CPU を動かして試合開始
-            m_director.SetStoryPaused(true);
-            var startLines = m_chapter.matchStart != null && m_chapter.matchStart.Count > 0
-                ? m_chapter.matchStart
-                : new List<StoryLine> { new StoryLine { speaker = "midaru", text = "では……一試合、やりましょう" } };
-            yield return m_dialogue.PlayBig(m_chapter, startLines);
-            SetCpusIdle(false);
-            m_director.SetStoryPaused(false);
+            // 締めの一言 → CPU を動かして試合開始（リトライでは繰り返さない）
+            if (!StorySession.MatchStartPlayed)
+            {
+                StorySession.MatchStartPlayed = true;
+                var startLines = m_chapter.matchStart;
+                if (startLines != null && startLines.Count > 0)
+                {
+                    m_director.SetStoryPaused(true);
+                    yield return m_dialogue.PlayBig(m_chapter, startLines);
+                }
+                SetCpusIdle(false);
+                m_director.SetStoryPaused(false);
 
-            m_dialogue.StartCoroutine(m_dialogue.PlaySmall("", "練習試合、開始！", m_chapter));
+                string notice = string.IsNullOrEmpty(m_chapter.matchStartNotice)
+                    ? "練習試合、開始！"
+                    : m_chapter.matchStartNotice;
+                m_dialogue.StartCoroutine(m_dialogue.PlaySmall("", notice, m_chapter));
+            }
+            else
+            {
+                // リトライ：前回すでに試合前の一言は見ている
+                SetCpusIdle(false);
+                m_director.SetStoryPaused(false);
+            }
         }
 
         // ========================================
         // CPU を見学にする／戻す
         // ========================================
 
-        void SetCpusIdle(bool idle)
+        void SetCpusForStep(TutorialStep step)
         {
+            string who = step != null ? step.cpu : null;
+            if (string.IsNullOrEmpty(who))
+            {
+                SetCpusIdle(true);
+                return;
+            }
             if (m_match == null) return;
-            if (m_cpusIdle == idle) return;
-            m_cpusIdle = idle;
-
             foreach (var p in m_match.Players)
             {
                 if (p == null || !p.IsCpu) continue;
-
-                // 操作の供給元（DarumaCpu など）を止める
-                if (p.CommandSource is MonoBehaviour behaviour) behaviour.enabled = !idle;
-
-                if (p.Character == null) continue;
-                if (idle)
-                {
-                    p.Character.SetCommandSource(null);
-                    p.Character.SetSuspended(true);   // 当たり判定も消えるので、攻撃が当たらない
-                }
-                else
-                {
-                    p.Character.SetSuspended(false);
-                    p.Character.SetCommandSource(p.CommandSource);
-                }
+                bool active = who == "all" || (p.CharacterData != null && p.CharacterData.id == who);
+                SetCpuIdle(p, !active);
             }
+        }
+
+        void SetCpusIdle(bool idle)
+        {
+            if (m_match == null) return;
+            foreach (var p in m_match.Players)
+            {
+                if (p == null || !p.IsCpu) continue;
+                SetCpuIdle(p, idle);
+            }
+        }
+
+        void SetCpuIdle(MatchPlayer p, bool idle)
+        {
+            bool changed = !m_cpuIdle.TryGetValue(p, out bool was) || was != idle;
+            m_cpuIdle[p] = idle;
+            if (changed) m_cpuBodies.Remove(p);
+            ApplyCpuState(p);
+        }
+
+        // 体が作り直された（復活した）ときも、いまの見学／稼働の状態を掛け直す
+        void ApplyCpuState(MatchPlayer p)
+        {
+            if (p == null || !p.IsCpu) return;
+            bool idle = m_cpuIdle.TryGetValue(p, out bool value) && value;
+            if (p.Character != null && m_cpuBodies.TryGetValue(p, out var body) && body == p.Character) return;
+
+            // 操作の供給元（DarumaCpu など）を止める
+            if (p.CommandSource is MonoBehaviour behaviour) behaviour.enabled = !idle;
+            if (p.Character == null) return;
+
+            m_cpuBodies[p] = p.Character;
+            if (idle)
+            {
+                p.Character.SetCommandSource(null);
+                p.Character.SetSuspended(true);   // 当たり判定も消えるので、攻撃が当たらない
+            }
+            else
+            {
+                p.Character.SetSuspended(false);
+                p.Character.SetCommandSource(p.CommandSource);
+            }
+        }
+
+        void ApplyCpuStates()
+        {
+            if (m_match == null) return;
+            foreach (var p in m_match.Players) ApplyCpuState(p);
         }
 
         IEnumerator WaitCondition(string condition, int count)
@@ -147,10 +227,14 @@ namespace Yurube.Story
             m_moved = false;
             m_jumped = false;
             m_attacked = false;
+            m_reflected = false;
+            m_reflectIdle = 0f;
             m_startStack = m_player != null ? m_player.StackCount : 0;
+            float assistSeconds = StorySettings.Instance != null ? StorySettings.Instance.ReflectAssistSeconds : 20f;
 
             while (true)
             {
+                ApplyCpuStates();
                 Hook();
                 var character = m_player != null ? m_player.Character : null;
                 if (character == null) { yield return null; continue; }
@@ -168,6 +252,18 @@ namespace Yurube.Story
 
                     case "Attack":
                         if (m_attacked) yield break;
+                        break;
+
+                    case "Reflect":
+                        if (m_reflected) yield break;
+                        // いわだるが積み木を飛ばしてこないときの詰まり防止
+                        bool incoming = m_director != null && m_director.HasIncomingBlockToPlayer();
+                        m_reflectIdle = incoming ? 0f : m_reflectIdle + Time.unscaledDeltaTime;
+                        if (m_reflectIdle >= assistSeconds)
+                        {
+                            if (m_director != null) m_director.FireReflectAssist();
+                            m_reflectIdle = 0f;
+                        }
                         break;
 
                     default:

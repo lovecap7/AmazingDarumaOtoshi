@@ -32,8 +32,11 @@ namespace Yurube.Story
     {
         public string speaker;      // 話者ID（ふつうはみだる）
         public string text;         // 台詞
-        public string condition;    // MoveAndJump / Stack / Attack / DialogueDone
+        // MoveAndJump / Stack / Attack / Reflect / DialogueDone
+        public string condition;
         public int count = 1;       // 条件の回数（1でよい）
+        // このステップの間だけ動かすCPU（キャラID。空なら全員見学、"all" なら全員）
+        public string cpu;
     }
 
     // 章の対戦設定（CPU1人分）
@@ -43,6 +46,8 @@ namespace Yurube.Story
         public string character;    // キャラID（例：akadaru）
         public int level = 1;       // CPUの強さ（1〜3）
         public int stocks = 1;      // その人だけストックを変えたいとき（0なら章の設定）
+        // 画面の名札だけ別名にする（例：巌高校 選手A）。空ならキャラの名前
+        public string displayName;
     }
 
     // 章の対戦ルール
@@ -59,6 +64,26 @@ namespace Yurube.Story
         public bool gaugeFromStart = true;
         // チュートリアル用の難易度（0 なら通常）。CPU だけに効く
         public int cpuBlockLimit;
+    }
+
+    // カットシーンの1カット（章データで並びと長さを決める）
+    [Serializable]
+    public class StoryShot
+    {
+        // wide: 会場の全景 / runner: 走っている人 / rival: 相手
+        public string view = "wide";
+        public float seconds = 3.0f;
+    }
+
+    // 章のカットシーン。type が空なら序章の部室ムービー（StoryMovie.PlayOpening）を使う
+    [Serializable]
+    public class StoryCutscene
+    {
+        public string type;             // "stage" = 実際のステージを撮る
+        public string caption;          // 場所テロップ（例：夏 ― 地区大会 決勝）
+        public string runner;           // 走るキャラID（空なら playerCharacter）
+        public string rival;            // 相手のキャラID（空なら最初のCPU）
+        public List<StoryShot> shots = new List<StoryShot>();
     }
 
     // 新聞（1枚絵）
@@ -78,6 +103,9 @@ namespace Yurube.Story
     {
         public string id;
         public string title;            // 章の名前（例：序章「はじまりは、おにぎり」）
+        // 章選択の並び順（小さいほど下の段）と、解放に必要な章ID
+        public int order;
+        public string requiredChapter;  // 空なら最初から遊べる
         public string stageId;          // StageInfo の Id（例：DebugStage31）
         public string sceneName = "AllStages";
         public string playerCharacter = "kidaru";
@@ -92,6 +120,13 @@ namespace Yurube.Story
         public List<TutorialStep> tutorial = new List<TutorialStep>();
         // チュートリアルのあと、試合を始める前の一言
         public List<StoryLine> matchStart = new List<StoryLine>();
+        // 試合開始の小窓に出す一言（空なら「練習試合、開始！」）
+        public string matchStartNotice;
+        // 初回だけ出すイベントの台詞（打ち返し成功・いわの積み木が壁で砕けた）
+        public List<StoryLine> reflectFirst = new List<StoryLine>();
+        public List<StoryLine> wallBreakFirst = new List<StoryLine>();
+        // カットシーン（type が空なら序章の部室ムービー）
+        public StoryCutscene cutscene = new StoryCutscene();
         // 必殺技の覚醒イベント（初回だけ。対戦中の小窓で出す）
         public List<StoryLine> awakening = new List<StoryLine>();
         // 対戦中に一度だけ出す掛け合い（CPUが攻撃したときなど）
@@ -124,6 +159,38 @@ namespace Yurube.Story
             }
             chapter.id = chapterId;
             return chapter;
+        }
+
+        // Resources/Story にある章を全部読む（章選択用。order の小さい順）
+        public static List<StoryChapter> LoadAll()
+        {
+            var list = new List<StoryChapter>();
+            var assets = Resources.LoadAll<TextAsset>("Story");
+            if (assets != null)
+            {
+                foreach (var asset in assets)
+                {
+                    if (asset == null || string.IsNullOrEmpty(asset.text)) continue;
+                    StoryChapter chapter = null;
+                    try
+                    {
+                        chapter = JsonUtility.FromJson<StoryChapter>(asset.text);
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.LogWarning("[Story] 台本を読めませんでした: " + asset.name + " / " + e.Message);
+                    }
+                    if (chapter == null) continue;
+                    if (string.IsNullOrEmpty(chapter.id)) chapter.id = asset.name;
+                    list.Add(chapter);
+                }
+            }
+            list.Sort((a, b) =>
+            {
+                int byOrder = a.order.CompareTo(b.order);
+                return byOrder != 0 ? byOrder : string.CompareOrdinal(a.id, b.id);
+            });
+            return list;
         }
 
         public static StorySpeaker FindSpeaker(StoryChapter chapter, string id)

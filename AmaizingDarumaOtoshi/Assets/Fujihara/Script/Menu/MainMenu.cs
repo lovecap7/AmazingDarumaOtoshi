@@ -1458,12 +1458,12 @@ public class MainMenu : MonoBehaviour
 
             case ItemKind.Story:
             {
-                // ストーリー：積み木を叩き飛ばして、少し待ってから章を始める（中身は Yurube/Story）
-                outIdx = index;
-                impactTime = sim;
-                phase = Phase.Leaving;
-                yield return new WaitForSecondsRealtime(0.55f);
-                Yurube.Story.StoryLauncher.StartPrologue();
+                // ストーリー：章選択を開く（中身は Yurube/Story）。章選択中はこのメニューの入力を止める
+                wobbleIdx = index;
+                wobbleTime = sim;
+                yield return new WaitForSecondsRealtime(0.35f);
+                phase = Phase.Browse;
+                Yurube.Story.StoryChapterSelect.Open(this);
                 break;
             }
 
@@ -1521,6 +1521,9 @@ public class MainMenu : MonoBehaviour
     // ================= 毎フレーム =================
     void Update()
     {
+        // 章選択を閉じたフレームは、同じ入力でメニューが二重に反応しないように1フレーム止める
+        if (Yurube.Story.StoryChapterSelect.SuppressMenuInput) return;
+
         sim += Time.deltaTime;
         float dt = Time.unscaledDeltaTime;
 
