@@ -7,7 +7,7 @@ namespace Nakagawa
     // バンパー。触れたプレイヤー・積み木を中心から外向きに一定の強さではじく円盤
     // 子のコライダーの衝突を受け取るため、このGameObjectに動かないRigidbodyを付ける
     [RequireComponent(typeof(Rigidbody))]
-    public class BumperGimmick : MonoBehaviour
+    public class BumperGimmick : MonoBehaviour, INetGimmickState
     {
         [Header("はじく強さ")]
         // プレイヤーをはじく水平の速さ
@@ -95,6 +95,18 @@ namespace Nakagawa
                 m_mpb.SetColor("_BaseColor", Color.Lerp(m_baseColor, m_flashColor, t));
                 m_renderer.SetPropertyBlock(m_mpb);
             }
+        }
+
+        // ネット対戦用(suehara): はじいたときに膨らんで光る残り時間をホストから受け取る(はじくのはホストだけ)
+        public void WriteNetState(GimmickNetState s)
+        {
+            s.Add(m_punchTimer);
+        }
+
+        public void ReadNetState(GimmickNetState s)
+        {
+            float timer = s.Float();
+            if (s.Ok) m_punchTimer = timer;
         }
 
         // 破棄された相手の記録を消す

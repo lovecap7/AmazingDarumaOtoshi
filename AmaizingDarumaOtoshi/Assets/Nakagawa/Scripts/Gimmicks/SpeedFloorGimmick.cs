@@ -277,6 +277,19 @@ namespace Nakagawa
             if (GimmickClock.IsHeld) return;
             float dt = Time.fixedDeltaTime;
             Vector3 half = new Vector3(m_size.x * 0.5f, m_rideHeight * 0.5f, m_size.y * 0.5f);
+            // ネット対戦用(suehara): クライアントは、乗っている間の粒だけを出す(速さはホストが変え、乗った瞬間のエフェクトはホストから届く)
+            if (GimmickClock.IsNetClient)
+            {
+                GimmickUtil.OverlapBoxForView(transform.position + Vector3.up * (m_rideHeight * 0.5f), half, transform.rotation, m_found);
+                m_effects.Begin();
+                foreach (var target in m_found)
+                {
+                    if (target is TumikiBlock ? m_affectBlocks : m_affectPlayers) m_effects.Touch(target);
+                }
+                m_effects.End();
+                return;
+            }
+            using var relay = GimmickNet.Relay();   // ネット対戦用(suehara): 乗った瞬間のエフェクトをクライアントにも出す
             GimmickUtil.OverlapBox(transform.position + Vector3.up * (m_rideHeight * 0.5f), half, transform.rotation, m_found);
 
             m_effects.Begin();
