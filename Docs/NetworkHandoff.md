@@ -52,6 +52,11 @@
 - 1人分の中身（状態・ストック・点数・記録・積み木数・順位・いまの体）は `NetMatchPlayer` が毎フレームまとめて送る（変わったときだけ）。
   クライアントは積み木を持っていないので、積み木の数は `MatchPlayer.NetStackCount` で受け取る。
 - 時間・カウントダウンは `NetMatch` が 0.05 秒刻みで送り、クライアントは間を自分で進めて、0.15 秒以上ずれたら合わせる。
+- ラグ対策（2026-11-13）: 通信の刻み（NetworkManager の TickRate）は 60（`NetworkManager.prefab` と `NetStages` の両方。ホストとクライアントで同じでないとつながらない）。
+  クライアントの表示の待ちは `NetClientTuning`（NetMatch に付けた）が詰める: ホストの時刻を遅らせて映す余裕を 1 刻みにし、NetworkTransform のなめらかに追いかける処理（LerpSmoothing）を切る。
+  回線が不安定でカクつくときは、`NetClientTuning` の一番上の2つの値で戻す。
+  クライアントで止まった状態からスティックを倒すと、動き出すまでの時間が Console に `[ラグ計測]` と出る（`NetworkCommandSource.LogLag`）。
+  これでも遅い場合の次の手は、自分のキャラだけ手元で先に動かす（クライアント予測。大きめの作業）
 
 ## 3. 作ったもの・変えたもの
 
