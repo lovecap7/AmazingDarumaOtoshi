@@ -12,7 +12,7 @@ namespace Yurube.Story
         [Tooltip("1秒あたりに表示する文字数（大きいほど速い）")]
         [SerializeField, Min(1f)] float m_charsPerSecond = 34f;
         [Tooltip("対戦中の小さいウィンドウを自動で閉じるまでの秒数")]
-        [SerializeField, Min(0.5f)] float m_smallSeconds = 4.5f;
+        [SerializeField, Min(0.5f)] float m_smallSeconds = 3.0f;
         [Tooltip("大きいウィンドウのとき、背景を暗くする濃さ")]
         [SerializeField, Range(0f, 0.9f)] float m_dimAlpha = 0.62f;
         [Tooltip("必殺技の覚醒イベントが、対戦開始から自動で起きるまでの秒数（保険。ストックが残り1になれば早く起きる）")]
@@ -22,9 +22,25 @@ namespace Yurube.Story
 
         [Header("打ち返しチュートリアル")]
         [Tooltip("プレイヤーへ向かう積み木が来ないとき、補助で飛ばすまでの秒数")]
-        [SerializeField, Min(3f)] float m_reflectAssistSeconds = 20f;
+        [SerializeField, Min(3f)] float m_reflectAssistSeconds = 6f;
         [Tooltip("補助で飛ばす積み木の速さ（m/s）")]
         [SerializeField, Min(1f)] float m_reflectAssistSpeed = 18f;
+
+        [Header("連鎖チュートリアル")]
+        [Tooltip("連鎖が起きないときに、操作バナーを強調するまでの秒数")]
+        [SerializeField, Min(3f)] float m_chainHintSeconds = 30f;
+        [Tooltip("強調してから、さらにこの秒数たっても起きないときに積み木を出す（合計 75 秒が既定）")]
+        [SerializeField, Min(3f)] float m_chainAssistSeconds = 45f;
+
+        [Header("必殺技イベント（追い詰められたら撃つ）")]
+        [Tooltip("操作プロンプトを出しておく秒数。必殺技を使えば早く消える")]
+        [SerializeField, Min(1f)] float m_specialPromptSeconds = 10f;
+        [Tooltip("章データの時間保険を、Inspector から強制的に有効にする")]
+        [SerializeField] bool m_specialFallbackEnabled;
+        [Tooltip("時間保険の秒数（章データの timeSeconds が 0 のときに使う）")]
+        [SerializeField, Min(5f)] float m_specialFallbackSeconds = 90f;
+        [Tooltip("リトライ後に、ストック1でゲージ満タン＋READY＋プロンプトの補助を出す")]
+        [SerializeField] bool m_specialReplayAssist = true;
 
         [Header("章の上書き（0 なら章データ）")]
         [Tooltip("章データのストック数の既定値を上書きする（0 なら章データ。CPU個別の stocks は優先）")]
@@ -41,6 +57,12 @@ namespace Yurube.Story
         public int TutorialCpuBlockLimit => Mathf.Max(0, m_tutorialCpuBlockLimit);
         public float ReflectAssistSeconds => Mathf.Max(3f, m_reflectAssistSeconds);
         public float ReflectAssistSpeed => Mathf.Max(1f, m_reflectAssistSpeed);
+        public float ChainHintSeconds => Mathf.Max(3f, m_chainHintSeconds);
+        public float ChainAssistSeconds => Mathf.Max(3f, m_chainAssistSeconds);
+        public float SpecialPromptSeconds => Mathf.Max(1f, m_specialPromptSeconds);
+        public bool SpecialFallbackEnabled => m_specialFallbackEnabled;
+        public float SpecialFallbackSeconds => Mathf.Max(5f, m_specialFallbackSeconds);
+        public bool SpecialReplayAssist => m_specialReplayAssist;
         public int OverrideStocks => Mathf.Max(0, m_overrideStocks);
         public int OverrideCpuLevel => Mathf.Max(0, m_overrideCpuLevel);
         public int OverrideCpuBlockLimit => Mathf.Max(0, m_overrideCpuBlockLimit);

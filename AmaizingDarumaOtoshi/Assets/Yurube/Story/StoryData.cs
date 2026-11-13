@@ -60,10 +60,36 @@ namespace Yurube.Story
         public bool cpuSpecial = true;  // CPU の必殺技を使ってよいか（チュートリアルでは false 推奨）
         // 必殺技の覚醒イベントを出す章か（序章だけ true）
         public bool awakening;
-        // 必殺技ゲージを最初から見せるか。序章は false（覚醒の瞬間まで隠す）
+        // 必殺技ゲージを最初から見せるか。見せ場まで隠す章は false（序章・第1章）
         public bool gaugeFromStart = true;
         // チュートリアル用の難易度（0 なら通常）。CPU だけに効く
         public int cpuBlockLimit;
+    }
+
+    // 対戦中の「追い詰められたら撃つ」イベント（第2章以降）。
+    // 章データで有効／無効・トリガー・台詞・プロンプトを変えられる。
+    // 序章の覚醒イベント（rules.awakening）は「必ず使う」仕様なので、こちらとは別に扱う。
+    [Serializable]
+    public class StorySpecialEvent
+    {
+        public bool enabled;
+        // lowStock: ストックが stockThreshold 以下になったら / time: timeSeconds 経過したら
+        // （timeFallback が true なら、lowStock の保険として時間でも起こす）
+        public string trigger = "lowStock";
+        public int stockThreshold = 1;
+        // 時間経過の保険（既定は無効。Inspector の StorySettings でも有効にできる）
+        public bool timeFallback;
+        public float timeSeconds = 90f;
+        // 掛け合いのあいだ試合を止めるか
+        public bool pause = true;
+        // 操作プロンプト（既存の表記に合わせる。キーボード L／パッド Y）
+        public string prompt = "[L／Y]で必殺技！";
+        // プロンプトを出しておく秒数。必殺技を使えば早く消える
+        public float promptSeconds = 10f;
+        // リトライ後に、もう一度ストック1になったときの補助（ゲージ満タン＋READY＋プロンプト）を出すか
+        public bool replayAssist = true;
+        // 掛け合い（初回だけ。対戦中の小窓で約3秒ずつ）
+        public List<StoryLine> lines = new List<StoryLine>();
     }
 
     // カットシーンの1カット（章データで並びと長さを決める）
@@ -125,12 +151,20 @@ namespace Yurube.Story
         // 初回だけ出すイベントの台詞（打ち返し成功・いわの積み木が壁で砕けた）
         public List<StoryLine> reflectFirst = new List<StoryLine>();
         public List<StoryLine> wallBreakFirst = new List<StoryLine>();
+        // 初回だけ出す連鎖の台詞（相手に当てたあと、抜けた積み木が別の積み木に当たった）
+        public List<StoryLine> chainFirst = new List<StoryLine>();
+        // 連鎖の詰まり防止で、一定時間たっても起きないときに出すヒント
+        public List<StoryLine> chainHint = new List<StoryLine>();
         // カットシーン（type が空なら序章の部室ムービー）
         public StoryCutscene cutscene = new StoryCutscene();
         // 必殺技の覚醒イベント（初回だけ。対戦中の小窓で出す）
         public List<StoryLine> awakening = new List<StoryLine>();
+        // 「追い詰められたら撃つ」必殺技イベント（第2章以降。初回だけ）
+        public StorySpecialEvent specialEvent = new StorySpecialEvent();
         // 対戦中に一度だけ出す掛け合い（CPUが攻撃したときなど）
         public List<StoryLine> cpuTaunts = new List<StoryLine>();
+        // CPU の掛け合いを「最初のショット」で出すか（false なら最初にダメージを与えたとき）
+        public bool cpuTauntOnShot;
         // 初回だけ出す掛け合い（黄色い積み木を積んで増えたとき）
         public List<StoryLine> yellowExtra = new List<StoryLine>();
         public StoryNewspaper newspaper = new StoryNewspaper();

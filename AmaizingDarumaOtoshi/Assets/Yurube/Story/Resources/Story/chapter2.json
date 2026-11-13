@@ -1,0 +1,118 @@
+{
+  "id": "chapter2",
+  "order": 2,
+  "requiredChapter": "chapter1",
+  "title": "第2章「まっすぐじゃない」",
+  "stageId": "DebugStage46",
+  "sceneName": "AllStages",
+  "playerCharacter": "akadaru",
+  "clearKey": "Story.Clear.chapter2",
+  "rules": {
+    "mode": "Stock",
+    "stocks": 3,
+    "timeLimit": 0,
+    "cpuSpecial": false,
+    "awakening": false,
+    "gaugeFromStart": true,
+    "cpuBlockLimit": 0
+  },
+  "cpu": [
+    { "character": "hebidaru", "level": 2, "stocks": 2 },
+    { "character": "iwadaru", "level": 2, "stocks": 2, "displayName": "蛇ノ目学園 選手A" },
+    { "character": "daruking", "level": 1, "stocks": 2, "displayName": "蛇ノ目学園 選手B" }
+  ],
+  "speakers": [
+    { "id": "akadaru", "name": "あかだる", "color": "#E8544B" },
+    { "id": "aodaru", "name": "あおだる", "color": "#4B8BE8" },
+    { "id": "midaru", "name": "みだる", "color": "#4BA85A" },
+    { "id": "kidaru", "name": "きだる", "color": "#E8C64B" },
+    { "id": "hebidaru", "name": "へびだる", "color": "#6BBF45" }
+  ],
+  "cutscene": {
+    "type": "venue",
+    "caption": "全国大会 準決勝",
+    "shots": [
+      { "view": "wide", "seconds": 3.4 },
+      { "view": "group", "seconds": 4.8 }
+    ]
+  },
+  "before": [
+    { "speaker": "", "direction": true, "text": "（鳥居の前。4人で「全国制覇！ だるま落とし部」の看板に誓う）" },
+    { "speaker": "akadaru", "text": "全国制覇！ 一撃入魂！" },
+    { "speaker": "hebidaru", "text": "相変わらずうるさいなあ、あかだる" },
+    { "speaker": "akadaru", "text": "その声は……へびだる！？ なぜここに！" },
+    { "speaker": "hebidaru", "text": "蛇ノ目学園のエースだよ。ボクも全国に来たってこと" },
+    { "speaker": "akadaru", "text": "中学のとき、一緒に全国へ行こうと言ったじゃないか！" },
+    { "speaker": "hebidaru", "text": "言ってないよ。キミが一人で叫んでただけ" },
+    { "speaker": "midaru", "text": "データによると、へびだるの弾は左右交互に曲がります" },
+    { "speaker": "aodaru", "text": "……読みづらい" },
+    { "speaker": "kidaru", "text": "へびせんぱい、おにぎり食べます？" },
+    { "speaker": "hebidaru", "text": "……いらない" }
+  ],
+  "tutorial": [
+    {
+      "speaker": "midaru",
+      "text": "積み木が積み木に当たると連鎖して崩れます。相手の積み木を狙って、まとめて崩しましょう",
+      "condition": "DialogueDone"
+    },
+    {
+      "speaker": "midaru",
+      "text": "B：積み木を飛ばす　相手の積み木を狙って、連鎖を起こそう",
+      "condition": "Chain",
+      "count": 1,
+      "cpu": "all"
+    }
+  ],
+  "matchStart": [],
+  "matchStartNotice": "全国大会 準決勝、開始！",
+  "chainFirst": [
+    { "speaker": "akadaru", "text": "一撃入魂ぁ！" },
+    { "speaker": "hebidaru", "text": "……っ！" }
+  ],
+  "chainHint": [
+    { "speaker": "midaru", "text": "相手の積み木が積み上がっているところを狙おう" }
+  ],
+  "cpuTaunts": [
+    { "speaker": "hebidaru", "text": "ほら、曲がったでしょ" }
+  ],
+  "cpuTauntOnShot": true,
+  "defeat": [
+    { "speaker": "hebidaru", "text": "ほら、曲がったでしょ" },
+    { "speaker": "akadaru", "text": "……まだだ、もう一本！" }
+  ],
+  "specialEvent": {
+    "enabled": true,
+    "trigger": "lowStock",
+    "stockThreshold": 1,
+    "timeFallback": false,
+    "timeSeconds": 90,
+    "pause": true,
+    "prompt": "[L／Y]で必殺技！",
+    "promptSeconds": 10,
+    "replayAssist": true,
+    "lines": [
+      { "speaker": "midaru", "text": "……ストックが残り1です。想定より、追い詰められています" },
+      { "speaker": "akadaru", "text": "まだだ……！ ここからが、一撃入魂だ！" }
+    ]
+  },
+  "after": [
+    { "speaker": "hebidaru", "text": "……笑えないな" },
+    { "speaker": "akadaru", "text": "へび。あのとき、なぜ笑った" },
+    { "speaker": "hebidaru", "text": "……全国制覇なんて、本気で言うやつがいるとは思わなかったんだよ。羨ましかっただけさ" },
+    { "speaker": "akadaru", "text": "羨ましい？" },
+    { "speaker": "hebidaru", "text": "うるさいな。……まっすぐ飛ばすなんてつまらないけど、今日のキミのは、悪くなかったよ" },
+    { "speaker": "akadaru", "text": "へび……" },
+    { "speaker": "hebidaru", "text": "決勝で会おう。ボクにも事情があるんだ" },
+    { "speaker": "akadaru", "text": "事情？" },
+    { "speaker": "hebidaru", "text": "……そのうち話すよ。ただ、『落とし手』って言葉だけは、覚えといて" },
+    { "speaker": "akadaru", "text": "落とし手……？" },
+    { "speaker": "hebidaru", "text": "ボクは断ったけどね。……じゃあ、決勝で" }
+  ],
+  "newspaper": {
+    "header": "だるま新聞",
+    "headline": "あかだる、元チームメイトを下し決勝へ",
+    "body": "全国大会準決勝。七転高校だるま落とし部のあかだるが、中学時代のチームメイト・へびだるを破り、決勝進出を決めた。へびだるの左右に曲がる弾に苦しみながらも、最後はまっすぐな一撃で押し切った。あかだるは「一撃入魂だ！」と声を弾ませた。",
+    "image": "",
+    "caption": "全国大会 準決勝 七転高校 あかだる"
+  }
+}

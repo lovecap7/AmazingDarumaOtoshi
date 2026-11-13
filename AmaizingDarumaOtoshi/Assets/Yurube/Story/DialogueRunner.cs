@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using TMPro;
@@ -19,7 +20,7 @@ namespace Yurube.Story
         // 文字送りの速さ（1秒あたりの文字数）。インスペクターで変えられる
         [SerializeField, Min(1f)] float m_charsPerSecond = 34f;
         // 小さいウィンドウを自動で閉じるまでの秒数
-        [SerializeField, Min(0.5f)] float m_smallSeconds = 4.5f;
+        [SerializeField, Min(0.5f)] float m_smallSeconds = 3.0f;
         // 背景を暗くする濃さ（大きいウィンドウのとき）
         [SerializeField, Range(0f, 0.9f)] float m_dimAlpha = 0.62f;
 
@@ -40,8 +41,18 @@ namespace Yurube.Story
         CanvasGroup m_bigGroup, m_smallGroup, m_newsGroup, m_objectiveGroup, m_koGroup, m_hintGroup;
         bool m_skipped;
         bool m_smallShowing;
+        bool m_bigShowing;
+        // いま出している小窓のコルーチン。新しい小窓が来たら止めて、すぐ切り替える
+        Coroutine m_smallRoutine;
 
-        public bool IsShowing { get; private set; }
+        // 大きいウィンドウ・小さいウィンドウ・新聞のどれかが出ているか
+        public bool IsShowing => m_bigShowing || m_smallShowing;
+
+        // 1行を表示し始めた（話者ID。ト書きは空）。会話中にカメラを話者へ寄せる演出用
+        public event Action<string> LineStarted;
+
+        // 操作バナーを目立たせる（連鎖の詰まり防止）
+        bool m_objectiveEmphasis;
 
         //========================================
         // 作る
@@ -349,7 +360,7 @@ namespace Yurube.Story
             if (lines == null || lines.Count == 0) yield break;
             Build();
             while (m_smallShowing) yield return null;   // 小窓と重ねない
-            IsShowing = true;
+            m_bigShowing = true;
             m_skipped = false;
             HideObjective();
 
@@ -379,8 +390,16 @@ namespace Yurube.Story
             yield return FadeGroup(m_bigGroup, 1f, 0f, 0.15f);
             yield return Fade(m_dim, m_dim.color.a, 0f, 0.2f);
             m_bigPanel.gameObject.SetActive(false);
-            IsShowing = false;
+            m_bigShowing = false;
             SpecialGaugeHUD.Suppressed = gaugeWasSuppressed;
+        }
+
+        // 右下の操作ヒントを消す（GO!やメニュー移行時に残らないように）
+        public void HideHint()
+        {
+            if (m_hintGroup == null) return;
+            m_hintGroup.alpha = 0f;
+            m_hintGroup.gameObject.SetActive(false);
         }
 
         // 背景を暗くする濃さを変える（ムービーを背景にするときは薄くする）
@@ -399,15 +418,32 @@ namespace Yurube.Story
             tag.color = StoryData.SpeakerColor(chapter, speakerId, ToyKit.Palette[3]);
             tag.gameObject.SetActive(!string.IsNullOrEmpty(speakerId));
             m_objectiveText.text = text;
+            m_objectivePanel.localScale = Vector3.one;
             m_objectivePanel.gameObject.SetActive(true);
             m_objectiveGroup.alpha = 1f;
         }
 
+        // 操作バナーを点滅させて目立たせる（連鎖が起きないときの強調）
+        public void SetObjectiveEmphasis(bool on)
+        {
+            m_objectiveEmphasis = on;
+            if (!on && m_objectivePanel != null) m_objectivePanel.localScale = Vector3.one;
+        }
+
         public void HideObjective()
         {
+            m_objectiveEmphasis = false;
             if (m_objectivePanel == null) return;
+            m_objectivePanel.localScale = Vector3.one;
             m_objectiveGroup.alpha = 0f;
             m_objectivePanel.gameObject.SetActive(false);
+        }
+
+        void Update()
+        {
+            if (!m_objectiveEmphasis || m_objectivePanel == null || !m_objectivePanel.gameObject.activeSelf) return;
+            float s = 1f + 0.035f * Mathf.Sin(Time.unscaledTime * 6f);
+            m_objectivePanel.localScale = new Vector3(s, s, 1f);
         }
 
         // やられたときの赤い閃光（ストックが残っているとき）
@@ -463,14 +499,21 @@ namespace Yurube.Story
 
         // 小さいウィンドウ（対戦中の説明）。対戦の操作ボタン（Aジャンプ・Bショットなど）で
         // 消えないように、入力では閉じず、文字数に応じた時間で自動的に閉じる。
+        // 新しい小窓が来たら、前の小窓を待たせずにすぐ入れ替える（台詞がキューに溜まらないように）。
         public IEnumerator PlaySmall(string speakerId, string text, StoryChapter chapter, float secondsOverride = -1f)
         {
             if (string.IsNullOrEmpty(text)) yield break;
             Build();
-            while (m_smallShowing) yield return null;   // 前の小窓が閉じるまで待つ（重ねない）
+            CloseSmallNow();
+            if (m_bigShowing) yield break;   // 大きい会話の最中は割り込まない
+
+            m_smallRoutine = StartCoroutine(ShowSmall(speakerId, text, chapter, secondsOverride));
+            yield return m_smallRoutine;
+        }
+
+        IEnumerator ShowSmall(string speakerId, string text, StoryChapter chapter, float secondsOverride)
+        {
             m_smallShowing = true;
-            bool wasShowing = IsShowing;
-            IsShowing = true;
 
             ApplySpeaker(chapter, speakerId, big: false);
             m_smallText.text = text;
@@ -480,7 +523,7 @@ namespace Yurube.Story
             // 読み終わるくらいの時間だけ出す（短い台詞でも最低 m_smallSeconds）
             float seconds = secondsOverride > 0f
                 ? secondsOverride
-                : Mathf.Clamp(m_smallSeconds + text.Length * 0.05f, m_smallSeconds, 9f);
+                : Mathf.Clamp(m_smallSeconds + text.Length * 0.03f, m_smallSeconds, 4.5f);
             float time = 0f;
             while (time < seconds)
             {
@@ -490,8 +533,21 @@ namespace Yurube.Story
 
             yield return FadeGroup(m_smallGroup, 1f, 0f, 0.2f);
             m_smallPanel.gameObject.SetActive(false);
-            IsShowing = wasShowing;
             m_smallShowing = false;
+            m_smallRoutine = null;
+        }
+
+        // いま出ている小窓をすぐ閉じる（次の小窓に切り替えるとき・シーンを離れるとき）
+        void CloseSmallNow()
+        {
+            if (m_smallRoutine != null)
+            {
+                StopCoroutine(m_smallRoutine);
+                m_smallRoutine = null;
+            }
+            m_smallShowing = false;
+            if (m_smallGroup != null) m_smallGroup.alpha = 0f;
+            if (m_smallPanel != null) m_smallPanel.gameObject.SetActive(false);
         }
 
         //========================================
@@ -502,7 +558,7 @@ namespace Yurube.Story
         {
             if (paper == null || string.IsNullOrEmpty(paper.headline)) yield break;
             Build();
-            IsShowing = true;
+            m_bigShowing = true;
 
             m_newsHeader.text = string.IsNullOrEmpty(paper.header) ? "だるま新聞" : paper.header;
             m_newsHeadline.text = paper.headline;
@@ -550,7 +606,7 @@ namespace Yurube.Story
             yield return FadeGroup(m_newsGroup, 1f, 0f, 0.2f);
             m_newsPanel.gameObject.SetActive(false);
             m_dim.color = new Color(m_dim.color.r, m_dim.color.g, m_dim.color.b, 0f);
-            IsShowing = false;
+            m_bigShowing = false;
             SpecialGaugeHUD.Suppressed = gaugeWasSuppressed;
         }
 
@@ -573,6 +629,7 @@ namespace Yurube.Story
         {
             bool direction = line.direction || string.IsNullOrEmpty(line.speaker);
             ApplySpeaker(chapter, line.speaker, big);
+            LineStarted?.Invoke(line.speaker);
 
             var text = big ? m_bigText : m_smallText;
             text.text = line.text;

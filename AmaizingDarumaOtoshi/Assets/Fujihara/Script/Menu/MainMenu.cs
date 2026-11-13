@@ -352,6 +352,16 @@ public class MainMenu : MonoBehaviour
 
     void Start()
     {
+        // ストーリー用(Yurube): 物語が途中なら「ものがたり」を最初に選んでおく（全章クリア後は「たたかう」）
+        if (Yurube.Story.StoryProgress.HasStoryInProgress())
+        {
+            for (int i = 0; i < ItemCount; i++)
+            {
+                if (Kind(i) != ItemKind.Story) continue;
+                cursor = i;
+                break;
+            }
+        }
         BuildStage();
         camLook = browseShot.look; camDist = browseShot.distance; camWidth = browseShot.width;
         camPos = CamPosition();
