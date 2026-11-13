@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using Nakahira;
 using UnityEngine;
+using Yurube.Achievements;
 
 namespace Yurube.Story
 {
@@ -26,6 +27,9 @@ namespace Yurube.Story
         int m_startStack;
         bool m_reflected;
         float m_reflectIdle;
+        // 連鎖チュートリアル：相手に当てたあと、連鎖が起きるまでを受け付ける時間
+        bool m_chained;
+        float m_chainOpponentHitUntil = -1f;
         readonly Dictionary<MatchPlayer, bool> m_cpuIdle = new Dictionary<MatchPlayer, bool>();
         readonly Dictionary<MatchPlayer, DarumaCharacter> m_cpuBodies = new Dictionary<MatchPlayer, DarumaCharacter>();
 
@@ -41,11 +45,15 @@ namespace Yurube.Story
         void OnEnable()
         {
             DarumaHammer.Hit += OnHammerHit;
+            TumikiBlock.Hit += OnBlockHit;
+            AchievementEvents.Chain += OnChain;
         }
 
         void OnDisable()
         {
             DarumaHammer.Hit -= OnHammerHit;
+            TumikiBlock.Hit -= OnBlockHit;
+            AchievementEvents.Chain -= OnChain;
         }
 
         void OnDestroy()
@@ -59,7 +67,24 @@ namespace Yurube.Story
             if (info.ReturnCount <= 0) return;
             if (m_player == null || m_player.Character == null) return;
             if (!ReferenceEquals(info.Owner, m_player.Character)) return;
+            if (!m_reflected) Debug.Log("[Story] 打ち返し成功（チュートリアル）");
             m_reflected = true;
+        }
+
+        // プレイヤーの弾が相手（CPU）に当たった
+        void OnBlockHit(TumikiHitInfo info)
+        {
+            if (!info.IsHarmful) return;
+            if (m_player == null || m_player.Character == null) return;
+            if (!ReferenceEquals(info.Block.Owner, m_player.Character)) return;
+            if (!(info.Target is DarumaCharacter target) || target == m_player.Character) return;
+            m_chainOpponentHitUntil = Time.unscaledTime + 1.2f;
+        }
+
+        // 相手に当てたあと、抜けた積み木が別の積み木に当たって連鎖した
+        void OnChain(int length)
+        {
+            if (Time.unscaledTime <= m_chainOpponentHitUntil) m_chained = true;
         }
 
         void Hook()
@@ -94,6 +119,15 @@ namespace Yurube.Story
             while (m_match != null && m_match.IsCountingDown) yield return null;
             yield return new WaitForSecondsRealtime(0.4f);
 
+            // 章データに「開始！」の文言がある章は、GO! の直後に出す
+            // （序章など文言のない章は、これまでどおりチュートリアルの後に「練習試合、開始！」を出す）
+            bool noticeShownAtStart = false;
+            if (!StorySession.MatchStartPlayed && !string.IsNullOrEmpty(m_chapter.matchStartNotice))
+            {
+                yield return m_dialogue.PlaySmall("", m_chapter.matchStartNotice, m_chapter);
+                noticeShownAtStart = true;
+            }
+
             var steps = m_chapter.tutorial;
             for (int i = StorySession.TutorialStep; i < steps.Count; i++)
             {
@@ -116,6 +150,8 @@ namespace Yurube.Story
 
                 // このステップの間だけ動かすCPU（第1章の打ち返しは、いわだるだけ動かす）
                 SetCpusForStep(step);
+                if (condition == "Reflect")
+                    Debug.Log("[Story] 打ち返しチュートリアル開始（いわだるの積み木を待つ）");
 
                 // 実際にやってもらう。できるまで次の説明には進まない
                 m_dialogue.ShowObjective(m_chapter, step.speaker, step.text);
@@ -140,10 +176,13 @@ namespace Yurube.Story
                 SetCpusIdle(false);
                 m_director.SetStoryPaused(false);
 
-                string notice = string.IsNullOrEmpty(m_chapter.matchStartNotice)
-                    ? "練習試合、開始！"
-                    : m_chapter.matchStartNotice;
-                m_dialogue.StartCoroutine(m_dialogue.PlaySmall("", notice, m_chapter));
+                if (!noticeShownAtStart)
+                {
+                    string notice = string.IsNullOrEmpty(m_chapter.matchStartNotice)
+                        ? "練習試合、開始！"
+                        : m_chapter.matchStartNotice;
+                    m_dialogue.StartCoroutine(m_dialogue.PlaySmall("", notice, m_chapter));
+                }
             }
             else
             {
@@ -229,8 +268,16 @@ namespace Yurube.Story
             m_attacked = false;
             m_reflected = false;
             m_reflectIdle = 0f;
+            m_chained = false;
+            m_chainOpponentHitUntil = -1f;
             m_startStack = m_player != null ? m_player.StackCount : 0;
             float assistSeconds = StorySettings.Instance != null ? StorySettings.Instance.ReflectAssistSeconds : 20f;
+            var settings = StorySettings.Instance;
+            float chainHintSeconds = settings != null ? settings.ChainHintSeconds : 30f;
+            float chainAssistSeconds = settings != null ? settings.ChainAssistSeconds : 45f;
+            float chainStart = Time.unscaledTime;
+            bool chainHintShown = false;
+            bool chainAssistDone = false;
 
             while (true)
             {
@@ -263,6 +310,23 @@ namespace Yurube.Story
                         {
                             if (m_director != null) m_director.FireReflectAssist();
                             m_reflectIdle = 0f;
+                        }
+                        break;
+
+                    case "Chain":
+                        if (m_chained) yield break;
+                        // 30秒で操作バナーを強調し、さらに45秒で連鎖しやすい位置に積み木を出す
+                        float elapsed = Time.unscaledTime - chainStart;
+                        if (!chainHintShown && elapsed >= chainHintSeconds)
+                        {
+                            chainHintShown = true;
+                            if (m_dialogue != null) m_dialogue.SetObjectiveEmphasis(true);
+                            if (m_director != null) m_director.NotifyChainHint();
+                        }
+                        if (!chainAssistDone && elapsed >= chainHintSeconds + chainAssistSeconds)
+                        {
+                            chainAssistDone = true;
+                            if (m_director != null) m_director.SpawnChainAssist();
                         }
                         break;
 

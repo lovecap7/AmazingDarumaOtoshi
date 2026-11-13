@@ -31,6 +31,28 @@ namespace Yurube.Story
             Debug.Log("[Story] 章クリアを保存: " + chapterId);
         }
 
+        // 物語が途中か（1章以上クリアしていて、まだクリアしていない章がある）。
+        // メニューの初期カーソルを「ものがたり」にする判定に使う。全章クリア後は false。
+        // 最終章（4枠目）がまだ実装されていない間は、第2章までクリアしても「途中」扱いにする。
+        public static bool HasStoryInProgress()
+        {
+            const int PlannedChapterSlots = 4;   // 序章＋第1章＋第2章＋最終章
+            int chapterCount = 0;
+            bool anyCleared = false;
+            bool anyUncleared = false;
+            foreach (var chapter in StoryData.LoadAll())
+            {
+                if (chapter == null) continue;
+                chapterCount++;
+                if (IsCleared(chapter.id)) anyCleared = true;
+                else anyUncleared = true;
+            }
+            if (!anyCleared) return false;
+            if (anyUncleared) return true;
+            // 実装済みの章はすべてクリア。最終章の枠が残っているなら、まだ物語の途中
+            return chapterCount < PlannedChapterSlots;
+        }
+
         // 記録を消す（デバッグ用）
         public static void Clear(string chapterId)
         {
@@ -55,6 +77,8 @@ namespace Yurube.Story
         public static bool YellowExtraPlayed { get; set; }
         // 必殺技の覚醒イベントを終えたか（リトライでも保持する）
         public static bool AwakeningDone { get; set; }
+        // 「追い詰められたら撃つ」イベントの掛け合いを一度見たか（リトライでは補助だけ）
+        public static bool LastStandPlayed { get; set; }
         // 試合前の一言（matchStart）を出したか。リトライでは繰り返さない
         public static bool MatchStartPlayed { get; set; }
         // 敗北した回数（デバッグ表示用）
@@ -81,6 +105,7 @@ namespace Yurube.Story
             TutorialStep = 0;
             YellowExtraPlayed = false;
             AwakeningDone = false;
+            LastStandPlayed = false;
             MatchStartPlayed = false;
             RetryCount = 0;
             s_events.Clear();
@@ -94,6 +119,7 @@ namespace Yurube.Story
             TutorialStep = 0;
             YellowExtraPlayed = false;
             AwakeningDone = false;
+            LastStandPlayed = false;
             MatchStartPlayed = false;
             RetryCount = 0;
             s_events.Clear();

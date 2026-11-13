@@ -13,12 +13,18 @@ MonoBehaviour:
   m_Name: StorySettings
   m_EditorClassIdentifier: Assembly-CSharp::Yurube.Story.StorySettings
   m_charsPerSecond: 34
-  m_smallSeconds: 4.5
+  m_smallSeconds: 3
   m_dimAlpha: 0.62
   m_awakeningSeconds: 90
   m_tutorialCpuBlockLimit: 0
-  m_reflectAssistSeconds: 20
+  m_reflectAssistSeconds: 6
   m_reflectAssistSpeed: 18
+  m_chainHintSeconds: 30
+  m_chainAssistSeconds: 45
+  m_specialPromptSeconds: 10
+  m_specialFallbackEnabled: 0
+  m_specialFallbackSeconds: 90
+  m_specialReplayAssist: 1
   m_overrideStocks: 0
   m_overrideCpuLevel: 0
   m_overrideCpuBlockLimit: 0

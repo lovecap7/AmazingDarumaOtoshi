@@ -289,6 +289,11 @@ namespace Yurube.Achievements
                     "第1章をクリア。走り込みの先に、地区大会優勝があった。",
                     AchievementCategory.Story, "第1章をクリアする（だるま新聞まで見る）", AchievementMetric.StoryChapterCleared, 1,
                     AchievementRarity.Silver, mode: AchievementMode.Story, storyChapter: "chapter1"),
+
+                new AchievementDefinition("story_chapter2", "まっすぐじゃない",
+                    "第2章をクリア。曲がる弾を、まっすぐな一撃で越えた。",
+                    AchievementCategory.Story, "第2章をクリアする（だるま新聞まで見る）", AchievementMetric.StoryChapterCleared, 1,
+                    AchievementRarity.Silver, mode: AchievementMode.Story, storyChapter: "chapter2"),
             };
             return list;
         }

@@ -753,7 +753,7 @@ MonoBehaviour:
   speed: 20
   deceleration: 0.2
   stopThreshold: 1
-  behaviorType: 18
+  behaviorType: 12
   hebiTurnSpeed: 60
   homingStartTurnSpeed: 270
   homingGuidanceDuration: 1.5
@@ -1453,7 +1453,7 @@ MonoBehaviour:
   speed: 20
   deceleration: 0.1
   stopThreshold: 0.1
-  behaviorType: 0
+  behaviorType: 18
   hebiTurnSpeed: 90
   homingStartTurnSpeed: 270
   homingGuidanceDuration: 1.5
@@ -2527,8 +2527,8 @@ Transform:
   m_GameObject: {fileID: 1291388730}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -16.85, y: 0.34, z: -11.2966}
-  m_LocalScale: {x: 0.6274662, y: 0.73045576, z: 23.509008}
+  m_LocalPosition: {x: -16.8349, y: 0.34, z: -11.4047}
+  m_LocalScale: {x: 0.59734786, y: 0.73045576, z: 23.292727}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}

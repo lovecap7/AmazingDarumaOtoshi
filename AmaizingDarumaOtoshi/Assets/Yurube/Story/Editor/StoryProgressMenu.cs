@@ -30,5 +30,12 @@ public static class StoryProgressMenu
         StoryProgress.MarkCleared("chapter1");
         Debug.Log("[Story] 第1章をクリア済みにしました");
     }
+
+    [MenuItem("Yurube/ストーリー/第2章をクリア済みにする")]
+    static void ClearChapter2()
+    {
+        StoryProgress.MarkCleared("chapter2");
+        Debug.Log("[Story] 第2章をクリア済みにしました");
+    }
 }
 #endif

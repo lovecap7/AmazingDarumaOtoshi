@@ -38,6 +38,7 @@ public class NetLobbyUI : MonoBehaviour
     void Start()
     {
         if (GetComponent<NetSessionMenu>() == null) gameObject.AddComponent<NetSessionMenu>();
+        if (GetComponent<NetLobbyPanels>() == null) gameObject.AddComponent<NetLobbyPanels>();
         m_nm = NetworkManager.Singleton;
         m_address = PlayerPrefs.GetString(kAddressKey, "127.0.0.1");
         if (m_nm == null) return;

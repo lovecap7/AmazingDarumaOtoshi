@@ -198,11 +198,38 @@ public class NetMatch : NetworkBehaviour
     // 抽選から試合が始まるまでの間(ルール・キャラ・ステージを変えられない)
     public bool IsLotteryRunning => m_lottery.Value;
 
+    // ホスト: 試合を始められるか(試合に出る人が1人以上いて、ホスト以外の出る人が全員準備完了)
+    public bool CanStart
+    {
+        get
+        {
+            int playing = 0;
+            foreach (var p in m_players.Values)
+            {
+                if (p == null || !p.InMatch) continue;
+                playing++;
+                if (!p.IsHostPlayer && !p.IsReady) return false;
+            }
+            return playing > 0;
+        }
+    }
+
+    // ホスト: 試合に出る人のうち、まだ準備完了でない人の数(ホストを除く)
+    public int NotReadyCount
+    {
+        get
+        {
+            int n = 0;
+            foreach (var p in m_players.Values) if (p != null && p.InMatch && !p.IsHostPlayer && !p.IsReady) n++;
+            return n;
+        }
+    }
+
     // ホスト: 全員が選んだステージ(おまかせはここで決める)から抽選し、決まったステージに切り替えてから試合を始める
     // 1人だけ・全員が同じステージ(おまかせ以外)なら、キャラクターセレクトと同じく抽選の演出は出さずに決める
     public void StartWithLottery(MatchSetup.MatchRules rules)
     {
-        if (!IsServer || m_match == null || IsStarted || m_lottery.Value) return;
+        if (!IsServer || m_match == null || IsStarted || m_lottery.Value || !CanStart) return;
         var list = NetCharacterList.Instance;
         var switcher = FindAnyObjectByType<Nakagawa.StageSwitcher>(FindObjectsInactive.Include);
 
@@ -212,8 +239,9 @@ public class NetMatch : NetworkBehaviour
         {
             if (list.Stage(i) != null && switcher.IndexOf(list.Stage(i).id) >= 0) candidates.Add(i);
         }
+        // 票は試合に出る人だけ(観戦の人は数えない)
         var voters = new List<NetMatchPlayer>();
-        foreach (var p in m_players.Values) if (p != null) voters.Add(p);
+        foreach (var p in m_players.Values) if (p != null && p.InMatch) voters.Add(p);
         voters.Sort((a, b) => a.Index.CompareTo(b.Index));
         if (candidates.Count == 0 || voters.Count == 0)
         {

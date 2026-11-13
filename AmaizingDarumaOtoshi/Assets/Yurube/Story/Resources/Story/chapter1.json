@@ -13,7 +13,7 @@
     "timeLimit": 0,
     "cpuSpecial": false,
     "awakening": false,
-    "gaugeFromStart": true,
+    "gaugeFromStart": false,
     "cpuBlockLimit": 0
   },
   "cpu": [
@@ -40,9 +40,9 @@
     ]
   },
   "before": [
-    { "speaker": "", "direction": true, "text": "（夏。地区大会会場のグラウンド。あおが黙々と走っている）" },
+    { "speaker": "", "direction": true, "text": "（夏。地区大会会場。観客席がざわめき、決勝の時を待っている）" },
     { "speaker": "akadaru", "text": "決勝の相手は巌高校だ。主将のいわだるは、積み木を壊さずに突っ込んでくるぞ" },
-    { "speaker": "midaru", "text": "いわだるの積み木は、他の積み木に当たっても壊れません。むしろ相手の積み木を壊します。ただし、壁に当たると砕けます。データ上、確実です" },
+    { "speaker": "midaru", "text": "いわだるの積み木は、他の積み木に当たっても壊れません。むしろ相手の積み木を壊します。ただし、あの左右の灰色の壁（せり上がる台）に当たると砕けます。データ上、確実です" },
     { "speaker": "aodaru", "text": "……俺は、飛ばすのが苦手だ" },
     { "speaker": "akadaru", "text": "わかってる。だから、打ち返せ" },
     { "speaker": "aodaru", "text": "……窓の時と同じか" },

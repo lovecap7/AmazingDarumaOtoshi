@@ -21,6 +21,14 @@ public class NetCharacterList : ScriptableObject
     }
 
     public List<Entry> entries = new List<Entry>();
+
+    [Header("ロビーのキャラ・ステージを選ぶ画面(キャラクターセレクトと同じ見た目にするための素材。SelectScene の MatchSelect と同じもの)")]
+    public SelectRoster roster;
+    public TMPro.TMP_FontAsset font;
+    [Tooltip("角丸の画像(UI/Skin/UISprite)")]
+    public Sprite uiSprite;
+    [Tooltip("丸い画像(UI/Skin/Knob)")]
+    public Sprite knobSprite;
     [Tooltip("ネット対戦で選べるステージ(ステージセレクトと同じ SelectRoster.stages の並び。通信ではこの並びの番号を送る。NetCharacterList.None はおまかせ)")]
     public List<StageData> stages = new List<StageData>();
 

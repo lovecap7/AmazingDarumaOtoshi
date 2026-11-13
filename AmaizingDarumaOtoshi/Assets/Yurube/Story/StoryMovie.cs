@@ -20,6 +20,8 @@ namespace Yurube.Story
     {
         // セットの場所（ゲームのステージから遠く離す）
         static readonly Vector3 SetOrigin = new Vector3(5000f, 0f, 0f);
+        // 第2章の全国大会会場（鳥居の前）のセット。部室とは別の場所に作る
+        static readonly Vector3 VenueOrigin = new Vector3(5200f, 0f, 0f);
         // 画面の並び（HUD 15 < ムービー 44 < 実績カード 45 < 会話 60）
         const int CanvasOrder = 44;
 
@@ -54,6 +56,9 @@ namespace Yurube.Story
         bool m_opening, m_advance;
         float m_time;
 
+        // 直前のムービーを B でスキップしたか（章クリア済みの再プレイで、会話もまとめて飛ばすため）
+        public bool WasSkipped { get; private set; }
+
         // 第1章以降：実際のステージを撮るカットシーン
         bool m_stageMode;
         Transform m_runner;
@@ -61,6 +66,12 @@ namespace Yurube.Story
         Quaternion m_runnerHomeRot;
         float m_runnerStart, m_runnerDuration;
         bool m_runnerActive;
+
+        // 第2章以降：全国大会会場（鳥居の前）のセットを撮るカットシーン
+        bool m_venueMode;
+        bool m_venueBuilt;
+        Transform m_venueRoot;
+        readonly Dictionary<string, Member> m_venueMembers = new Dictionary<string, Member>();
 
         // 台本（タイトルのムービーと同じ書き方）
         System.Func<float, Vector3> m_camPos, m_camLook;
@@ -120,6 +131,7 @@ namespace Yurube.Story
                 Destroy(m_rt);
             }
             if (m_root != null) Destroy(m_root.gameObject);
+            if (m_venueRoot != null) Destroy(m_venueRoot.gameObject);
             if (m_camera != null) Destroy(m_camera.gameObject);
             if (m_screen != null) Destroy(m_screen);
             if (m_volume != null) Destroy(m_volume.gameObject);
@@ -274,6 +286,8 @@ namespace Yurube.Story
         //========================================
 
         Vector3 P(float x, float y, float z) => SetOrigin + new Vector3(x, y, z);
+        // 会場セット（鳥居の前）のワールド座標
+        Vector3 V(float x, float y, float z) => VenueOrigin + new Vector3(x, y, z);
         // ステージを撮るときは、部室のセットではなくワールド座標をそのまま使う
         Vector3 W(float x, float y, float z) => new Vector3(x, y, z);
 
@@ -432,11 +446,12 @@ namespace Yurube.Story
         // 部員
         //========================================
 
-        Member AddMember(Vector3 pos, float yaw, Color color, float scale, bool happy)
+        Member AddMember(Vector3 pos, float yaw, Color color, float scale, bool happy,
+                         Transform parent = null, string id = null)
         {
             var m = new Member { basePos = pos, phase = m_members.Count * 1.7f };
             var root = new GameObject("Member").transform;
-            root.SetParent(m_root, false);
+            root.SetParent(parent != null ? parent : m_root, false);
             root.localPosition = pos;
             root.localRotation = Quaternion.Euler(0f, yaw, 0f);
 
@@ -459,6 +474,7 @@ namespace Yurube.Story
             m.root = root;
             m.head = head.root;
             m_members.Add(m);
+            if (!string.IsNullOrEmpty(id)) m_venueMembers[id] = m;
             return m;
         }
 
@@ -468,6 +484,88 @@ namespace Yurube.Story
             AddMember(new Vector3(1.4f, 0f, 0.35f), -14f, new Color(0.28f, 0.62f, 0.32f), 0.92f, false);  // みだる
             AddMember(new Vector3(-0.2f, 0f, 2.45f), 2f, new Color(0.85f, 0.22f, 0.18f), 0.95f, true);    // あかだる
             AddMember(new Vector3(2.9f, 0f, 2.25f), -10f, new Color(0.2f, 0.42f, 0.85f), 0.95f, false);   // あおだる
+        }
+
+        //========================================
+        // 全国大会会場（鳥居の前）のセット（第2章）
+        //========================================
+
+        Transform VenueBox(string name, Vector3 pos, Vector3 size, Material mat)
+        {
+            var t = ToyKit.Primitive(PrimitiveType.Cube, name, m_venueRoot);
+            t.localPosition = pos;
+            t.localScale = size;
+            t.GetComponent<Renderer>().sharedMaterial = mat;
+            return t;
+        }
+
+        void BuildVenue()
+        {
+            if (m_venueBuilt) return;
+            m_venueBuilt = true;
+
+            m_venueRoot = new GameObject("StoryVenueSet").transform;
+            m_venueRoot.position = VenueOrigin;
+
+            var groundMat = Unlit(new Color(0.64f, 0.60f, 0.53f));
+            var redMat = Unlit(new Color(0.78f, 0.13f, 0.10f));
+            var redDarkMat = Unlit(new Color(0.52f, 0.08f, 0.06f));
+            var stoneMat = Unlit(new Color(0.55f, 0.53f, 0.48f));
+            var boardMat = Unlit(new Color(0.97f, 0.95f, 0.88f));
+
+            // 床と空
+            VenueBox("VenueGround", new Vector3(0f, -0.1f, 0f), new Vector3(26f, 0.2f, 26f), groundMat);
+            TitleDressingKit.Quad(m_venueRoot, "VenueSky", V(0f, 7f, 22f), new Vector3(60f, 30f, 1f), m_skyDay);
+
+            // 鳥居（奥）
+            VenueBox("ToriiBaseL", new Vector3(-3.0f, 0.15f, 6f), new Vector3(0.9f, 0.3f, 0.9f), stoneMat);
+            VenueBox("ToriiBaseR", new Vector3(3.0f, 0.15f, 6f), new Vector3(0.9f, 0.3f, 0.9f), stoneMat);
+            VenueBox("ToriiPillarL", new Vector3(-3.0f, 2.6f, 6f), new Vector3(0.45f, 5.2f, 0.45f), redMat);
+            VenueBox("ToriiPillarR", new Vector3(3.0f, 2.6f, 6f), new Vector3(0.45f, 5.2f, 0.45f), redMat);
+            VenueBox("ToriiTop", new Vector3(0f, 5.15f, 6f), new Vector3(8.2f, 0.5f, 0.72f), redDarkMat);
+            VenueBox("ToriiBeam", new Vector3(0f, 4.25f, 6f), new Vector3(6.6f, 0.35f, 0.55f), redMat);
+            VenueBox("ToriiPlaque", new Vector3(0f, 4.7f, 5.58f), new Vector3(1.3f, 1.0f, 0.1f), m_inkMat);
+
+            // 看板「全国制覇！ だるま落とし部」（手前）
+            VenueBox("SignPostL", new Vector3(-2.2f, 1.2f, 3.4f), new Vector3(0.18f, 2.4f, 0.18f), m_woodMat);
+            VenueBox("SignPostR", new Vector3(2.2f, 1.2f, 3.4f), new Vector3(0.18f, 2.4f, 0.18f), m_woodMat);
+            VenueBox("SignFrame", new Vector3(0f, 3.1f, 3.47f), new Vector3(5.2f, 2.0f, 0.12f), m_inkMat);
+            VenueBox("SignBoard", new Vector3(0f, 3.1f, 3.36f), new Vector3(5.0f, 1.8f, 0.14f), boardMat);
+
+            var signText = TitleDressingKit.Text(m_venueRoot, PresentationSettings.DefaultFont,
+                "全国制覇！\nだるま落とし部", V(0f, 3.1f, 3.24f), new Vector2(4.6f, 1.5f), 3.2f,
+                new Color(0.12f, 0.10f, 0.09f), new Color(1f, 1f, 1f), 0.08f, 0f);
+            signText.transform.localRotation = Quaternion.identity;
+            signText.textWrappingMode = TextWrappingModes.Normal;
+            signText.alignment = TextAlignmentOptions.Center;
+            signText.lineSpacing = 6f;
+
+            // 約束する4人（あか・あお・み・き）。へびだるは画面の外に立たせ、会話で寄る
+            AddMember(new Vector3(-2.4f, 0f, 0f), 0f, new Color(0.85f, 0.22f, 0.18f), 1.0f, true, m_venueRoot, "akadaru");
+            AddMember(new Vector3(-0.8f, 0f, 0f), 0f, new Color(0.2f, 0.42f, 0.85f), 1.0f, false, m_venueRoot, "aodaru");
+            AddMember(new Vector3(0.8f, 0f, 0f), 0f, new Color(0.28f, 0.62f, 0.32f), 1.0f, false, m_venueRoot, "midaru");
+            AddMember(new Vector3(2.4f, 0f, 0f), 0f, new Color(0.95f, 0.78f, 0.18f), 0.96f, true, m_venueRoot, "kidaru");
+            var hebi = AddMember(new Vector3(8.8f, 0f, 2.0f), -20f, new Color(0.35f, 0.62f, 0.22f), 1.0f, false, m_venueRoot, "hebidaru");
+            // カットシーンでは4人だけを映す。へびだるは会話のときに出会うまで隠しておく
+            if (hebi != null && hebi.root != null) hebi.root.gameObject.SetActive(false);
+
+            // 会場の光（屋外なので、正面と上から）
+            VenueLight("VenueSun", new Vector3(0f, 5.5f, -2f), new Color(1f, 0.9f, 0.74f), 12f, 22f);
+            VenueLight("VenueFill", new Vector3(0f, 3.2f, 4.5f), new Color(0.8f, 0.88f, 1f), 7f, 18f);
+            VenueLight("VenueFront", new Vector3(0f, 2.2f, -5f), new Color(1f, 0.95f, 0.88f), 9f, 16f);
+        }
+
+        void VenueLight(string name, Vector3 pos, Color color, float intensity, float range)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(m_venueRoot, false);
+            go.transform.localPosition = pos;
+            var l = go.AddComponent<Light>();
+            l.type = LightType.Point;
+            l.color = color;
+            l.intensity = intensity;
+            l.range = range;
+            l.shadows = LightShadows.None;
         }
 
         void AnimateMembers()
@@ -668,6 +766,7 @@ namespace Yurube.Story
         public void Show()
         {
             m_visible = true;
+            if (m_view != null) m_view.enabled = true;
             if (m_screen != null) m_screen.SetActive(true);
             if (m_camera != null) m_camera.enabled = true;
         }
@@ -676,16 +775,53 @@ namespace Yurube.Story
         {
             RestoreRunner();
             m_stageMode = false;
+            m_venueMode = false;
             m_visible = false;
             m_opening = false;
             m_advance = false;
             m_baseScale = 1f;
             SetMemory(false);
             SetCinema(false);
+            if (m_view != null) m_view.enabled = true;
             if (m_screen != null) m_screen.SetActive(false);
             if (m_camera != null) m_camera.enabled = false;
             // 画面に直接描いていないことを保証する（撮影用の RenderTexture はそのまま）
             RenderTexture.active = null;
+        }
+
+        // 映像は止めるが、黒い画面は残す。
+        // 会話（前）のあと、ステージが見えるまでのつなぎに使う（ステージが一瞬映るのを防ぐ）。
+        public void HideViewKeepBlack()
+        {
+            RestoreRunner();
+            m_stageMode = false;
+            m_venueMode = false;
+            m_visible = false;
+            m_opening = false;
+            m_advance = false;
+            m_baseScale = 1f;
+            SetMemory(false);
+            SetCinema(false);
+            SetCaption(false);
+            SetTitle(false);
+            SetHint(false);
+            if (m_camera != null) m_camera.enabled = false;
+            if (m_view != null) m_view.enabled = false;
+            if (m_screen != null) m_screen.SetActive(true);
+            if (m_fadeGroup != null) m_fadeGroup.alpha = 1f;
+            RenderTexture.active = null;
+        }
+
+        // 黒い画面を消して、下のステージを見せる
+        public IEnumerator FadeOutBlack(float duration)
+        {
+            if (m_screen == null) yield break;
+            m_screen.SetActive(true);
+            if (m_view != null) m_view.enabled = false;
+            if (m_camera != null) m_camera.enabled = false;
+            yield return FadeTo(0f, duration);
+            m_screen.SetActive(false);
+            m_visible = false;
         }
 
         public void SetBlack()
@@ -734,6 +870,9 @@ namespace Yurube.Story
                 yield return null;
             }
             m_fadeGroup.alpha = target;
+            // フェード中のAは「次のカットへ」として持ち越さない
+            // （持ち越すと、フェード明けの最初のカットが一瞬で飛ばされて別の画が見える）
+            m_advance = false;
         }
 
         //========================================
@@ -749,6 +888,21 @@ namespace Yurube.Story
             m_camLook = look;
             m_shotStart = m_time;
             m_shotFov = fov;
+            // コルーチンから切り替えた直後も、次のUpdateまで前の画を残さない
+            ApplyShotNow();
+        }
+
+        // いまのカットのカメラをすぐ反映する（Aでカットを送った瞬間の1フレームの残像を防ぐ）
+        void ApplyShotNow()
+        {
+            if (m_camera == null || m_camPos == null || m_camLook == null) return;
+            Vector3 pos = m_camPos(0f);
+            Vector3 look = m_camLook(0f);
+            Vector3 dir = look - pos;
+            if (dir.sqrMagnitude <= 0.0001f) return;
+            m_camera.transform.position = pos;
+            m_camera.transform.rotation = Quaternion.LookRotation(dir);
+            m_camera.fieldOfView = Mathf.Max(1f, m_shotFov);
         }
 
         // A：つぎへ（次のカットへ進む）
@@ -800,6 +954,7 @@ namespace Yurube.Story
             m_time = 0f;
             m_shift = 0f;
             m_skipped = false;
+            WasSkipped = false;
             m_advance = false;
             m_baseScale = 1f;
             m_opening = true;
@@ -868,6 +1023,7 @@ namespace Yurube.Story
             SetCinema(false);
             m_baseScale = 1f;
             m_advance = false;
+            WasSkipped = m_skipped;
             yield return FadeTo(1f, 0.35f);
             ShowConversation(false);
             yield return FadeTo(0f, 0.6f);
@@ -890,6 +1046,7 @@ namespace Yurube.Story
             m_time = 0f;
             m_shift = 0f;
             m_skipped = false;
+            WasSkipped = false;
             m_advance = false;
             m_baseScale = 1f;
             m_opening = true;
@@ -967,11 +1124,152 @@ namespace Yurube.Story
             SetCinema(false);
             m_baseScale = 1f;
             m_advance = false;
+            WasSkipped = m_skipped;
             RestoreRunner();
             yield return FadeTo(1f, 0.35f);
             ShowStageConversation(false);
             yield return FadeTo(0f, 0.6f);
             m_skipped = false;
+        }
+
+        //========================================
+        // 全国大会会場（鳥居の前）のカットシーン（第2章以降）
+        //========================================
+
+        public IEnumerator PlayVenueIntro(StoryChapter chapter)
+        {
+            BuildVenue();
+            // カットシーンでは七転高校の4人だけを映す（へびだるは会話から）
+            if (m_venueMembers.TryGetValue("hebidaru", out var hebiMember)
+                && hebiMember != null && hebiMember.root != null)
+                hebiMember.root.gameObject.SetActive(false);
+            m_time = 0f;
+            m_shift = 0f;
+            m_skipped = false;
+            WasSkipped = false;
+            m_advance = false;
+            m_baseScale = 1f;
+            m_opening = true;
+            m_stageMode = false;
+            m_venueMode = true;
+            Show();
+            m_camera.clearFlags = CameraClearFlags.SolidColor;
+            m_camera.backgroundColor = new Color(0.55f, 0.74f, 0.94f);
+            m_camera.farClipPlane = 120f;
+            m_fadeGroup.alpha = 1f;
+            SetCaption(false);
+            SetTitle(false);
+            SetHint(true);
+            SetMemory(false);
+            SetCinema(false);
+            SetCaptionText(chapter != null && chapter.cutscene != null ? chapter.cutscene.caption : null);
+
+            // フェードインの前から、最初のカットにしておく
+            SetVenueWide();
+            yield return FadeTo(0f, 0.5f);
+            SetCaption(!string.IsNullOrEmpty(chapter != null && chapter.cutscene != null ? chapter.cutscene.caption : null));
+
+            var shots = chapter != null && chapter.cutscene != null ? chapter.cutscene.shots : null;
+            if (shots == null || shots.Count == 0)
+            {
+                SetVenueWide();
+                yield return Hold(3.4f);
+                if (!m_skipped) { SetVenueGroup(); yield return Hold(4.8f); }
+            }
+            else
+            {
+                foreach (var shot in shots)
+                {
+                    if (shot == null) continue;
+                    if (shot.view == "group") SetVenueGroup();
+                    else SetVenueWide();
+                    yield return Hold(Mathf.Max(0.5f, shot.seconds));
+                    if (m_skipped) break;
+                }
+            }
+
+            SetCaption(false);
+            if (!m_skipped)
+            {
+                SetCinema(true);
+                yield return FadeTo(0.65f, 0.5f);
+                var card = (RectTransform)m_titleGroup.transform;
+                card.localScale = Vector3.one * 1.06f;
+                SetTitle(true);
+                yield return Tween(0.8f, u => card.localScale = Vector3.one * Mathf.Lerp(1.06f, 1f, u));
+                yield return Hold(1.4f);
+                SetTitle(false);
+            }
+
+            yield return FinishVenueIntro();
+        }
+
+        IEnumerator FinishVenueIntro()
+        {
+            m_opening = false;
+            SetHint(false);
+            SetCaption(false);
+            SetTitle(false);
+            SetMemory(false);
+            SetCinema(false);
+            m_baseScale = 1f;
+            m_advance = false;
+            WasSkipped = m_skipped;
+            yield return FadeTo(1f, 0.35f);
+            ShowVenueConversation(false);
+            yield return FadeTo(0f, 0.6f);
+            m_skipped = false;
+        }
+
+        // 会話の背景にする（4人＋看板。話者に合わせてカメラを寄せる）
+        public void ShowVenueConversation(bool after)
+        {
+            BuildVenue();
+            Show();
+            // 会話では、へびだるも姿を見せる（話者に寄るカメラで使う）
+            if (m_venueMembers.TryGetValue("hebidaru", out var hebiMember)
+                && hebiMember != null && hebiMember.root != null)
+                hebiMember.root.gameObject.SetActive(true);
+            m_stageMode = false;
+            m_venueMode = true;
+            m_opening = false;
+            m_advance = false;
+            m_baseScale = 1f;
+            m_camera.clearFlags = CameraClearFlags.SolidColor;
+            m_camera.backgroundColor = new Color(0.55f, 0.74f, 0.94f);
+            m_camera.farClipPlane = 120f;
+            SetCinema(true);
+            SetCaption(false);
+            SetTitle(false);
+            SetHint(false);
+            SetVenueGroup();
+        }
+
+        // 話者にカメラを寄せる（見つからなければ4人の引き画）
+        public void FocusVenueSpeaker(string speakerId)
+        {
+            if (!m_venueMode || !m_visible || m_venueRoot == null) return;
+            if (string.IsNullOrEmpty(speakerId) || !m_venueMembers.TryGetValue(speakerId, out var member)
+                || member == null || member.root == null)
+            {
+                SetVenueGroup();
+                return;
+            }
+            Transform t = member.root;
+            // 会話ウィンドウ（画面下）に顔がかからないよう、顔を画面の上寄りに置く
+            SetShot(lt => t.position + new Vector3(0f, 1.35f, -3.0f),
+                    lt => t.position + new Vector3(0f, 1.0f, 0f), 40f);
+        }
+
+        void SetVenueWide()
+        {
+            SetShot(lt => V(0f, 3.0f, -11f), lt => V(0f, 2.4f, 1.5f), 50f);
+        }
+
+        void SetVenueGroup()
+        {
+            // 顔が会話ウィンドウより上に来るよう、少し下を注視する
+            SetShot(lt => V(0f, 1.7f, -6.2f), lt => V(0f, 0.95f, 0.3f), 45f);
         }
 
         // 会話の背景にする（実際のステージをゆっくり寄る）
@@ -992,14 +1290,13 @@ namespace Yurube.Story
 
             if (after)
             {
-                // 祝勝：少し引いて、夕方の色
-                SetShot(lt => W(0.5f, 4.8f, -9.5f), lt => W(0f, 1.2f, 0f), 44f);
+                // 祝勝：引きの高い画にして、会話ウィンドウが顔にかからないようにする
+                SetShot(lt => W(0f, 9.0f, -8.5f), lt => W(0f, 1.2f, 0f), 55f);
             }
             else
             {
-                // 対戦前：フィールドを見渡す（南の壁の内側から）
-                SetShot(lt => W(0.3f + 0.15f * Mathf.Sin(lt * 0.1f), 3.4f, -8.8f),
-                        lt => W(0f, 1.1f, 0f), 40f);
+                // 対戦前：盤面全体（左右の灰色の壁も見える高さ）を見渡す
+                SetShot(lt => W(0f, 9.0f, -8.5f), lt => W(0f, 1.2f, 0f), 55f);
             }
         }
 
@@ -1018,8 +1315,9 @@ namespace Yurube.Story
         {
             Transform runner = m_runner;
             if (runner == null) { SetStageWide(); return; }
-            SetShot(lt => runner.position + new Vector3(0f, 1.35f, -3.4f),
-                    lt => runner.position + new Vector3(0f, 0.7f, 0f), 38f);
+            // 走る人の顔が見えるよう、進行方向の前（北東）から斜めに撮る。全身が入る高さ・距離にする
+            SetShot(lt => runner.position + new Vector3(1.8f, 2.6f, 3.0f),
+                    lt => runner.position + new Vector3(0f, 1.0f, 0f), 45f);
         }
 
         void SetStageRival(StoryChapter chapter)
@@ -1029,13 +1327,16 @@ namespace Yurube.Story
             Vector3 target = rival != null && rival.Character != null
                 ? rival.Character.transform.position
                 : W(0f, 0f, 0f);
-            // ステージの外（壁の向こう）から撮らないように、中央寄りに寄せる
-            Vector3 inward = W(0f, 0f, 0f) - target;
-            inward.y = 0f;
-            if (inward.sqrMagnitude < 0.01f) inward = Vector3.forward;
-            inward.Normalize();
-            Vector3 cameraPos = target + inward * 3.2f + Vector3.up * 1.5f;
-            SetShot(lt => cameraPos, lt => target + new Vector3(0f, 0.8f, 0f), 36f);
+            // 相手の顔が見えるよう、相手が向いている中央側から撮る。全身が入る高さ・距離にする
+            Vector3 toCenter = W(0f, 0f, 0f) - target;
+            toCenter.y = 0f;
+            if (toCenter.sqrMagnitude < 0.01f) toCenter = Vector3.forward;
+            toCenter.Normalize();
+            // 真正面だと相手のハンマーが顔を隠すので、中央側から斜め 45 度へ回す
+            Vector3 side = Vector3.Cross(Vector3.up, toCenter);
+            Vector3 viewDir = (toCenter + side * 0.9f).normalized;
+            Vector3 cameraPos = target + viewDir * 5.5f + Vector3.up * 3.0f;
+            SetShot(lt => cameraPos, lt => target + new Vector3(0f, 1.0f, 0f), 45f);
         }
 
         // 走る人を、実際のキャラクターで走路に出す（終わったら元の位置へ戻す）
@@ -1180,7 +1481,15 @@ namespace Yurube.Story
 
         void SetHint(bool on)
         {
-            if (m_hintGroup != null) m_hintGroup.alpha = on ? 1f : 0f;
+            if (m_hintGroup == null) return;
+            m_hintGroup.gameObject.SetActive(on);
+            m_hintGroup.alpha = on ? 1f : 0f;
+        }
+
+        // 右下の操作ヒントを確実に消す（GO!やメニュー移行時に残らないように）
+        public void HideHint()
+        {
+            SetHint(false);
         }
 
         void Update()

@@ -33,10 +33,15 @@ namespace Yurube.Story
         bool m_koRunning;
         bool m_matchRunning;
         bool m_awakeningRunning;
+        bool m_lastStandRunning;
+        bool m_lastStandHandled;
         bool m_stageMode;
+        bool m_venueMode;
         float m_matchStartTime;
         float m_nextIncomingCheck;
         bool m_incomingBlock;
+        // プレイヤーの弾が相手に当たってから、連鎖が起きるまでを受け付ける時間
+        float m_chainOpponentHitUntil = -1f;
 
         // チュートリアルから使う
         public MatchPlayer Player => m_player;
@@ -94,7 +99,9 @@ namespace Yurube.Story
             m_match = DarumaMatch.Current;
             m_chapter = StorySession.Chapter;
             if (m_match == null || m_chapter == null) { enabled = false; return; }
-            m_stageMode = m_chapter.cutscene != null && !string.IsNullOrEmpty(m_chapter.cutscene.type);
+            m_venueMode = m_chapter.cutscene != null && m_chapter.cutscene.type == "venue";
+            m_stageMode = m_chapter.cutscene != null && m_chapter.cutscene.type == "stage";
+            m_chainOpponentHitUntil = -1f;
 
             PauseMenu.StoryMode = true;
             AchievementManager.StoryMode = true;
@@ -103,13 +110,15 @@ namespace Yurube.Story
             // 章の設定で CPU の必殺技を止められる（チュートリアルでは止める）
             if (m_chapter.rules != null && !m_chapter.rules.cpuSpecial) CpuSpecial.Disabled = true;
             SpecialGaugeHUD.Suppressed = false;
-            // 序章は覚醒イベントまでゲージを見せない。第1章以降とリトライ後は最初から見せる
+            // ゲージを見せる章は最初から見せる（序章・第1章は見せ場まで隠す）
             bool gaugeFromStart = m_chapter.rules == null || m_chapter.rules.gaugeFromStart;
             SpecialGaugeHUD.Visible = gaugeFromStart || StorySession.AwakeningDone;
-            // 覚醒前は必殺技を撃てない（「初めて出せた」の瞬間を守る）
-            SpecialInput.StoryLocked = m_chapter.rules != null && m_chapter.rules.awakening && !StorySession.AwakeningDone;
+            // ゲージを見せない章は、見せ場（覚醒）まで必殺技も撃てない扱いにする
+            // （隠れているのに撃てると不自然なので、表示と解禁をそろえる）
+            SpecialInput.StoryLocked = !gaugeFromStart && !StorySession.AwakeningDone;
 
             m_dialogue = DialogueRunner.Create();
+            m_dialogue.LineStarted += OnStoryLineStarted;
             m_movie = StoryMovie.Create(m_chapter);
             // シーンが明けた瞬間にチュートリアルステージが見えないよう、黒いムービー画面で覆っておく
             m_movie.SetBlack();
@@ -121,6 +130,7 @@ namespace Yurube.Story
             m_match.PlayerOut += OnPlayerOut;
             HookYellowExtra();
             HookReflectEvents();
+            HookChainEvents();
             StartCoroutine(RunStory());
         }
 
@@ -135,7 +145,11 @@ namespace Yurube.Story
             }
             KidaruPassive.ExtraAdded -= OnYellowExtra;
             DarumaHammer.Hit -= OnHammerHit;
+            DarumaHammer.ShotFired -= OnCpuShot;
             IwaBlock.WallBroken -= OnIwaWallBroken;
+            TumikiBlock.Hit -= OnBlockHitForChain;
+            AchievementEvents.Chain -= OnChainForStory;
+            if (m_dialogue != null) m_dialogue.LineStarted -= OnStoryLineStarted;
             if (m_movie != null) Destroy(m_movie.gameObject);
 
             // ポーズメニューからタイトルへ戻った等：ストーリーを中断し、次の試合に影響を残さない
@@ -153,7 +167,9 @@ namespace Yurube.Story
             SpecialGaugeHUD.Visible = true;
             CpuSpecial.Disabled = false;
             AchievementManager.StoryMode = false;
-            MatchSetup.StoryNames = false;
+            // リトライ中は、次のシーンの Awake より前に名前表示を消さない
+            // （消すと HUD が「1P」「CPU」で作られてしまう）
+            if (!StorySession.IsRunning) MatchSetup.StoryNames = false;
             Time.timeScale = 1f;
             AudioListener.pause = false;
         }
@@ -166,6 +182,7 @@ namespace Yurube.Story
             if (m_dialogue != null && (m_dialogue.IsShowing || (m_match != null && m_match.IsPaused))) return;
 
             TryStartAwakening();
+            TryStartSpecialEvent();
         }
 
         //========================================
@@ -239,6 +256,117 @@ namespace Yurube.Story
             m_awakeningRunning = false;
         }
 
+        //========================================
+        // 「追い詰められたら撃つ」必殺技イベント（第2章以降）
+        //========================================
+
+        void TryStartSpecialEvent()
+        {
+            var ev = m_chapter != null ? m_chapter.specialEvent : null;
+            if (ev == null || !ev.enabled || m_finishedHandled || m_lastStandRunning || m_lastStandHandled) return;
+            if (!m_matchRunning || m_koRunning) return;
+            if (m_player == null || m_player.Character == null) return;
+
+            var settings = StorySettings.Instance;
+            int threshold = Mathf.Max(1, ev.stockThreshold);
+            bool timeTrigger = ev.trigger == "time";
+            bool lowStock = !timeTrigger && m_player.Stocks <= threshold;
+            bool fallback = ev.timeFallback || (settings != null && settings.SpecialFallbackEnabled);
+            float fallbackSeconds = ev.timeSeconds > 0f
+                ? ev.timeSeconds
+                : settings != null ? settings.SpecialFallbackSeconds : 90f;
+            bool timeout = (timeTrigger || fallback)
+                && Time.unscaledTime - m_matchStartTime >= Mathf.Max(1f, fallbackSeconds);
+            if (!lowStock && !timeout) return;
+
+            StartCoroutine(SpecialEvent(ev));
+        }
+
+        IEnumerator SpecialEvent(StorySpecialEvent ev)
+        {
+            m_lastStandRunning = true;
+            m_lastStandHandled = true;
+            bool replay = StorySession.LastStandPlayed;
+            var settings = StorySettings.Instance;
+
+            if (replay && !(ev.replayAssist && (settings == null || settings.SpecialReplayAssist)))
+            {
+                m_lastStandRunning = false;
+                yield break;
+            }
+
+            // あかだるの必殺技は積み木1個以上が必要。ストック1直後は0個のことが多いので補助する
+            EnsurePlayerHasBlock("必殺技イベントの補助");
+
+            var gauge = m_player != null && m_player.Character != null
+                ? m_player.Character.GetComponent<SpecialGauge>() : null;
+            if (gauge != null) gauge.Fill();
+            SpecialGaugeHUD.Visible = true;
+            SpecialInput.StoryLocked = false;
+
+            // 初回だけ、試合を止めて掛け合い（約3秒ずつ）。リトライは台詞なしの補助だけ
+            if (!replay)
+            {
+                if (ev.pause) SetStoryPaused(true);
+                yield return new WaitForSecondsRealtime(0.35f);
+                if (ev.lines != null)
+                {
+                    foreach (var line in ev.lines)
+                    {
+                        if (line == null) continue;
+                        yield return m_dialogue.PlaySmall(line.speaker, line.text, m_chapter, 3.0f);
+                    }
+                }
+                if (ev.pause) SetStoryPaused(false);
+            }
+
+            float promptSeconds = ev.promptSeconds > 0f
+                ? ev.promptSeconds
+                : settings != null ? settings.SpecialPromptSeconds : 10f;
+            string prompt = string.IsNullOrEmpty(ev.prompt) ? "[L／Y]で必殺技！" : ev.prompt;
+            m_dialogue.ShowObjective(m_chapter, "", prompt);
+
+            bool used = false;
+            System.Action<SpecialGauge> onConsumed = g =>
+            {
+                if (g == gauge) used = true;
+            };
+            SpecialGauge.Consumed += onConsumed;
+            try
+            {
+                float until = Time.unscaledTime + Mathf.Max(1f, promptSeconds);
+                while (!used && !m_finishedHandled && Time.unscaledTime < until)
+                {
+                    yield return null;
+                }
+            }
+            finally
+            {
+                SpecialGauge.Consumed -= onConsumed;
+            }
+
+            m_dialogue.HideObjective();
+            if (!replay) StorySession.LastStandPlayed = true;
+            Debug.Log(replay
+                ? "[Story] 必殺技イベント（リトライ補助）: ゲージ満タン＋プロンプト"
+                : "[Story] 必殺技イベント: ストック1で掛け合い→プロンプト" + (used ? "（使用）" : "（時間切れ）"));
+            m_lastStandRunning = false;
+        }
+
+        // 必殺技・連鎖の補助用。積み木が0個なら1個渡す
+        void EnsurePlayerHasBlock(string reason)
+        {
+            if (m_player == null || m_player.Character == null || m_player.Character.Stack == null) return;
+            if (m_player.Character.Stack.Count > 0) return;
+
+            Vector3 pos = m_player.Character.transform.position;
+            TumikiBlock block = FindLooseBlock(pos);
+            if (block == null) block = CreateAssistBlock(pos + m_player.Character.transform.forward * 1.2f);
+            if (block == null) return;
+            m_player.Character.Stack.AddBottom(block);
+            Debug.Log("[Story] " + reason + "：積み木を1個渡しました");
+        }
+
         // 「あっ、増えた！」：黄色の追加分が積まれたとき（チュートリアル後・初回だけ）
         void HookYellowExtra()
         {
@@ -298,6 +426,32 @@ namespace Yurube.Story
         // 進行
         //========================================
 
+        // ストーリーのカットシーン用。無敵の点滅などで体のRendererが切れていても、
+        // カットシーンのあいだは全員の見た目を出しておく（ハンマーだけになるのを防ぐ）
+        void EnsureStoryBodiesVisible()
+        {
+            if (m_match == null) return;
+            foreach (var p in m_match.Players)
+            {
+                if (p == null || p.Character == null) continue;
+                if (!p.Character.gameObject.activeSelf) p.Character.gameObject.SetActive(true);
+                // 体の見た目（Visual / Head）が非アクティブになっていても戻す
+                var visual = p.Character.transform.Find("Visual");
+                if (visual != null && !visual.gameObject.activeSelf) visual.gameObject.SetActive(true);
+                var stack = p.Character.transform.Find("Visual/Stack");
+                if (stack != null && !stack.gameObject.activeSelf) stack.gameObject.SetActive(true);
+                var head = p.Character.Stack != null ? p.Character.Stack.Head : null;
+                if (head == null) head = p.Character.transform.Find("Visual/Stack/Head");
+                if (head != null && !head.gameObject.activeSelf) head.gameObject.SetActive(true);
+                var renderers = p.Character.GetComponentsInChildren<Renderer>(true);
+                foreach (var r in renderers)
+                {
+                    if (r != null) r.enabled = true;
+                }
+                Debug.Log($"[Story] カットシーン表示: {p.Label} Head={(head != null)} Renderers={renderers.Length}");
+            }
+        }
+
         IEnumerator RunStory()
         {
             // 試合の準備（プレイヤーが出るまで待つ）
@@ -326,16 +480,27 @@ namespace Yurube.Story
                 m_dialogue.SetDimAlpha(0.3f);
                 // ムービー中は OnGUI のゲージが映像の上に出てしまうので止める
                 SpecialGaugeHUD.Suppressed = true;
+                // カットシーンで体が消えないよう、出ている全員の見た目を有効にしておく
+                EnsureStoryBodiesVisible();
                 if (m_stageMode) yield return m_movie.PlayStageIntro(m_chapter);
+                else if (m_venueMode) yield return m_movie.PlayVenueIntro(m_chapter);
                 else yield return m_movie.PlayOpening();
-                yield return m_dialogue.PlayBig(m_chapter, m_chapter.before);
+                // 章クリア済みの再プレイで B を押したら、カットシーンだけでなく会話（前）も飛ばす
+                bool skipBefore = StoryProgress.IsCleared(m_chapter.id) && m_movie.WasSkipped;
+                if (!skipBefore) yield return m_dialogue.PlayBig(m_chapter, m_chapter.before);
                 StorySession.MarkIntroPlayed();
                 m_dialogue.SetDimAlpha(0.62f);
                 yield return m_movie.FadeToBlack(0.4f);
                 // 暗転のあと、すぐにステージとカウントダウンを見せず、少し間を置く
                 yield return new WaitForSecondsRealtime(0.45f);
-                m_movie.Hide();
+                // ここで映像画面を消すと、黒幕も一緒に消えてステージが一瞬映る。
+                // 黒い画面だけ残し、最後にフェードでステージを見せる
+                m_movie.HideViewKeepBlack();
+                // GO! の瞬間に会話の操作ヒントが残らないようにする
+                m_dialogue.HideHint();
+                m_movie.HideHint();
                 yield return new WaitForSecondsRealtime(1.0f);
+                yield return m_movie.FadeOutBlack(0.35f);
                 SpecialGaugeHUD.Suppressed = false;
                 SetCountdownHidden(false);
                 SetStoryPaused(false);
@@ -385,6 +550,8 @@ namespace Yurube.Story
                 var character = p.Character;
                 character.DealtDamage += attacker => OnCpuAttack(character, attacker);
             }
+            // 第2章のへびだるのように「攻撃したとき」で出したい章は、ショットでも拾う
+            if (m_chapter.cpuTauntOnShot) DarumaHammer.ShotFired += OnCpuShot;
         }
 
         // CPU が攻撃したときの掛け合い（同じ台詞は一度だけ・数秒で自動的に閉じる）
@@ -400,9 +567,25 @@ namespace Yurube.Story
             {
                 if (p != null && p.Character == cpu && p.CharacterData != null) { speaker = p.CharacterData.id; break; }
             }
+            PlayCpuTaunt(speaker);
+        }
+
+        // CPU が股抜きショットを撃った（初回だけ台詞）
+        void OnCpuShot(HammerHitInfo info)
+        {
+            if (m_finishedHandled || m_match == null) return;
+            if (!(info.Owner is DarumaCharacter character)) return;
+            var player = m_match.PlayerOf(character);
+            if (player == null || !player.IsCpu || player.CharacterData == null) return;
+            PlayCpuTaunt(player.CharacterData.id);
+        }
+
+        void PlayCpuTaunt(string speaker)
+        {
+            if (m_chapter == null || m_dialogue == null || string.IsNullOrEmpty(speaker)) return;
             // 同じ掛け合いは一度だけ（リトライでも繰り返さない）
             string eventKey = m_chapter.id + ".taunt." + speaker;
-            if (string.IsNullOrEmpty(speaker) || StorySession.HasEvent(eventKey)) return;
+            if (StorySession.HasEvent(eventKey)) return;
 
             foreach (var line in m_chapter.cpuTaunts)
             {
@@ -467,8 +650,124 @@ namespace Yurube.Story
         }
 
         //========================================
-        // 詰まり防止：プレイヤーへ向かう積み木が来ないときに、いわだるの積み木を飛ばす
+        // 連鎖（第2章）
         //========================================
+
+        void HookChainEvents()
+        {
+            TumikiBlock.Hit += OnBlockHitForChain;
+            AchievementEvents.Chain += OnChainForStory;
+        }
+
+        void OnStoryLineStarted(string speakerId)
+        {
+            if (m_movie != null) m_movie.FocusVenueSpeaker(speakerId);
+        }
+
+        // プレイヤーの弾が相手（CPU）に当たった。このあと抜けた積み木が連鎖すれば「相手の積み木を崩した」
+        void OnBlockHitForChain(TumikiHitInfo info)
+        {
+            if (m_finishedHandled || !info.IsHarmful) return;
+            if (m_player == null || m_player.Character == null) return;
+            if (!ReferenceEquals(info.Block.Owner, m_player.Character)) return;
+            if (!(info.Target is DarumaCharacter target) || target == m_player.Character) return;
+            m_chainOpponentHitUntil = Time.unscaledTime + 1.2f;
+        }
+
+        void OnChainForStory(int length)
+        {
+            if (m_finishedHandled || m_chapter == null || m_player == null || m_player.Character == null) return;
+            if (Time.unscaledTime > m_chainOpponentHitUntil) return;
+            m_chainOpponentHitUntil = -1f;
+
+            string key = m_chapter.id + ".chainFirst";
+            if (StorySession.HasEvent(key)) return;
+            StorySession.MarkEvent(key);
+            if (m_chapter.chainFirst != null && m_chapter.chainFirst.Count > 0)
+                StartCoroutine(PlayLines(m_chapter.chainFirst));
+        }
+
+        // 連鎖が起きないときのヒント（TutorialController から呼ぶ）
+        public void NotifyChainHint()
+        {
+            if (m_chapter == null || m_dialogue == null) return;
+            string key = m_chapter.id + ".chainHint";
+            if (StorySession.HasEvent(key)) return;
+            StorySession.MarkEvent(key);
+            if (m_chapter.chainHint != null && m_chapter.chainHint.Count > 0)
+                StartCoroutine(PlayLines(m_chapter.chainHint));
+            else
+                m_dialogue.StartCoroutine(m_dialogue.PlaySmall("midaru",
+                    "相手の積み木が積み上がっているところを狙おう", m_chapter));
+        }
+
+        // 連鎖が起きにくいとき、相手の奥に積み木を2個出して「当てる→連鎖」を作りやすくする
+        public void SpawnChainAssist()
+        {
+            if (m_finishedHandled || m_player == null || m_player.Character == null) return;
+            MatchPlayer target = FindCpu("hebidaru");
+            if (target == null || target.Character == null)
+            {
+                foreach (var p in m_match.Players)
+                {
+                    if (p != null && p.IsCpu && p.Character != null) { target = p; break; }
+                }
+            }
+            if (target == null || target.Character == null) return;
+            EnsureCpuHasBlock(target);
+            EnsurePlayerHasBlock("連鎖の補助");
+
+            Vector3 from = m_player.Character.transform.position;
+            Vector3 to = target.Character.transform.position;
+            Vector3 dir = to - from;
+            dir.y = 0f;
+            if (dir.sqrMagnitude < 0.01f) dir = m_player.Character.transform.forward;
+            dir.Normalize();
+
+            float distance = Vector3.Distance(from, to);
+            float near = Mathf.Clamp(distance * 0.35f, 1.1f, 1.8f);
+            float far = Mathf.Clamp(distance * 0.65f, 2.0f, 2.8f);
+            if (distance < 3.0f) { near = Mathf.Max(0.8f, distance * 0.3f); far = Mathf.Max(1.4f, distance * 0.55f); }
+
+            // 相手の奥（プレイヤーから見て向こう側）に、手前→奥の順で2個置く。
+            // 相手に当てて抜けた積み木が、そのまま奥の2個へ連鎖する
+            Vector3 pA = to + dir * near;
+            Vector3 pB = to + dir * far;
+            SpawnAssistBlock(pA);
+            SpawnAssistBlock(pB);
+            Debug.Log("[Story] 連鎖の補助：相手の奥に積み木を2個出しました", this);
+        }
+
+        // 相手に積み木が無いと「抜けた1個」が発生しないので、1個だけ足しておく
+        void EnsureCpuHasBlock(MatchPlayer cpu)
+        {
+            if (cpu == null || cpu.Character == null || cpu.Character.Stack == null) return;
+            if (cpu.Character.Stack.Count > 0) return;
+            TumikiBlock block = CreateAssistBlock(cpu.Character.transform.position + Vector3.up * 0.5f);
+            if (block == null) block = FindLooseBlock(cpu.Character.transform.position);
+            if (block != null) cpu.Character.Stack.AddBottom(block);
+        }
+
+        void SpawnAssistBlock(Vector3 pos)
+        {
+            // 床の上に置く（穴の上なら相手の位置に寄せる）
+            if (Physics.Raycast(pos + Vector3.up * 3f, Vector3.down, out RaycastHit hit, 6f, ~0, QueryTriggerInteraction.Ignore))
+                pos.y = hit.point.y + TumikiBlock.kHeight * 0.5f + 0.02f;
+            TumikiBlock block = CreateAssistBlock(pos);
+            if (block == null) block = FindLooseBlock(pos);
+            if (block == null) return;
+            block.transform.position = pos;
+            block.SetLoose();
+        }
+
+        static TumikiBlock CreateAssistBlock(Vector3 pos)
+        {
+            var spawner = UnityEngine.Object.FindAnyObjectByType<TumikiSpawner>();
+            if (spawner == null || spawner.Prefab == null) return null;
+            var block = Instantiate(spawner.Prefab, pos, Quaternion.identity);
+            block.SetColor(TumikiColor.Red);
+            return block;
+        }
 
         // プレイヤーへ向かっている攻撃判定のある積み木があるか（0.1秒ごとに数える）
         public bool HasIncomingBlockToPlayer()
@@ -641,6 +940,7 @@ namespace Yurube.Story
             // 試合が終わったらゲージは出さない（リザルト・新聞・黒画面の上に出ないように）
             SpecialGaugeHUD.Suppressed = true;
             SpecialInput.StoryLocked = true;
+            if (m_dialogue != null) m_dialogue.HideObjective();
             StartCoroutine(won ? Victory() : Defeat());
         }
 
@@ -665,6 +965,7 @@ namespace Yurube.Story
             m_dialogue.SetDimAlpha(0.3f);
             m_movie.SetBlack();
             if (m_stageMode) m_movie.ShowStageConversation(true);
+            else if (m_venueMode) m_movie.ShowVenueConversation(true);
             else m_movie.ShowConversation(true);
             yield return m_movie.FadeIn(0.6f);
             yield return m_dialogue.PlayBig(m_chapter, m_chapter.after);
@@ -682,7 +983,10 @@ namespace Yurube.Story
                 Destroy(clearCanvas.gameObject);
             }
 
-            m_movie.Hide();
+            // メニューへ切り替わるまで映像画面を残す（HUD付きの対戦画面を一瞬見せない）
+            m_dialogue.HideHint();
+            m_movie.HideHint();
+            m_movie.SetBlack();
             StoryProgress.MarkCleared(m_chapter.id);
 
             StorySession.End();
@@ -702,6 +1006,8 @@ namespace Yurube.Story
 
             DarumaMatch.AutoReturnToSelect = false;
             m_leavingForRetry = true;
+            // 次のシーンの Awake 前に、名前表示（1P/CPU ではなく だるま名）を戻しておく
+            MatchSetup.StoryNames = true;
             Nakagawa.StageSwitcher.RequestStage(m_chapter.stageId);
             Fader.Load(SceneManager.GetActiveScene().name);
         }

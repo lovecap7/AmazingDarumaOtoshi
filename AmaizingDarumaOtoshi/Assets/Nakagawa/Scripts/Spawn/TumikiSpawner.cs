@@ -87,6 +87,8 @@ namespace Nakagawa
         public float PlayerScale => m_scaleByPlayers ? Mathf.Max(1, PlayersOnStage) / (float)m_referencePlayers : 1.0f;
         // 今の人数での盤面の上限
         public int MaxBlocksOnBoard => ScaleCount(m_maxBlocksOnBoard, PlayerScale);
+        // ストーリー用(Yurube): 連鎖・必殺技の補助で積み木を出すときに使う（ローカルの挙動は変えない）
+        public TumikiBlock Prefab => m_tumikiPrefab;
 
         // 有効になるたび(ゲーム開始・ステージ切り替え)に最初からやり直す
         // 同時に有効になったエリアがまだ見つからないことがあるので、盤面の読み取りと最初の配置は次のUpdateで行う

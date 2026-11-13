@@ -19,6 +19,9 @@ namespace Yurube.Story
 
         MonoBehaviour m_menu;
         bool m_starting;
+        // 章選択のUIは、このコンポーネントとは別のCanvasに作られる。
+        // Destroy(gameObject) だけではCanvasが残ってしまうので、必ず一緒に消す
+        GameObject m_canvas;
         List<StoryChapter> m_chapters;
         int m_index;
         TMP_FontAsset m_font;
@@ -41,6 +44,11 @@ namespace Yurube.Story
         void OnDestroy()
         {
             IsOpen = false;
+            if (m_canvas != null)
+            {
+                Destroy(m_canvas);
+                m_canvas = null;
+            }
             // 章を始めるときは、シーンが変わるまでメニューを動かさない
             if (!m_starting && m_menu != null)
             {
@@ -53,6 +61,7 @@ namespace Yurube.Story
         {
             m_font = PresentationSettings.DefaultFont;
             var root = ToyKit.CreateOverlayCanvas("StoryChapterSelect", 100);
+            m_canvas = root.gameObject;
 
             var dim = ToyKit.UIImage("Dim", root, new Color(0.04f, 0.03f, 0.02f, 0.8f));
             ToyKit.Stretch(dim);
@@ -76,16 +85,24 @@ namespace Yurube.Story
             }
 
             float bottom = -378f;
-            float top = -170f;
-            int count = Mathf.Max(1, m_chapters.Count);
+            // タイトル・説明の下から、下の余白までを使って章の段を大きく見せる
+            float top = 230f;
+            // まだ実装していない章も「？？？」のロック枠として見せ、物語の全体像が分かるようにする
+            int futureCount = Mathf.Max(0, 4 - m_chapters.Count);
+            int totalCount = m_chapters.Count + futureCount;
+            int count = Mathf.Max(1, totalCount);
             float gap = 10f;
             float blockHeight = Mathf.Clamp((top - bottom - gap * (count - 1)) / count, 46f, 100f);
             float spacing = blockHeight + gap;
-            float start = bottom + blockHeight * 0.5f;
+            float stackHeight = blockHeight * count + gap * (count - 1);
+            float start = bottom + (top - bottom - stackHeight) * 0.5f + blockHeight * 0.5f;
 
-            for (int i = 0; i < m_chapters.Count; i++)
+            for (int i = 0; i < totalCount; i++)
             {
-                var chapter = m_chapters[i];
+                bool placeholder = i >= m_chapters.Count;
+                string chapterTitle = placeholder
+                    ? (i == totalCount - 1 ? "最終章「？？？」" : $"第{i}章「？？？」")
+                    : m_chapters[i].title;
                 var block = ToyKit.UIRounded("Chapter" + i, panel, Color.white, 20f);
                 ToyKit.Anchor(block, new Vector2(0.5f, 0.5f), new Vector2(0f, start + i * spacing),
                     new Vector2(1080f, blockHeight));
@@ -95,20 +112,31 @@ namespace Yurube.Story
                 m_blocks.Add(image);
                 m_outlines.Add(outline);
 
-                float fontSize = Mathf.Clamp(blockHeight * 0.31f, 18f, 32f);
-                var name = ToyKit.UIText("Name", block, m_font, chapter.title, fontSize, ToyKit.Ink);
+                float fontSize = Mathf.Clamp(blockHeight * 0.52f, 24f, 38f);
+                var name = ToyKit.UIText("Name", block, m_font, chapterTitle, fontSize, ToyKit.Ink);
                 name.alignment = TextAlignmentOptions.Left;
+                name.fontStyle = FontStyles.Bold;
                 name.enableAutoSizing = true;
-                name.fontSizeMin = 16f;
+                name.fontSizeMin = 22f;
                 name.fontSizeMax = fontSize;
+                // 白い縁取りが付いていると読みにくいので消す
+                name.outlineWidth = 0f;
+                name.outlineColor = Color.clear;
                 var nameRect = name.rectTransform;
                 nameRect.anchorMin = nameRect.anchorMax = new Vector2(0f, 0.5f);
                 nameRect.pivot = new Vector2(0f, 0.5f);
                 nameRect.anchoredPosition = new Vector2(36f, 0f);
-                nameRect.sizeDelta = new Vector2(660f, blockHeight - 12f);
+                nameRect.sizeDelta = new Vector2(680f, blockHeight - 10f);
 
-                var state = ToyKit.UIText("State", block, m_font, "", Mathf.Min(20f, fontSize), ToyKit.Ink);
+                float stateSize = Mathf.Clamp(fontSize * 0.78f, 20f, 28f);
+                var state = ToyKit.UIText("State", block, m_font, "", stateSize, ToyKit.Ink);
                 state.alignment = TextAlignmentOptions.Right;
+                state.fontStyle = FontStyles.Bold;
+                state.outlineWidth = 0f;
+                state.outlineColor = Color.clear;
+                state.enableAutoSizing = true;
+                state.fontSizeMin = 18f;
+                state.fontSizeMax = stateSize;
                 var stateRect = state.rectTransform;
                 stateRect.anchorMin = stateRect.anchorMax = new Vector2(1f, 0.5f);
                 stateRect.pivot = new Vector2(1f, 0.5f);
@@ -127,11 +155,15 @@ namespace Yurube.Story
 
         int DefaultIndex()
         {
+            int lastUnlocked = 0;
             for (int i = 0; i < m_chapters.Count; i++)
             {
-                if (StoryProgress.IsUnlocked(m_chapters[i]) && !StoryProgress.IsCleared(m_chapters[i].id)) return i;
+                if (!StoryProgress.IsUnlocked(m_chapters[i])) continue;
+                lastUnlocked = i;
+                if (!StoryProgress.IsCleared(m_chapters[i].id)) return i;
             }
-            return 0;
+            // 全部クリア済みなら、最後に遊べる章（第2章）を選んでおく
+            return lastUnlocked;
         }
 
         void Update()
@@ -140,50 +172,73 @@ namespace Yurube.Story
             if (MenuInput.Cancel()) { Close(); return; }
             if (m_chapters == null || m_chapters.Count == 0) return;
 
-            if (MenuInput.Up()) Move(-1);
-            else if (MenuInput.Down()) Move(1);
+            if (MenuInput.Up()) Move(1);
+            else if (MenuInput.Down()) Move(-1);
             else if (MenuInput.Submit()) StartSelected();
         }
 
         void Move(int delta)
         {
+            if (m_chapters.Count == 0) return;
             m_index = (m_index + delta + m_chapters.Count) % m_chapters.Count;
             Refresh();
         }
 
         void Refresh()
         {
-            for (int i = 0; i < m_chapters.Count; i++)
+            for (int i = 0; i < m_blocks.Count; i++)
             {
-                var chapter = m_chapters[i];
-                bool cleared = StoryProgress.IsCleared(chapter.id);
-                bool unlocked = StoryProgress.IsUnlocked(chapter);
-                bool selected = i == m_index;
+                bool placeholder = i >= m_chapters.Count;
+                bool cleared = !placeholder && StoryProgress.IsCleared(m_chapters[i].id);
+                bool unlocked = !placeholder && StoryProgress.IsUnlocked(m_chapters[i]);
+                bool selected = !placeholder && i == m_index;
 
-                m_blocks[i].color = !unlocked
-                    ? new Color(0.62f, 0.60f, 0.56f)
+                m_blocks[i].color = placeholder
+                    ? new Color(0.82f, 0.80f, 0.76f)
+                    : !unlocked ? new Color(0.72f, 0.70f, 0.66f)
                     : cleared ? new Color(0.72f, 0.88f, 0.68f) : new Color(0.78f, 0.90f, 0.99f);
                 m_blocks[i].rectTransform.localScale = selected ? Vector3.one * 1.02f : Vector3.one;
 
                 m_outlines[i].effectColor = selected ? new Color(0.95f, 0.62f, 0.15f) : new Color(0f, 0f, 0f, 0f);
                 m_outlines[i].enabled = selected;
 
-                m_titles[i].color = unlocked ? ToyKit.Ink : new Color(0.35f, 0.33f, 0.30f);
-                m_states[i].color = unlocked ? ToyKit.Ink : new Color(0.40f, 0.38f, 0.35f);
-                m_states[i].text = !unlocked
-                    ? "ロック（前の章をクリアで解放）"
+                // 灰色の台の上でも読めるよう、ロック中は濃い文字にする
+                m_titles[i].color = unlocked ? ToyKit.Ink : new Color(0.16f, 0.14f, 0.12f);
+                m_states[i].color = unlocked ? ToyKit.Ink : new Color(0.24f, 0.22f, 0.19f);
+                m_states[i].text = placeholder
+                    ? PlaceholderState(i)
+                    : !unlocked ? "ロック（前の章をクリアで解放）"
                     : cleared ? "クリア済み（Aで再プレイ）" : "あそべる";
             }
         }
 
+        // 実装待ちの最終章の表示。直前の章をクリアしたかで文言を変える
+        string PlaceholderState(int index)
+        {
+            if (m_chapters == null || m_chapters.Count == 0) return "ロック（準備中）";
+            if (index != m_chapters.Count) return "ロック（準備中）";
+            var last = m_chapters[m_chapters.Count - 1];
+            if (last == null) return "ロック（準備中）";
+            if (StoryProgress.IsCleared(last.id)) return "ロック（準備中）";
+            string label = last.order <= 0 ? "序章" : "第" + last.order + "章";
+            return "ロック（" + label + "クリアで解放）";
+        }
+
         void StartSelected()
         {
+            if (m_chapters.Count == 0 || m_index < 0 || m_index >= m_chapters.Count) return;
             var chapter = m_chapters[m_index];
             if (!StoryProgress.IsUnlocked(chapter)) return;
 
             string id = chapter.id;
             m_starting = true;
             IsOpen = false;
+            if (m_canvas != null)
+            {
+                m_canvas.SetActive(false);
+                Destroy(m_canvas);
+                m_canvas = null;
+            }
             Destroy(gameObject);
             StoryLauncher.Start(id);
         }
@@ -191,6 +246,14 @@ namespace Yurube.Story
         void Close()
         {
             IsOpen = false;
+            // ウィンドウ（別Canvas）を先に消す。これを忘れると、Bで閉じても
+            // 見た目が残ったまま裏のメニューだけ操作できてしまう
+            if (m_canvas != null)
+            {
+                m_canvas.SetActive(false);
+                Destroy(m_canvas);
+                m_canvas = null;
+            }
             if (m_menu != null)
             {
                 s_menuSuppressFrame = Time.frameCount;
