@@ -198,16 +198,34 @@ NetStages を直接開いて試すとき:
 - 試合
   - 接続してきた人は試合中でもすぐ参加する（ストックは満タンで出る）。次の試合から参加にするかは要検討
   - ルールの選択はホストのテスト用画面だけ（本番はセレクト画面から。B-08）
-  - クライアントでは名札・HUD の「頭の高さ」（積み木の高さ）が出ない（無敵中の点滅は 2026-11-12 から出る。NetworkDarumaCharacter）
+  - 名札・HUD の「頭の高さ」（`DarumaStack.Height`）: 2026-11-13 から、クライアントはホストから届いた段数で出す（中平さんの `DarumaStack.NetCount`。ユーザー了承済み）
 - ギミック
   - シューターの矢印・加速床の輪などの飾りの点滅はホストとずれる（見た目だけ）
-  - バンパーが弾いたときの膨らみ、シューター・加速床・ワープ・低重力の演出はクライアントで出ない（ホストの結果の位置は届く）
-  - ワープの瞬間移動は、クライアントでは NetworkTransform の補間ですべるように見える
+  - 2026-11-13 にクライアントでも出るようにした（中川さんのファイル。ユーザー了承済み）:
+    - シューター・加速床・ワープ: 飛ばした・乗った・入った/出たときのエフェクト・音を `GimmickNet.Relay` で送る。ワープの入口・出口の光り方とバンパーの膨らみは `INetGimmickState`
+    - 加速床・低重力の、乗っている間の粒: クライアントは `GimmickUtil.OverlapBoxForView`（影響を与えない、見た目用の範囲の検索）で相手を探して出す。
+      積まれている積み木は `GimmickNet.ViewFilter`（`NetGimmickSync` が入れる）で外す
+    - ワープの判定はホストだけ（クライアントで幽霊を勝手に送らないように）
+  - ワープなどの瞬間移動: ホストで1フレームに大きく動いたものを `NetTeleportWatch` が見つけて `NetworkTransform.Teleport` で送る（クライアントですべらずに移る）
   - ステージ19・20: ルーレットの賭けの表のチップが落ちる・弾む動き、ビリヤードの入れ替えの予告の輪は、クライアントが自分で進める（ホストと少しずれる）。
     入れ替えの予告の輪は、クライアントでは出ているキャラ全員に出る（ホストはやられ中などを除く）
+  - ステージ21〜24（氷床・麻雀・サンドバッグ。2026-11-12 に本編に入った）: 中川さんがネット対戦用の仕組み（`INetGimmickState`・`GimmickNet.Relay`）を入れてくれていたので、
+    2026-11-13 に NetStages を作り直して取り込んだ。ホストで、氷が割れて落ちる・サンドバッグの破裂・麻雀のポン → ツモ → 補充まで動き、積み木がネットワークに乗るのを確認（クライアント側も 2026-11-13 に MPPM で確認済み）
+  - ギミックが Instantiate した直後の積み木に付ける勢い（linearVelocity・Launch）が、ネット用の積み木では消えていた（NetworkRigidbody が Spawn まで物理を止めるため）。
+    2026-11-13 から、ホストで作った積み木は `NetworkTumiki.Awake` で物理を止めずにおく（サンドバッグの破裂・麻雀の補充・ビリヤードの噴水・ルーレットの積み木の雨が、ローカルと同じく飛ぶ）
+  - **AllStages にステージが足されたら、`Tools → ネット対戦 → NetStages を AllStages から作り直す` で取り込む**（ネット用の部品・設定は写される）
   - ステージ19・20 のように、ホストだけで動くギミックを新しく作るときは、`INetGimmickState` を付けて状態を送り、
     エフェクト・音は `GimmickNet.Relay()` の範囲で出す（`Nakagawa/Scripts/Gimmicks/Common/GimmickNet.cs` の説明を参照）
-- ヒットストップの揺れ・カメラの揺れ・効果音（A-09, C-06。MatchAudio は Match を後から表示するので付かない）
+- ヒットストップ・カメラの揺れ・効果音（A-09, C-06）: 2026-11-13 に対応（下のギミックの演出・頭の高さとあわせて、クライアント側も MPPM で確認済み）
+  - 試合の BGM・効果音（藤原さんの MatchAudio）は、Match を後から表示するので付いていなかった（ホストも）。`NetMatch.AttachMatchExtras` で付ける
+  - 当たった・打ち返した・拾った（`TumikiBlock.Hit`・`DarumaHammer.Hit / ShotFired`・`AnyPickedUp`）はホストでしか起きないので、`NetEffects` が送る。
+    クライアントでは、見た目と音を出すもの（CameraShake・MatchAudio・HammerHitEffect・TumikiCatchEffect）の受け取るメソッドにだけ渡す
+    （知らせそのものは起こさない。実績・必殺技ゲージがクライアントで数えないように）
+  - 脱落の揺れ・音は `NetEliminationSync` が出す
+  - ヒットストップ（`HitStop`）は、ホストで始まったのを `NetHitStopWatch` が見つけて送る（キャラ・幽霊は NetworkHammerView、積み木は NetworkTumiki）
+  - 拾った音の高さ・ジャンプの音（2026-11-13。藤原さんの MatchAudio に足した。ユーザー了承済み）:
+    拾った音は `DarumaStack.NetCount`（`NetEffects` が拾った知らせといっしょにホストの段数を入れる）で高さを決める。
+    ジャンプはホストの MatchAudio が見つけたとき `MatchAudio.Jumped` を出し、`NetEffects` が送って、クライアントは `MatchAudio.PlayJump` で鳴らす
 - 脱落の演出（EliminationCinematic。B-11）は 2026-11-12 に対応・クライアント側も確認済み:
   ホストは脱落を `NetEliminationSync`（NetMatch に付けた）で送り、クライアントは同じ設定でエフェクト・カメラの寄り・スロー（`Time.timeScale`）を出す。
   クライアントのスローは知らせが届いてから始まるので、通信の遅れの分だけ遅れる。いわだるの隕石のように演出を止めているときは送らない

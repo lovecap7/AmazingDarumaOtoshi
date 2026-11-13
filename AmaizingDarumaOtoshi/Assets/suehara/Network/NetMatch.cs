@@ -146,6 +146,8 @@ public class NetMatch : NetworkBehaviour
         if (Nakagawa.RespawnAppearEffect.AutoAttach && go.GetComponent<Nakagawa.RespawnAppearEffect>() == null) go.AddComponent<Nakagawa.RespawnAppearEffect>();
         if (Nakagawa.StartCountdownCinematic.AutoAttach && go.GetComponent<Nakagawa.StartCountdownCinematic>() == null) go.AddComponent<Nakagawa.StartCountdownCinematic>();
         if (Nakagawa.MatchCrown.AutoAttach && FindAnyObjectByType<Nakagawa.MatchCrown>() == null) go.AddComponent<Nakagawa.MatchCrown>();
+        // 藤原さんの試合の BGM・効果音も、シーンを読んだときに表示中の試合へ付く作りなので、ここで付ける(ホスト・クライアントとも)
+        if (go.GetComponent<MatchAudio>() == null) go.AddComponent<MatchAudio>();
     }
 
     public override void OnNetworkDespawn()

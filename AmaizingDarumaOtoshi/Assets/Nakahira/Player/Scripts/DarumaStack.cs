@@ -28,7 +28,10 @@ namespace Nakahira
         // 頭(王冠などの飾りを乗せる位置を読む。未設定なら null)
         public Transform Head => m_head;
         // 頭を含めたタワー全体の高さ
-        public float Height => Count * TumikiBlock.kHeight + m_headRadius * 2.0f;
+        public float Height => (NetCount >= 0 ? NetCount : Count) * TumikiBlock.kHeight + m_headRadius * 2.0f;
+
+        // ネット対戦用(suehara): クライアントは積み木を持っていないので、ホストから届いた段数で高さを出す(-1 なら使わない。ローカルは -1 のまま)
+        public int NetCount { get; set; } = -1;
 
         // 段数が変わったとき
         public event Action Changed;

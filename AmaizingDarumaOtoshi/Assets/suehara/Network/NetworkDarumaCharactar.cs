@@ -156,7 +156,10 @@ public class NetworkDarumaCharacter : NetworkBehaviour
     // DarumaStack.LateUpdate の頭の部分と同じ動き
     void ClientLateUpdate()
     {
-        if (m_head == null || m_stack == null) return;
+        if (m_stack == null) return;
+        // 名札・HUD が読むタワーの高さ(DarumaStack.Height)も、届いた段数で出す
+        m_stack.NetCount = m_stackCount.Value;
+        if (m_head == null) return;
         Vector3 target = new Vector3(0.0f, m_stackCount.Value * TumikiBlock.kHeight + m_stack.HeadRadius, 0.0f);
         m_head.localPosition = Vector3.MoveTowards(m_head.localPosition, target, m_fallSpeed * Time.deltaTime);
     }

@@ -48,11 +48,14 @@ namespace Nakagawa
         private void FixedUpdate()
         {
             Vector3 center = transform.position + transform.rotation * new Vector3(0.0f, m_size.y * 0.5f, 0.0f);
-            GimmickUtil.OverlapBox(center, m_size * 0.5f, transform.rotation, m_targets);
+            // ネット対戦用(suehara): クライアントは紫の粒だけを出す(重力はホストが変える)
+            bool client = GimmickClock.IsNetClient;
+            if (client) GimmickUtil.OverlapBoxForView(center, m_size * 0.5f, transform.rotation, m_targets);
+            else GimmickUtil.OverlapBox(center, m_size * 0.5f, transform.rotation, m_targets);
 
             foreach (var target in m_targets)
             {
-                target.RequestGravityScale(m_gravityScale);
+                if (!client) target.RequestGravityScale(m_gravityScale);
                 if (!m_effects.ContainsKey(target)) m_effects[target] = CreateEffect(target.Rigidbody.transform);
             }
             RemoveExitedEffects();

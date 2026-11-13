@@ -45,7 +45,12 @@ public class NetGimmickSync : NetworkBehaviour
     public override void OnNetworkSpawn()
     {
         FindTargets();
-        if (!IsServer) return;
+        if (!IsServer)
+        {
+            // クライアントで見た目だけ出すとき(加速床・低重力の粒)、積まれている積み木は数えない(ホストでもギミックの影響を受けない)
+            GimmickNet.ViewFilter = ViewFilter;
+            return;
+        }
         GimmickNet.BurstSent = SendBurst;
         GimmickNet.SoundSent = SendSound;
         GimmickNet.ShakeSent = SendShake;
@@ -58,7 +63,14 @@ public class NetGimmickSync : NetworkBehaviour
         if (GimmickNet.SoundSent == (Action<AudioClip, float, float>)SendSound) GimmickNet.SoundSent = null;
         if (GimmickNet.ShakeSent == (Action<float, float>)SendShake) GimmickNet.ShakeSent = null;
         if (GimmickNet.MessageSent == (Action<string, Color, float, float>)SendStageMessage) GimmickNet.MessageSent = null;
+        if (GimmickNet.ViewFilter == (Func<Nakahira.IGimmickAffectable, bool>)ViewFilter) GimmickNet.ViewFilter = null;
         m_snapshots.Clear();
+    }
+
+    static bool ViewFilter(Nakahira.IGimmickAffectable target)
+    {
+        if (target is Nakahira.TumikiBlock block && block.TryGetComponent<NetworkTumiki>(out var net) && net.IsSpawned) return !net.IsStacked;
+        return true;
     }
 
     // シーンの中の INetGimmickState を、親からの並び順で集める(ホストとクライアントで同じ順番になる)

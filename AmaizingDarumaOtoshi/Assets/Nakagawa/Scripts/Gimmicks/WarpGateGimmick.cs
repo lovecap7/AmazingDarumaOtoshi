@@ -17,7 +17,7 @@ namespace Nakagawa
     // 見た目: リングの色はグループごと、リングの模様(顔マーク / 積み木マーク / 両方)で対象を区別する
     // このTransformの位置がゲートの中心(床の高さ)。向き(forward)を基準に回す方式で使う
     [DefaultExecutionOrder(-10)]
-    public class WarpGateGimmick : MonoBehaviour
+    public class WarpGateGimmick : MonoBehaviour, INetGimmickState
     {
         public enum TargetType { Players, Blocks, Both }
         public enum Selection { Random, Sequential }
@@ -189,7 +189,9 @@ namespace Nakagawa
 
         private void FixedUpdate()
         {
-            if (GimmickClock.IsHeld) return;
+            // ネット対戦用(suehara): 送るのはホストだけ(クライアントは位置・大きさが届く。光り方は ReadNetState)
+            if (GimmickClock.IsHeld || GimmickClock.IsNetClient) return;
+            using var relay = GimmickNet.Relay();   // ネット対戦用(suehara): 入ったときのエフェクト・音をクライアントにも出す
             DetectEntrants();
             UpdateIgnore(Time.fixedDeltaTime);
         }
@@ -254,6 +256,7 @@ namespace Nakagawa
         private void Update()
         {
             float dt = Time.deltaTime;
+            using var relay = GimmickNet.RelayOrMute();   // ネット対戦用(suehara): 出口に出たときのエフェクトをクライアントにも出す
             for (int i = m_travels.Count - 1; i >= 0; i--)
             {
                 var t = m_travels[i];
@@ -447,6 +450,25 @@ namespace Nakagawa
         //========================================
         // 見た目
         //========================================
+
+        // ネット対戦用(suehara): 入口の光・出口の光の残り時間をホストから受け取る(ワープそのものはホストが動かし、位置・大きさが届く)
+        public void WriteNetState(GimmickNetState s)
+        {
+            s.Add(m_glowTimer);
+            s.Add(m_glowDuration);
+            s.Add(m_flashTimer);
+        }
+
+        public void ReadNetState(GimmickNetState s)
+        {
+            float glow = s.Float();
+            float duration = s.Float();
+            float flash = s.Float();
+            if (!s.Ok) return;
+            m_glowTimer = glow;
+            m_glowDuration = Mathf.Max(0.05f, duration);
+            m_flashTimer = flash;
+        }
 
         private void StartGlow(float duration)
         {

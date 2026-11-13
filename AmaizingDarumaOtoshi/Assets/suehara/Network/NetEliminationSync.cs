@@ -7,7 +7,8 @@ using UnityEngine;
 // 脱落した瞬間の演出(中川さんの EliminationCinematic: カメラが寄る・K.O. のエフェクト)を、クライアントでも出す。
 // NetMatch と同じ GameObject(シーンの NetworkObject)に付ける。
 //  ・ホスト      : 脱落(DarumaCharacter.AnyEliminated。ホストでしか起きない)を、原因と場所といっしょにクライアントへ送る。
-//                  ホストの演出は EliminationCinematic がそのまま出す。演出を止めているとき(いわだるの隕石など)は送らない
+//                  ホストの演出は EliminationCinematic がそのまま出す。演出を止めているとき(いわだるの隕石など)は寄る演出だけ出さない
+//                  (カメラの揺れ CameraShake・脱落の音 MatchAudio もクライアントで出す。キャラクターの処理を止めているので知らせが起きないため)
 //  ・クライアント: 届いた脱落で、EliminationCinematic と同じ設定・同じ流れでエフェクトを出し、カメラを寄せ、スローにする。
 //                  (位置はホストの遅くなった動きが届くが、ハンマーの振り・エフェクトなどクライアントで動かす見た目は
 //                   クライアントの時間で進むので、クライアントの Time.timeScale も同じように落とす)
@@ -63,21 +64,22 @@ public class NetEliminationSync : NetworkBehaviour
         return f != null && Cinematic != null ? (T)f.GetValue(Cinematic) : default;
     }
 
-    // ホスト: 脱落をクライアントへ送る
+    // ホスト: 脱落をクライアントへ送る(カメラの揺れ・音はいつも。寄る演出は EliminationCinematic が動いているときだけ)
     void OnEliminated(DarumaCharacter character)
     {
         if (!IsSpawned || character == null) return;
         var cinematic = Cinematic;
-        if (cinematic == null || !cinematic.isActiveAndEnabled) return;
-        EliminatedRpc((byte)character.EliminationCause, character.transform.position, character.EliminationPosition);
+        bool cinematicOn = cinematic != null && cinematic.isActiveAndEnabled;
+        EliminatedRpc((byte)character.EliminationCause, character.transform.position, character.EliminationPosition, cinematicOn);
     }
 
-    // クライアント: EliminationCinematic.OnEliminated と同じ流れ(時間の速さには触れない)
+    // クライアント: EliminationCinematic.OnEliminated と同じ流れ
     [Rpc(SendTo.NotServer)]
-    void EliminatedRpc(byte causeValue, Vector3 position, Vector3 eliminationPosition)
+    void EliminatedRpc(byte causeValue, Vector3 position, Vector3 eliminationPosition, bool cinematicOn)
     {
-        if (Cinematic == null || !Setting<bool>("m_enabled")) return;
         var cause = (EliminationCause)causeValue;
+        ShakeAndSound(cause, position);
+        if (!cinematicOn || Cinematic == null || !Setting<bool>("m_enabled")) return;
         float focusHeight = Setting<float>("m_focusHeight");
         if (cause == EliminationCause.Fall) SpawnFallEffect(eliminationPosition);
         if (!ShouldPlay(cause)) return;
@@ -89,6 +91,27 @@ public class NetEliminationSync : NetworkBehaviour
         var effect = Setting<GameObject>("m_effectPrefab");
         if (effect != null) Destroy(Instantiate(effect, position, Quaternion.identity), Setting<float>("m_effectLifetime"));
         StartZoom(position + Vector3.up * focusHeight);
+    }
+
+    // CameraShake.OnEliminated・MatchAudio.OnEliminated と同じ(キャラクターはもう消えていることがあるので、原因と場所から出す)
+    void ShakeAndSound(EliminationCause cause, Vector3 position)
+    {
+        bool attack = cause == EliminationCause.Projectile || cause == EliminationCause.Hammer;
+        var shake = FindAnyObjectByType<CameraShake>();
+        if (shake != null && shake.isActiveAndEnabled)
+        {
+            var t = typeof(CameraShake);
+            if (attack) shake.Shake((CameraShake.ShakeSettings)t.GetField("m_elimination", kPrivate).GetValue(shake));
+            else if (cause == EliminationCause.Fall && (bool)t.GetField("m_shakeOnFall", kPrivate).GetValue(shake))
+                shake.Shake((CameraShake.ShakeSettings)t.GetField("m_fall", kPrivate).GetValue(shake));
+        }
+        var audio = FindAnyObjectByType<MatchAudio>();
+        var sounds = MatchSounds.Instance;
+        if (audio != null && audio.isActiveAndEnabled && sounds != null)
+        {
+            var play = typeof(MatchAudio).GetMethod("Play", kPrivate, null, new[] { typeof(AudioClip), typeof(float), typeof(float), typeof(Vector3?) }, null);
+            play?.Invoke(audio, new object[] { cause == EliminationCause.Fall ? sounds.Fall : sounds.KO, 1.0f, 1.0f, (Vector3?)position });
+        }
     }
 
     void SpawnFallEffect(Vector3 position)
