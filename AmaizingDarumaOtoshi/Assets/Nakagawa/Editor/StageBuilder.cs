@@ -88,6 +88,19 @@ namespace Nakagawa.EditorTools
             BuildIntoCombined(def => InNumberRange(def.Id, kDebugPrefix, 31, 70));
         }
 
+        // 新しいギミックの本編ステージ(Stage21〜24: 氷・麻雀卓・大会・部室)だけを作り直す。他のステージはそのまま
+        [MenuItem("Nakagawa/Stages/Build Stages 21-24 Into AllStages")]
+        public static void BuildStages21To24()
+        {
+            BuildIntoCombined(def => InNumberRange(def.Id, kStagePrefix, 21, 24));
+        }
+
+        // 本編のステージのうち、番号が from〜to のものだけを作り直す(ほかのステージを足したときにも使える)
+        public static void BuildMainStageRange(int from, int to)
+        {
+            BuildIntoCombined(def => InNumberRange(def.Id, kStagePrefix, from, to));
+        }
+
         // id が「接頭辞 + 通し番号」で、番号が from〜to か
         static bool InNumberRange(string id, string prefix, int from, int to)
         {
@@ -161,6 +174,8 @@ namespace Nakagawa.EditorTools
             public string Backdrop;
             // 見下ろすカメラの角度
             public float CameraPitch = kCameraPitch;
+            // ふつうの積み木の生成の間隔に掛ける倍率(1 なら設定どおり。別の供給元が主のステージで大きくする)
+            public float SpawnIntervalScale = 1.0f;
         }
 
         static List<StageDef> Definitions()
@@ -2197,6 +2212,103 @@ namespace Nakagawa.EditorTools
                     c.Spawns(new Vector2(-6, 6), new Vector2(6, 6), new Vector2(-6, -6), new Vector2(6, -6));
                 }).Backdrop = kBathBackdrop;
 
+            // Stage18〜20 は専用のビルダー(Stage18 は手で作ったもの、Stage19 は BilliardStageBuilder、Stage20 は RouletteStageBuilder)で作るので、ここでは番号を飛ばす
+            // (Stage21〜 はこの定義から作る。案は StageProposals.md)
+            number = 20;
+
+            // 新しいギミックの本編ステージ(Stage21〜24)
+
+            Add("氷割りゲーム", 22,
+                "ちゃぶ台の上のクラッシュアイスゲーム。六角形の氷のタイルを大きな六角形に並べた盤で、出現地点だけは割れない床(タイル3枚分)。盤の外は崖で、壁はない。",
+                "序盤は氷の上の積み木を取り合う。ジャンプして氷に着地すると、着地したタイルと隣のタイルにひびが入り、3回で崩れ落ちる(上の積み木も人も一緒に落ちる)。崩れた氷は10秒で元に戻る。" +
+                "積み木の少ない軽い人ほど跳べるので、積んで重くなった人の足元を割って落とせる。割れた所が多いほど穴だらけになり、割れない出現地点の小さな床が逃げ場になる。",
+                c =>
+                {
+                    // 半径5(タイル5枚分)の大きな六角形。出現地点は、互いに接する3枚(三角形)をまとめた割れない床を4か所(左右・上下に対称)
+                    var spawnFloors = c.IceBoardGroups(Vector2.zero, 5, 2.4f,
+                        new[] { new Vector2Int(1, 2), new Vector2Int(2, 2), new Vector2Int(2, 1) },
+                        new[] { new Vector2Int(-3, 2), new Vector2Int(-4, 2), new Vector2Int(-3, 1) },
+                        new[] { new Vector2Int(3, -2), new Vector2Int(4, -2), new Vector2Int(3, -1) },
+                        new[] { new Vector2Int(-1, -2), new Vector2Int(-2, -2), new Vector2Int(-2, -1) });
+                    c.AreaCircle(0, 0, 2.5f);
+                    // 出現地点の床の間(東西・南北) / 盤の縁の4か所
+                    c.AreaCircle(9.6f, 0, 2);
+                    c.AreaCircle(-9.6f, 0, 2);
+                    c.AreaCircle(0, 8.3f, 2);
+                    c.AreaCircle(0, -8.3f, 2);
+                    c.AreaCircle(7.2f, 8.3f, 1.5f);
+                    c.AreaCircle(-7.2f, 8.3f, 1.5f);
+                    c.AreaCircle(7.2f, -8.3f, 1.5f);
+                    c.AreaCircle(-7.2f, -8.3f, 1.5f);
+                    // 出現位置は、3枚の床の真ん中(3枚が接する頂点)
+                    c.Spawns(spawnFloors.ToArray());
+                }).Backdrop = kChanomaBackdrop;
+
+            Add("こたつの全自動卓", 24,
+                "お茶の間のこたつに置いた全自動麻雀卓。全周が縁(壁)の卓の上に、空から4種類の牌が降ってくる。中央の 9×9m はふたで、ふだんは床。",
+                "牌(東・南・西・北)は触れると取れ、攻撃を受けると手持ちから1枚落とす(やられると全部)。場の牌は積み木に当たると弾かれる。" +
+                "同じ牌3枚(ポン)か4種を1枚ずつそろえると、牌が空に集まって巨大になり、ポンの形で中央のふたの上に落ちてくる(近くの人ははじかれる)。" +
+                "5秒後に「ツモ！」で洗牌が始まり、中央のふたが開いて、発動した人以外のプレイヤーと積み木が中央の穴へ流される。そのあと縁の内側から積み木が補充される。" +
+                "牌を持っている人ほど狙われ、あと1枚の人を全員で殴って止めるか、落ちた牌を横取りするかの駆け引きになる。全周が壁なので、落下はふたが開いている間だけ。",
+                c =>
+                {
+                    // 中央のふた(穴)は 9×9m(案の 6×6m の1.5倍)
+                    c.Mahjong(0, 0, 26, 26, 9, 9);
+                    // 四隅 / 4辺の中央(壁にかぶせる) / ふたの上(閉じている間だけ湧く)
+                    c.AreaCircle(-10.5f, -10.5f, 2.5f);
+                    c.AreaCircle(10.5f, -10.5f, 2.5f);
+                    c.AreaCircle(-10.5f, 10.5f, 2.5f);
+                    c.AreaCircle(10.5f, 10.5f, 2.5f);
+                    c.AreaRect(0, 11.5f, 6, 3);
+                    c.AreaRect(0, -11.5f, 6, 3);
+                    c.AreaRect(11.5f, 0, 3, 6);
+                    c.AreaRect(-11.5f, 0, 3, 6);
+                    c.AreaRect(0, 0, 7.5f, 7.5f);
+                    c.Spawns(new Vector2(-7, -7), new Vector2(7, -7), new Vector2(-7, 7), new Vector2(7, 7));
+                }).Backdrop = kChanomaBackdrop;
+
+            Add("決勝の特設ステージ", 24,
+                "スタジアムの特設ステージ。南北だけ壁があり、東西は崖。左右の広い床(せり上がり塀)が、交互に高台へせり上がっては下がる。",
+                "上がっている側は高台と盾になり、下がっている側は見通しが開く。上がった床の側面で弾が跳ね返るので、中央の通路は跳弾が多い。" +
+                "床が上がる前に乗っていれば一緒に持ち上がり、高台から撃ち下ろせる(高さ1.5mなので、積み木の少ない人は下から跳び乗れる)。東西の崖が落下の場所。",
+                c =>
+                {
+                    c.Arena(0, 0, 28, 20, true, true, false, false);
+                    // 左右の床が半周期ずれて交互に上下する(1周 8.3秒 = 床3 + 予兆1 + 上昇0.5 + 壁3 + 下降0.8)
+                    // 大きさは 6×7.5m(案の 8×10m の 3/4。中心の位置と高さ 1.5m は同じ)
+                    c.RisingWall(-6.5f, 0, new Vector2(6, 7.5f), 0.0f, 1.5f);
+                    c.RisingWall(6.5f, 0, new Vector2(6, 7.5f), 4.15f, 1.5f);
+                    c.AreaRect(0, 0, 4, 8);
+                    c.AreaRect(0, 7.5f, 10, 3);
+                    c.AreaRect(0, -7.5f, 10, 3);
+                    c.AreaCircle(-6.5f, 0, 2.5f);
+                    c.AreaCircle(6.5f, 0, 2.5f);
+                    c.AreaRect(12.25f, 0, 3, 8);
+                    c.AreaRect(-12.25f, 0, 3, 8);
+                    c.Spawns(new Vector2(-9, 7.5f), new Vector2(9, -7.5f), new Vector2(-9, -7.5f), new Vector2(9, 7.5f));
+                }).Backdrop = kStadiumBackdrop;
+
+            var sandbagStage = Add("部室のサンドバッグ", 16,
+                "だるま落とし部の部室。全周が壁の部屋の中央に、大きなサンドバッグが立っている。",
+                "ハンマーで殴るたびに、殴った人の反対側へ積み木が1個出るので、全員が中央に集まって殴り合い、出た積み木の横取りが起きる。" +
+                "殴られ続けたサンドバッグは点滅しながらふくらみ、床に8方向の線が出たあと破裂して、攻撃判定のある積み木を8方向へ撃ち出す。" +
+                "破裂が近づくと、殴り続けるか離れるかの読み合いになり、破裂の弾は壁で跳ね返って連鎖する。サンドバッグは10秒で元に戻る。ふつうの積み木の生成は少なめ。",
+                c =>
+                {
+                    c.Arena(0, 0, 26, 26, true, true, true, true);
+                    c.Sandbag(0, 0, 1.5f);
+                    c.AreaCircle(-10, -10, 2);
+                    c.AreaCircle(10, -10, 2);
+                    c.AreaCircle(-10, 10, 2);
+                    c.AreaCircle(10, 10, 2);
+                    // 南北の壁にかぶせる
+                    c.AreaRect(0, 11.5f, 8, 3);
+                    c.AreaRect(0, -11.5f, 8, 3);
+                    c.Spawns(new Vector2(-6.5f, -6.5f), new Vector2(6.5f, -6.5f), new Vector2(-6.5f, 6.5f), new Vector2(6.5f, 6.5f));
+                });
+            sandbagStage.Backdrop = kClubroomBackdrop;
+            sandbagStage.SpawnIntervalScale = 1.6f;
+
             //----------------------------------------
             // 追加ギミックの確認用ステージ(GimmickDebugStage01〜)。背景なし・種類の数の制限なし
             //----------------------------------------
@@ -2405,13 +2517,14 @@ namespace Nakagawa.EditorTools
 
             // せり上がり塀。phaseOffset: 開始のずれ(秒)。並べて少しずつずらすと波のように立ち上がる
             // 高さはジャンプで登れない kRisingWallHeight(せり上がるときに乗っていれば、持ち上げられて上に乗れる)
-            public void RisingWall(float x, float z, Vector2 size, float phaseOffset)
+            // height: 上がったときの高さ(既定はジャンプで登れない高さ。広い床として使うときは低くして、跳び乗れるようにする)
+            public void RisingWall(float x, float z, Vector2 size, float phaseOffset, float height = kRisingWallHeight)
             {
                 var go = Place(AdditionalGimmickBuilder.kRisingWall, new Vector3(x, 0, z));
                 var wall = go.GetComponent<RisingWallGimmick>();
                 var so = new SerializedObject(wall);
                 so.FindProperty("m_size").vector2Value = size;
-                so.FindProperty("m_wallHeight").floatValue = kRisingWallHeight;
+                so.FindProperty("m_wallHeight").floatValue = height;
                 so.FindProperty("m_phaseOffset").floatValue = phaseOffset;
                 so.ApplyModifiedPropertiesWithoutUndo();
                 wall.ApplyShape();
@@ -2529,6 +2642,359 @@ namespace Nakagawa.EditorTools
 
             public void Spawns(params Vector2[] points) => SpawnPoints.AddRange(points);
 
+            //---- 本編 Stage21〜 の新しいギミック ----
+
+            // 作っているステージの id(メッシュのアセットの名前に使う)と、メッシュをアセットに保存するか(検証だけの組み立てでは保存しない)
+            public string Id;
+            public bool SaveMeshes;
+            // 積み木の生成(TumikiSpawner)ができたあとに、参照を入れる先(コンポーネントとプロパティ名)
+            public readonly List<(Object target, string property)> SpawnerLinks = new List<(Object, string)>();
+            MeshAssetStore m_meshStore;
+
+            // 床として扱う範囲(当たり判定のある床をギミックが自分で作る所。配置の検証にだけ使う)
+            public void FloorRegion(Rect rect) => Floors.Add(rect);
+
+            // 割れる氷。fill の範囲のうち、すでに置いた動かない床のない所を、六角形のタイル(向かい合う辺の間 flat m)で埋める
+            // タイルは動かない床(Rigidbody なし)。動かない床と重なる所は切り取る(すき間も重なりもできない)
+            public void IceField(Rect fill, float flat)
+            {
+                var root = new GameObject("IceField");
+                root.transform.SetParent(Gimmicks, false);
+                var ice = root.AddComponent<IceFloorGimmick>();
+                var mats = new IceMaterials();
+                var solid = new List<Rect>(Floors);
+
+                float apothem = flat * 0.5f;
+                float circum = apothem / Mathf.Cos(30.0f * Mathf.Deg2Rad);
+                int rMax = Mathf.CeilToInt(Mathf.Max(fill.width, fill.height) / (1.5f * circum)) + 2;
+                int qMax = Mathf.CeilToInt(Mathf.Max(fill.width, fill.height) / flat) + rMax + 2;
+                var tiles = new List<(int q, int r, Vector2 c, List<List<Vector2>> pieces)>();
+                for (int r = -rMax; r <= rMax; r++)
+                {
+                    for (int q = -qMax; q <= qMax; q++)
+                    {
+                        Vector2 c = new Vector2(fill.center.x + flat * (q + r * 0.5f), fill.center.y + 1.5f * circum * r);
+                        if (c.x < fill.xMin - circum || c.x > fill.xMax + circum || c.y < fill.yMin - circum || c.y > fill.yMax + circum) continue;
+                        var hex = new List<Vector2>();
+                        for (int k = 0; k < 6; k++)
+                        {
+                            float a = (30.0f + 60.0f * k) * Mathf.Deg2Rad;
+                            hex.Add(c + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * circum);
+                        }
+                        // 範囲の中だけ残し、動かない床の所を切り取る
+                        var pieces = new List<List<Vector2>> { Poly.ClipToRect(hex, fill) };
+                        foreach (var s in solid)
+                        {
+                            var next = new List<List<Vector2>>();
+                            foreach (var p in pieces) next.AddRange(Poly.Subtract(p, s));
+                            pieces = next;
+                        }
+                        pieces.RemoveAll(p => p.Count < 3 || Poly.Area(p) < 0.01f);
+                        if (pieces.Count > 0) tiles.Add((q, r, c, pieces));
+                    }
+                }
+
+                var specs = new List<IceTileSpec>();
+                foreach (var (q, r, c, pieces) in tiles) specs.Add(new IceTileSpec { Q = q, R = r, Pivot = c, Pieces = pieces });
+                BuildIceTiles(root, ice, specs, apothem, mats);
+                FloorRegion(fill);
+            }
+
+            // 割れる氷の盤。中心 center・半径 radius(タイルの数)の大きな六角形に、六角形のタイル(向かい合う辺の間 flat m)を並べる
+            // solidCenters(六角形の格子の軸座標)を中心にした7枚分(中心と周りの6枚)は、割れない床(出現地点など)にする
+            // 盤の外は崖。動かない床・壁は置かない
+            public void IceBoard(Vector2 center, int radius, float flat, params Vector2Int[] solidCenters)
+            {
+                var groups = new Vector2Int[solidCenters.Length][];
+                (int dq, int dr)[] dirs = { (0, 0), (1, 0), (1, -1), (0, -1), (-1, 0), (-1, 1), (0, 1) };
+                for (int i = 0; i < solidCenters.Length; i++)
+                {
+                    groups[i] = new Vector2Int[dirs.Length];
+                    for (int k = 0; k < dirs.Length; k++) groups[i][k] = solidCenters[i] + new Vector2Int(dirs[k].dq, dirs[k].dr);
+                }
+                IceBoardGroups(center, radius, flat, groups);
+            }
+
+            // 割れる氷の盤(割れない床をタイルの組で指定する版)。solidGroups の組ごとに、そのタイルをまとめて割れない床(出現地点など)にする
+            // 戻り値: 組ごとの床の中心(タイルの中心の平均。出現位置に使う)
+            public List<Vector2> IceBoardGroups(Vector2 center, int radius, float flat, params Vector2Int[][] solidGroups)
+            {
+                var root = new GameObject("IceField");
+                root.transform.SetParent(Gimmicks, false);
+                var ice = root.AddComponent<IceFloorGimmick>();
+                var mats = new IceMaterials();
+                float apothem = flat * 0.5f;
+                float circum = apothem / Mathf.Cos(30.0f * Mathf.Deg2Rad);
+                Vector2 CellCenter(int q, int r) => center + new Vector2(flat * (q + r * 0.5f), 1.5f * circum * r);
+                int Distance(int dq, int dr) => Mathf.Max(Mathf.Abs(dq), Mathf.Max(Mathf.Abs(dr), Mathf.Abs(dq + dr)));
+
+                var specs = new List<IceTileSpec>();
+                var clusters = new List<IceTileSpec>();
+                var centers = new List<Vector2>();
+                foreach (var group in solidGroups)
+                {
+                    Vector2 sum = Vector2.zero;
+                    foreach (var cell in group) sum += CellCenter(cell.x, cell.y);
+                    Vector2 c = sum / Mathf.Max(1, group.Length);
+                    centers.Add(c);
+                    clusters.Add(new IceTileSpec { Q = group[0].x, R = group[0].y, Pivot = c, Pieces = new List<List<Vector2>>(), Solid = true });
+                }
+                for (int r = -radius; r <= radius; r++)
+                {
+                    for (int q = -radius; q <= radius; q++)
+                    {
+                        if (Distance(q, r) > radius) continue;
+                        var hex = Poly.Hexagon(CellCenter(q, r), circum);
+                        int cluster = -1;
+                        for (int i = 0; i < solidGroups.Length; i++)
+                        {
+                            foreach (var cell in solidGroups[i]) if (cell.x == q && cell.y == r) cluster = i;
+                        }
+                        if (cluster >= 0) clusters[cluster].Pieces.Add(hex);
+                        else specs.Add(new IceTileSpec { Q = q, R = r, Pivot = CellCenter(q, r), Pieces = new List<List<Vector2>> { hex } });
+                    }
+                }
+                specs.AddRange(clusters);
+                BuildIceTiles(root, ice, specs, apothem, mats);
+                return centers;
+            }
+
+            // 氷のタイル1枚分(割れない床なら、7枚分を1つにまとめたもの)
+            class IceTileSpec
+            {
+                public int Q, R;
+                public Vector2 Pivot;
+                public List<List<Vector2>> Pieces;
+                public bool Solid;
+            }
+
+            // タイルを組み立てて IceFloorGimmick に入れる
+            //  ・Root(当たり判定。崩れたら落とす) → Visual(見た目。予兆で揺らす) → 縁・ひび
+            //  ・メッシュはステージごとに1つのアセットへまとめて保存する
+            void BuildIceTiles(GameObject root, IceFloorGimmick ice, List<IceTileSpec> specs, float apothem, IceMaterials mats)
+            {
+                if (SaveMeshes) m_meshStore = new MeshAssetStore($"{kMeshDir}/{Id}_IceTiles.asset");
+                var index = new Dictionary<(int, int), int>();
+                for (int i = 0; i < specs.Count; i++) if (!specs[i].Solid) index[(specs[i].Q, specs[i].R)] = i;
+                (int dq, int dr)[] dirs = { (1, 0), (1, -1), (0, -1), (-1, 0), (-1, 1), (0, 1) };
+                Material solidMat = FloorMaterial != null ? FloorMaterial : Load<Material>(kStageMaterial);
+
+                var so = new SerializedObject(ice);
+                var list = so.FindProperty("m_tiles");
+                list.arraySize = specs.Count;
+                for (int i = 0; i < specs.Count; i++)
+                {
+                    var spec = specs[i];
+                    int q = spec.Q, r = spec.R;
+                    Vector2 c = spec.Pivot;
+                    var pieces = spec.Pieces;
+                    string name = spec.Solid ? $"SolidFloor_{q}_{r}" : $"IceTile_{q}_{r}";
+                    var go = new GameObject(name);
+                    go.transform.SetParent(root.transform, false);
+                    go.transform.localPosition = new Vector3(c.x, 0, c.y);
+                    var body = Poly.PrismMesh(pieces, c, 1.0f, name);
+                    m_meshStore?.Add(body);
+                    var col = go.AddComponent<MeshCollider>();
+                    col.sharedMesh = body;
+                    var visual = new GameObject("Visual").transform;
+                    visual.SetParent(go.transform, false);
+                    visual.gameObject.AddComponent<MeshFilter>().sharedMesh = body;
+                    var renderer = visual.gameObject.AddComponent<MeshRenderer>();
+                    renderer.sharedMaterial = spec.Solid ? solidMat : mats.Ice;
+
+                    Renderer edge = null;
+                    var cracks = new Renderer[spec.Solid ? 0 : 2];
+                    if (!spec.Solid)
+                    {
+                        var edgeMesh = Poly.EdgeMesh(pieces, c, 0.07f, 0.006f, $"IceEdge_{q}_{r}");
+                        m_meshStore?.Add(edgeMesh);
+                        edge = MeshChild(visual, "Edge", edgeMesh, mats.Edge);
+                        var rng = new System.Random(q * 7919 + r * 104729 + 17);
+                        for (int k = 0; k < cracks.Length; k++)
+                        {
+                            var crackMesh = Poly.CrackMesh(pieces, c, apothem, k == 0 ? 2 : 3, rng, 0.05f, 0.008f + k * 0.001f, $"IceCrack{k}_{q}_{r}");
+                            m_meshStore?.Add(crackMesh);
+                            cracks[k] = MeshChild(visual, $"Crack{k + 1}", crackMesh, mats.Crack);
+                            // ひびは割れてから見せる(エディタ・ステージの写真では無傷に見えるように)
+                            cracks[k].enabled = false;
+                        }
+                    }
+
+                    var e = list.GetArrayElementAtIndex(i);
+                    e.FindPropertyRelative("Q").intValue = q;
+                    e.FindPropertyRelative("R").intValue = r;
+                    e.FindPropertyRelative("Root").objectReferenceValue = go.transform;
+                    e.FindPropertyRelative("Visual").objectReferenceValue = visual;
+                    e.FindPropertyRelative("Body").objectReferenceValue = renderer;
+                    e.FindPropertyRelative("Collider").objectReferenceValue = col;
+                    e.FindPropertyRelative("Edge").objectReferenceValue = edge;
+                    e.FindPropertyRelative("Solid").boolValue = spec.Solid;
+                    e.FindPropertyRelative("Depth").floatValue = 1.0f;
+                    var cr = e.FindPropertyRelative("Cracks");
+                    cr.arraySize = cracks.Length;
+                    for (int k = 0; k < cracks.Length; k++) cr.GetArrayElementAtIndex(k).objectReferenceValue = cracks[k];
+                    var neighbors = new List<int>();
+                    if (!spec.Solid) foreach (var (dq, dr) in dirs) if (index.TryGetValue((q + dq, r + dr), out int n)) neighbors.Add(n);
+                    var nb = e.FindPropertyRelative("Neighbors");
+                    nb.arraySize = neighbors.Count;
+                    for (int k = 0; k < neighbors.Count; k++) nb.GetArrayElementAtIndex(k).intValue = neighbors[k];
+
+                    // 上から見た形(継ぎ目の処理用。Root からの相対)と、配置の検証用の床
+                    var points = new List<Vector2>();
+                    var sizes = new List<int>();
+                    foreach (var piece in pieces)
+                    {
+                        sizes.Add(piece.Count);
+                        foreach (var p in piece) points.Add(p - c);
+                        FloorPolygons.Add(piece);
+                    }
+                    var pp = e.FindPropertyRelative("Points");
+                    pp.arraySize = points.Count;
+                    for (int k = 0; k < points.Count; k++) pp.GetArrayElementAtIndex(k).vector2Value = points[k];
+                    var ps = e.FindPropertyRelative("PieceSizes");
+                    ps.arraySize = sizes.Count;
+                    for (int k = 0; k < sizes.Count; k++) ps.GetArrayElementAtIndex(k).intValue = sizes[k];
+                }
+                so.ApplyModifiedPropertiesWithoutUndo();
+                m_meshStore?.Save();
+                Count("割れる氷");
+            }
+
+            // 全自動麻雀卓。遊べる範囲 w×d(全周が壁)の中央に lw×ld のふた(閉じている間は床、開くと穴)
+            public void Mahjong(float cx, float cz, float w, float d, float lw, float ld)
+            {
+                var felt = LitMaterial("MahjongFelt", new Color(0.33f, 0.42f, 0.36f), 0.15f);
+                var floorBefore = FloorMaterial;
+                FloorMaterial = felt;
+                float xMin = cx - w * 0.5f - 1, xMax = cx + w * 0.5f + 1, zMin = cz - d * 0.5f - 1, zMax = cz + d * 0.5f + 1;
+                float lx0 = cx - lw * 0.5f, lx1 = cx + lw * 0.5f, lz0 = cz - ld * 0.5f, lz1 = cz + ld * 0.5f;
+                // ふたの周りの床(ふたの所だけ空ける)
+                Floor((xMin + xMax) * 0.5f, (lz1 + zMax) * 0.5f, xMax - xMin, zMax - lz1);
+                Floor((xMin + xMax) * 0.5f, (zMin + lz0) * 0.5f, xMax - xMin, lz0 - zMin);
+                Floor((lx1 + xMax) * 0.5f, cz, xMax - lx1, ld);
+                Floor((xMin + lx0) * 0.5f, cz, lx0 - xMin, ld);
+                FloorMaterial = floorBefore;
+                Wall(cx, zMax - 0.5f, xMax - xMin, 1);
+                Wall(cx, zMin + 0.5f, xMax - xMin, 1);
+                Wall(xMax - 0.5f, cz, 1, zMax - zMin);
+                Wall(xMin + 0.5f, cz, 1, zMax - zMin);
+
+                var root = new GameObject("MahjongTable");
+                root.transform.SetParent(Gimmicks, false);
+                root.transform.position = new Vector3(cx, 0, cz);
+                var table = root.AddComponent<MahjongTable>();
+
+                // ふた(上面が床の高さ。開くと下がる)。動かない床と同じく Rigidbody なし
+                var lid = new GameObject("Lid").transform;
+                lid.SetParent(root.transform, false);
+                var lidBody = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                lidBody.name = "LidBody";
+                lidBody.transform.SetParent(lid, false);
+                lidBody.transform.localPosition = new Vector3(0, -0.5f, 0);
+                lidBody.transform.localScale = new Vector3(lw, 1.0f, ld);
+                lidBody.GetComponent<Renderer>().sharedMaterial = felt;
+                var edgeMat = LitMaterial("MahjongLidEdge", new Color(0.32f, 0.3f, 0.26f), 0.2f);
+                var edges = new Renderer[4];
+                float ew = 0.12f;
+                Vector3[] pos = { new Vector3(0, 0.005f, ld * 0.5f - ew * 0.5f), new Vector3(0, 0.005f, -ld * 0.5f + ew * 0.5f), new Vector3(lw * 0.5f - ew * 0.5f, 0.005f, 0), new Vector3(-lw * 0.5f + ew * 0.5f, 0.005f, 0) };
+                Vector3[] scl = { new Vector3(lw, 0.01f, ew), new Vector3(lw, 0.01f, ew), new Vector3(ew, 0.01f, ld), new Vector3(ew, 0.01f, ld) };
+                for (int i = 0; i < 4; i++)
+                {
+                    var e = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                    Object.DestroyImmediate(e.GetComponent<Collider>());
+                    e.name = $"LidEdge{i}";
+                    e.transform.SetParent(lid, false);
+                    e.transform.localPosition = pos[i];
+                    e.transform.localScale = scl[i];
+                    e.GetComponent<Renderer>().sharedMaterial = edgeMat;
+                    edges[i] = e.GetComponent<Renderer>();
+                }
+
+                var so = new SerializedObject(table);
+                so.FindProperty("m_tableSize").vector2Value = new Vector2(w, d);
+                so.FindProperty("m_lid").objectReferenceValue = lid;
+                so.FindProperty("m_lidCollider").objectReferenceValue = lidBody.GetComponent<Collider>();
+                so.FindProperty("m_lidSize").vector2Value = new Vector2(lw, ld);
+                var ep = so.FindProperty("m_lidEdges");
+                ep.arraySize = edges.Length;
+                for (int i = 0; i < edges.Length; i++) ep.GetArrayElementAtIndex(i).objectReferenceValue = edges[i];
+                so.FindProperty("m_tileMaterial").objectReferenceValue = LitMaterial("MahjongTile", MahjongTileArt.Ivory, 0.55f);
+                so.FindProperty("m_backMaterial").objectReferenceValue = LitMaterial("MahjongTileBack", MahjongTileArt.Back, 0.5f);
+                so.FindProperty("m_tumikiPrefab").objectReferenceValue = Load<GameObject>(kTumikiPrefab).GetComponent<TumikiBlock>();
+                so.ApplyModifiedPropertiesWithoutUndo();
+                SpawnerLinks.Add((table, "m_spawner"));
+                FloorRegion(new Rect(lx0, lz0, lw, ld));
+                Count("牌と洗牌");
+            }
+
+            // サンドバッグ(半径 radius)。当たり判定は壁と同じ(飛んでいる積み木は跳ね返る)
+            public void Sandbag(float x, float z, float radius)
+            {
+                const float kHeight = 2.6f;
+                var root = new GameObject("Sandbag");
+                root.transform.SetParent(Gimmicks, false);
+                root.transform.position = new Vector3(x, 0, z);
+                var cap = root.AddComponent<CapsuleCollider>();
+                cap.radius = radius;
+                cap.height = kHeight + 1.0f;
+                cap.center = new Vector3(0, (kHeight + 1.0f) * 0.5f, 0);
+                root.AddComponent<ReflectWall>();
+                var bag = root.AddComponent<SandbagGimmick>();
+
+                var canvas = LitMaterial("SandbagCanvas", new Color(0.93f, 0.91f, 0.86f), 0.1f);
+                var leather = LitMaterial("SandbagLeather", new Color(0.36f, 0.3f, 0.26f), 0.3f);
+                var visual = new GameObject("Visual").transform;
+                visual.SetParent(root.transform, false);
+                var body = Primitive(PrimitiveType.Cylinder, visual, "Body", new Vector3(0, kHeight * 0.5f + 0.15f, 0), new Vector3(radius * 2, kHeight * 0.5f, radius * 2), canvas);
+                Primitive(PrimitiveType.Cylinder, visual, "Base", new Vector3(0, 0.08f, 0), new Vector3(radius * 2 + 0.2f, 0.08f, radius * 2 + 0.2f), leather);
+                Primitive(PrimitiveType.Cylinder, visual, "BandLow", new Vector3(0, 0.75f, 0), new Vector3(radius * 2 + 0.04f, 0.07f, radius * 2 + 0.04f), leather);
+                Primitive(PrimitiveType.Cylinder, visual, "BandHigh", new Vector3(0, kHeight - 0.35f, 0), new Vector3(radius * 2 + 0.04f, 0.07f, radius * 2 + 0.04f), leather);
+                Primitive(PrimitiveType.Cylinder, visual, "Cap", new Vector3(0, kHeight + 0.18f, 0), new Vector3(radius * 1.6f, 0.05f, radius * 1.6f), leather);
+
+                var so = new SerializedObject(bag);
+                so.FindProperty("m_radius").floatValue = radius;
+                so.FindProperty("m_visual").objectReferenceValue = visual;
+                so.FindProperty("m_collider").objectReferenceValue = cap;
+                var br = so.FindProperty("m_blinkRenderers");
+                br.arraySize = 1;
+                br.GetArrayElementAtIndex(0).objectReferenceValue = body.GetComponent<Renderer>();
+                so.FindProperty("m_tumikiPrefab").objectReferenceValue = Load<GameObject>(kTumikiPrefab).GetComponent<TumikiBlock>();
+                so.ApplyModifiedPropertiesWithoutUndo();
+                SpawnerLinks.Add((bag, "m_spawner"));
+                Blockers.Add(new Vector3(x, z, radius + 0.1f));
+                Count("サンドバッグ");
+            }
+
+            static GameObject Primitive(PrimitiveType type, Transform parent, string name, Vector3 localPos, Vector3 localScale, Material mat)
+            {
+                var go = GameObject.CreatePrimitive(type);
+                Object.DestroyImmediate(go.GetComponent<Collider>());
+                go.name = name;
+                go.transform.SetParent(parent, false);
+                go.transform.localPosition = localPos;
+                go.transform.localScale = localScale;
+                go.GetComponent<Renderer>().sharedMaterial = mat;
+                return go;
+            }
+
+            static Renderer MeshChild(Transform parent, string name, Mesh mesh, Material mat)
+            {
+                var go = new GameObject(name);
+                go.transform.SetParent(parent, false);
+                go.AddComponent<MeshFilter>().sharedMesh = mesh;
+                var r = go.AddComponent<MeshRenderer>();
+                r.sharedMaterial = mat;
+                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                return r;
+            }
+
+            class IceMaterials
+            {
+                public readonly Material Ice = LitMaterial("IceTile", new Color(0.80f, 0.88f, 0.92f), 0.8f);
+                public readonly Material Edge = LitMaterial("IceTileEdge", new Color(0.9f, 0.95f, 0.98f), 0.5f);
+                public readonly Material Crack = LitMaterial("IceTileCrack", new Color(0.16f, 0.18f, 0.24f), 0.1f);
+            }
+
             GameObject Place(string prefabName, Vector3 pos, Transform parent = null)
             {
                 var prefab = Load<GameObject>($"{kPrefabDir}/{prefabName}.prefab");
@@ -2544,18 +3010,27 @@ namespace Nakagawa.EditorTools
                 {
                     if (x >= r.xMin && x <= r.xMax && z >= r.yMin && z <= r.yMax) return true;
                 }
+                var p = new Vector2(x, z);
+                foreach (var poly in FloorPolygons) if (Poly.Contains(poly, p)) return true;
                 return false;
             }
 
             public Rect Bounds()
             {
-                Rect b = Floors[0];
-                foreach (var r in Floors)
+                bool any = false;
+                Rect b = default;
+                void Grow(Rect r)
                 {
-                    b = Rect.MinMaxRect(Mathf.Min(b.xMin, r.xMin), Mathf.Min(b.yMin, r.yMin), Mathf.Max(b.xMax, r.xMax), Mathf.Max(b.yMax, r.yMax));
+                    b = any ? Rect.MinMaxRect(Mathf.Min(b.xMin, r.xMin), Mathf.Min(b.yMin, r.yMin), Mathf.Max(b.xMax, r.xMax), Mathf.Max(b.yMax, r.yMax)) : r;
+                    any = true;
                 }
+                foreach (var r in Floors) Grow(r);
+                foreach (var poly in FloorPolygons) foreach (var p in poly) Grow(new Rect(p, Vector2.zero));
                 return b;
             }
+
+            // 箱ではない形の床(六角形の氷など。上から見た凸多角形)。配置の検証と、ステージの広さに使う
+            public readonly List<List<Vector2>> FloorPolygons = new List<List<Vector2>>();
         }
 
         static void ConfigureArea(TumikiSpawnArea area, TumikiSpawnArea.Shape shape, Vector2 size, float radius)
@@ -2661,7 +3136,7 @@ namespace Nakagawa.EditorTools
             var list = new List<AreaSpec>();
             try
             {
-                var c = new Ctx { Scene = scene };
+                var c = new Ctx { Scene = scene, Id = def.Id };
                 c.Stage = new GameObject("Stage").transform;
                 c.Gimmicks = new GameObject("Gimmicks").transform;
                 c.Areas = new GameObject("TumikiSpawner").transform;
@@ -2714,7 +3189,7 @@ namespace Nakagawa.EditorTools
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Additive);
             SceneManager.SetActiveScene(scene);
 
-            var c = new Ctx { Scene = scene };
+            var c = new Ctx { Scene = scene, Id = def.Id, SaveMeshes = true };
             StageBackdrop backdrop = BackdropBuilder.LoadOrBuild(def.Backdrop);
             if (backdrop != null)
             {
@@ -2760,7 +3235,15 @@ namespace Nakagawa.EditorTools
             }
 
             DarumaMatch match = BuildMatch(spawns, stageArea);
-            SetupSpawner(spawnerGo.AddComponent<TumikiSpawner>(), c.AreaList, def.MaxBlocks, match);
+            var spawner = spawnerGo.AddComponent<TumikiSpawner>();
+            SetupSpawner(spawner, c.AreaList, def.MaxBlocks, match, def.SpawnIntervalScale);
+            // ギミックから積み木の生成(盤面の上限・色の決め方)を参照する
+            foreach (var (target, property) in c.SpawnerLinks)
+            {
+                var so = new SerializedObject(target);
+                so.FindProperty(property).objectReferenceValue = spawner;
+                so.ApplyModifiedPropertiesWithoutUndo();
+            }
 
             BuildLightAndCamera(bounds, def.CameraPitch);
             SetupCameraAndDebugTools(scene);
@@ -2802,8 +3285,11 @@ namespace Nakagawa.EditorTools
             return match;
         }
 
-        static void SetupSpawner(TumikiSpawner spawner, List<TumikiSpawnArea> areas, int maxBlocks, DarumaMatch match)
+        static void SetupSpawner(TumikiSpawner spawner, List<TumikiSpawnArea> areas, int maxBlocks, DarumaMatch match, float intervalScale = 1.0f)
         {
+            var scaleSo = new SerializedObject(spawner);
+            scaleSo.FindProperty("m_intervalScale").floatValue = intervalScale;
+            scaleSo.ApplyModifiedPropertiesWithoutUndo();
             var so = new SerializedObject(spawner);
             so.FindProperty("m_tumikiPrefab").objectReferenceValue = Load<GameObject>(kTumikiPrefab).GetComponent<TumikiBlock>();
             var patterns = so.FindProperty("m_patterns");
@@ -3347,6 +3833,285 @@ namespace Nakagawa.EditorTools
             if (AssetDatabase.IsValidFolder(path)) return;
             int slash = path.LastIndexOf('/');
             AssetDatabase.CreateFolder(path.Substring(0, slash), path.Substring(slash + 1));
+        }
+
+        //========================================
+        // Stage21〜 の新しいギミックの見た目
+        //========================================
+
+        const string kMeshDir = "Assets/Nakagawa/Meshes";
+
+        // URP の Lit のマテリアル(Assets/Nakagawa/Materials/<name>.mat)。あれば色とつやを上書きする
+        static Material LitMaterial(string name, Color color, float smoothness)
+        {
+            string path = $"{kMaterialDir}/{name}.mat";
+            var shader = Shader.Find("Universal Render Pipeline/Lit");
+            var mat = Load<Material>(path);
+            if (mat == null)
+            {
+                EnsureFolder(kMaterialDir);
+                mat = new Material(shader);
+                AssetDatabase.CreateAsset(mat, path);
+            }
+            else if (shader != null && mat.shader != shader) mat.shader = shader;
+            mat.SetColor("_BaseColor", color);
+            mat.SetFloat("_Smoothness", smoothness);
+            mat.SetFloat("_Metallic", 0.0f);
+            EditorUtility.SetDirty(mat);
+            return mat;
+        }
+
+        // 1つのアセットファイルに、たくさんのメッシュをまとめて保存する(作り直すと中身を入れ替える。ファイルの GUID は変わらない)
+        class MeshAssetStore
+        {
+            readonly string m_path;
+            readonly Mesh m_main;
+
+            public MeshAssetStore(string path)
+            {
+                m_path = path;
+                EnsureFolder(Path.GetDirectoryName(path).Replace('\\', '/'));
+                m_main = Load<Mesh>(path);
+                if (m_main == null)
+                {
+                    m_main = new Mesh { name = Path.GetFileNameWithoutExtension(path) };
+                    AssetDatabase.CreateAsset(m_main, path);
+                    return;
+                }
+                foreach (var sub in AssetDatabase.LoadAllAssetRepresentationsAtPath(path))
+                {
+                    if (sub == null || sub == m_main) continue;
+                    AssetDatabase.RemoveObjectFromAsset(sub);
+                    Object.DestroyImmediate(sub, true);
+                }
+            }
+
+            public void Add(Mesh mesh)
+            {
+                if (mesh != null) AssetDatabase.AddObjectToAsset(mesh, m_main);
+            }
+
+            public void Save()
+            {
+                EditorUtility.SetDirty(m_main);
+                AssetDatabase.SaveAssets();
+            }
+        }
+
+        // 床の高さ(XZ 平面)の多角形の計算と、そのメッシュ。多角形は上から見て反時計回り(Vector2 の y が Z)
+        static class Poly
+        {
+            public static float Area(List<Vector2> p)
+            {
+                float a = 0.0f;
+                for (int i = 0; i < p.Count; i++)
+                {
+                    Vector2 u = p[i], v = p[(i + 1) % p.Count];
+                    a += u.x * v.y - v.x * u.y;
+                }
+                return Mathf.Abs(a) * 0.5f;
+            }
+
+            // axis(0: X / 1: Z) が value 以上(keepGreater)/以下の側だけを残す
+            static List<Vector2> ClipHalf(List<Vector2> poly, int axis, float value, bool keepGreater)
+            {
+                var res = new List<Vector2>();
+                if (poly.Count == 0) return res;
+                for (int i = 0; i < poly.Count; i++)
+                {
+                    Vector2 a = poly[i], b = poly[(i + 1) % poly.Count];
+                    bool ina = keepGreater ? a[axis] >= value : a[axis] <= value;
+                    bool inb = keepGreater ? b[axis] >= value : b[axis] <= value;
+                    if (ina) res.Add(a);
+                    if (ina != inb)
+                    {
+                        float t = (value - a[axis]) / (b[axis] - a[axis]);
+                        res.Add(Vector2.Lerp(a, b, t));
+                    }
+                }
+                return res;
+            }
+
+            // 頂点が上下を向いた六角形(反時計回り)。circum: 中心から頂点までの距離
+            public static List<Vector2> Hexagon(Vector2 c, float circum)
+            {
+                var hex = new List<Vector2>();
+                for (int k = 0; k < 6; k++)
+                {
+                    float a = (30.0f + 60.0f * k) * Mathf.Deg2Rad;
+                    hex.Add(c + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * circum);
+                }
+                return hex;
+            }
+
+            public static List<Vector2> ClipToRect(List<Vector2> poly, Rect r)
+            {
+                poly = ClipHalf(poly, 0, r.xMin, true);
+                poly = ClipHalf(poly, 0, r.xMax, false);
+                poly = ClipHalf(poly, 1, r.yMin, true);
+                return ClipHalf(poly, 1, r.yMax, false);
+            }
+
+            // 凸多角形から長方形を取り除いた残り(凸多角形の組)
+            public static List<List<Vector2>> Subtract(List<Vector2> poly, Rect r)
+            {
+                float xMin = float.MaxValue, xMax = float.MinValue, zMin = float.MaxValue, zMax = float.MinValue;
+                foreach (var p in poly)
+                {
+                    xMin = Mathf.Min(xMin, p.x); xMax = Mathf.Max(xMax, p.x);
+                    zMin = Mathf.Min(zMin, p.y); zMax = Mathf.Max(zMax, p.y);
+                }
+                if (xMax <= r.xMin || xMin >= r.xMax || zMax <= r.yMin || zMin >= r.yMax) return new List<List<Vector2>> { poly };
+                var mid = ClipHalf(ClipHalf(poly, 0, r.xMin, true), 0, r.xMax, false);
+                var parts = new List<List<Vector2>>
+                {
+                    ClipHalf(poly, 0, r.xMin, false),
+                    ClipHalf(poly, 0, r.xMax, true),
+                    ClipHalf(mid, 1, r.yMin, false),
+                    ClipHalf(mid, 1, r.yMax, true),
+                };
+                parts.RemoveAll(p => p.Count < 3 || Area(p) < 0.0001f);
+                return parts;
+            }
+
+            public static bool Contains(List<Vector2> poly, Vector2 p)
+            {
+                for (int i = 0; i < poly.Count; i++)
+                {
+                    Vector2 a = poly[i], b = poly[(i + 1) % poly.Count];
+                    if ((b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x) < -0.0001f) return false;
+                }
+                return true;
+            }
+
+            static bool InAny(List<List<Vector2>> pieces, Vector2 p, List<Vector2> except = null)
+            {
+                foreach (var piece in pieces) if (piece != except && Contains(piece, p)) return true;
+                return false;
+            }
+
+            static Vector2 Centroid(List<Vector2> p)
+            {
+                Vector2 c = Vector2.zero;
+                foreach (var v in p) c += v;
+                return c / Mathf.Max(1, p.Count);
+            }
+
+            // 三角形を、法線が normal の向きを向くように足す
+            static void Tri(List<Vector3> v, List<int> t, int a, int b, int c, Vector3 normal)
+            {
+                Vector3 n = Vector3.Cross(v[b] - v[a], v[c] - v[a]);
+                if (Vector3.Dot(n, normal) < 0.0f) (b, c) = (c, b);
+                t.Add(a); t.Add(b); t.Add(c);
+            }
+
+            static Mesh Build(string name, List<Vector3> v, List<int> t, List<Vector2> uv)
+            {
+                var m = new Mesh { name = name };
+                m.SetVertices(v);
+                if (uv != null) m.SetUVs(0, uv);
+                m.SetTriangles(t, 0);
+                m.RecalculateNormals();
+                m.RecalculateBounds();
+                return m;
+            }
+
+            // 上面(高さ0)と側面(下へ depth)の柱。座標は center からの相対
+            public static Mesh PrismMesh(List<List<Vector2>> pieces, Vector2 center, float depth, string name)
+            {
+                var v = new List<Vector3>();
+                var uv = new List<Vector2>();
+                var t = new List<int>();
+                foreach (var piece in pieces)
+                {
+                    int top = v.Count;
+                    foreach (var p in piece)
+                    {
+                        v.Add(new Vector3(p.x - center.x, 0, p.y - center.y));
+                        uv.Add(p * 0.35f);
+                    }
+                    for (int i = 1; i < piece.Count - 1; i++) Tri(v, t, top, top + i, top + i + 1, Vector3.up);
+                    for (int i = 0; i < piece.Count; i++)
+                    {
+                        Vector2 a = piece[i], b = piece[(i + 1) % piece.Count];
+                        Vector2 d = b - a;
+                        if (d.sqrMagnitude < 0.0001f) continue;
+                        var outward = new Vector3(d.y, 0, -d.x);
+                        // 同じタイルの別の欠片と接している側面は作らない(内側の面に積み木が引っかからないように)
+                        Vector2 out2 = new Vector2(d.y, -d.x).normalized;
+                        if (InAny(pieces, (a + b) * 0.5f + out2 * 0.05f, piece)) continue;
+                        int s = v.Count;
+                        v.Add(new Vector3(a.x - center.x, 0, a.y - center.y));
+                        v.Add(new Vector3(b.x - center.x, 0, b.y - center.y));
+                        v.Add(new Vector3(b.x - center.x, -depth, b.y - center.y));
+                        v.Add(new Vector3(a.x - center.x, -depth, a.y - center.y));
+                        uv.Add(new Vector2(0, 0)); uv.Add(new Vector2(d.magnitude * 0.35f, 0));
+                        uv.Add(new Vector2(d.magnitude * 0.35f, -depth * 0.35f)); uv.Add(new Vector2(0, -depth * 0.35f));
+                        Tri(v, t, s, s + 1, s + 2, outward);
+                        Tri(v, t, s, s + 2, s + 3, outward);
+                    }
+                }
+                return Build(name, v, t, uv);
+            }
+
+            // 縁の帯(内側へ width、高さ y)。同じタイルの別の欠片と接している辺には付けない
+            public static Mesh EdgeMesh(List<List<Vector2>> pieces, Vector2 center, float width, float y, string name)
+            {
+                var v = new List<Vector3>();
+                var t = new List<int>();
+                foreach (var piece in pieces)
+                {
+                    for (int i = 0; i < piece.Count; i++)
+                    {
+                        Vector2 a = piece[i], b = piece[(i + 1) % piece.Count];
+                        Vector2 d = b - a;
+                        if (d.sqrMagnitude < 0.0001f) continue;
+                        Vector2 inward = new Vector2(-d.y, d.x).normalized;
+                        if (InAny(pieces, (a + b) * 0.5f - inward * 0.05f, piece)) continue;
+                        int s = v.Count;
+                        Vector2 c = center;
+                        v.Add(new Vector3(a.x - c.x, y, a.y - c.y));
+                        v.Add(new Vector3(b.x - c.x, y, b.y - c.y));
+                        v.Add(new Vector3(b.x + inward.x * width - c.x, y, b.y + inward.y * width - c.y));
+                        v.Add(new Vector3(a.x + inward.x * width - c.x, y, a.y + inward.y * width - c.y));
+                        Tri(v, t, s, s + 1, s + 2, Vector3.up);
+                        Tri(v, t, s, s + 2, s + 3, Vector3.up);
+                    }
+                }
+                return Build(name, v, t, null);
+            }
+
+            // ひび(中心付近から外へ伸びる折れ線を branches 本)。タイルの外にはみ出す所は描かない
+            public static Mesh CrackMesh(List<List<Vector2>> pieces, Vector2 center, float apothem, int branches, System.Random rng, float width, float y, string name)
+            {
+                var v = new List<Vector3>();
+                var t = new List<int>();
+                List<Vector2> largest = pieces[0];
+                foreach (var p in pieces) if (Area(p) > Area(largest)) largest = p;
+                Vector2 origin = Contains(largest, center) ? center : Centroid(largest);
+                for (int b = 0; b < branches; b++)
+                {
+                    float angle = (float)(rng.NextDouble() * Mathf.PI * 2.0);
+                    Vector2 p = origin + new Vector2((float)rng.NextDouble() - 0.5f, (float)rng.NextDouble() - 0.5f) * (apothem * 0.3f);
+                    for (int s = 0; s < 3; s++)
+                    {
+                        angle += ((float)rng.NextDouble() - 0.5f) * 1.2f;
+                        Vector2 q = p + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * (apothem * (0.28f + (float)rng.NextDouble() * 0.12f));
+                        if (!InAny(pieces, p) || !InAny(pieces, q)) break;
+                        Vector2 d = (q - p).normalized;
+                        Vector2 n = new Vector2(-d.y, d.x) * (width * 0.5f * (1.0f - s * 0.25f));
+                        int i0 = v.Count;
+                        v.Add(new Vector3(p.x + n.x - center.x, y, p.y + n.y - center.y));
+                        v.Add(new Vector3(q.x + n.x - center.x, y, q.y + n.y - center.y));
+                        v.Add(new Vector3(q.x - n.x - center.x, y, q.y - n.y - center.y));
+                        v.Add(new Vector3(p.x - n.x - center.x, y, p.y - n.y - center.y));
+                        Tri(v, t, i0, i0 + 1, i0 + 2, Vector3.up);
+                        Tri(v, t, i0, i0 + 2, i0 + 3, Vector3.up);
+                        p = q;
+                    }
+                }
+                return Build(name, v, t, null);
+            }
         }
     }
 }

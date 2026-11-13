@@ -29,7 +29,7 @@ namespace Nakahira
     {
         public Object Source;
         public CpuHazardKind Kind;
-        public DarumaCharacter Owner;   // 出した人(エクスカリバーはこの人には当たらない。ビームは自分にも当たる)
+        public DarumaCharacter Owner;   // 出した人(この人と、チーム戦の味方には当たらない)
         public Vector3 A;
         public Vector3 B;
         public float HalfWidth;
@@ -167,6 +167,12 @@ namespace Nakahira
         public IReadOnlyList<CpuHazardSegment> Segments => m_segments;
         public bool Any => m_circles.Count > 0 || m_segments.Count > 0;
 
+        // チーム戦で、味方が出した危ない場所か(必殺技は味方には効かない)
+        private static bool IsAllyHazard(CpuContext c, DarumaCharacter owner)
+        {
+            return owner != null && DarumaMatch.AreFriends(owner, c.Self);
+        }
+
         public void Update(CpuContext c)
         {
             m_context = c;
@@ -181,7 +187,7 @@ namespace Nakahira
 
             foreach (var h in CpuHazardSources.Circles)
             {
-                if (h.Owner == c.Self) continue;
+                if (h.Owner == c.Self || IsAllyHazard(c, h.Owner)) continue;   // 自分・チーム戦の味方の必殺技は効かない
                 if (!Notice(h.Source, now, reaction)) continue;
                 if (Mathf.Abs(h.Center.y - selfY) > kMaxHeightGap) continue;
                 // 必殺技で無敵の間(きだるの黄金化・いわだるの隕石)は、落ちるまでに無敵が切れない隕石は気にしない(毒沼は無敵でも効くので避ける)
@@ -190,7 +196,7 @@ namespace Nakahira
             }
             foreach (var h in CpuHazardSources.Segments)
             {
-                if (h.Kind == CpuHazardKind.Sword && h.Owner == c.Self) continue;
+                if (h.Owner == c.Self || IsAllyHazard(c, h.Owner)) continue;   // 自分・チーム戦の味方の必殺技は効かない(トロンのビームも自分には当たらない)
                 if (!Notice(h.Source, now, reaction)) continue;
                 if (Mathf.Abs(Mathf.Min(h.A.y, h.B.y) - selfY) > kMaxHeightGap) continue;
                 // 必殺技で無敵の間は、ビーム・エクスカリバーを気にしない(無敵で防げる。切れそうになったら避け始める)

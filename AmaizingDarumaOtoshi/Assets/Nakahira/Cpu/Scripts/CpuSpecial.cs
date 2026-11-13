@@ -69,6 +69,8 @@ namespace Nakahira
         MatchPlayer m_swampTarget;
         // 敵の方との差がこれ(度)以内になったら撃つ(分裂弾は 1 秒に 360° 曲がって追う)
         const float kFunnelFaceAngle = 15.0f;
+        // チーム戦:トロンの先頭の通り道に味方がいないか調べる長さ(狙う敵までの距離にこれを足す)
+        const float kAllyLineBeyond = 3.0f;
 
         // だるきんぐ(エクスカリバー):ため中か・狙いのぶれ(度。ため始めに一度だけ決める)
         bool m_kingCharging;
@@ -401,6 +403,8 @@ namespace Nakahira
             to.y = 0.0f;
             if (to.sqrMagnitude < 0.0001f) return false;
             m_aimDir = Quaternion.AngleAxis(m_tronAimError, Vector3.up) * to.normalized;
+            // チーム戦:トロンの先頭の積み木の通り道に味方がいる間は撃たない(先頭は普通の弾と同じく味方にも当たる)
+            if (c.AllyInLine(pos, m_aimDir, to.magnitude + kAllyLineBeyond)) { m_aiming = false; return false; }   // 向き直りもやめて、状態の動きに戻す
 
             Vector3 forward = c.Self.transform.forward;
             forward.y = 0.0f;
@@ -544,6 +548,8 @@ namespace Nakahira
             if (to.sqrMagnitude < 0.0001f) return true;
             m_aiming = true;
             m_aimDir = to.normalized;
+            // チーム戦:撃ち出す向き(一番近い敵まで)に味方がいる間は撃たない(分裂弾は普通の弾と同じく味方にも当たる)
+            if (c.AllyInLine(c.Position, m_aimDir, to.magnitude)) { m_aiming = false; return false; }   // 向き直りもやめて、状態の動きに戻す
             Vector3 forward = c.Self.transform.forward;
             forward.y = 0.0f;
             return Vector3.Angle(forward, m_aimDir) <= kFunnelFaceAngle;
@@ -573,6 +579,8 @@ namespace Nakahira
                 if (!m_gauge.IsFull) return false;
                 DarumaCharacter caster = FindFunnelCaster();
                 if (caster == null || caster == c.Self) return false;
+                // チーム戦:味方のみだるのファンネルは自分に来ない
+                if (DarumaMatch.Current != null && DarumaMatch.Current.IsFriendly(caster, c.Self)) return false;
                 if (!FacesCaster(c, caster, engaged)) return false;
                 // 疲れているほど見逃す
                 m_blackoutCounter = Random.value < p.BlackoutCounterChance * c.Alertness;

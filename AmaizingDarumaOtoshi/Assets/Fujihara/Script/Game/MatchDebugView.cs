@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Nakahira;
 using TMPro;
 using UnityEngine;
@@ -24,6 +24,7 @@ public class MatchDebugView : MonoBehaviour
     readonly List<Tag> m_tags = new List<Tag>();
     RectTransform m_canvas;
     CanvasGroup m_finishGroup;
+    GameObject m_finish;
     TextMeshProUGUI m_finishText, m_timerText;
     TMP_FontAsset m_font;
     Material m_letterMat, m_popMat;
@@ -68,9 +69,24 @@ public class MatchDebugView : MonoBehaviour
     void ShowResult(DarumaMatch.MatchResult result)
     {
         string title = result.Reason == DarumaMatch.FinishReason.TimeUp ? "タイムアップ！" : "しあい しゅうりょう！";
-        m_finishText.text = result.Winner == null ? $"{title}\n<size=70%>ひきわけ</size>"
-            : result.WinnerTeam >= 0 ? $"{title}\n<size=70%>しょうしゃ：{TeamWinnerText(result.WinnerTeam)}</size>"
-            : $"{title}\n<size=70%>しょうしゃ：{result.Winner.Label}　{CharaName(result.Winner)}</size>";
+        string winnerText;
+        if (result.Winner == null) winnerText = "ひきわけ";
+        else if (result.WinnerTeam >= 0) winnerText = "しょうしゃ：" + TeamWinnerText(result.WinnerTeam);
+        else
+        {
+            // ストーリー中は「1P きだる」ではなく、だるまの名前だけにする
+            string name = CharaName(result.Winner);
+            winnerText = MatchSetup.StoryNames && name != "-"
+                ? "しょうしゃ：" + name
+                : "しょうしゃ：" + result.Winner.Label + "　" + name;
+        }
+        m_finishText.text = $"{title}\n<size=70%>{winnerText}</size>";
+    }
+
+    // ストーリー用(Yurube): 実績カードと重ならないように、試合結果の表示を消す
+    public void SetResultVisible(bool visible)
+    {
+        if (m_finish != null) m_finish.SetActive(visible);
     }
 
     // チーム戦の勝者：「赤チーム（1P、CPU）」
@@ -128,6 +144,8 @@ public class MatchDebugView : MonoBehaviour
             "Select：キャラクターセレクトに戻る", 24f, Color.white);
         hint.fontSharedMaterial = m_letterMat;
         ToyKit.Anchor(hint.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, 24f), new Vector2(1800f, 40f));
+        // ストーリー用(Yurube): ストーリー中はセレクトに戻れないので、案内を出さない
+        hint.gameObject.SetActive(!Yurube.Story.StorySession.IsRunning);
 
         m_timerText = ToyKit.UIText("Timer", m_canvas, m_font, "", 72f, Color.white);
         m_timerText.fontSharedMaterial = m_popMat;
@@ -136,6 +154,7 @@ public class MatchDebugView : MonoBehaviour
 
         var finish = ToyKit.UIImage("Finish", m_canvas, new Color(0f, 0f, 0f, 0.45f));
         ToyKit.Stretch(finish);
+        m_finish = finish.gameObject;
         m_finishGroup = finish.gameObject.AddComponent<CanvasGroup>();
         m_finishGroup.alpha = 0f;
         m_finishGroup.blocksRaycasts = false;
@@ -149,10 +168,13 @@ public class MatchDebugView : MonoBehaviour
     {
         string label = p.Label;
         var bg = ToyKit.UIImage("Tag" + label, m_canvas, p.Color);
-        ToyKit.Anchor(bg, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(24f + label.Length * 16f, 36f));
+        ToyKit.Anchor(bg, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(28f + label.Length * 24f, 36f));
         bg.gameObject.AddComponent<Outline>().effectColor = ToyKit.Ink;
         var t = ToyKit.UIText("Text", bg, m_font, label, 24f, Color.white);
         t.fontSharedMaterial = m_letterMat;
+        t.enableAutoSizing = true;
+        t.fontSizeMin = 14f;
+        t.fontSizeMax = 24f;
         ToyKit.Stretch(t.rectTransform);
         return new Tag { player = p, rect = bg, group = bg.gameObject.AddComponent<CanvasGroup>() };
     }

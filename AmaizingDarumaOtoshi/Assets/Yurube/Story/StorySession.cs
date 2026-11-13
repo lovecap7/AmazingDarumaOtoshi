@@ -45,6 +45,8 @@ namespace Yurube.Story
         public static int TutorialStep { get; set; }
         // 初回限定の掛け合い（黄色い積み木）を出したか
         public static bool YellowExtraPlayed { get; set; }
+        // 必殺技の覚醒イベントを終えたか（リトライでも保持する）
+        public static bool AwakeningDone { get; set; }
         // 敗北した回数（デバッグ表示用）
         public static int RetryCount { get; private set; }
 
@@ -55,6 +57,7 @@ namespace Yurube.Story
             IntroPlayed = false;
             TutorialStep = 0;
             YellowExtraPlayed = false;
+            AwakeningDone = false;
             RetryCount = 0;
         }
 
@@ -65,6 +68,7 @@ namespace Yurube.Story
             IntroPlayed = false;
             TutorialStep = 0;
             YellowExtraPlayed = false;
+            AwakeningDone = false;
             RetryCount = 0;
         }
 

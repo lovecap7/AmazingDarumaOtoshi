@@ -11,12 +11,16 @@ using UnityEngine;
 //  ・ハンマーの振りの見た目は NetworkHammerView が見せる
 //  ・操作はキャラクターではなく1人分(NetPlayer)の NetworkCommandSource が送り、DarumaMatch がつなぐ
 //  ・無敵の残り時間: ホストから受け取り、クライアントでも同じように点滅させる(必殺技の見た目も IsInvincible を読む)
-//  ・必殺技ゲージ(Yurube.SpecialGauge): ホストの溜まり具合を受け取る(クライアントは積み木を積んでいないので自分では溜まらない)
+//  ・必殺技ゲージ(Yurube.SpecialGauge): ホストの溜まり具合(最大に対する割合)を受け取る。クライアントでは自分で溜めない(SpecialGauge.NetDriven)
+//    (2026-11-12 中平: ゲージが小数のポイント・キャラごとの最大になったので、割合を 0〜254・満タン 255 で送る形にした。末原さん了承済み)
 public class NetworkDarumaCharacter : NetworkBehaviour
 {
     const BindingFlags kPrivate = BindingFlags.NonPublic | BindingFlags.Instance;
     // 無敵の残り時間は、これ以上ずれたら送り直す(間はクライアントが自分で減らす)
     const float kInvincibleResend = 0.25f;
+    // 必殺技ゲージの割合の送り方: 0〜kGaugeSteps(途中)、kGaugeFull(満タン)
+    const int kGaugeSteps = 254;
+    const byte kGaugeFull = 255;
 
     readonly NetworkVariable<byte> m_stackCount = new NetworkVariable<byte>();
     readonly NetworkVariable<float> m_invincible = new NetworkVariable<float>();
@@ -31,7 +35,7 @@ public class NetworkDarumaCharacter : NetworkBehaviour
     float m_fallSpeed = 8.0f;
 
     Yurube.SpecialGauge m_specialGauge;
-    FieldInfo m_invincibleField, m_gaugeBlocksField;
+    FieldInfo m_invincibleField;
     float m_blinkInterval = 0.1f;
     float m_invincibleLeft;     // クライアント: 無敵の残り(届いた値から自分で減らす)
     bool m_blinking;
@@ -42,9 +46,11 @@ public class NetworkDarumaCharacter : NetworkBehaviour
         m_stack = GetComponentInChildren<DarumaStack>(true);
         m_specialGauge = GetComponent<Yurube.SpecialGauge>();
         m_invincibleField = typeof(DarumaCharacter).GetField("m_invincibleTimer", kPrivate);
-        m_gaugeBlocksField = typeof(Yurube.SpecialGauge).GetField("m_blocks", kPrivate);
 
         if (IsServer) return;
+
+        // クライアントのゲージは自分で溜めず、ホストの値を受け取るだけ
+        if (m_specialGauge != null) m_specialGauge.NetDriven = true;
 
         if (m_character != null)
         {
@@ -96,7 +102,12 @@ public class NetworkDarumaCharacter : NetworkBehaviour
             if ((left > 0.0f) != (sent > 0.0f) || Mathf.Abs(left - sent) > kInvincibleResend) m_invincible.Value = left;
         }
 
-        if (m_specialGauge != null && m_gauge.Value != (byte)m_specialGauge.Blocks) m_gauge.Value = (byte)m_specialGauge.Blocks;
+        if (m_specialGauge != null)
+        {
+            byte gauge = m_specialGauge.IsFull ? kGaugeFull
+                : (byte)Mathf.Min(kGaugeSteps, Mathf.FloorToInt(m_specialGauge.Normalized * kGaugeSteps));
+            if (m_gauge.Value != gauge) m_gauge.Value = gauge;
+        }
 
         if (m_stack != null)
         {
@@ -137,9 +148,9 @@ public class NetworkDarumaCharacter : NetworkBehaviour
 
     void ClientUpdateGauge()
     {
-        if (m_specialGauge == null || m_gaugeBlocksField == null) return;
-        int blocks = m_gauge.Value;
-        if ((int)m_gaugeBlocksField.GetValue(m_specialGauge) != blocks) m_gaugeBlocksField.SetValue(m_specialGauge, blocks);
+        if (m_specialGauge == null) return;
+        byte v = m_gauge.Value;
+        m_specialGauge.NetSetNormalized(v >= kGaugeFull ? 1.0f : (float)v / kGaugeSteps);
     }
 
     // DarumaStack.LateUpdate の頭の部分と同じ動き

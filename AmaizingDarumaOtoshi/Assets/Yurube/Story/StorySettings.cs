@@ -15,10 +15,16 @@ namespace Yurube.Story
         [SerializeField, Min(0.5f)] float m_smallSeconds = 4.5f;
         [Tooltip("大きいウィンドウのとき、背景を暗くする濃さ")]
         [SerializeField, Range(0f, 0.9f)] float m_dimAlpha = 0.62f;
+        [Tooltip("必殺技の覚醒イベントが、対戦開始から自動で起きるまでの秒数（保険。ストックが残り1になれば早く起きる）")]
+        [SerializeField, Min(5f)] float m_awakeningSeconds = 90f;
+        [Tooltip("チュートリアルCPUの積み木の上限（0 なら章データの cpuBlockLimit を使う）")]
+        [SerializeField, Min(0)] int m_tutorialCpuBlockLimit;
 
         public float CharsPerSecond => Mathf.Max(1f, m_charsPerSecond);
         public float SmallSeconds => Mathf.Max(0.5f, m_smallSeconds);
         public float DimAlpha => Mathf.Clamp(m_dimAlpha, 0f, 0.9f);
+        public float AwakeningSeconds => Mathf.Max(5f, m_awakeningSeconds);
+        public int TutorialCpuBlockLimit => Mathf.Max(0, m_tutorialCpuBlockLimit);
 
         static StorySettings s_instance;
 

@@ -118,7 +118,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0.015, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 0.85, y: 1, z: 0.85}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 8310583598157580008}
@@ -208,7 +208,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0.015999999, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 0.85, y: 1, z: 0.85}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 8310583598157580008}
@@ -338,7 +338,12 @@ MonoBehaviour:
   m_accelerateColor: {r: 1, g: 0.55, b: 0.1, a: 1}
   m_decelerateColor: {r: 0.1, g: 0.85, b: 0.8, a: 1}
   m_baseAlpha: 0.6
+  m_accelerateBaseAlpha: 0.9
   m_ringCycle: 1.2
+  m_ringRiseHeight: 0.8
+  m_ringRadiusRate: 0.85
+  m_ringTeeth: 10
+  m_ringZigzagHeight: 0.12
   m_surfaceOffset: 0.01
   m_accelerateEffect:
     Material: {fileID: 0}
@@ -366,6 +371,48 @@ MonoBehaviour:
     ConeAngle: 10
     Radius: 0.4
     Stretch: 0
+  m_accelerateEnterEffect:
+    Enabled: 1
+    Material: {fileID: 0}
+    Additive: 1
+    ColorA: {r: 1, g: 0.55, b: 0.1, a: 1}
+    ColorB: {r: 1, g: 0.9, b: 0.4, a: 1}
+    Count: 22
+    Speed: {x: 4, y: 8}
+    Size: {x: 0.05, y: 0.14}
+    Lifetime: {x: 0.2, y: 0.4}
+    Gravity: 0
+    Shape: 4
+    ShapeSize: {x: 0.3, y: 0, z: 0}
+    ConeAngle: 30
+    Stretch: 1
+    Shockwave: 1
+    ShockwaveColor: {r: 1, g: 0.55, b: 0.1, a: 1}
+    ShockwaveRadius: 1.2
+    ShockwaveTime: 0.25
+  m_decelerateEnterEffect:
+    Enabled: 1
+    Material: {fileID: 0}
+    Additive: 1
+    ColorA: {r: 0.1, g: 0.85, b: 0.8, a: 1}
+    ColorB: {r: 0.75, g: 1, b: 1, a: 1}
+    Count: 18
+    Speed: {x: 0.5, y: 1.5}
+    Size: {x: 0.08, y: 0.2}
+    Lifetime: {x: 0.5, y: 0.9}
+    Gravity: -0.1
+    Shape: 1
+    ShapeSize: {x: 0.45, y: 0, z: 0}
+    ConeAngle: 25
+    Stretch: 0
+    Shockwave: 1
+    ShockwaveColor: {r: 0.1, g: 0.85, b: 0.8, a: 1}
+    ShockwaveRadius: 1
+    ShockwaveTime: 0.4
+  m_patternColorA: {r: 1, g: 0.88, b: 0.1, a: 1}
+  m_patternColorB: {r: 0, g: 0, b: 0, a: 0}
+  m_patternCycle: 0.5
+  m_patternAlpha: 1
 --- !u!1 &9161024247788545129
 GameObject:
   m_ObjectHideFlags: 0
@@ -394,7 +441,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0.016999999, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 0.85, y: 1, z: 0.85}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 8310583598157580008}

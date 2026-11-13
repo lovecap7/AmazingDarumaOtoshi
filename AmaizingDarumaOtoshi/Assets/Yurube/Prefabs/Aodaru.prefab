@@ -587,6 +587,7 @@ MonoBehaviour:
   m_sweepStartYaw: 110
   m_sweepEndYaw: -110
   m_sweepHeight: 0.25
+  m_sweepRoll: 90
   m_hammerHalfWidth: 0.2
   m_hitHeightRange: 0.6
   m_maxReturnAngle: 60
@@ -608,6 +609,7 @@ GameObject:
   - component: {fileID: 6242312641939630888}
   - component: {fileID: 1611246128041429823}
   - component: {fileID: 5182239471364050811}
+  - component: {fileID: 8458015634401770295}
   m_Layer: 0
   m_Name: Aodaru
   m_TagString: Untagged
@@ -735,3 +737,16 @@ MonoBehaviour:
   m_maxMoveSpeed: 12
   m_logMoveSpeed: 1
   m_effectMaterial: {fileID: 2100000, guid: dd619cf70c425c048af5157405cb98d5, type: 2}
+--- !u!114 &8458015634401770295
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9069936943766670842}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0a13560a26218d46964d9c9f251e1ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Yurube.SpecialGauge
+  m_params: {fileID: 11400000, guid: b9a441f725ab50f489b3a9378147dab5, type: 2}

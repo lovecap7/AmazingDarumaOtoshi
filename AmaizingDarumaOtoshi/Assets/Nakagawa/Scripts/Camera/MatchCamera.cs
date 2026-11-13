@@ -235,6 +235,13 @@ namespace Nakagawa
             m_fovOffset = 0.0f;
         }
 
+        // 画面に収める体から外す体(ギミックの演出でカメラのそばに寄せたプレイヤーなど)。演出を終えたら外す
+        public static readonly HashSet<Transform> HiddenBodies = new HashSet<Transform>();
+
+        // ドメインの再読み込みをしない設定でも、再生のたびに空にする
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetHiddenBodies() => HiddenBodies.Clear();
+
         // 参加中のプレイヤーが操作している体(生存キャラクター・幽霊)と、カメラの目印(CameraFocusTarget。復活の出現演出など)の位置
         private void CollectBodies()
         {
@@ -247,7 +254,10 @@ namespace Nakagawa
             if (m_match == null) return;
             // 自由参加・セレクトから、どちらの試合でも全員の体を取れる
             m_match.GetBodies(m_bodyTransforms);
-            foreach (var body in m_bodyTransforms) m_bodies.Add(body.position);
+            foreach (var body in m_bodyTransforms)
+            {
+                if (body != null && !HiddenBodies.Contains(body)) m_bodies.Add(body.position);
+            }
         }
 
         // この位置・向きから、すべての体(足元〜頭)が余白付きで映る視野角

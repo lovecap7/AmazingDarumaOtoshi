@@ -44,6 +44,8 @@ namespace Nakahira
         const float kStrafeLookAhead = 0.8f;
         // 踏み込みながら撃つのは、相手が殴る間合いよりこの距離(m)以上遠いときだけ
         const float kStepInMinGap = 1.5f;
+        // チーム戦:弾の通り道に味方がいないか調べる長さ(相手までの距離にこれを足す。外れた弾は相手の先へ飛ぶので)
+        const float kAllyLineBeyond = 3.0f;
 
         Motive m_motive;
         MatchPlayer m_target;
@@ -144,7 +146,9 @@ namespace Nakahira
                 return true;
             }
 
-            if (Time.time < m_nextShotTime || hammer.IsBusy || !c.Self.CanStartShot)
+            // チーム戦:弾の通り道(相手の少し先まで)に味方がいる間は撃たない(撃てる時刻になっても待つ)
+            bool allyInLine = !hammer.IsBusy && c.AllyInLine(c.Position, aim, TargetDistance(c) + kAllyLineBeyond);
+            if (Time.time < m_nextShotTime || hammer.IsBusy || !c.Self.CanStartShot || allyInLine)
             {
                 // 待つ間は横へ動く(撃つ瞬間にスティックの向きへ向き直るので、走っていても狙える)。止まる番なら狙う向きを向いておく
                 if (m_strafeSide == 0 || !Strafe(c, ref cmd)) cmd.Move = new Vector2(aim.x, aim.z) * kAimInput;
@@ -398,6 +402,8 @@ namespace Nakahira
                 if (along <= 0.0f || along > p.ShotRange) continue;
                 float miss = (toTarget - dir * along).magnitude;
                 if (miss > p.FlickAimWidth) continue;
+                // チーム戦:弾いた積み木の通り道に味方がいたら弾かない
+                if (c.AllyInLine(bp, dir, along + kAllyLineBeyond)) continue;
 
                 // 弾くか決める(積み木ごとに一度だけ。強いほど逃さない)
                 m_flickRolled.Add(block);
