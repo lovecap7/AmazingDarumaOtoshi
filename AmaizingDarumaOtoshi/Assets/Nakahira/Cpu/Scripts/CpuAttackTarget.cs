@@ -26,7 +26,7 @@ namespace Nakahira
         {
             var match = DarumaMatch.Current;
             if (match == null || player == null) return 0.0f;
-            bool teams = MatchSetup.IsTeamBattle;
+            bool teams = match.Rules.teams;   // 直接再生のチーム戦も見る
             switch (match.Mode)
             {
                 case MatchSetup.MatchMode.Stock:

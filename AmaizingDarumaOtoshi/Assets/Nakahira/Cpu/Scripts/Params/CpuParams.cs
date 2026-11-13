@@ -294,6 +294,10 @@ namespace Nakahira
         [Header("必殺技:だるきんぐのエクスカリバー(ため中に向きを決める。線の上の敵は即死)")]
         [Tooltip("線の中心から左右この距離(m)以内に 2 人(1 対 1 なら 1 人)入ったら、ため中に確定する。撃ち始めは線の太さ全体で数える")]
         [Min(0.0f)] public float ExcaliburConfirmHalfWidth = 0.8f;
+        [Tooltip("状態「必殺技」に入ってから(満タンの間、入り直しても続けて数える)この秒数たっても 2 人狙いが決まらなければ、1 人狙いで撃つ")]
+        [Min(0.0f)] public float ExcaliburSoloAfter = 5.0f;
+        [Tooltip("状態「必殺技」で、敵 2 人が一直線に並んで見える位置(近い方の敵の、もう 1 人と反対側)へ回り込むときの、近い方の敵からの距離(m)")]
+        [Min(0.0f)] public float ExcaliburLineupDistance = 4.0f;
 
         [Header("チーム戦:味方と離れる(味方はいないものとして動くので、同じ敵を追って重なりやすい)")]
         [Tooltip("歩いているとき、この距離(m)以内に味方がいたら、味方から離れる向きへ歩く向きをずらす")]

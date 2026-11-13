@@ -145,6 +145,8 @@ namespace Nakahira
         public bool IsGrounded => m_isGrounded;
         // 必殺技中など、移動だけを受け付ける状態
         public bool MovementOnly { get; set; }
+        // 向き直る速さの上限(度/秒)。0 なら上限なし(ふだん)。だるきんぐのエクスカリバーの詠唱中に使う
+        public float MaxTurnDegreesPerSecond { get; set; }
         // 方向入力での旋回は許可しつつ、並進移動だけを止める(だるきんぐの照準詠唱など)
         public bool MovementLocked { get; set; }
         // 毒などのデバフ: 移動入力の左右前後を反転する(攻撃・カメラ操作は反転しない)
@@ -364,7 +366,10 @@ namespace Nakahira
             if (moveDir.sqrMagnitude > 0.0001f && canTurn)
             {
                 Quaternion target = Quaternion.LookRotation(moveDir, Vector3.up);
-                m_rb.MoveRotation(Quaternion.Slerp(m_rb.rotation, target, m_turnSpeed * dt));
+                Quaternion next = Quaternion.Slerp(m_rb.rotation, target, m_turnSpeed * dt);
+                // 向き直る速さの上限(だるきんぐのエクスカリバーの詠唱中など。0 なら上限なし)
+                if (MaxTurnDegreesPerSecond > 0.0f) next = Quaternion.RotateTowards(m_rb.rotation, next, MaxTurnDegreesPerSecond * dt);
+                m_rb.MoveRotation(next);
             }
         }
 

@@ -2,7 +2,8 @@ using UnityEngine;
 
 namespace Nakahira
 {
-    // 状態「必殺技」:ゲージが満タンで、撃つには敵に近づく必要があるキャラ(みだる・いわだる・へびだる)が、撃てる所まで近づく
+    // 状態「必殺技」:ゲージが満タンで、撃つには敵に近づく必要があるキャラ(みだる・いわだる・へびだる・だるきんぐ)が、撃てる所まで近づく
+    //  (だるきんぐ:敵 2 人が一直線に並ぶ位置へ回り込む。5 秒で決まらなければ 1 人狙い。2026-11-13)
     //  ・点数は SpecialStateScore(殴る・撃つより高く、逃げるより低い)
     //  ・近づく相手は CpuSpecial.ApproachTarget(みだる:道で一番近い敵・いわだる:一番積み木を積んでいる敵・
     //    へびだる:一番積み木が少ない敵。生存者・無敵でない)
@@ -90,6 +91,7 @@ namespace Nakahira
             else
             {
                 if (!m_special.WantsApproach(c)) return false;   // 撃った(ゲージが空になった)・積み木がなくなった
+                m_special.TickApproach(c);   // だるきんぐ:2 人狙いを探した時間を数える(5 秒で 1 人狙い)
                 m_time += c.DeltaTime;
                 if (m_time > c.Params.SpecialGiveUpTime) return false;
                 m_thinkTimer -= c.DeltaTime;
@@ -111,7 +113,8 @@ namespace Nakahira
 
             // 撃ちどころ(射程内・間に壁なし)なら、CpuSpecial が向き直って撃つ。それまでは相手へ道をたどる
             Vector3 pos = c.Position;
-            m_route.MoveDestination(o.Position);
+            // だるきんぐは敵 2 人が一直線に並ぶ位置へ回り込む(ほかのキャラは敵の所)
+            m_route.MoveDestination(following ? o.Position : m_special.ApproachPoint(c, o));
             m_route.Update(pos, c.Params, c.DeltaTime, out _);
             m_route.IsOnFinalLeg(pos, out Vector3 next);
             CpuPathFollower.Walk(pos, next, c.Self.MoveSpeed, c.Params, ref cmd);

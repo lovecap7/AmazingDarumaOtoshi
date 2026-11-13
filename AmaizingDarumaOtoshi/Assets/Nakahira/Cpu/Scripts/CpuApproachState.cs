@@ -108,6 +108,7 @@ namespace Nakahira
             if (o == null || o.IsGhost || o.IsInvincible || o.Character == null) return false;
             if (o.PathDistance <= c.Params.MeleeEnterDistance) return false;
             if (c.IsGolden) return true;   // 黄金化中は不利な相手にも攻めに行く
+            if (c.IgnoresStackGap) return true;   // だるきんぐが 2 段積んだら、どんな段数の相手にも攻めに行く
             return o.StackDiff >= (c.IsPlayful ? 0 : c.Params.AdvantageMargin);
         }
 
