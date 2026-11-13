@@ -19,6 +19,14 @@ public class NetworkCommandSource : NetworkBehaviour, IDarumaCommandSource
     bool m_special, m_anyAction;
     int m_specialFrame, m_anyActionFrame;
 
+    // ラグの計測(クライアントだけ): 止まっている状態からスティックを倒して、自分のキャラが動き出すまでの時間を Console に出す
+    public static bool LogLag = true;
+    const float kLagMoveDistance = 0.05f;   // これだけ動いたら「動き出した」とみなす(m)
+    const float kLagTimeout = 1.0f;         // これを過ぎても動かなければ計り直す(壁に向かって倒したときなど)
+    float m_lagStart = -1.0f;
+    Vector3 m_lagFrom, m_lastBodyPos;
+    bool m_wasIdle;
+
     public override void OnNetworkSpawn()
     {
         // 持ち主の端末だけ、実際の入力を読む部品を付ける
@@ -39,6 +47,47 @@ public class NetworkCommandSource : NetworkBehaviour, IDarumaCommandSource
             m_lastSent = c.Move;
             SubmitRpc(c.Move, c.Jump, c.Sweep, c.Shot, special, any);
         }
+        if (LogLag && !IsServer) ProbeLag(c.Move);
+    }
+
+    // クライアント: スティックを倒した時刻と、自分のキャラが動き出した時刻の差を出す
+    void ProbeLag(Vector2 move)
+    {
+        var mp = GetComponent<MatchPlayer>();
+        var body = mp != null && mp.Character != null ? mp.Character.transform : null;
+        if (body == null)
+        {
+            m_lagStart = -1.0f;
+            return;
+        }
+        Vector3 pos = body.position;
+        Vector3 step = pos - m_lastBodyPos;
+        step.y = 0.0f;
+        m_lastBodyPos = pos;
+
+        if (m_lagStart < 0.0f)
+        {
+            // スティックを離していて、キャラも止まっていたところから倒したときだけ計る
+            if (m_wasIdle && move.sqrMagnitude > 0.25f && step.sqrMagnitude < 0.0001f)
+            {
+                m_lagStart = Time.realtimeSinceStartup;
+                m_lagFrom = pos;
+            }
+        }
+        else
+        {
+            Vector3 d = pos - m_lagFrom;
+            d.y = 0.0f;
+            float elapsed = Time.realtimeSinceStartup - m_lagStart;
+            if (d.magnitude >= kLagMoveDistance)
+            {
+                Debug.Log($"[ラグ計測] スティックを倒してから自分のキャラが動き出すまで {elapsed * 1000.0f:0} ms" +
+                          $"(往復 {NetworkManager.NetworkConfig.NetworkTransport.GetCurrentRtt(NetworkManager.ServerClientId)} ms)");
+                m_lagStart = -1.0f;
+            }
+            else if (elapsed > kLagTimeout) m_lagStart = -1.0f;
+        }
+        m_wasIdle = move.sqrMagnitude < 0.01f;
     }
 
     [Rpc(SendTo.Server)]

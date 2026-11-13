@@ -265,6 +265,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 26
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -531,6 +532,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -4168,6 +4170,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -10554,6 +10557,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 22
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -19307,6 +19311,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 26
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -30756,6 +30761,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -32254,6 +32260,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 28
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -38841,6 +38848,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 26
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -39042,6 +39050,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 26
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -39448,6 +39457,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -42627,6 +42637,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 26
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -45272,6 +45283,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 22
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -45601,6 +45613,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 22
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -75626,6 +75639,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -82184,6 +82198,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 26
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -89183,6 +89198,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -96725,6 +96741,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -99463,6 +99480,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -101950,6 +101968,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -123308,6 +123327,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 22
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -125192,6 +125212,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -125665,6 +125686,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 20
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -131404,6 +131426,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 28
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -140925,6 +140948,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -146510,6 +146534,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -151818,6 +151843,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -152881,6 +152907,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -155479,6 +155506,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -164032,6 +164060,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -164330,6 +164359,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -167180,6 +167210,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -178923,6 +178954,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -180025,6 +180057,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 26
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -182960,6 +182993,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -191786,7 +191820,7 @@ MonoBehaviour:
     Prefabs:
       NetworkPrefabsLists:
       - {fileID: 11400000, guid: 244b0e5ae0ddc264b92532c84c188c30, type: 2}
-    TickRate: 30
+    TickRate: 60
     ClientConnectionBufferTimeout: 10
     ConnectionApproval: 0
     ConnectionData: 
@@ -194233,6 +194267,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -201612,6 +201647,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 28
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -202499,6 +202535,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -213596,6 +213633,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 20
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -213809,6 +213847,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -226676,6 +226715,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -227748,6 +227788,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 28
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -231439,6 +231480,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -232687,6 +232729,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 22
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -234271,6 +234314,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -248053,6 +248097,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 22
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -253174,6 +253219,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -253451,6 +253497,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -254324,6 +254371,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -255602,6 +255650,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 22
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -260210,6 +260259,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -281787,6 +281837,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -290055,6 +290106,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -295750,6 +295802,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -301648,6 +301701,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 26
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -303404,6 +303458,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -303701,6 +303756,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -321005,6 +321061,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -322000,6 +322057,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 26
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -324260,6 +324318,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -332111,6 +332170,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -334255,6 +334315,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -335804,6 +335865,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 30
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -344572,6 +344634,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -345476,6 +345539,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -351962,6 +352026,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -354324,6 +354389,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -358251,6 +358317,7 @@ GameObject:
   - component: {fileID: 1498755686}
   - component: {fileID: 1498755691}
   - component: {fileID: 1498755692}
+  - component: {fileID: 1498755693}
   m_Layer: 0
   m_Name: NetMatch
   m_TagString: Untagged
@@ -358368,6 +358435,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bb5cbe459782ba24e8bdc5158fc6a8b8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NetEliminationSync
+  ShowTopMostFoldoutHeaderGroup: 1
+--- !u!114 &1498755693
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1498755685}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 41d35078591759542a0757541b8d0d3d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NetClientTuning
   ShowTopMostFoldoutHeaderGroup: 1
 --- !u!1 &1499203381
 GameObject:
@@ -364652,6 +364732,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -366385,6 +366466,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 22
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -370865,6 +370947,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 22
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -375418,6 +375501,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 26
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -382066,6 +382150,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -386211,6 +386296,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 26
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -388365,6 +388451,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -396193,6 +396280,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 18
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -402854,6 +402942,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -406024,6 +406113,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -409730,6 +409820,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 30
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -410238,6 +410329,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -416298,6 +416390,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 26
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -416804,6 +416897,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 26
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -435979,6 +436073,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -442629,6 +442724,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -448288,6 +448384,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 26
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -459699,6 +459796,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 22
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -466677,6 +466775,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 20
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -477983,6 +478082,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 1
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -479011,6 +479111,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 20
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -482383,6 +482484,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -483387,6 +483489,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 26
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -499333,6 +499436,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 28
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -501010,6 +501114,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 24
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
@@ -506343,6 +506448,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e13550045359dcd41a33a33914c83130, type: 2}
   m_maxBlocksOnBoard: 22
   m_firstDelay: 3
+  m_intervalScale: 1
   m_match: {fileID: 1218044441}
   m_log: 1
   m_fillAtStart: 1
