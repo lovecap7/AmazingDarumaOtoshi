@@ -82,6 +82,10 @@ namespace Nakagawa
         public static Action<float, float> ShakeSent;
         public static Action<string, Color, float, float> MessageSent;
 
+        // クライアントで見た目(乗っている間の粒など)だけを出すとき、その相手を数えるか(GimmickUtil.OverlapBoxForView が使う)。
+        // suehara/Network が入れる(積まれている積み木など、ホストで影響を受けないものを外す)。null なら全部数える
+        public static Func<Nakahira.IGimmickAffectable, bool> ViewFilter;
+
         static int s_relay;
         static int s_mute;
 

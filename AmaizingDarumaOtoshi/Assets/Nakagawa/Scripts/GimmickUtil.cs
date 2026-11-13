@@ -37,6 +37,25 @@ namespace Nakagawa
             }
         }
 
+        // ネット対戦用(suehara): クライアントで見た目(乗っている間の粒など)だけを出すために、箱の範囲内にいるものを集める。
+        // 影響は与えない(Find はクライアントでは何も返さないので、こちらを使う)。数えるかは GimmickNet.ViewFilter で決める
+        public static void OverlapBoxForView(Vector3 center, Vector3 halfExtents, Quaternion rotation,
+            List<IGimmickAffectable> results, int layerMask = Physics.DefaultRaycastLayers)
+        {
+            results.Clear();
+            s_found.Clear();
+            int count = Physics.OverlapBoxNonAlloc(center, halfExtents, s_buffer, rotation, layerMask,
+                QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < count; i++)
+            {
+                Rigidbody rb = s_buffer[i].attachedRigidbody;
+                var target = rb != null ? rb.GetComponent<IGimmickAffectable>() : null;
+                if (target == null || !IsAlive(target)) continue;
+                if (GimmickNet.ViewFilter != null && !GimmickNet.ViewFilter(target)) continue;
+                if (s_found.Add(target)) results.Add(target);
+            }
+        }
+
         // 当たり判定のある足場(移動床・せり上がり塀)に乗っていれば、物理の摩擦・押し上げだけで一緒に動くもの(落ちている積み木)
         // 足場が AddCarryVelocity でも運ぶと二重に動いて足場から滑り落ちるので、運ぶ対象から外す
         public static bool MovesWithSolidPlatform(IGimmickAffectable target)

@@ -9,7 +9,8 @@ using UnityEngine.UI;
 //  ・右上: いまの試合の設定(モード・ストック・時間)・へやばんごう・人数(見るだけ。クリックはしない)
 //  ・Start(+ / キーボードは Tab)でメニューを開く。見た目は試合のポーズ画面(PauseMenu)と同じ
 //      ホスト(開始待ち): 試合を はじめる / キャラクター / ステージ / モード / ストック / 時間 / へやを かいさん / とじる
-//      ホスト(試合中) ・さんか: キャラクター / ステージ / へやを かいさん(ぬける) / とじる
+//      さんか: キャラクター / ステージ / へやを ぬける / とじる
+//    試合中(始まってから終わるまで)は開かない(開いていたら閉じる)
 //    キャラクター: 自分のキャラを選ぶ画面を開く(だれでも。開始待ちの間だけ。選ぶとその場で体が入れ替わる。NetMatchPlayer.RequestCharacter)
 //    ステージ    : 自分が遊びたいステージ(おまかせも)を選ぶ画面を開く(だれでも。開始待ちの間だけ。NetMatchPlayer.RequestStage)。
 //                  ホストが「試合を はじめる」を押すと、みんなが選んだものから抽選して(NetMatch.StartWithLottery・NetStageLottery)そのステージで始める
@@ -40,7 +41,7 @@ public class NetSessionMenu : MonoBehaviour
     // メニューを開いているか(開いている間はキャラクターを動かさない)
     public static bool IsOpen { get; private set; }
 
-    enum Item { Start, Character, Stage, Mode, Stocks, Time, Leave, Close }
+    enum Item { Start, Ready, Spectate, Character, Stage, Mode, Stocks, Time, Leave, Close }
 
     NetworkManager m_nm;
     TMP_FontAsset m_font;
@@ -101,6 +102,10 @@ public class NetSessionMenu : MonoBehaviour
     static NetMatch Net => NetMatch.Instance != null && NetMatch.Instance.IsSpawned ? NetMatch.Instance : null;
     // ホストがルールを変えられるのは開始待ちのときだけ
     bool CanEditRules => IsHost && Net != null && !Net.IsStarted && !Net.IsLotteryRunning;
+    // 試合中(始まってから終わるまで)はメニューを開かない
+    static bool InMatch => Net != null && Net.IsStarted && !(Net.Match != null && Net.Match.IsFinished);
+    // 試合中で、自分も試合に出ている(このときはメニューを開かない。観戦・待機の人は開ける)
+    static bool PlayingNow => InMatch && NetMatchPlayer.Local != null && NetMatchPlayer.Local.InMatch;
 
     void Start()
     {
@@ -133,8 +138,13 @@ public class NetSessionMenu : MonoBehaviour
 
         if (!IsOpen)
         {
-            // 画面の切り替え中・リザルトへ移る前は開かない
-            if (!NetSceneFlow.IsBusy && !Fader.IsBusy && !NetStageLottery.IsPlaying && PressedToggle()) Open();
+            // 試合中・画面の切り替え中・リザルトへ移る前は開かない
+            if (!PlayingNow && !NetSceneFlow.IsBusy && !Fader.IsBusy && !NetStageLottery.IsPlaying && PressedToggle()) Open();
+        }
+        else if (PlayingNow)
+        {
+            // 開いている間に試合が始まったら閉じる
+            Close(false);
         }
         else
         {
@@ -196,10 +206,17 @@ public class NetSessionMenu : MonoBehaviour
         m_infoRoom.text = room > 0 ? $"へやばんごう {room}" : "";
         m_infoRules.text = net != null ? RulesText(net.Rules) : "";
         string phase = net == null ? "" : !net.IsStarted ? "開始待ち" : net.Match != null && net.Match.IsFinished ? "試合終了" : "試合中";
-        m_infoState.text = net != null ? $"{phase} ・ {net.PlayerCount}人" : "";
+        // 人数: 試合に出る(出ている)人と、観戦・待機の人
+        int playing = 0, watching = 0;
+        foreach (var p in NetMatchPlayer.All)
+        {
+            if (p == null || !p.IsSpawned) continue;
+            if (p.InMatch) playing++; else watching++;
+        }
+        m_infoState.text = net != null ? $"{phase} ・ {playing}人" + (watching > 0 ? $"(観戦 {watching}人)" : "") : "";
         m_infoHint.text = net != null && !net.IsStarted
             ? (host ? "Start：メニュー(試合を はじめる・設定)" : "ホストが はじめるのを まっています　Start：メニュー")
-            : "Start：メニュー";
+            : PlayingNow ? "" : "Start：メニュー";
         // 試合中はじゃまにならないように薄くする
         var g = m_info.GetComponent<CanvasGroup>();
         g.alpha = Mathf.MoveTowards(g.alpha, net != null && net.IsStarted && !IsOpen ? 0.55f : 1.0f, Time.unscaledDeltaTime * 3.0f);
@@ -259,6 +276,8 @@ public class NetSessionMenu : MonoBehaviour
     void Close(bool sound = true)
     {
         IsOpen = false;
+        if (m_picking) NetMatchPlayer.Local?.SetPicking(false);
+        CloseScreens();
         m_picking = false;
         if (m_picker != null) m_picker.root.gameObject.SetActive(false);
         m_picker = null;
@@ -275,6 +294,11 @@ public class NetSessionMenu : MonoBehaviour
     {
         var items = new List<Item>();
         if (CanEditRules) items.Add(Item.Start);
+        // 準備完了(ホスト以外で、開始待ちの間・試合に出る人)・観戦(開始待ちの間はだれでも。試合中は試合に出ていない人)
+        var local = NetMatchPlayer.Local;
+        bool lobby = Net != null && !Net.IsStarted;
+        if (local != null && lobby && !IsHost && local.InMatch) items.Add(Item.Ready);
+        if (local != null && (lobby || !local.InMatch)) items.Add(Item.Spectate);
         // キャラクター・ステージはだれでも(試合中は薄くして選べない)
         if (NetCharacterList.Instance != null)
         {
@@ -312,7 +336,8 @@ public class NetSessionMenu : MonoBehaviour
             ToyKit.Anchor(item, new Vector2(0.5f, 1.0f), new Vector2(0.0f, -top - i * step + 6.0f), new Vector2(560.0f, 74.0f));
             m_itemImages.Add(item.GetComponent<Image>());
             // 設定の行は左に名前・右に「＜ 値 ＞」(キャラクターは右にいまのキャラ)、ほかは真ん中に名前
-            bool value = IsValue(items[i]) || items[i] == Item.Character || items[i] == Item.Stage;
+            bool value = IsValue(items[i]) || items[i] == Item.Character || items[i] == Item.Stage
+                         || items[i] == Item.Start || items[i] == Item.Ready || items[i] == Item.Spectate;
             var t = Text("Text", item, "", 34.0f, Color.white, m_letterMat);
             ToyKit.Stretch(t.rectTransform);
             t.rectTransform.offsetMin = new Vector2(36.0f, 0.0f);
@@ -383,6 +408,28 @@ public class NetSessionMenu : MonoBehaviour
                 Net.StartWithLottery(BuildRules());
                 Close(false);
                 break;
+            case Item.Ready:
+            {
+                var local = NetMatchPlayer.Local;
+                if (local == null) break;
+                bool ready = local.Status != NetMatchPlayer.NetStatus.Ready;
+                local.RequestReady(ready);
+                if (ready) MenuSounds.Decide(); else MenuSounds.Cancel();
+                // 準備完了にしたら、そのままメニューを閉じる
+                if (ready) Close(false);
+                break;
+            }
+            case Item.Spectate:
+            {
+                var local = NetMatchPlayer.Local;
+                if (local == null) break;
+                bool spectate = !local.IsSpectating;
+                local.RequestSpectate(spectate);
+                MenuSounds.Decide();
+                // 試合中に観戦にしたら、待機画面を閉じて試合を見る(メニューも閉じる)
+                if (spectate && InMatch) Close(false);
+                break;
+            }
             case Item.Character:
                 OpenPicker(PickKind.Character);
                 break;
@@ -408,6 +455,7 @@ public class NetSessionMenu : MonoBehaviour
     // ストックの行はストックのときだけ、キャラクターは開始待ちの間だけ選べる
     static bool Selectable(Item item)
     {
+        if (item == Item.Start) return Net != null && Net.CanStart;
         if (item == Item.Stocks) return s_mode == MatchSetup.MatchMode.Stock;
         if (item == Item.Character) return CanPickCharacter;
         if (item == Item.Stage) return CanPickStage;
@@ -459,6 +507,8 @@ public class NetSessionMenu : MonoBehaviour
         switch (item)
         {
             case Item.Start: return "試合を はじめる";
+            case Item.Ready: return "準備完了";
+            case Item.Spectate: return "観戦する";
             case Item.Character: return "キャラクター";
             case Item.Stage: return "ステージ";
             case Item.Mode: return "モード";
@@ -479,6 +529,13 @@ public class NetSessionMenu : MonoBehaviour
             case Item.Time: return $"＜ {TimeLabel(TimeLimit)} ＞";
             case Item.Character: return CanPickCharacter ? CurrentCharacterName : "試合中は 変えられません";
             case Item.Stage: return CanPickStage ? CurrentStageName : "試合中は 変えられません";
+            case Item.Start:
+                if (Net == null || Net.CanStart) return "";
+                return Net.NotReadyCount > 0 ? $"準備まち {Net.NotReadyCount}人" : "出る人が いません";
+            case Item.Ready:
+                return NetMatchPlayer.Local != null && NetMatchPlayer.Local.Status == NetMatchPlayer.NetStatus.Ready ? "ＯＫ！" : "まだ";
+            case Item.Spectate:
+                return NetMatchPlayer.Local != null && NetMatchPlayer.Local.IsSpectating ? "する" : "しない";
             default: return "";
         }
     }
@@ -491,7 +548,8 @@ public class NetSessionMenu : MonoBehaviour
             var local = NetMatchPlayer.Local;
             var list = NetCharacterList.Instance;
             var data = local != null && list != null ? list.Character(local.CharacterIndex) : null;
-            return data != null ? data.displayName : "だるま";
+            string name = data != null ? data.displayName : "だるま";
+            return NetMatchPlayer.IsRandomCharacter ? $"ランダム({name})" : name;
         }
     }
 
@@ -509,38 +567,85 @@ public class NetSessionMenu : MonoBehaviour
 
     //========================================
     // キャラクター・ステージを選ぶ画面
-    //  キャラ  : 並びは NetCharacterList の順。まだ選べないキャラ(だるきんぐ)は飛ばす。決めるとすぐ入れ替わる
+    //  キャラ  : 並びは NetCharacterList の順で、最後がランダム。まだ選べないキャラ(だるきんぐ)は並べない。決めるとすぐ入れ替わる
     //  ステージ: 並びは NetCharacterList.stages の順で、最後がおまかせ。決めたものは、ホストが試合を始めるときの抽選に入る
     //========================================
+
+    // キャラの画面に並べるもの(キャラクターセレクトと同じ: 選べるキャラだけを並べ、最後にランダム(NetCharacterList.None))。
+    // だるきんぐは実績をすべて解除するまで並べない
+    static readonly List<int> s_charSlots = new List<int>();
+
+    static void BuildCharSlots()
+    {
+        s_charSlots.Clear();
+        var list = NetCharacterList.Instance;
+        if (list == null) return;
+        for (int i = 0; i < list.Count; i++)
+        {
+            if (list.Character(i) != null && list.IsAvailable(i)) s_charSlots.Add(i);
+        }
+        s_charSlots.Add(NetCharacterList.None);
+    }
+
+    // キャラの画面の i 番目のキャラの番号(ランダムなら NetCharacterList.None)
+    static int CharAt(int i) => i >= 0 && i < s_charSlots.Count ? s_charSlots[i] : NetCharacterList.None;
 
     static int PickCount(PickKind kind)
     {
         var list = NetCharacterList.Instance;
         if (list == null) return 0;
-        return kind == PickKind.Character ? list.Count : list.stages.Count + 1;
+        return kind == PickKind.Character ? s_charSlots.Count : list.stages.Count + 1;
     }
 
-    static bool PickAvailable(PickKind kind, int i) => kind == PickKind.Stage || NetCharacterList.Instance.IsAvailable(i);
+    static bool PickAvailable(PickKind kind, int i) => true;
 
     static bool CanPick(PickKind kind) => kind == PickKind.Character ? CanPickCharacter : CanPickStage;
 
-    // いま選んでいるもの(ステージのおまかせは最後)
+    // いま選んでいるもの(キャラのランダム・ステージのおまかせは最後)
     static int PickCurrent(PickKind kind)
     {
         var local = NetMatchPlayer.Local;
         if (local == null) return -1;
-        if (kind == PickKind.Character) return local.CharacterIndex;
+        if (kind == PickKind.Character) return NetMatchPlayer.IsRandomCharacter ? s_charSlots.Count - 1 : s_charSlots.IndexOf(local.CharacterIndex);
         var list = NetCharacterList.Instance;
         return list != null && list.Stage(local.StageVote) != null ? local.StageVote : PickCount(kind) - 1;
     }
 
+    // キャラ・ステージを選ぶ画面(キャラクターセレクト・ステージセレクトと同じ見た目。NetCharacterScreen・NetStageScreen)
+    NetCharacterScreen m_charScreen;
+    NetStageScreen m_stageScreen;
+    PickKind m_screenKind;
+
+    bool ScreenOpen => m_screenKind == PickKind.Character ? m_charScreen != null && m_charScreen.IsOpen : m_stageScreen != null && m_stageScreen.IsOpen;
+
+    void CloseScreens()
+    {
+        if (m_charScreen != null && m_charScreen.IsOpen) m_charScreen.Close();
+        if (m_stageScreen != null && m_stageScreen.IsOpen) m_stageScreen.Close();
+    }
+
     void OpenPicker(PickKind kind)
+    {
+        if (NetMatchPlayer.Local == null) return;
+        if (m_charScreen == null) m_charScreen = GetComponent<NetCharacterScreen>() ?? gameObject.AddComponent<NetCharacterScreen>();
+        if (m_stageScreen == null) m_stageScreen = GetComponent<NetStageScreen>() ?? gameObject.AddComponent<NetStageScreen>();
+        m_picker = null;
+        m_picking = true;
+        m_screenKind = kind;
+        NetMatchPlayer.Local.SetPicking(true);   // ほかの人の表示に「えらんでいます」と出す
+        if (kind == PickKind.Character) m_charScreen.Open();
+        else m_stageScreen.Open();
+    }
+
+    // (前の、メニューの中で選ぶ画面。いまは使っていない)
+    void OpenListPicker(PickKind kind)
     {
         var picker = kind == PickKind.Character ? m_charPicker : m_stagePicker;
         int n = PickCount(kind);
         if (picker == null || NetMatchPlayer.Local == null || n == 0) return;
         m_picker = picker;
         m_picking = true;
+        NetMatchPlayer.Local?.SetPicking(true);   // ほかの人の表示に「選んでいる」と出す
         // いま選んでいるものから(なければ選べる最初のもの)
         m_pickIndex = Mathf.Clamp(PickCurrent(kind), 0, n - 1);
         if (!PickAvailable(kind, m_pickIndex)) MovePick(1, 0);
@@ -550,6 +655,8 @@ public class NetSessionMenu : MonoBehaviour
 
     void ClosePicker(bool sound = true)
     {
+        if (m_picking) NetMatchPlayer.Local?.SetPicking(false);
+        CloseScreens();
         m_picking = false;
         if (m_picker != null) m_picker.root.gameObject.SetActive(false);
         m_picker = null;
@@ -559,6 +666,13 @@ public class NetSessionMenu : MonoBehaviour
 
     void UpdatePicker()
     {
+        // キャラクターセレクトと同じ見た目の画面: 操作はその画面がする。閉じたらメニューに戻る
+        if (m_picker == null)
+        {
+            if (!CanPick(m_screenKind)) { ClosePicker(false); return; }
+            if (!ScreenOpen) ClosePicker(false);
+            return;
+        }
         var kind = m_picker.kind;
         // 試合が始まった・抽選が始まったら選べない
         if (!CanPick(kind))
@@ -579,7 +693,12 @@ public class NetSessionMenu : MonoBehaviour
         if (!PressedSubmit()) return;
 
         if (!PickAvailable(kind, m_pickIndex)) { MenuSounds.Cancel(); return; }
-        if (kind == PickKind.Character) NetMatchPlayer.Local.RequestCharacter(m_pickIndex);
+        if (kind == PickKind.Character)
+        {
+            int c = CharAt(m_pickIndex);
+            if (c == NetCharacterList.None) NetMatchPlayer.Local.RequestRandomCharacter();
+            else NetMatchPlayer.Local.RequestCharacter(c);
+        }
         else NetMatchPlayer.Local.RequestStage(m_pickIndex < PickCount(kind) - 1 ? m_pickIndex : NetCharacterList.None);
         MenuSounds.Decide();
         ClosePicker(false);
@@ -620,7 +739,11 @@ public class NetSessionMenu : MonoBehaviour
             c.bg.rectTransform.localScale = Vector3.one * (on ? pulse : 1.0f);
             c.name.text = available ? PickName(kind, i) : "？？？";
             c.name.color = on ? ToyKit.Ink : available ? Color.white : new Color(1.0f, 1.0f, 1.0f, 0.3f);
-            if (kind == PickKind.Character) c.icon.color = available ? (list.Character(i) != null && list.Character(i).portrait == null ? list.Character(i).color : Color.white) : new Color(0.1f, 0.1f, 0.1f, 0.8f);
+            if (kind == PickKind.Character)
+            {
+                var data = list.Character(CharAt(i));
+                c.icon.color = data == null ? kRandomColor : data.portrait == null ? data.color : Color.white;
+            }
             c.now.gameObject.SetActive(current == i);
         }
         bool selAvailable = PickAvailable(kind, m_pickIndex);
@@ -631,7 +754,7 @@ public class NetSessionMenu : MonoBehaviour
     static string PickName(PickKind kind, int i)
     {
         var list = NetCharacterList.Instance;
-        if (kind == PickKind.Character) return list.Character(i) != null ? list.Character(i).displayName : "";
+        if (kind == PickKind.Character) return list.Character(CharAt(i)) != null ? list.Character(CharAt(i)).displayName : "ランダム";
         return list.Stage(i) != null ? list.Stage(i).displayName : "おまかせ";
     }
 
@@ -643,8 +766,8 @@ public class NetSessionMenu : MonoBehaviour
             var s = list.Stage(i);
             return s != null ? s.description : "ステージは あとで ランダムに 決まります(当たったときに めくります)";
         }
-        var c = list.Character(i);
-        if (c == null) return "";
+        var c = list.Character(CharAt(i));
+        if (c == null) return "選べる キャラの中から ランダムに 決まります(試合のたびに 選び直します)";
         var lines = new List<string>();
         if (!string.IsNullOrEmpty(c.passiveName) || !string.IsNullOrEmpty(c.passiveText)) lines.Add($"パッシブ：{c.passiveName}　{c.passiveText}");
         if (!string.IsNullOrEmpty(c.specialName) || !string.IsNullOrEmpty(c.specialText)) lines.Add($"必殺技：{c.specialName}　{c.specialText}");
@@ -654,6 +777,7 @@ public class NetSessionMenu : MonoBehaviour
     Picker BuildPicker(PickKind kind)
     {
         bool chara = kind == PickKind.Character;
+        if (chara) BuildCharSlots();
         var p = new Picker { kind = kind, columns = chara ? 5 : 6 };
         int n = PickCount(kind);
         // キャラは正方形の顔、ステージは横長のプレビュー
@@ -682,16 +806,17 @@ public class NetSessionMenu : MonoBehaviour
             ToyKit.Anchor(iconRt, new Vector2(0.5f, 1.0f), new Vector2(0.0f, -12.0f - iconSize.y * 0.5f), iconSize);
             var icon = iconRt.GetComponent<Image>();
             icon.preserveAspect = true;
-            Sprite sprite = chara ? (list.Character(i) != null ? list.Character(i).portrait : null) : (list.Stage(i) != null ? list.Stage(i).preview : null);
+            var charData = chara ? list.Character(CharAt(i)) : null;
+            Sprite sprite = chara ? (charData != null ? charData.portrait : null) : (list.Stage(i) != null ? list.Stage(i).preview : null);
             TextMeshProUGUI letter = null;
             if (sprite != null) icon.sprite = sprite;
             else
             {
                 // 画像が無いものは、色と頭文字で仮に出す(キャラクターセレクトと同じ。おまかせは「？」)
-                Color color = chara ? (list.Character(i) != null ? list.Character(i).color : Color.gray) : (list.Stage(i) != null ? list.Stage(i).color : kRandomColor);
+                Color color = chara ? (charData != null ? charData.color : kRandomColor) : (list.Stage(i) != null ? list.Stage(i).color : kRandomColor);
                 icon.color = color;
                 string name0 = PickName(kind, i);
-                string mark = !chara && list.Stage(i) == null ? "？" : !string.IsNullOrEmpty(name0) ? name0.Substring(0, 1) : "?";
+                string mark = (chara ? charData == null : list.Stage(i) == null) ? "？" : !string.IsNullOrEmpty(name0) ? name0.Substring(0, 1) : "?";
                 letter = Text("Letter", iconRt, mark, 80.0f, Color.white, m_popMat);
                 ToyKit.Stretch(letter.rectTransform);
             }

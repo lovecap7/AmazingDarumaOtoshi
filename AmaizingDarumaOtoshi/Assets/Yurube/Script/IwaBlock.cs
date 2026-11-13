@@ -54,6 +54,18 @@ namespace Yurube
             if (m_logIwa) Debug.Log("[いわだる] 積み木が岩化：積み木を壊し、壁で壊れる", this);
         }
 
+        // ネット対戦用(suehara): クライアントで、見た目(岩の破片)だけを付ける。
+        // クライアントの積み木は止めてあり状態の変化が来ないので、飛び終わったかは Update で SpecialNet から読む
+        bool m_netVisual;
+
+        public void BeginNetVisual()
+        {
+            m_netVisual = true;
+            ConsumedLaunch = true;
+            BuildChunks();
+            enabled = true;
+        }
+
         private void OnBlockStateChanged(TumikiBlock block)
         {
             if (block.CurrentState == TumikiBlock.State.Flying) return;
@@ -149,6 +161,14 @@ namespace Yurube
         // 破片をゆっくり回して「岩がまとわりついている」感じを出す
         private void Update()
         {
+            // ネット対戦用(suehara): クライアントで飛び終わったら、岩の見た目を外す
+            if (m_netVisual && !SpecialNet.IsFlying(m_block))
+            {
+                m_netVisual = false;
+                ConsumedLaunch = false;
+                Restore();
+                return;
+            }
             if (m_chunkRoot == null) return;
             float delta = m_chunkSpin * Time.deltaTime;
             for (int i = 0; i < m_chunkRoot.childCount; i++)

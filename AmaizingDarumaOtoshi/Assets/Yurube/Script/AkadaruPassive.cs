@@ -8,7 +8,7 @@ namespace Yurube
     // ハンマーの性能(HammerParams)はこのキャラクター専用の複製を使い、元のアセットは書き換えない
     // 撃っている間は弾速を更新しない(弾が出る直前に最下段が減るため、撃ち始めた時点の段数で固定する)
     [RequireComponent(typeof(DarumaCharacter))]
-    public class AkadaruPassive : MonoBehaviour
+    public class AkadaruPassive : MonoBehaviour, INetSpecial
     {
         [Tooltip("赤色の積み木1個あたりの弾速の上昇量(m/s)")]
         [SerializeField, Min(0.0f)] float m_shotSpeedPerRedBlock = 1.0f;
@@ -51,6 +51,8 @@ namespace Yurube
         private void Update()
         {
             if (m_params == null) return;
+            // ネット対戦用(suehara): クライアントでは弾を撃たない(弾速はホストが決める)
+            if (SpecialNet.IsClient) return;
 
             // 赤い積み木が1個でも積まれたら、パッシブが動き出したとみなす
             if (!m_reportedPassive && m_character != null && m_character.Stack != null
@@ -81,6 +83,8 @@ namespace Yurube
         private void FixedUpdate()
         {
             if (!m_enableShotVisuals || m_character == null || !m_character.CanBeAffected) return;
+            // ネット対戦用(suehara): クライアントはホストからの知らせ(NetReceive)で付ける
+            if (SpecialNet.IsClient) return;
 
             Vector3 center = m_character.transform.position + Vector3.up * 0.5f;
             int count = Physics.OverlapSphereNonAlloc(center, m_searchRadius, m_overlaps, ~0, QueryTriggerInteraction.Ignore);
@@ -103,8 +107,30 @@ namespace Yurube
                 Vector3 muzzle = m_character.transform.position
                     + Vector3.up * (TumikiBlock.kHeight * 0.5f)
                     + m_character.transform.forward * (DarumaCharacter.kBodyRadius + TumikiBlock.kRadius + 0.05f);
+                // ネット対戦用(suehara): クライアントでも同じ残光・フラッシュを出す
+                Vector3 dir = block.Direction;
+                SpecialNet.Send(m_character, this, kNetShot,
+                    new[] { muzzle.x, muzzle.y, muzzle.z, dir.x, dir.z, block.Speed }, new[] { block });
                 trail.Begin(EffectMaterial, m_baseShotSpeed > 0.0f ? m_baseShotSpeed : 10.0f, m_maxShotSpeed, muzzle);
             }
+        }
+
+        //========================================
+        // ネット対戦用(suehara): クライアントで、ホストと同じショットの残光を出す
+        //========================================
+
+        const int kNetShot = 0;
+
+        public void NetReceive(int ev, float[] v, TumikiBlock[] blocks)
+        {
+            if (ev != kNetShot || v.Length < 6 || blocks.Length < 1 || blocks[0] == null) return;
+            var block = blocks[0];
+            SpecialNet.MarkLaunched(block, new Vector3(v[3], 0.0f, v[4]), v[5]);
+
+            var trail = block.GetComponent<AkadaruShotTrail>();
+            if (trail == null) trail = block.gameObject.AddComponent<AkadaruShotTrail>();
+            trail.Begin(EffectMaterial, m_baseShotSpeed > 0.0f ? m_baseShotSpeed : 10.0f, m_maxShotSpeed,
+                new Vector3(v[0], v[1], v[2]));
         }
 
         private Material EffectMaterial

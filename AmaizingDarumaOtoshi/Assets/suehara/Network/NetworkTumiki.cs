@@ -9,6 +9,7 @@ using UnityEngine;
 // 生成されたときのポンと出る演出(TumikiSpawnPop)はクライアントでも出し、割れて消えたら NetEffects で破片を出す。
 // (積み木のプレハブ Tumiki_Net にだけ付ける。ローカル用の Tumiki.prefab には付けない)
 [RequireComponent(typeof(TumikiBlock))]
+[DefaultExecutionOrder(1000)]   // NetworkRigidbody の Awake のあとに動く(下の Awake)
 public class NetworkTumiki : NetworkBehaviour
 {
     const byte kHarmful = 1;   // 攻撃判定がある(炎)
@@ -32,6 +33,17 @@ public class NetworkTumiki : NetworkBehaviour
     // 接続する前にローカルで生成された(ネットワークに乗っていない)積み木
     public bool CreatedOffline { get; private set; }
 
+    // ホスト: NetworkRigidbody は Awake で物理を止める(Spawn するまで Kinematic)。
+    // そのままだと、Instantiate のすぐあとに付けた勢い(linearVelocity・Launch。サンドバッグの破裂・麻雀の補充・ビリヤードの噴水など)が消えて、
+    // その場に落ちるだけになる(ローカルの Tumiki.prefab では消えない)ので、ホストでは止めずにおく。Spawn したあとも物理はホストが動かす
+    private void Awake()
+    {
+        var nm = NetworkManager.Singleton;
+        if (nm == null || !nm.IsListening || !nm.IsServer) return;
+        var rb = GetComponent<Rigidbody>();
+        if (rb != null && rb.isKinematic) rb.isKinematic = false;
+    }
+
     // 生成エリア・大砲は普通に Instantiate するだけなので、ホストでは最初のフレームに自分で Spawn する
     // (位置・色・発射の指定が済んだあとに配られる)
     private void Start()
@@ -48,6 +60,10 @@ public class NetworkTumiki : NetworkBehaviour
         }
     }
 
+    // ヒットストップ・ワープの瞬間移動をクライアントにも出す(ホストで見張る)
+    NetHitStopWatch m_hitStopWatch;
+    NetTeleportWatch m_teleportWatch;
+
     public override void OnNetworkSpawn()
     {
         m_block = GetComponent<TumikiBlock>();
@@ -55,6 +71,8 @@ public class NetworkTumiki : NetworkBehaviour
         {
             m_color.Value = (byte)m_block.Color;
             m_flags.Value = ReadFlags();
+            m_hitStopWatch = new NetHitStopWatch(GetComponent<HitStop>());
+            m_teleportWatch = new NetTeleportWatch(this);
             return;
         }
 
@@ -100,6 +118,7 @@ public class NetworkTumiki : NetworkBehaviour
 
     // クライアント: 飛んでいるか・見た目の速さ(TumikiBlock を止めているので、届いた状態と動きから答える)
     public bool IsFlying => (m_flags.Value & kFlying) != 0;
+    public bool IsStacked => (m_flags.Value & kStacked) != 0;
     public float Speed => m_speed;
 
     void ApplyColor(byte c)
@@ -119,6 +138,20 @@ public class NetworkTumiki : NetworkBehaviour
             return;
         }
         UpdateClientEffects();
+    }
+
+    private void LateUpdate()
+    {
+        if (!IsSpawned || !IsServer) return;
+        if (m_hitStopWatch != null && m_hitStopWatch.Poll(out float duration, out float scale, out float shake)) HitStopRpc(duration, scale, shake);
+        m_teleportWatch?.Update();
+    }
+
+    [Rpc(SendTo.NotServer)]
+    void HitStopRpc(float duration, float timeScale, float shake)
+    {
+        var hitStop = GetComponent<HitStop>();
+        if (hitStop != null) hitStop.Begin(duration, timeScale, shake);
     }
 
     // 煙: 動いている間 / 炎: 攻撃判定がある間(TumikiBlock.UpdateEffects と同じ決まり)

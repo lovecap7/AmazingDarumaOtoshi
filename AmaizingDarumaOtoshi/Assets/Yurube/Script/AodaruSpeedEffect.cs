@@ -124,8 +124,28 @@ namespace Yurube
             return false;
         }
 
+        // ネット対戦用(suehara): クライアントのキャラクターは止めてあり速度が 0 なので、位置の動きから速さを出す
+        Vector3 m_lastPosition;
+        float m_lastTime = -1.0f;
+        float m_netSpeed;
+
         private float HorizontalSpeed()
         {
+            if (SpecialNet.IsClient)
+            {
+                Vector3 p = transform.position;
+                float dt = Time.time - m_lastTime;
+                if (m_lastTime >= 0.0f && dt > 0.0f)
+                {
+                    Vector3 d = p - m_lastPosition;
+                    d.y = 0.0f;
+                    // 届く位置はとびとびなので、速さはならして使う
+                    m_netSpeed = Mathf.Lerp(m_netSpeed, d.magnitude / dt, 0.3f);
+                }
+                m_lastPosition = p;
+                m_lastTime = Time.time;
+                return m_netSpeed;
+            }
             if (m_character.Rigidbody == null) return 0.0f;
             Vector3 v = m_character.Rigidbody.linearVelocity;
             v.y = 0.0f;
@@ -134,8 +154,8 @@ namespace Yurube
 
         private int CountBlue()
         {
-            var stack = m_character.Stack;
-            return stack != null ? stack.CountColor(TumikiColor.Blue) : 0;
+            // ネット対戦用(suehara): クライアントは積み木を積んでいないので、ホストから届いた数を使う
+            return SpecialNet.CountColor(m_character, TumikiColor.Blue);
         }
 
         private static Material EffectMaterial

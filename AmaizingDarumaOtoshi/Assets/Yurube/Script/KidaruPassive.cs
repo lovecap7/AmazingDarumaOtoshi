@@ -53,6 +53,7 @@ namespace Yurube
         void OnStackChanged()
         {
             if (m_character == null) return;
+            if (SpecialNet.IsClient) return;   // ネット対戦用(suehara): 積み木を増やすのはホストだけ
             int yellow = CountYellow();
             bool gained = yellow > m_lastYellow;
             m_lastYellow = yellow;
@@ -62,7 +63,8 @@ namespace Yurube
             if (m_blockPrefab == null || stack == null || stack.Count >= stack.MaxCount) return;
 
             m_adding = true;
-            var go = Instantiate(m_blockPrefab, m_character.transform.position, m_character.transform.rotation);
+            // ネット対戦用(suehara): ネット対戦のホストでは、ネットワークに乗せた積み木を作る(ローカルは今までどおり Instantiate)
+            var go = SpecialNet.InstantiateBlock(m_blockPrefab, m_character.transform.position, m_character.transform.rotation);
             var block = go.GetComponent<TumikiBlock>();
             if (block == null)
             {

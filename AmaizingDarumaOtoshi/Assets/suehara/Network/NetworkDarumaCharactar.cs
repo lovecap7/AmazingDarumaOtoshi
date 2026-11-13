@@ -25,6 +25,9 @@ public class NetworkDarumaCharacter : NetworkBehaviour
     readonly NetworkVariable<byte> m_stackCount = new NetworkVariable<byte>();
     readonly NetworkVariable<float> m_invincible = new NetworkVariable<float>();
     readonly NetworkVariable<byte> m_gauge = new NetworkVariable<byte>();
+    // 積んでいる積み木の色ごとの数(4ビットずつ。赤・青・緑・黄)。パッシブの見た目が読む(あおだるの風など。Yurube.SpecialNet.CountColor)
+    readonly NetworkVariable<ushort> m_colors = new NetworkVariable<ushort>();
+    static readonly TumikiColor[] kColors = { TumikiColor.Red, TumikiColor.Blue, TumikiColor.Green, TumikiColor.Yellow };
 
     DarumaCharacter m_character;
     DarumaStack m_stack;
@@ -105,6 +108,20 @@ public class NetworkDarumaCharacter : NetworkBehaviour
                 : (byte)Mathf.Min(kGaugeSteps, Mathf.FloorToInt(m_specialGauge.Normalized * kGaugeSteps));
             if (m_gauge.Value != gauge) m_gauge.Value = gauge;
         }
+
+        if (m_stack != null)
+        {
+            int packed = 0;
+            for (int i = 0; i < kColors.Length; i++) packed |= Mathf.Min(m_stack.CountColor(kColors[i]), 15) << (i * 4);
+            if (m_colors.Value != (ushort)packed) m_colors.Value = (ushort)packed;
+        }
+    }
+
+    // クライアント: ホストのキャラクターが積んでいるその色の積み木の数
+    public int ColorCount(TumikiColor color)
+    {
+        int i = System.Array.IndexOf(kColors, color);
+        return i < 0 ? 0 : (m_colors.Value >> (i * 4)) & 15;
     }
 
     // DarumaCharacter.UpdateInvincible と同じ: 残り時間を減らし、その間は点滅する
@@ -139,7 +156,10 @@ public class NetworkDarumaCharacter : NetworkBehaviour
     // DarumaStack.LateUpdate の頭の部分と同じ動き
     void ClientLateUpdate()
     {
-        if (m_head == null || m_stack == null) return;
+        if (m_stack == null) return;
+        // 名札・HUD が読むタワーの高さ(DarumaStack.Height)も、届いた段数で出す
+        m_stack.NetCount = m_stackCount.Value;
+        if (m_head == null) return;
         Vector3 target = new Vector3(0.0f, m_stackCount.Value * TumikiBlock.kHeight + m_stack.HeadRadius, 0.0f);
         m_head.localPosition = Vector3.MoveTowards(m_head.localPosition, target, m_fallSpeed * Time.deltaTime);
     }

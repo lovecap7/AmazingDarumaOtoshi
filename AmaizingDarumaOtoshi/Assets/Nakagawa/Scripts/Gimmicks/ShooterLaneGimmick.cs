@@ -116,6 +116,7 @@ namespace Nakagawa
         private void FixedUpdate()
         {
             if (GimmickClock.IsHeld) return;
+            using var relay = GimmickNet.RelayOrMute();   // ネット対戦用(suehara): 飛ばしたときの火花・音をクライアントにも出す
             Vector3 half = new Vector3(m_size.x * 0.5f, m_rideHeight * 0.5f, m_size.y * 0.5f);
             GimmickUtil.OverlapBox(transform.position + Vector3.up * (m_rideHeight * 0.5f), half, transform.rotation, m_found);
             Vector3 forward = Forward;

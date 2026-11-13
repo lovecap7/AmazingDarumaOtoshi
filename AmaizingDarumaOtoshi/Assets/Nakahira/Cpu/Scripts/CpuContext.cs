@@ -50,6 +50,10 @@ namespace Nakahira
         public bool IsStackFull => StackCount >= StackLimit;
         // ここまで積んだら積むのをやめる段数(CollectUntil と積める上限の小さい方)
         public int CollectUntil => Mathf.Min(Params.CollectUntil, StackLimit);
+        // 段数の差を気にしない(だるきんぐが上限の 2 段まで積んだとき。2026-11-13 中平が決めた)
+        // 2 段では誰と比べても不利になり、攻めに行かずに待ってばかりだったため。
+        // 相手がどんな段数でも攻めに行く・殴る。段数の差では逃げない(幽霊からは逃げる)
+        public bool IgnoresStackGap => m_kingPassive != null && IsStackFull;
         Yurube.DaruKingPassive m_kingPassive;
 
         // きだるの黄金化(無敵＋速さ 1.5 倍)の残り時間(秒。黄金化していなければ 0)

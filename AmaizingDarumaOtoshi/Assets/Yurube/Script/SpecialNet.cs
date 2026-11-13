@@ -34,6 +34,34 @@ namespace Yurube
         // クライアント: 積み木が飛んでいるか・速さ(クライアントの積み木は TumikiBlock を止めているので、届いた状態で答える)
         public static Func<TumikiBlock, bool?> NetBlockFlying;
         public static Func<TumikiBlock, float?> NetBlockSpeed;
+        // クライアント: キャラクターが積んでいるその色の積み木の数(クライアントは積み木を積んでいないので、ホストから届いた数で答える)
+        public static Func<DarumaCharacter, TumikiColor, int?> NetCountColor;
+        // ホスト: 積み木をネットワークに乗せて作る(ローカル用のプレハブを渡すと、ネット用の同じ積み木を作ってすぐ配る)
+        public static Func<GameObject, Vector3, Quaternion, GameObject> NetInstantiateBlock;
+
+        // パッシブで積み木を作る(ネット対戦のホストではネットワークに乗せる。積む前に配らないと物理が戻ってしまうため、すぐ配る)
+        public static GameObject InstantiateBlock(GameObject prefab, Vector3 position, Quaternion rotation)
+        {
+            if (prefab == null) return null;
+            if (NetInstantiateBlock != null && !IsClient)
+            {
+                var go = NetInstantiateBlock(prefab, position, rotation);
+                if (go != null) return go;
+            }
+            return UnityEngine.Object.Instantiate(prefab, position, rotation);
+        }
+
+        // キャラクターが積んでいるその色の積み木の数(クライアントではホストから届いた数)
+        public static int CountColor(DarumaCharacter character, TumikiColor color)
+        {
+            if (character == null) return 0;
+            if (IsClient && NetCountColor != null)
+            {
+                var n = NetCountColor(character, color);
+                if (n.HasValue) return n.Value;
+            }
+            return character.Stack != null ? character.Stack.CountColor(color) : 0;
+        }
 
         // ホスト: 必殺技の出来事をクライアントへ送る(通信していなければ何もしない)
         public static void Send(DarumaCharacter character, MonoBehaviour special, int ev, float[] values = null, TumikiBlock[] blocks = null)
@@ -58,20 +86,24 @@ namespace Yurube
 
         // クライアント: 発射を知らせてきた積み木(状態が届くまでの少しの間は、飛んでいることにする)
         static readonly Dictionary<TumikiBlock, float> s_launched = new Dictionary<TumikiBlock, float>();
+        // クライアント: 発射の知らせで届いた速さ(動きから速さが分かるまでの少しの間に使う)
+        static readonly Dictionary<TumikiBlock, float> s_launchSpeed = new Dictionary<TumikiBlock, float>();
         const float kLaunchGrace = 0.3f;
 
-        // クライアント: 発射の知らせを受けた(向きもそろえる)
-        public static void MarkLaunched(TumikiBlock block, Vector3 direction)
+        // クライアント: 発射の知らせを受けた(向きもそろえる。speed が 0 以上なら、少しの間はその速さとする)
+        public static void MarkLaunched(TumikiBlock block, Vector3 direction, float speed = -1.0f)
         {
             if (block == null) return;
             s_launched[block] = Time.time + kLaunchGrace;
+            if (speed >= 0.0f) s_launchSpeed[block] = speed;
+            else s_launchSpeed.Remove(block);
             direction.y = 0.0f;
             if (direction.sqrMagnitude > 0.0001f) block.transform.rotation = Quaternion.LookRotation(direction.normalized, Vector3.up);
             if (s_launched.Count > 64)
             {
                 var dead = new List<TumikiBlock>();
                 foreach (var pair in s_launched) if (pair.Key == null || pair.Value < Time.time) dead.Add(pair.Key);
-                foreach (var key in dead) s_launched.Remove(key);
+                foreach (var key in dead) { s_launched.Remove(key); s_launchSpeed.Remove(key); }
             }
         }
 
@@ -94,6 +126,8 @@ namespace Yurube
             if (block == null) return 0.0f;
             if (IsClient && NetBlockSpeed != null)
             {
+                if (s_launchSpeed.TryGetValue(block, out float launched)
+                    && s_launched.TryGetValue(block, out float until) && Time.time < until) return launched;
                 var speed = NetBlockSpeed(block);
                 if (speed.HasValue) return speed.Value;
             }

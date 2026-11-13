@@ -106,9 +106,11 @@ namespace Nakahira
         }
 
         // 危険な相手(近づかれたら逃げる相手):幽霊、または段数が FleeStackGap 以上多い生存者
+        // (段数の差を気にしないとき(だるきんぐの 2 段)は幽霊だけ)
         public static bool IsThreat(CpuContext c, CpuOpponent o)
         {
-            return o.IsGhost || o.StackDiff <= -c.Params.FleeStackGap;
+            if (o.IsGhost) return true;
+            return !c.IgnoresStackGap && o.StackDiff <= -c.Params.FleeStackGap;
         }
 
         // 道が危険な相手から clearance(m)より離れたところだけを通るか(積み木を取りに行って、逃げることにならないように)

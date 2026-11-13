@@ -220,11 +220,22 @@ public class MatchAudio : MonoBehaviour
             if (c != null)
             {
                 bool grounded = c.IsGrounded;
-                if (!grounded && w.grounded && c.Rigidbody != null && c.Rigidbody.linearVelocity.y > 1f) Play(m_sounds.Jump, 0.5f, 1f, body);
+                if (!grounded && w.grounded && c.Rigidbody != null && c.Rigidbody.linearVelocity.y > 1f)
+                {
+                    PlayJump(body);
+                    Jumped?.Invoke(c);
+                }
                 w.grounded = grounded;
             }
         }
     }
+
+    // ネット対戦用(suehara): ジャンプした(ホストで見つけたとき)。参加する側はキャラクターの物理を動かしていないので自分では見つけられない。
+    // ホストのこれを suehara/Network/NetEffects が送り、参加する側は PlayJump で鳴らす
+    public static event System.Action<DarumaCharacter> Jumped;
+
+    // ジャンプの音を鳴らす
+    public void PlayJump(Transform body) => Play(m_sounds.Jump, 0.5f, 1f, body);
 
     // ================= 部品のお知らせ =================
     void OnHammerHit(HammerHitInfo h)
@@ -268,7 +279,10 @@ public class MatchAudio : MonoBehaviour
     {
         if (info.Character == null) return;
         // 積むほど高く
-        float pitch = Mathf.Min(0.9f + 0.05f * info.Character.Stack.Count, 1.6f);
+        // ネット対戦用(suehara): 参加する側は積み木を持っていないので、ホストから届いた段数(DarumaStack.NetCount)で決める
+        var stack = info.Character.Stack;
+        int count = stack.NetCount >= 0 ? stack.NetCount : stack.Count;
+        float pitch = Mathf.Min(0.9f + 0.05f * count, 1.6f);
         Play(m_sounds.Pickup, info.WasHarmful ? 0.9f : 0.65f, pitch, info.Character.transform.position);
     }
 
