@@ -17,6 +17,11 @@ namespace Yurube
         [SerializeField, Min(0.1f)] float m_chargeDuration = 2.0f;
         [Tooltip("発動直後の入力を詠唱完了として拾わないための最小時間(秒)")]
         [SerializeField, Min(0.0f)] float m_anyButtonMinTime = 0.15f;
+        // 2026-11-13 中平: 強すぎたので、詠唱中の向き変えを遅くし、カットインのあと少し待ってから斬るようにした(チームで決めた)
+        [Tooltip("詠唱中に向きを変えられる速さの上限(度/秒)。0 なら上限なし")]
+        [SerializeField, Min(0.0f)] float m_chargeTurnSpeed = 90.0f;
+        [Tooltip("カットインが終わってから斬るまでの時間(秒)。この間は確定した向きの攻撃の線を出したままにする")]
+        [SerializeField, Min(0.0f)] float m_strikeDelay = 0.1f;
         [Tooltip("攻撃判定の長さ(m)。ステージ端まで伸ばす場合はフォールバック値")]
         [SerializeField, Min(0.5f)] float m_attackLength = 14.0f;
         [Tooltip("ステージ端まで攻撃を伸ばす")]
@@ -43,6 +48,7 @@ namespace Yurube
             Idle,
             Charging,
             CutIn,
+            Windup,     // カットインのあと、斬るまで待つ(m_strikeDelay)
             Recover,
         }
 
@@ -58,6 +64,8 @@ namespace Yurube
         bool m_previousMovementOnly;
         bool m_previousMovementLocked;
         bool m_movementFlagsStored;
+        float m_previousMaxTurn;
+        bool m_turnLimitStored;
 
         // 無敵表示: きだる/いわだると同じ発光レインボー
         Renderer[] m_rainbowRenderers;
@@ -110,7 +118,7 @@ namespace Yurube
         // 発動したキャラクター(この人には当たらない)
         public DarumaCharacter Caster => m_character;
         // 攻撃の予定の線が出ていて、これから斬るか(詠唱中〜カットイン中)
-        public bool IsThreatening => m_state == State.Charging || m_state == State.CutIn;
+        public bool IsThreatening => m_state == State.Charging || m_state == State.CutIn || m_state == State.Windup;
         // 攻撃判定の太さ(m)
         public float AttackWidth => m_attackWidth;
         // 攻撃の予定の線(詠唱中は今の向き、確定後は確定した向き)
@@ -167,6 +175,16 @@ namespace Yurube
 
             if (m_state == State.CutIn && !DaruKingCutIn.IsPlaying)
             {
+                // カットインのあと m_strikeDelay 秒待ってから斬る(その間は攻撃の線を出したまま。線から出れば助かる)
+                m_state = State.Windup;
+                m_stateTime = 0.0f;
+            }
+
+            if (m_state == State.Windup)
+            {
+                m_stateTime += Time.deltaTime;
+                if (m_stateTime < m_strikeDelay) return;
+                DestroyGuide();
                 FireExcalibur();
                 m_state = State.Recover;
                 m_stateTime = 0.0f;
@@ -222,9 +240,16 @@ namespace Yurube
             m_movementFlagsStored = true;
             m_character.MovementOnly = true;
             m_character.MovementLocked = true;
+            // 詠唱中は向き変えの速さに上限をつける(2026-11-13 中平)
+            if (!m_turnLimitStored)
+            {
+                m_previousMaxTurn = m_character.MaxTurnDegreesPerSecond;
+                m_turnLimitStored = true;
+            }
+            m_character.MaxTurnDegreesPerSecond = m_chargeTurnSpeed;
 
-            // 詠唱・カットイン・攻撃エフェクト終了まで内部無敵
-            float invincibleTime = m_chargeDuration + 1.4f + m_effectDuration + m_invincibleExtra;
+            // 詠唱・カットイン・斬るまでの待ち・攻撃エフェクト終了まで内部無敵
+            float invincibleTime = m_chargeDuration + 1.4f + m_strikeDelay + m_effectDuration + m_invincibleExtra;
             m_character.SetInvincible(invincibleTime);
             BeginRainbow();
 
@@ -251,10 +276,13 @@ namespace Yurube
             m_attackDirection = direction;
             m_attackOrigin = origin;
             m_resolvedLength = length;
-            DestroyGuide();
+            // 攻撃の線(ガイド)は確定した向きで斬るまで残す(2026-11-13 中平)。詠唱の光だけ消す
+            DestroyChargeEffect();
+            RestoreTurnLimit();
 
             m_state = State.CutIn;
             m_stateTime = 0.0f;
+            UpdateGuide();
 
             GameObject subject = m_character.Stack != null && m_character.Stack.Head != null
                 ? m_character.Stack.Head.gameObject
@@ -353,9 +381,11 @@ namespace Yurube
         {
             if (m_guide == null || m_character == null) return;
 
-            Vector3 direction = HorizontalForward();
-            Vector3 origin = m_character.transform.position;
-            m_resolvedLength = ResolveAttackLength(direction);
+            // 詠唱中は今の向き、確定後(カットイン〜斬るまで)は確定した向き
+            bool charging = m_state == State.Charging;
+            Vector3 direction = charging ? HorizontalForward() : m_attackDirection;
+            Vector3 origin = charging ? m_character.transform.position : m_attackOrigin;
+            if (charging) m_resolvedLength = ResolveAttackLength(direction);
             Vector3 center = origin + direction * (m_resolvedLength * 0.5f) + Vector3.up * 0.06f;
             m_guide.transform.position = center;
             m_guide.transform.rotation = Quaternion.LookRotation(direction, Vector3.up);
@@ -747,7 +777,16 @@ namespace Yurube
                 }
             }
             m_movementFlagsStored = false;
+            RestoreTurnLimit();
             EndRainbow();
+        }
+
+        // 詠唱中の向き変えの上限を元に戻す
+        void RestoreTurnLimit()
+        {
+            if (!m_turnLimitStored) return;
+            if (m_character != null) m_character.MaxTurnDegreesPerSecond = m_previousMaxTurn;
+            m_turnLimitStored = false;
         }
 
         // きだる/いわだると同じ無敵レインボー

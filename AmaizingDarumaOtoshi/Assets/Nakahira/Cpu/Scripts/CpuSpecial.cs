@@ -75,6 +75,9 @@ namespace Nakahira
         // だるきんぐ(エクスカリバー):ため中か・狙いのぶれ(度。ため始めに一度だけ決める)
         bool m_kingCharging;
         float m_kingAimError;
+        // 状態「必殺技」で 2 人狙いを探した時間(秒。満タンの間は入り直しても続けて数える)と、1 人狙いで撃ったか
+        float m_kingSeekTime;
+        bool m_kingSolo;
 
         // 撃つと決めた理由を Console に出す(テスト用)
         public static bool LogDecisions;
@@ -125,6 +128,7 @@ namespace Nakahira
             if (!m_gauge.IsFull)
             {
                 m_wasFull = false;
+                m_kingSeekTime = 0.0f;
                 ForgetChance();
                 return false;
             }
@@ -149,6 +153,9 @@ namespace Nakahira
             // 撃てない間(ハンマーを振っているなど)は、撃ちどころが続く間 毎フレーム試す
             if (!m_ability.TryActivate()) return false;
             m_wasFull = false;
+            // だるきんぐ:2 人狙いをあきらめて撃ったなら、ため中も 1 人入れば確定する
+            m_kingSolo = KingSoloReady(c);
+            m_kingSeekTime = 0.0f;
             ForgetChance();
             return Activated();
         }
@@ -211,6 +218,7 @@ namespace Nakahira
                 m_armsDecided.Clear();
                 m_armsPending = false;
                 m_wasFull = false;
+                m_kingSeekTime = 0.0f;
                 ForgetChance();
             }
             if (m_self == null) return;
@@ -227,7 +235,7 @@ namespace Nakahira
                 case IwadaruSpecial iwa: return MeteorChance(c, iwa);   // 隕石
                 case HebidaruSpecial hebi: return SwampChance(c, hebi);   // 毒沼
                 case AkadaruSpecial _:  return TronChance(c);   // トロン(ビーム)
-                case DaruKingSpecial king: return ExcaliburChance(c, king);   // エクスカリバー
+                case DaruKingSpecial king: return ExcaliburChance(c, king, KingSoloReady(c));   // エクスカリバー
                 case MidaruSpecial _:   return FunnelChance(c);   // ファンネル
                 case KidaruSpecial _:   return KidaruChance(c, current);   // 黄金化
                 default:                return true;
@@ -235,11 +243,13 @@ namespace Nakahira
         }
 
         // だるきんぐ(エクスカリバー):向きを変えれば線(太さ全体)に 2 人入るとき(1 対 1 なら 1 人)
+        // 状態「必殺技」で ExcaliburSoloAfter 秒たっても 2 人狙いが決まらなければ、1 人入れば撃つ(solo。2026-11-13 中平)
         // 撃つとため(2 秒)が始まり、その間に向きを決める(AimExcalibur)
-        private static bool ExcaliburChance(CpuContext c, DaruKingSpecial king)
+        private static bool ExcaliburChance(CpuContext c, DaruKingSpecial king, bool solo)
         {
             int need = ExcaliburNeed(c);
             if (need <= 0) return false;
+            if (solo) need = 1;
             BestExcaliburDir(c, king.AttackWidth * 0.5f, c.Params.ExcaliburConfirmHalfWidth, out _, out int full);
             return full >= need;
         }
@@ -265,10 +275,49 @@ namespace Nakahira
             forward.y = 0.0f;
             if (forward.sqrMagnitude < 0.0001f) return;
             forward.Normalize();
-            int need = Mathf.Max(1, ExcaliburNeed(c));
+            int need = m_kingSolo ? 1 : Mathf.Max(1, ExcaliburNeed(c));
             if (CountOnLine(c, forward, center) < need) return;
             king.RequestConfirm();
             if (LogDecisions) Debug.Log($"[CPU 必殺技] {c.Self.name} エクスカリバー確定(中心部分に {need} 人以上)");
+        }
+
+        // 2 人狙いをあきらめて 1 人狙いにする時間がたったか
+        private bool KingSoloReady(CpuContext c) => m_ability is DaruKingSpecial && m_kingSeekTime >= c.Params.ExcaliburSoloAfter;
+
+        // 状態「必殺技」で近づいている間に呼ぶ(だるきんぐの 2 人狙いを探した時間を数える)
+        public void TickApproach(CpuContext c)
+        {
+            if (!(m_ability is DaruKingSpecial)) return;
+            float before = m_kingSeekTime;
+            m_kingSeekTime += c.DeltaTime;
+            if (LogDecisions && before < c.Params.ExcaliburSoloAfter && m_kingSeekTime >= c.Params.ExcaliburSoloAfter)
+                Debug.Log($"[CPU 必殺技] {c.Self.name} エクスカリバー:2 人狙いが {c.Params.ExcaliburSoloAfter:0.#} 秒決まらない → 1 人狙い");
+        }
+
+        // 状態「必殺技」で向かう場所(target:近づく敵)
+        //  ・だるきんぐ(2 人狙いの間):近い方の敵の、もう 1 人と反対側 ExcaliburLineupDistance m(そこから見ると 2 人が一直線に並ぶ)。床がなければ敵の所
+        //  ・ほか:敵の所
+        public Vector3 ApproachPoint(CpuContext c, CpuOpponent target)
+        {
+            if (!(m_ability is DaruKingSpecial) || KingSoloReady(c) || ExcaliburNeed(c) < 2) return target.Position;
+            CpuOpponent other = null;
+            float bestSqr = float.MaxValue;
+            foreach (var o in c.Perception.Opponents)
+            {
+                if (o == target || !IsExcaliburTarget(o)) continue;
+                float sqr = (o.Position - target.Position).sqrMagnitude;
+                if (sqr < bestSqr)
+                {
+                    bestSqr = sqr;
+                    other = o;
+                }
+            }
+            if (other == null) return target.Position;
+            Vector3 away = target.Position - other.Position;
+            away.y = 0.0f;
+            if (away.sqrMagnitude < 0.0001f) return target.Position;
+            Vector3 point = target.Position + away.normalized * c.Params.ExcaliburLineupDistance;
+            return CpuSensor.HasGround(point + Vector3.up, 3.0f) ? point : target.Position;
         }
 
         // 線に入れたい人数:自分以外の生存者(幽霊・復活待ちを除く)が 1 人だけなら 1、2 人以上なら 2、いなければ 0
@@ -416,8 +465,9 @@ namespace Nakahira
         public bool WantsApproach(CpuContext c)
         {
             if (Disabled || m_gauge == null || !m_gauge.IsFull) return false;
-            // へびだるの毒沼は積み木 0 個でも撃てる(ほかは 1 個以上)
-            if (m_ability is HebidaruSpecial) return true;
+            // へびだるの毒沼・だるきんぐのエクスカリバーは積み木 0 個でも撃てる(ほかは 1 個以上)
+            // だるきんぐは敵 2 人が一直線に並ぶ位置へ回り込む(ApproachPoint。2026-11-13 中平)
+            if (m_ability is HebidaruSpecial || m_ability is DaruKingSpecial) return true;
             if (c.StackCount <= 0) return false;
             return m_ability is MidaruSpecial || m_ability is IwadaruSpecial;
         }

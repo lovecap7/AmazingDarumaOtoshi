@@ -130,6 +130,7 @@ namespace Nakahira
             if (o.ThreatDistance > p.FleeEnterDistance) return 0.0f;
             if (o.IsGhost) return p.GhostThreatUrgency;
             if (c.IsTrapped(o)) return 0.0f;   // 自分の毒沼で反転している敵からは逃げない(思うように動けないので)
+            if (c.IgnoresStackGap) return 0.0f;   // だるきんぐが 2 段積んだら、段数の差では逃げない
             if (o.StackDiff <= -p.FleeStackGap) return p.StackThreatUrgency;
             if (ZeroStackCheck && o.StackDiff < 0) return p.StackThreatUrgency;
             return 0.0f;
@@ -152,6 +153,7 @@ namespace Nakahira
                 CpuOpponent o = c.Perception.Find(player);
                 if (o == null) return true;                                     // 復活待ち・脱落
                 if (o.ThreatDistance > p.FleeExitDistance) return true;         // 逃げ切った
+                if (!o.IsGhost && c.IgnoresStackGap) return true;               // だるきんぐが 2 段積んだ(段数の差では逃げない)
                 return !o.IsGhost && o.StackDiff >= 0;                          // 積み木を拾って追いついた
             });
             AddNewPursuers(c);

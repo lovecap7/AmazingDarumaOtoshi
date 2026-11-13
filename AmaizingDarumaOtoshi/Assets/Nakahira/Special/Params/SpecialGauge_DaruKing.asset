@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9d4c95d8c6d05be45853a83e71b1a969, type: 3}
   m_Name: SpecialGauge_DaruKing
   m_EditorClassIdentifier: Assembly-CSharp::Nakahira.SpecialGaugeParams
-  MaxPoints: 40
+  MaxPoints: 100
   RideHarmfulBlock: 25
   ReturnBlock: 20
   DirectHit: 15
