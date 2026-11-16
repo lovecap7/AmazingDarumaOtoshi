@@ -1,0 +1,135 @@
+{
+  "id": "chapter3",
+  "order": 3,
+  "requiredChapter": "chapter2",
+  "title": "最終章「二つで足りる王」",
+  "hiddenTitle": "最終章「？？？」",
+  "stageId": "DebugStage47",
+  "sceneName": "AllStages",
+  "playerCharacter": "akadaru",
+  "clearKey": "Story.Clear.chapter3",
+  "rules": {
+    "mode": "Stock",
+    "stocks": 3,
+    "timeLimit": 0,
+    "cpuSpecial": false,
+    "awakening": false,
+    "gaugeFromStart": true,
+    "cpuBlockLimit": 0
+  },
+  "cpu": [
+    { "character": "daruking", "level": 3, "stocks": 2 },
+    { "character": "iwadaru", "level": 3, "stocks": 2 },
+    { "character": "hebidaru", "level": 3, "stocks": 2 }
+  ],
+  "speakers": [
+    { "id": "akadaru", "name": "あかだる", "color": "#E8544B" },
+    { "id": "aodaru", "name": "あおだる", "color": "#4B8BE8" },
+    { "id": "midaru", "name": "みだる", "color": "#4BA85A" },
+    { "id": "kidaru", "name": "きだる", "color": "#E8C64B" },
+    { "id": "iwadaru", "name": "いわだる", "color": "#80786B" },
+    { "id": "hebidaru", "name": "へびだる", "color": "#6BBF45" },
+    { "id": "daruking", "name": "だるきんぐ", "color": "#8C59B3" },
+    { "id": "unknown", "name": "？？？", "color": "#5A4A6E" }
+  ],
+  "cutscene": {
+    "type": "final",
+    "caption": "全国大会 決勝",
+    "rival": "iwadaru",
+    "shots": [
+      { "view": "room", "seconds": 3.0, "caption": "決勝前 ― 控室" },
+      { "view": "notebook", "seconds": 3.4, "caption": "決勝前 ― 控室" },
+      { "view": "rivals", "seconds": 3.4, "caption": "全国大会 決勝" },
+      { "view": "wide", "seconds": 3.0, "caption": "全国大会 決勝" }
+    ]
+  },
+  "before": [
+    { "speaker": "", "direction": true, "scene": "room", "text": "（控室。決勝を前に、みだるが分厚いノートを差し出す）" },
+    { "speaker": "midaru", "scene": "room", "text": "これまで記録したのは、相手のデータでした。……最後のページには、数字にできないことを書きました。それと、12冊目に書いた覚えのない一文がありました。『最後に、落としに行く』……いえ、今は関係ありません" },
+    { "speaker": "akadaru", "scene": "room", "text": "……ありがとう" },
+    { "speaker": "aodaru", "scene": "room", "text": "……俺たちは、積んできた" },
+    { "speaker": "kidaru", "scene": "room", "text": "ぼく、いっぱい増えました！" },
+    { "speaker": "akadaru", "scene": "room", "text": "全国制覇だ！ 一撃入魂！" },
+    { "speaker": "", "direction": true, "scene": "stage", "text": "（決勝の舞台。いわ・へびが先に待っている）" },
+    { "speaker": "iwadaru", "scene": "stage", "text": "ガハハ！ 決勝で会えたな！" },
+    { "speaker": "hebidaru", "scene": "stage", "text": "ボクもいるよ" },
+    { "speaker": "akadaru", "scene": "stage", "text": "みんな……！" },
+    { "speaker": "daruking", "scene": "stage", "text": "騒がしい。余の前であるぞ" },
+    { "speaker": "akadaru", "scene": "stage", "text": "お前が、だるきんぐか" },
+    { "speaker": "daruking", "scene": "stage", "text": "王冠は二つあれば足りる。余には、それ以上は要らぬ。……積み上げる仲間も、おらぬからな" },
+    { "speaker": "daruking", "scene": "stage", "text": "……いや、聞かなかったことにせよ" },
+    { "speaker": "akadaru", "scene": "stage", "text": "……待て。『落とし手』って、へびが言っていた" },
+    { "speaker": "daruking", "scene": "stage", "text": "ほう、知っておるか。この大会の裏に、そう呼ばれる者がおるという噂だ。余の王座も、一度だけぐらついた" },
+    { "speaker": "daruking", "scene": "stage", "text": "……戯れ言よ。忘れよ。今は余との勝負である" }
+  ],
+  "tutorial": [],
+  "matchStart": [],
+  "matchStartNotice": "全国大会 決勝、開始！",
+  "startLines": [
+    { "speaker": "daruking", "text": "余に挑むか" },
+    { "speaker": "midaru", "text": "だるきんぐは、積み木を2個までしか積めません。鎧が薄いので、崩されるとすぐ首だけになります" }
+  ],
+  "outLines": [
+    { "character": "iwadaru", "lines": [ { "speaker": "iwadaru", "text": "ぐぬぅ……壁か！" } ] },
+    { "character": "hebidaru", "lines": [ { "speaker": "hebidaru", "text": "……笑えないな" } ] }
+  ],
+  "lastTwoCharacter": "daruking",
+  "lastTwoLines": [
+    { "speaker": "akadaru", "text": "一撃入魂ぁ！" },
+    { "speaker": "daruking", "text": "余の……二つが……" }
+  ],
+  "specialEvent": {
+    "enabled": true,
+    "trigger": "lowStock",
+    "stockThreshold": 1,
+    "timeFallback": false,
+    "timeSeconds": 90,
+    "pause": true,
+    "prompt": "[L／Y]で必殺技！",
+    "promptSeconds": 10,
+    "replayAssist": true,
+    "lines": [
+      { "speaker": "akadaru", "text": "みんなが積んでくれたものを、ここで撃つ！ 一撃入魂！" }
+    ]
+  },
+  "defeat": [
+    { "speaker": "daruking", "text": "二つで足りる" },
+    { "speaker": "akadaru", "text": "……まだだ。みんなが積んでくれたんだ、もう一度！" }
+  ],
+  "after": [
+    { "speaker": "daruking", "scene": "stage", "text": "……なぜ、お前は崩れぬ" },
+    { "speaker": "akadaru", "scene": "stage", "text": "オレだけの力じゃない。仲間が、積んでくれたからだ" },
+    { "speaker": "daruking", "scene": "stage", "text": "……積む、か。余は、積む相手を持たなんだ" },
+    { "speaker": "akadaru", "scene": "stage", "text": "じゃあ、うちに来い！ おにぎりもあるぞ！" },
+    { "speaker": "kidaru", "scene": "stage", "text": "おにぎりありますよー！" },
+    { "speaker": "daruking", "scene": "stage", "text": "……考えておく。……いや、余に、おにぎりを一つ" },
+    { "speaker": "", "direction": true, "scene": "stage", "text": "（横断幕「全国制覇！ だるま落とし部」が掲げられる）" }
+  ],
+  "bannerText": "全国制覇！\nだるま落とし部",
+  "bannerSeconds": 3.6,
+  "newspaper": {
+    "header": "だるま新聞",
+    "headline": "全国制覇！ 七転高校だるま落とし部",
+    "body": "全国大会決勝。七転高校だるま落とし部のあかだるが、だるきんぐ・いわだる・へびだるを相手に最後まで立ち続け、全国制覇を成し遂げた。あかだるは「オレだけの力じゃない。仲間が積んでくれたからだ」と語った。だるきんぐは「余に、おにぎりを一つ」とだけ答えたという。",
+    "image": "",
+    "caption": "全国大会 決勝 七転高校 だるま落とし部",
+    "subHeader": "深夜の部室に小槌の音？",
+    "subBody": "全国制覇の夜、七転高校の部室から「コツン」という音が聞こえたとの情報。部員は「誰も残っていない」と話しており、くわしいことは分かっていない。"
+  },
+  "epilogue": {
+    "enabled": true,
+    "caption": "全国制覇の夜 ― 部室",
+    "shots": [
+      { "view": "notebook", "seconds": 3.4 },
+      { "view": "roster", "seconds": 3.0 },
+      { "view": "doll", "seconds": 3.2 },
+      { "view": "logo", "seconds": 2.6 }
+    ],
+    "lines": [
+      { "speaker": "midaru", "scene": "notebook", "text": "……最後のページの文字が、増えています" },
+      { "speaker": "unknown", "scene": "doll", "text": "積み上がったな。……ならば、落とす番だ" }
+    ],
+    "rosterText": "部員名簿\n主将　あかだる\n副主将　あおだる\n分析　みだる\n一年　きだる\n―――――",
+    "knockText": "コツン"
+  }
+}

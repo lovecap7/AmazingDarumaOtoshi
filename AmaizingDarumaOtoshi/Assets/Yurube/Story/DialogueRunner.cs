@@ -38,6 +38,8 @@ namespace Yurube.Story
         Image m_newsImage;
         TextMeshProUGUI m_newsCaption;
         GameObject m_newsCaptionBg;
+        RectTransform m_newsSubBg;
+        TextMeshProUGUI m_newsSubHeader, m_newsSubBody;
         CanvasGroup m_bigGroup, m_smallGroup, m_newsGroup, m_objectiveGroup, m_koGroup, m_hintGroup;
         bool m_skipped;
         bool m_smallShowing;
@@ -47,6 +49,9 @@ namespace Yurube.Story
 
         // 大きいウィンドウ・小さいウィンドウ・新聞のどれかが出ているか
         public bool IsShowing => m_bigShowing || m_smallShowing;
+
+        // 直前の会話で B（スキップ）が押されたか。エピローグのように「Bで残りを飛ばす」場面で使う
+        public bool WasSkipped => m_skipped;
 
         // 1行を表示し始めた（話者ID。ト書きは空）。会話中にカメラを話者へ寄せる演出用
         public event Action<string> LineStarted;
@@ -347,6 +352,32 @@ namespace Yurube.Story
             bodyRect.anchoredPosition = new Vector2(60f, -610f);
             bodyRect.sizeDelta = new Vector2(1180f, 100f);
 
+            // 紙面の隅の小さな囲み記事（最終章）。subBody があるときだけ出す
+            var subBg = ToyKit.UIRounded("SubArticle", panel, new Color(0.97f, 0.94f, 0.87f, 1f), 10f);
+            subBg.pivot = new Vector2(0f, 1f);
+            ToyKit.Anchor(subBg, new Vector2(0f, 1f), new Vector2(60f, -716f), new Vector2(640f, 96f));
+            subBg.gameObject.AddComponent<Outline>().effectColor = Ink;
+            m_newsSubBg = subBg;
+            m_newsSubHeader = ToyKit.UIText("SubHeader", subBg, m_font, "", 26f, Ink);
+            m_newsSubHeader.alignment = TextAlignmentOptions.TopLeft;
+            m_newsSubHeader.fontStyle = FontStyles.Bold;
+            m_newsSubHeader.textWrappingMode = TextWrappingModes.NoWrap;
+            m_newsSubHeader.rectTransform.anchorMin = m_newsSubHeader.rectTransform.anchorMax = new Vector2(0f, 1f);
+            m_newsSubHeader.rectTransform.pivot = new Vector2(0f, 1f);
+            m_newsSubHeader.rectTransform.anchoredPosition = new Vector2(14f, -8f);
+            m_newsSubHeader.rectTransform.sizeDelta = new Vector2(612f, 30f);
+            m_newsSubBody = ToyKit.UIText("SubBody", subBg, m_font, "", 20f, Ink);
+            m_newsSubBody.alignment = TextAlignmentOptions.TopLeft;
+            m_newsSubBody.textWrappingMode = TextWrappingModes.Normal;
+            m_newsSubBody.enableAutoSizing = true;
+            m_newsSubBody.fontSizeMin = 14f;
+            m_newsSubBody.fontSizeMax = 20f;
+            m_newsSubBody.rectTransform.anchorMin = m_newsSubBody.rectTransform.anchorMax = new Vector2(0f, 1f);
+            m_newsSubBody.rectTransform.pivot = new Vector2(0f, 1f);
+            m_newsSubBody.rectTransform.anchoredPosition = new Vector2(14f, -38f);
+            m_newsSubBody.rectTransform.sizeDelta = new Vector2(612f, 52f);
+            subBg.gameObject.SetActive(false);
+
             m_newsGroup.alpha = 0f;
             panel.gameObject.SetActive(false);
         }
@@ -355,7 +386,8 @@ namespace Yurube.Story
         // 大きいウィンドウ（物語の会話）
         //========================================
 
-        public IEnumerator PlayBig(StoryChapter chapter, IList<StoryLine> lines)
+        // onLine: 行を出し始めたときに呼ぶ（章ごとの演出を台詞に合わせるため。省略可）
+        public IEnumerator PlayBig(StoryChapter chapter, IList<StoryLine> lines, Action<int, StoryLine> onLine = null)
         {
             if (lines == null || lines.Count == 0) yield break;
             Build();
@@ -378,10 +410,12 @@ namespace Yurube.Story
             yield return Fade(m_dim, 0f, m_dimAlpha, 0.2f);
             yield return FadeGroup(m_bigGroup, 0f, 1f, 0.15f);
 
+            int index = 0;
             foreach (var line in lines)
             {
-                if (line == null) continue;
-                yield return ShowLine(chapter, line, big: true);
+                if (line == null) { index++; continue; }
+                yield return ShowLine(chapter, line, big: true, index, onLine);
+                index++;
                 if (m_skipped) break;
             }
 
@@ -508,7 +542,10 @@ namespace Yurube.Story
             if (m_bigShowing) yield break;   // 大きい会話の最中は割り込まない
 
             m_smallRoutine = StartCoroutine(ShowSmall(speakerId, text, chapter, secondsOverride));
-            yield return m_smallRoutine;
+            // 新しい小窓が来たら、この小窓は閉じられる。そのときは待たずに戻る。
+            // （待ち続けると、前の台詞の続きが新しい台詞を上書きしてしまう）
+            Coroutine mine = m_smallRoutine;
+            while (m_smallShowing && ReferenceEquals(m_smallRoutine, mine)) yield return null;
         }
 
         IEnumerator ShowSmall(string speakerId, string text, StoryChapter chapter, float secondsOverride)
@@ -550,6 +587,13 @@ namespace Yurube.Story
             if (m_smallPanel != null) m_smallPanel.gameObject.SetActive(false);
         }
 
+        // 外から小窓を閉じる（試合終了・敗北のときに、台詞が残らないように）
+        public void CloseSmallWindow()
+        {
+            if (m_smallPanel == null) return;
+            CloseSmallNow();
+        }
+
         //========================================
         // だるま新聞
         //========================================
@@ -576,6 +620,15 @@ namespace Yurube.Story
             m_newsCaption.text = hasCaption ? paper.caption : "";
             m_newsCaption.gameObject.SetActive(hasCaption);
             m_newsCaptionBg.SetActive(hasCaption);
+
+            // 紙面の隅の小さな囲み記事（最終章）
+            bool hasSub = !string.IsNullOrEmpty(paper.subBody);
+            m_newsSubBg.gameObject.SetActive(hasSub);
+            if (hasSub)
+            {
+                m_newsSubHeader.text = string.IsNullOrEmpty(paper.subHeader) ? "囲み記事" : paper.subHeader;
+                m_newsSubBody.text = paper.subBody;
+            }
 
             m_newsPanel.gameObject.SetActive(true);
             if (hasCaption)
@@ -640,10 +693,14 @@ namespace Yurube.Story
             text.ForceMeshUpdate();
         }
 
-        IEnumerator ShowLine(StoryChapter chapter, StoryLine line, bool big)
+        IEnumerator ShowLine(StoryChapter chapter, StoryLine line, bool big, int index = -1,
+                             Action<int, StoryLine> onLine = null)
         {
             PrepareLine(chapter, line, big);
             var text = big ? m_bigText : m_smallText;
+
+            // 行を出し始めたことを外へ知らせる（横断幕など、台詞に合わせて起こす演出用）
+            if (onLine != null) onLine(index, line);
 
             // 演出イベント（行を出した瞬間）
             if (!string.IsNullOrEmpty(line.eventId)) StoryData.PlayEvent(line.eventId);

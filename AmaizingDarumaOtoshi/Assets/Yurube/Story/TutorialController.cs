@@ -112,8 +112,11 @@ namespace Yurube.Story
         {
             if (m_chapter == null || m_player == null || m_director == null) yield break;
 
-            // チュートリアルのあいだ CPU は見学（動かない・当たらない）
-            SetCpusIdle(true);
+            var steps = m_chapter.tutorial;
+            int stepCount = steps != null ? steps.Count : 0;
+            // 最終章のようにチュートリアルの無い章は、開始直後から CPU を動かしておく
+            bool cpusIdle = stepCount > 0;
+            if (cpusIdle) SetCpusIdle(true);   // チュートリアルのあいだ CPU は見学（動かない・当たらない）
 
             // 開始のカウントダウンが終わるまで待つ（会話のあと）
             while (m_match != null && m_match.IsCountingDown) yield return null;
@@ -128,8 +131,10 @@ namespace Yurube.Story
                 noticeShownAtStart = true;
             }
 
-            var steps = m_chapter.tutorial;
-            for (int i = StorySession.TutorialStep; i < steps.Count; i++)
+            // 対戦開始直後の掛け合い（最終章）。初回だけ
+            yield return PlayStartLines();
+
+            for (int i = StorySession.TutorialStep; i < stepCount; i++)
             {
                 var step = steps[i];
                 if (step == null) { StorySession.TutorialStep = i + 1; continue; }
@@ -173,7 +178,7 @@ namespace Yurube.Story
                     m_director.SetStoryPaused(true);
                     yield return m_dialogue.PlayBig(m_chapter, startLines);
                 }
-                SetCpusIdle(false);
+                if (cpusIdle) SetCpusIdle(false);
                 m_director.SetStoryPaused(false);
 
                 if (!noticeShownAtStart)
@@ -187,8 +192,22 @@ namespace Yurube.Story
             else
             {
                 // リトライ：前回すでに試合前の一言は見ている
-                SetCpusIdle(false);
+                if (cpusIdle) SetCpusIdle(false);
                 m_director.SetStoryPaused(false);
+            }
+        }
+
+        // 対戦開始（GO!）の直後に、小窓で出す掛け合い（最終章。初回だけ）
+        IEnumerator PlayStartLines()
+        {
+            if (m_chapter.startLines == null || m_chapter.startLines.Count == 0) yield break;
+            string key = m_chapter.id + ".startLines";
+            if (StorySession.HasEvent(key)) yield break;
+            StorySession.MarkEvent(key);
+            foreach (var line in m_chapter.startLines)
+            {
+                if (line == null) continue;
+                yield return m_dialogue.PlaySmall(line.speaker, line.text, m_chapter);
             }
         }
 

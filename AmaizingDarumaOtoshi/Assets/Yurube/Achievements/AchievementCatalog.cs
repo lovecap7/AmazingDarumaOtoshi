@@ -294,6 +294,11 @@ namespace Yurube.Achievements
                     "第2章をクリア。曲がる弾を、まっすぐな一撃で越えた。",
                     AchievementCategory.Story, "第2章をクリアする（だるま新聞まで見る）", AchievementMetric.StoryChapterCleared, 1,
                     AchievementRarity.Silver, mode: AchievementMode.Story, storyChapter: "chapter2"),
+
+                new AchievementDefinition("story_chapter3", "二つで足りる王",
+                    "最終章をクリア。全国制覇、そして――。",
+                    AchievementCategory.Story, "最終章をクリアする（だるま新聞まで見る）", AchievementMetric.StoryChapterCleared, 1,
+                    AchievementRarity.Gold, mode: AchievementMode.Story, storyChapter: "chapter3"),
             };
             return list;
         }

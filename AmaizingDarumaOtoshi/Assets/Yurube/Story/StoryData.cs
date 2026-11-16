@@ -16,6 +16,9 @@ namespace Yurube.Story
         public bool direction;      // ト書きにする（台詞ではなく演出の指示）
         public string eventId;      // 演出イベントID（例：doll_shake）
         public string portrait;     // 顔アイコン（空なら話者の色の丸で代用）
+        // この行を出す場面（最終章用）。"room" = 控室 / "stage" = 決勝の舞台
+        // エピローグではカット名（"notebook" / "roster" / "doll" / "logo"）として使う
+        public string scene;
     }
 
     [Serializable]
@@ -97,8 +100,12 @@ namespace Yurube.Story
     public class StoryShot
     {
         // wide: 会場の全景 / runner: 走っている人 / rival: 相手
+        // 最終章: room: 控室 / notebook: ノートの寄り / rivals: 相手2人
+        // エピローグ: notebook: ノート / roster: 部員名簿 / doll: だるま人形 / logo: ロゴ
         public string view = "wide";
         public float seconds = 3.0f;
+        // このカットのあいだに出す場所テロップ（空なら cutscene.caption のまま）
+        public string caption;
     }
 
     // 章のカットシーン。type が空なら序章の部室ムービー（StoryMovie.PlayOpening）を使う
@@ -121,6 +128,33 @@ namespace Yurube.Story
         public string body;             // 本文（空でもよい）
         public string image;            // 画像（Resources のパス。空なら新聞用の絵を作る）
         public string caption;          // 写真のキャプション（空なら出さない）
+        // 紙面の隅の小さな囲み記事（最終章）。空なら出さない
+        public string subHeader;
+        public string subBody;
+    }
+
+    // 対戦中に「そのキャラが脱落したとき」の台詞（最終章）
+    [Serializable]
+    public class StoryOutLine
+    {
+        public string character;    // 脱落したキャラID（例：iwadaru）
+        public List<StoryLine> lines = new List<StoryLine>();
+    }
+
+    // エピローグ（新聞のあとの短いカットシーン。最終章）
+    //  ・shots の view でカットを並べる（notebook / roster / doll / logo）
+    //  ・lines は scene にカット名を書くと、そのカットのあいだに出る
+    [Serializable]
+    public class StoryEpilogue
+    {
+        public bool enabled;
+        public string caption;              // 場所テロップ（例：全国制覇の夜 ― 部室）
+        public List<StoryShot> shots = new List<StoryShot>();
+        public List<StoryLine> lines = new List<StoryLine>();
+        // 黒板の部員名簿に書く文字（空なら名簿を出さない）
+        public string rosterText;
+        // 小槌の音のときに出す文字（空なら「コツン」）
+        public string knockText = "コツン";
     }
 
     // 章1つ分
@@ -129,6 +163,8 @@ namespace Yurube.Story
     {
         public string id;
         public string title;            // 章の名前（例：序章「はじまりは、おにぎり」）
+        // 未解放のあいだ伏せる名前（最終章の「？？？」）。空なら title をそのまま出す
+        public string hiddenTitle;
         // 章選択の並び順（小さいほど下の段）と、解放に必要な章ID
         public int order;
         public string requiredChapter;  // 空なら最初から遊べる
@@ -167,6 +203,18 @@ namespace Yurube.Story
         public bool cpuTauntOnShot;
         // 初回だけ出す掛け合い（黄色い積み木を積んで増えたとき）
         public List<StoryLine> yellowExtra = new List<StoryLine>();
+        // 対戦開始（GO!の直後）に小窓で出す掛け合い（最終章。初回だけ）
+        public List<StoryLine> startLines = new List<StoryLine>();
+        // そのキャラが脱落したときの台詞（最終章。初回だけ・キャラごとに1回）
+        public List<StoryOutLine> outLines = new List<StoryOutLine>();
+        // 残り2人になったときの掛け合い（最終章）。lastTwoCharacter が最後の相手のキャラID
+        public string lastTwoCharacter;
+        public List<StoryLine> lastTwoLines = new List<StoryLine>();
+        // 勝利後、会話（後）の最後のト書きに合わせて掲げる横断幕（空なら出さない）
+        public string bannerText;
+        public float bannerSeconds = 3.6f;
+        // 新聞のあとの短いカットシーン（最終章）
+        public StoryEpilogue epilogue = new StoryEpilogue();
         public StoryNewspaper newspaper = new StoryNewspaper();
     }
 

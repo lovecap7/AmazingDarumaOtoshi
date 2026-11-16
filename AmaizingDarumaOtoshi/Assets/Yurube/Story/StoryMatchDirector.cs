@@ -37,9 +37,12 @@ namespace Yurube.Story
         bool m_lastStandHandled;
         bool m_stageMode;
         bool m_venueMode;
+        bool m_finalMode;
         float m_matchStartTime;
         float m_nextIncomingCheck;
         bool m_incomingBlock;
+        // いま出している小窓の台詞の世代。新しいイベントが来たら、前の台詞の続きは打ち切る
+        int m_smallGen;
         // プレイヤーの弾が相手に当たってから、連鎖が起きるまでを受け付ける時間
         float m_chainOpponentHitUntil = -1f;
 
@@ -101,6 +104,7 @@ namespace Yurube.Story
             if (m_match == null || m_chapter == null) { enabled = false; return; }
             m_venueMode = m_chapter.cutscene != null && m_chapter.cutscene.type == "venue";
             m_stageMode = m_chapter.cutscene != null && m_chapter.cutscene.type == "stage";
+            m_finalMode = m_chapter.cutscene != null && m_chapter.cutscene.type == "final";
             m_chainOpponentHitUntil = -1f;
 
             PauseMenu.StoryMode = true;
@@ -484,10 +488,15 @@ namespace Yurube.Story
                 EnsureStoryBodiesVisible();
                 if (m_stageMode) yield return m_movie.PlayStageIntro(m_chapter);
                 else if (m_venueMode) yield return m_movie.PlayVenueIntro(m_chapter);
+                else if (m_finalMode) yield return m_movie.PlayFinalIntro(m_chapter);
                 else yield return m_movie.PlayOpening();
                 // 章クリア済みの再プレイで B を押したら、カットシーンだけでなく会話（前）も飛ばす
                 bool skipBefore = StoryProgress.IsCleared(m_chapter.id) && m_movie.WasSkipped;
-                if (!skipBefore) yield return m_dialogue.PlayBig(m_chapter, m_chapter.before);
+                if (!skipBefore)
+                {
+                    if (m_finalMode) yield return PlayFinalBefore();
+                    else yield return m_dialogue.PlayBig(m_chapter, m_chapter.before);
+                }
                 StorySession.MarkIntroPlayed();
                 m_dialogue.SetDimAlpha(0.62f);
                 yield return m_movie.FadeToBlack(0.4f);
@@ -591,7 +600,7 @@ namespace Yurube.Story
             {
                 if (line == null || line.speaker != speaker) continue;
                 StorySession.MarkEvent(eventKey);
-                m_dialogue.StartCoroutine(m_dialogue.PlaySmall(line.speaker, line.text, m_chapter));
+                StartCoroutine(PlayLines(new List<StoryLine> { line }));
                 break;
             }
         }
@@ -661,7 +670,8 @@ namespace Yurube.Story
 
         void OnStoryLineStarted(string speakerId)
         {
-            if (m_movie != null) m_movie.FocusVenueSpeaker(speakerId);
+            // 会話中にカメラを話者へ寄せる（会場・控室・決勝の舞台で、顔がウィンドウに隠れないように）
+            if (m_movie != null) m_movie.FocusSpeaker(speakerId);
         }
 
         // プレイヤーの弾が相手（CPU）に当たった。このあと抜けた積み木が連鎖すれば「相手の積み木を崩した」
@@ -697,8 +707,10 @@ namespace Yurube.Story
             if (m_chapter.chainHint != null && m_chapter.chainHint.Count > 0)
                 StartCoroutine(PlayLines(m_chapter.chainHint));
             else
-                m_dialogue.StartCoroutine(m_dialogue.PlaySmall("midaru",
-                    "相手の積み木が積み上がっているところを狙おう", m_chapter));
+                StartCoroutine(PlayLines(new List<StoryLine>
+                {
+                    new StoryLine { speaker = "midaru", text = "相手の積み木が積み上がっているところを狙おう" }
+                }));
         }
 
         // 連鎖が起きにくいとき、相手の奥に積み木を2個出して「当てる→連鎖」を作りやすくする
@@ -873,12 +885,55 @@ namespace Yurube.Story
             return best;
         }
 
+        // 出しかけの小窓の台詞を止める（試合終了・敗北のときに、台詞が残らないように）
+        void StopEventLines()
+        {
+            m_smallGen++;
+            if (m_dialogue != null) m_dialogue.CloseSmallWindow();
+        }
+
         IEnumerator PlayLines(List<StoryLine> lines)
         {
+            if (lines == null || lines.Count == 0) yield break;
+            // 新しいイベント（脱落など）が来たら、前の台詞の続きは出さない
+            int gen = ++m_smallGen;
             foreach (var line in lines)
             {
                 if (line == null) continue;
+                if (gen != m_smallGen) yield break;
                 yield return m_dialogue.PlaySmall(line.speaker, line.text, m_chapter);
+            }
+        }
+
+        //========================================
+        // 最終章：控室 → 決勝の舞台の会話（前）
+        //========================================
+
+        // 章データの before を scene（room / stage）で分け、場面に合わせて背景を切り替える
+        IEnumerator PlayFinalBefore()
+        {
+            var roomLines = new List<StoryLine>();
+            var stageLines = new List<StoryLine>();
+            if (m_chapter.before != null)
+            {
+                foreach (var line in m_chapter.before)
+                {
+                    if (line == null) continue;
+                    if (line.scene == "stage") stageLines.Add(line);
+                    else roomLines.Add(line);
+                }
+            }
+
+            if (roomLines.Count > 0)
+            {
+                m_movie.ShowFinalConversation(false);
+                yield return m_dialogue.PlayBig(m_chapter, roomLines);
+            }
+            if (stageLines.Count > 0)
+            {
+                if (roomLines.Count > 0) yield return m_movie.SwitchFinalScene("stage", 0.4f);
+                else m_movie.ShowFinalConversation(true);
+                yield return m_dialogue.PlayBig(m_chapter, stageLines);
             }
         }
 
@@ -907,9 +962,16 @@ namespace Yurube.Story
         // プレイヤーが脱落した（4人戦ではCPU同士の試合が続いてしまうので、ここでストーリーの敗北にする）
         void OnPlayerOut(MatchPlayer player)
         {
-            if (m_finishedHandled || player == null || player != m_player) return;
+            if (m_finishedHandled || player == null) return;
+            if (player != m_player)
+            {
+                // CPU の脱落（最終章）。試合は続くので、台詞だけ出す
+                OnCpuOut(player);
+                return;
+            }
             m_finishedHandled = true;
             // その場で試合を止めて、敗北の台詞 → リトライへ
+            StopEventLines();
             if (m_dialogue != null) m_dialogue.HideObjective();
             SetStoryPaused(true);
             // 試合は止めるが、敗北の台詞の音は鳴らす
@@ -917,6 +979,64 @@ namespace Yurube.Story
             SpecialGaugeHUD.Suppressed = true;
             SpecialInput.StoryLocked = true;
             StartCoroutine(Defeat());
+        }
+
+        // CPU が脱落した（最終章）。そのキャラの台詞と、残り2人になったときの掛け合い
+        void OnCpuOut(MatchPlayer player)
+        {
+            if (m_chapter == null || m_dialogue == null || player == null || player.CharacterData == null) return;
+            string id = player.CharacterData.id;
+            var lines = new List<StoryLine>();
+
+            string key = m_chapter.id + ".out." + id;
+            if (!StorySession.HasEvent(key) && m_chapter.outLines != null)
+            {
+                foreach (var entry in m_chapter.outLines)
+                {
+                    if (entry == null || entry.character != id) continue;
+                    StorySession.MarkEvent(key);
+                    if (entry.lines != null) lines.AddRange(entry.lines);
+                    break;
+                }
+            }
+
+            // 残りが「操作キャラ＋決勝の相手」の2人になったときだけ、2人きりの掛け合いを出す
+            // （だるきんぐが先に落ちたときは残り2人でも出さない）
+            string lastKey = m_chapter.id + ".lastTwo";
+            bool hasLastTwo = m_chapter.lastTwoLines != null && m_chapter.lastTwoLines.Count > 0;
+            if (hasLastTwo && !StorySession.HasEvent(lastKey) && IsLastTwoLeft())
+            {
+                StorySession.MarkEvent(lastKey);
+                lines.AddRange(m_chapter.lastTwoLines);
+            }
+
+            if (lines.Count > 0)
+            {
+                Debug.Log("[Story] 脱落の掛け合い: " + id + "（" + lines.Count + "行）");
+                StartCoroutine(PlayLines(lines));
+            }
+        }
+
+        // 残っているのが自分と lastTwoCharacter だけか
+        bool IsLastTwoLeft()
+        {
+            if (m_match == null || m_player == null || m_chapter == null) return false;
+            if (m_player.State == MatchPlayer.PlayerState.Out) return false;
+
+            MatchPlayer other = null;
+            int alive = 0;
+            foreach (var p in m_match.Players)
+            {
+                if (p == null || p.State == MatchPlayer.PlayerState.Out) continue;
+                alive++;
+                if (p != m_player) other = p;
+            }
+            if (alive != 2 || other == null || other.CharacterData == null) return false;
+
+            string id = !string.IsNullOrEmpty(m_chapter.lastTwoCharacter)
+                ? m_chapter.lastTwoCharacter
+                : (m_chapter.cpu != null && m_chapter.cpu.Count > 0 ? m_chapter.cpu[0].character : null);
+            return !string.IsNullOrEmpty(id) && other.CharacterData.id == id;
         }
 
         //========================================
@@ -927,6 +1047,8 @@ namespace Yurube.Story
         {
             if (m_finishedHandled) return;
             m_finishedHandled = true;
+            // 出しかけの小窓の台詞は止める（リザルトに重ねない）
+            StopEventLines();
             bool won = result != null && result.Winner != null && !result.Winner.IsCpu;
 
             // 念のため：会話用に止めていたら解く
@@ -964,17 +1086,22 @@ namespace Yurube.Story
             // 会話（後）：部室（第1章以降はステージ）の夕方のムービーを背景に
             m_dialogue.SetDimAlpha(0.3f);
             m_movie.SetBlack();
-            if (m_stageMode) m_movie.ShowStageConversation(true);
+            if (m_finalMode) m_movie.ShowFinalConversation(true, true);
+            else if (m_stageMode) m_movie.ShowStageConversation(true);
             else if (m_venueMode) m_movie.ShowVenueConversation(true);
             else m_movie.ShowConversation(true);
             yield return m_movie.FadeIn(0.6f);
-            yield return m_dialogue.PlayBig(m_chapter, m_chapter.after);
+            yield return m_dialogue.PlayBig(m_chapter, m_chapter.after, OnAfterLine);
+            // 横断幕が掲げられたのを少し見せる
+            if (!string.IsNullOrEmpty(m_chapter.bannerText)) yield return new WaitForSecondsRealtime(1.4f);
 
-            // だるま新聞 → 章クリア保存
+            // だるま新聞
             yield return m_dialogue.PlayNewspaper(m_chapter.newspaper);
 
-            // 新聞まで見終わったら、章クリアの実績を解除する
+            // 新聞まで見終わったら、章クリアの実績とセーブを記録する。
+            // このあとのエピローグを途中で終了しても、進行が失われないようにする
             AchievementManager.ReportStoryCleared(m_chapter.id);
+            StoryProgress.MarkCleared(m_chapter.id);
             if (AchievementManager.PendingCount > 0)
             {
                 var clearCanvas = ToyKit.CreateOverlayCanvas("StoryClearAchievements", 45);
@@ -983,16 +1110,31 @@ namespace Yurube.Story
                 Destroy(clearCanvas.gameObject);
             }
 
-            // メニューへ切り替わるまで映像画面を残す（HUD付きの対戦画面を一瞬見せない）
+            // エピローグ（最終章。データがあるときだけ）
+            if (m_chapter.epilogue != null && m_chapter.epilogue.enabled)
+            {
+                yield return m_movie.PlayEpilogue(m_chapter, m_dialogue);
+            }
+
+            // メニューへ切り替わるまで映像画面（黒）を残す（HUD付きの対戦画面を一瞬見せない）
             m_dialogue.HideHint();
             m_movie.HideHint();
-            m_movie.SetBlack();
-            StoryProgress.MarkCleared(m_chapter.id);
+            if (m_finalMode) m_movie.ShowBlackCover();
+            else m_movie.SetBlack();
 
             StorySession.End();
             DarumaMatch.AutoReturnToSelect = true;
             m_leavingForRetry = true;
             Fader.Load(MenuSceneName);
+        }
+
+        // 会話（後）の最後のト書きに合わせて、横断幕を掲げる
+        void OnAfterLine(int index, StoryLine line)
+        {
+            if (m_chapter == null || string.IsNullOrEmpty(m_chapter.bannerText)) return;
+            if (m_chapter.after == null || m_chapter.after.Count == 0) return;
+            if (index != m_chapter.after.Count - 1) return;
+            m_movie.ShowBanner(m_chapter.bannerText, m_chapter.bannerSeconds);
         }
 
         IEnumerator Defeat()

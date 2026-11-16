@@ -73,6 +73,32 @@ namespace Yurube.Story
         Transform m_venueRoot;
         readonly Dictionary<string, Member> m_venueMembers = new Dictionary<string, Member>();
 
+        // 最終章：控室（部室セット）と決勝の舞台を行き来する
+        bool m_finalMode;
+        string m_finalScene = "";                 // "room" / "stage"
+        readonly Dictionary<string, Member> m_roomMembers = new Dictionary<string, Member>();
+        Transform m_offerNotebook;                // 控室で差し出す分厚いノート
+        Transform m_epilogueRoot;                 // エピローグ用の小道具（まとめて消す）
+        bool m_epilogueBuilt;
+        bool m_bannerBuilt;
+        Transform m_bannerRoot, m_bannerCloth;
+        TextMeshPro m_bannerText;
+        float m_bannerStart = -1f, m_bannerLength = 1f, m_bannerSeconds;
+
+        // エピローグ：人形の2つ目の目・ロゴのひび
+        Renderer m_dollEye2;
+        Light m_dollEyeLight;
+        float m_dollEyeTime = -1f;
+        Transform m_rosterBoard;
+        TextMeshPro m_rosterText;
+        GameObject m_logoCard;
+        CanvasGroup m_logoGroup;
+        Image m_logoCrack;
+        TextMeshProUGUI m_logoKnock;
+        float m_crackTime = -1f;
+        // エピローグ中は、台詞に合わせてカメラを寄せない（カットの画を保つ）
+        bool m_epilogueOn;
+
         // 台本（タイトルのムービーと同じ書き方）
         System.Func<float, Vector3> m_camPos, m_camLook;
         float m_shotStart, m_shotFov = 42f;
@@ -447,7 +473,8 @@ namespace Yurube.Story
         //========================================
 
         Member AddMember(Vector3 pos, float yaw, Color color, float scale, bool happy,
-                         Transform parent = null, string id = null)
+                         Transform parent = null, string id = null,
+                         Dictionary<string, Member> registry = null)
         {
             var m = new Member { basePos = pos, phase = m_members.Count * 1.7f };
             var root = new GameObject("Member").transform;
@@ -474,16 +501,25 @@ namespace Yurube.Story
             m.root = root;
             m.head = head.root;
             m_members.Add(m);
-            if (!string.IsNullOrEmpty(id)) m_venueMembers[id] = m;
+            if (!string.IsNullOrEmpty(id))
+            {
+                if (registry != null) registry[id] = m;
+                else m_venueMembers[id] = m;
+            }
             return m;
         }
 
         void BuildMembers()
         {
-            AddMember(new Vector3(-1.9f, 0f, 0.05f), 14f, new Color(0.95f, 0.78f, 0.18f), 0.92f, true);   // きだる
-            AddMember(new Vector3(1.4f, 0f, 0.35f), -14f, new Color(0.28f, 0.62f, 0.32f), 0.92f, false);  // みだる
-            AddMember(new Vector3(-0.2f, 0f, 2.45f), 2f, new Color(0.85f, 0.22f, 0.18f), 0.95f, true);    // あかだる
-            AddMember(new Vector3(2.9f, 0f, 2.25f), -10f, new Color(0.2f, 0.42f, 0.85f), 0.95f, false);   // あおだる
+            // 部室の4人。id を付けておくと、会話のときに話者へカメラを寄せられる
+            AddMember(new Vector3(-1.9f, 0f, 0.05f), 14f, new Color(0.95f, 0.78f, 0.18f), 0.92f, true,
+                m_root, "kidaru", m_roomMembers);    // きだる
+            AddMember(new Vector3(1.4f, 0f, 0.35f), -14f, new Color(0.28f, 0.62f, 0.32f), 0.92f, false,
+                m_root, "midaru", m_roomMembers);    // みだる
+            AddMember(new Vector3(-0.2f, 0f, 2.45f), 2f, new Color(0.85f, 0.22f, 0.18f), 0.95f, true,
+                m_root, "akadaru", m_roomMembers);   // あかだる
+            AddMember(new Vector3(2.9f, 0f, 2.25f), -10f, new Color(0.2f, 0.42f, 0.85f), 0.95f, false,
+                m_root, "aodaru", m_roomMembers);    // あおだる
         }
 
         //========================================
@@ -776,12 +812,19 @@ namespace Yurube.Story
             RestoreRunner();
             m_stageMode = false;
             m_venueMode = false;
+            m_finalMode = false;
+            m_finalScene = "";
+            m_bannerStart = -1f;
+            m_dollEyeTime = -1f;
+            m_crackTime = -1f;
+            m_epilogueOn = false;
             m_visible = false;
             m_opening = false;
             m_advance = false;
             m_baseScale = 1f;
             SetMemory(false);
             SetCinema(false);
+            if (m_logoCard != null) m_logoCard.SetActive(false);
             if (m_view != null) m_view.enabled = true;
             if (m_screen != null) m_screen.SetActive(false);
             if (m_camera != null) m_camera.enabled = false;
@@ -796,6 +839,8 @@ namespace Yurube.Story
             RestoreRunner();
             m_stageMode = false;
             m_venueMode = false;
+            m_finalMode = false;
+            m_finalScene = "";
             m_visible = false;
             m_opening = false;
             m_advance = false;
@@ -808,6 +853,17 @@ namespace Yurube.Story
             if (m_camera != null) m_camera.enabled = false;
             if (m_view != null) m_view.enabled = false;
             if (m_screen != null) m_screen.SetActive(true);
+            if (m_fadeGroup != null) m_fadeGroup.alpha = 1f;
+            RenderTexture.active = null;
+        }
+
+        // 黒い画面だけを残す（エピローグのあと、メニューへ移るまでステージを見せない）
+        public void ShowBlackCover()
+        {
+            if (m_screen == null) return;
+            m_screen.SetActive(true);
+            if (m_view != null) m_view.enabled = false;
+            if (m_camera != null) m_camera.enabled = false;
             if (m_fadeGroup != null) m_fadeGroup.alpha = 1f;
             RenderTexture.active = null;
         }
@@ -959,6 +1015,9 @@ namespace Yurube.Story
             m_baseScale = 1f;
             m_opening = true;
             m_stageMode = false;
+            m_venueMode = false;
+            m_finalMode = false;
+            m_finalScene = "";
             Show();
             m_fadeGroup.alpha = 1f;
             SetCaption(false);
@@ -1272,6 +1331,799 @@ namespace Yurube.Story
             SetShot(lt => V(0f, 1.7f, -6.2f), lt => V(0f, 0.95f, 0.3f), 45f);
         }
 
+        //========================================
+        // 最終章：控室（部室セット）→ 決勝の舞台
+        //========================================
+
+        Transform Prop(string name, Transform parent, Vector3 localPos, Vector3 size, Material mat, float yaw = 0f)
+        {
+            var t = ToyKit.Primitive(PrimitiveType.Cube, name, parent);
+            t.localPosition = localPos;
+            t.localScale = size;
+            t.localRotation = Quaternion.Euler(0f, yaw, 0f);
+            t.GetComponent<Renderer>().sharedMaterial = mat;
+            return t;
+        }
+
+        void UseRoomCamera()
+        {
+            if (m_camera == null) return;
+            m_camera.clearFlags = CameraClearFlags.SolidColor;
+            m_camera.backgroundColor = new Color(0.09f, 0.07f, 0.08f);
+            m_camera.farClipPlane = 120f;
+        }
+
+        void UseStageCamera()
+        {
+            if (m_camera == null) return;
+            m_camera.clearFlags = CameraClearFlags.Skybox;
+            m_camera.farClipPlane = 120f;
+        }
+
+        Member RoomMember(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return null;
+            return m_roomMembers.TryGetValue(id, out var m) && m != null && m.root != null ? m : null;
+        }
+
+        void PlaceRoomMember(string id, Vector3 localPos, float yaw)
+        {
+            var m = RoomMember(id);
+            if (m == null) return;
+            m.basePos = localPos;
+            m.root.localPosition = localPos;
+            m.root.localRotation = Quaternion.Euler(0f, yaw, 0f);
+        }
+
+        void HideRoomMember(string id)
+        {
+            var m = RoomMember(id);
+            if (m != null) m.root.gameObject.SetActive(false);
+        }
+
+        // 控室の画づくり：みだるとあかが机の前に向かい合い、あいだに分厚いノート
+        void StageRoomForFinal()
+        {
+            BuildOfferNotebook();
+            if (m_offerNotebook != null) m_offerNotebook.gameObject.SetActive(true);
+            PlaceRoomMember("midaru", new Vector3(-0.85f, 0f, 0.2f), 90f);
+            PlaceRoomMember("akadaru", new Vector3(0.85f, 0f, 0.2f), -90f);
+        }
+
+        void BuildOfferNotebook()
+        {
+            if (m_offerNotebook != null) return;
+            var root = new GameObject("OfferNotebook").transform;
+            root.SetParent(m_root, false);
+            root.localPosition = new Vector3(0.05f, 0.95f, 0.2f);
+            root.localRotation = Quaternion.Euler(0f, 0f, -10f);
+            Prop("Cover", root, Vector3.zero, new Vector3(0.62f, 0.12f, 0.82f), Unlit(new Color(0.86f, 0.83f, 0.76f)));
+            Prop("Pages", root, new Vector3(0.025f, 0f, 0f), new Vector3(0.57f, 0.10f, 0.78f), Unlit(new Color(0.99f, 0.97f, 0.9f)));
+            Prop("Band", root, new Vector3(0f, 0.005f, 0.14f), new Vector3(0.66f, 0.14f, 0.09f), Unlit(new Color(0.78f, 0.16f, 0.13f)));
+            m_offerNotebook = root;
+        }
+
+        void SetFinalRoomTwoShot()
+        {
+            UseRoomCamera();
+            SetShot(lt => P(2.6f, 1.55f, -1.8f), lt => P(0.05f, 1.0f, 0.35f), 42f);
+        }
+
+        void SetFinalRoomNotebook()
+        {
+            UseRoomCamera();
+            SetShot(lt => P(1.35f, 1.45f, -1.05f), lt => P(0.0f, 0.98f, 0.25f), 36f);
+        }
+
+        // 相手2人（いわ・へび）が待っている画
+        void SetStageRivals(StoryChapter chapter)
+        {
+            UseStageCamera();
+            string firstId = chapter != null && chapter.cutscene != null ? chapter.cutscene.rival : null;
+            var cpu = chapter != null ? chapter.cpu : null;
+            if (string.IsNullOrEmpty(firstId) && cpu != null && cpu.Count > 0) firstId = cpu[0].character;
+            // 2人目は、章データの cpu の並びで rival の次の人（第1章の決勝なら、いわ→へび）
+            string secondId = null;
+            if (cpu != null && cpu.Count > 1)
+            {
+                for (int i = 0; i < cpu.Count; i++)
+                {
+                    if (cpu[i] == null || cpu[i].character != firstId) continue;
+                    secondId = cpu[(i + 1) % cpu.Count].character;
+                    break;
+                }
+            }
+            var a = FindPlayer(firstId);
+            var b = FindPlayer(secondId);
+            if (a == null || a.Character == null || b == null || b.Character == null || b == a) { SetStageWide(); return; }
+
+            Vector3 pa = a.Character.transform.position;
+            Vector3 pb = b.Character.transform.position;
+            Vector3 mid = (pa + pb) * 0.5f;
+            Vector3 toCenter = W(0f, 0f, 0f) - mid;
+            toCenter.y = 0f;
+            if (toCenter.sqrMagnitude < 0.01f) toCenter = Vector3.forward;
+            toCenter.Normalize();
+            Vector3 side = Vector3.Cross(Vector3.up, toCenter).normalized;
+            // 2人の間が離れていても、両方が入る距離にする
+            float separation = Vector3.Distance(pa, pb);
+            float distance = Mathf.Clamp(separation * 0.8f + 3.5f, 6f, 15f);
+            Vector3 cameraPos = mid + toCenter * distance + side * (distance * 0.3f)
+                + Vector3.up * (2.4f + distance * 0.12f);
+            var match = Nakahira.DarumaMatch.Current;
+            if (match != null && match.StageArea != null)
+            {
+                Vector3 clamped = match.StageArea.Clamp(cameraPos, 1.5f);
+                clamped.y = cameraPos.y;
+                cameraPos = clamped;
+            }
+            SetShot(lt => cameraPos, lt => mid + Vector3.up * 1.0f, 45f);
+        }
+
+        void ApplyFinalShot(StoryChapter chapter, StoryShot shot)
+        {
+            switch (shot.view)
+            {
+                case "room":
+                    SetFinalRoomTwoShot();
+                    break;
+                case "notebook":
+                    SetFinalRoomNotebook();
+                    break;
+                case "rivals":
+                    SetStageRivals(chapter);
+                    break;
+                case "rival":
+                    UseStageCamera();
+                    SetStageRival(chapter);
+                    break;
+                case "runner":
+                    UseStageCamera();
+                    BeginRunner(chapter, shot.seconds);
+                    SetStageRunner();
+                    break;
+                default:
+                    UseStageCamera();
+                    SetStageWide();
+                    break;
+            }
+            string caption = string.IsNullOrEmpty(shot.caption)
+                ? (chapter != null && chapter.cutscene != null ? chapter.cutscene.caption : null)
+                : shot.caption;
+            SetCaptionText(caption);
+            SetCaption(!string.IsNullOrEmpty(caption));
+        }
+
+        // 控室 → 決勝の舞台のカットシーン。A：つぎへ／B：スキップは序章と同じ
+        public IEnumerator PlayFinalIntro(StoryChapter chapter)
+        {
+            m_time = 0f;
+            m_shift = 0f;
+            m_skipped = false;
+            WasSkipped = false;
+            m_advance = false;
+            m_baseScale = 1f;
+            m_opening = true;
+            m_stageMode = false;
+            m_venueMode = false;
+            m_finalMode = true;
+            m_finalScene = "room";
+            Show();
+            UseRoomCamera();
+            m_fadeGroup.alpha = 1f;
+            SetCaption(false);
+            SetTitle(false);
+            SetHint(true);
+            SetMemory(false);
+            SetCinema(false);
+            StageRoomForFinal();
+            SetFinalRoomTwoShot();
+            SetCaptionText(chapter != null && chapter.cutscene != null ? chapter.cutscene.caption : null);
+            yield return FadeTo(0f, 0.5f);
+            SetCaption(!string.IsNullOrEmpty(chapter != null && chapter.cutscene != null ? chapter.cutscene.caption : null));
+
+            var shots = chapter != null && chapter.cutscene != null ? chapter.cutscene.shots : null;
+            if (shots == null || shots.Count == 0)
+            {
+                SetFinalRoomTwoShot();
+                yield return Hold(3.0f);
+                if (!m_skipped) { SetFinalRoomNotebook(); yield return Hold(3.2f); }
+                if (!m_skipped) { SetStageRivals(chapter); yield return Hold(3.0f); }
+            }
+            else
+            {
+                foreach (var shot in shots)
+                {
+                    if (shot == null) continue;
+                    ApplyFinalShot(chapter, shot);
+                    yield return Hold(Mathf.Max(0.5f, shot.seconds));
+                    if (m_skipped) break;
+                }
+            }
+
+            SetCaption(false);
+            if (!m_skipped)
+            {
+                SetCinema(true);
+                yield return FadeTo(0.65f, 0.5f);
+                var card = (RectTransform)m_titleGroup.transform;
+                card.localScale = Vector3.one * 1.06f;
+                SetTitle(true);
+                yield return Tween(0.8f, u => card.localScale = Vector3.one * Mathf.Lerp(1.06f, 1f, u));
+                yield return Hold(1.4f);
+                SetTitle(false);
+            }
+
+            yield return FinishFinalIntro();
+        }
+
+        IEnumerator FinishFinalIntro()
+        {
+            m_opening = false;
+            SetHint(false);
+            SetCaption(false);
+            SetTitle(false);
+            SetMemory(false);
+            SetCinema(false);
+            m_baseScale = 1f;
+            m_advance = false;
+            WasSkipped = m_skipped;
+            RestoreRunner();
+            yield return FadeTo(1f, 0.35f);
+            // 会話（前）は控室から（ノートを差し出す場面）
+            ShowFinalConversation(false);
+            yield return FadeTo(0f, 0.6f);
+            m_skipped = false;
+        }
+
+        // 最終章の会話の背景。stageSide で控室／決勝の舞台を切り替える
+        public void ShowFinalConversation(bool stageSide, bool sunset = false)
+        {
+            Show();
+            m_finalMode = true;
+            m_venueMode = false;
+            m_stageMode = stageSide;
+            m_finalScene = stageSide ? "stage" : "room";
+            m_opening = false;
+            m_advance = false;
+            m_baseScale = 1f;
+            SetCinema(true);
+            SetCaption(false);
+            SetTitle(false);
+            SetHint(false);
+
+            if (stageSide)
+            {
+                if (m_offerNotebook != null) m_offerNotebook.gameObject.SetActive(false);
+                UseStageCamera();
+                SetSunset(sunset);
+                // 引きの保険（話者に合わせて、このあと寄る）
+                SetShot(lt => W(0f, 3.0f, -8.0f), lt => W(0f, 1.3f, 0f), 50f);
+            }
+            else
+            {
+                UseRoomCamera();
+                StageRoomForFinal();
+                SetFinalRoomTwoShot();
+            }
+        }
+
+        // 控室 ⇔ 決勝の舞台。暗転して切り替える
+        public IEnumerator SwitchFinalScene(string scene, float fade = 0.4f)
+        {
+            if (scene == m_finalScene) yield break;
+            yield return FadeTo(1f, fade);
+            if (scene == "stage") ShowFinalConversation(true);
+            else ShowFinalConversation(false);
+            yield return FadeTo(0f, fade + 0.15f);
+        }
+
+        // 会話の話者へカメラを寄せる（章ごとの背景に合わせる）
+        public void FocusSpeaker(string speakerId)
+        {
+            if (m_epilogueOn) return;   // エピローグは決めたカットのまま見せる
+            if (m_venueMode) { FocusVenueSpeaker(speakerId); return; }
+            if (!m_finalMode || !m_visible) return;
+            if (m_finalScene == "stage") FocusStageSpeaker(speakerId);
+            else FocusRoomSpeaker(speakerId);
+        }
+
+        // 決勝の舞台：実際のキャラクターの顔が見える位置から撮る
+        void FocusStageSpeaker(string speakerId)
+        {
+            var p = FindPlayer(speakerId);
+            if (p == null || p.Character == null)
+            {
+                SetShot(lt => W(0f, 3.0f, -8.0f), lt => W(0f, 1.3f, 0f), 50f);
+                return;
+            }
+            Transform t = p.Character.transform;
+            Vector3 basePos = t.position;
+            Vector3 forward = t.forward;
+            forward.y = 0f;
+            if (forward.sqrMagnitude < 0.0001f) forward = Vector3.back;
+            forward.Normalize();
+            Vector3 cameraPos = basePos + forward * 3.2f + Vector3.up * 2.05f;
+            // 壁の外へ出ると背景だけになるので、ステージの中へ収める。
+            // 大きく動かすことになる（壁を背にしている）ときは、引きの画にする
+            var match = Nakahira.DarumaMatch.Current;
+            if (match != null && match.StageArea != null)
+            {
+                Vector3 clamped = match.StageArea.Clamp(cameraPos, 1.2f);
+                clamped.y = cameraPos.y;
+                if ((clamped - cameraPos).sqrMagnitude > 0.04f)
+                {
+                    SetShot(lt => W(0f, 3.0f, -8.0f), lt => W(0f, 1.3f, 0f), 50f);
+                    return;
+                }
+                cameraPos = clamped;
+            }
+            // 会話ウィンドウ（画面下）に顔がかからないよう、少し下を注視する
+            SetShot(lt => cameraPos, lt => basePos + Vector3.up * 1.10f, 40f);
+        }
+
+        // 控室：部室セットの部員の顔が見える位置から撮る
+        void FocusRoomSpeaker(string speakerId)
+        {
+            var member = RoomMember(speakerId);
+            if (member == null) { SetFinalRoomTwoShot(); return; }
+            Transform t = member.root;
+            Vector3 basePos = t.position;
+            Vector3 forward = t.forward;
+            forward.y = 0f;
+            if (forward.sqrMagnitude < 0.0001f) forward = Vector3.back;
+            forward.Normalize();
+            Vector3 cameraPos = basePos + forward * 2.7f + Vector3.up * 1.72f;
+            // 壁の外へ出ないように、部屋の中へ収める
+            Vector3 local = cameraPos - SetOrigin;
+            local.x = Mathf.Clamp(local.x, -5.4f, 5.4f);
+            local.z = Mathf.Clamp(local.z, -4.4f, 4.4f);
+            cameraPos = SetOrigin + local;
+            SetShot(lt => cameraPos, lt => basePos + Vector3.up * 1.02f, 38f);
+        }
+
+        //========================================
+        // 横断幕（最終章・勝利後）
+        //========================================
+
+        void BannerBox(string name, Vector3 pos, Vector3 size, Material mat)
+        {
+            var t = ToyKit.Primitive(PrimitiveType.Cube, name, m_bannerRoot);
+            t.localPosition = pos;
+            t.localScale = size;
+            t.GetComponent<Renderer>().sharedMaterial = mat;
+        }
+
+        void BuildBanner(string text)
+        {
+            if (m_bannerBuilt)
+            {
+                if (m_bannerText != null && m_bannerText.text != text) m_bannerText.text = text;
+                return;
+            }
+            m_bannerBuilt = true;
+            m_bannerRoot = new GameObject("StoryBanner").transform;
+
+            var poleMat = ToyKit.Lit(new Color(0.45f, 0.42f, 0.4f), 0.3f);
+            BannerBox("PoleL", new Vector3(-2.95f, 2.6f, 7.7f), new Vector3(0.16f, 5.2f, 0.16f), poleMat);
+            BannerBox("PoleR", new Vector3(2.95f, 2.6f, 7.7f), new Vector3(0.16f, 5.2f, 0.16f), poleMat);
+            BannerBox("Rod", new Vector3(0f, 5.15f, 7.7f), new Vector3(6.2f, 0.12f, 0.12f), poleMat);
+            m_bannerCloth = TitleDressingKit.Quad(m_bannerRoot, "Cloth", W(0f, 4.52f, 7.66f),
+                new Vector3(5.7f, 1.2f, 1f), Unlit(new Color(0.78f, 0.13f, 0.10f)));
+
+            m_bannerText = TitleDressingKit.Text(m_bannerRoot, PresentationSettings.DefaultFont, text,
+                W(0f, 4.52f, 7.60f), new Vector2(5.2f, 1.0f), 4.2f,
+                new Color(1f, 0.96f, 0.86f), new Color(0.32f, 0.05f, 0.04f), 0.06f, 0f);
+            m_bannerText.textWrappingMode = TextWrappingModes.Normal;
+            m_bannerText.alignment = TextAlignmentOptions.Center;
+            m_bannerText.lineSpacing = 4f;
+        }
+
+        // 横断幕を掲げる（上から垂れ下がる簡単な演出）。会話の最後のト書きに合わせて呼ぶ
+        public void ShowBanner(string text, float seconds)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+            BuildBanner(text);
+            if (m_bannerRoot != null) m_bannerRoot.gameObject.SetActive(true);
+            if (m_bannerCloth != null) m_bannerCloth.localScale = new Vector3(1f, 0.04f, 1f);
+            if (m_bannerText != null)
+            {
+                m_bannerText.text = text;
+                var c = m_bannerText.color;
+                c.a = 0f;
+                m_bannerText.color = c;
+            }
+            m_bannerStart = m_time;
+            m_bannerLength = 0.9f;
+            m_bannerSeconds = Mathf.Max(1.5f, seconds);
+            Show();
+            UseStageCamera();
+            SetShot(lt => W(0f, 4.4f, 1.6f), lt => W(0f, 4.75f, 7.7f), 42f);
+        }
+
+        void AnimateBanner()
+        {
+            if (m_bannerStart < 0f || m_bannerRoot == null) return;
+            float u = Mathf.Clamp01((m_time - m_bannerStart) / m_bannerLength);
+            float ease = 1f - Mathf.Pow(1f - u, 3f);
+            if (m_bannerCloth != null)
+                m_bannerCloth.localScale = new Vector3(1f, Mathf.Lerp(0.04f, 1f, ease), 1f);
+            if (m_bannerText != null)
+            {
+                var c = m_bannerText.color;
+                c.a = Mathf.SmoothStep(0f, 1f, ease);
+                m_bannerText.color = c;
+            }
+            // 掲げたあとは、決めた時間だけゆっくり揺れる
+            if (u >= 1f)
+            {
+                float elapsed = m_time - m_bannerStart;
+                float sway = Mathf.Clamp01((m_bannerSeconds - elapsed) / 0.6f);
+                m_bannerRoot.localRotation = Quaternion.Euler(0f, 0f, 0.5f * sway * Mathf.Sin(elapsed * 1.6f));
+            }
+        }
+
+        //========================================
+        // エピローグ（最終章・新聞のあと）
+        //========================================
+
+        void BuildEpilogue(StoryEpilogue ep)
+        {
+            if (m_offerNotebook != null) m_offerNotebook.gameObject.SetActive(false);
+            if (!m_epilogueBuilt)
+            {
+                m_epilogueBuilt = true;
+                m_epilogueRoot = new GameObject("StoryEpilogueProps").transform;
+                m_epilogueRoot.SetParent(m_root, false);
+                BuildEpilogueNotebook();
+                BuildRosterBoard();
+                BuildDollEye();
+                BuildLogoCard();
+            }
+
+            // 全国制覇の夜：みだるだけが部室に残っている
+            HideRoomMember("akadaru");
+            HideRoomMember("aodaru");
+            HideRoomMember("kidaru");
+            PlaceRoomMember("midaru", new Vector3(1.5f, 0f, 0.95f), -65f);
+
+            bool hasRoster = !string.IsNullOrEmpty(ep.rosterText);
+            if (m_rosterBoard != null) m_rosterBoard.gameObject.SetActive(hasRoster);
+            if (m_rosterText != null) m_rosterText.text = hasRoster ? ep.rosterText : "";
+
+            if (m_logoCard != null) m_logoCard.SetActive(false);
+            if (m_dollEye2 != null) m_dollEye2.gameObject.SetActive(false);
+            if (m_dollEyeLight != null) m_dollEyeLight.intensity = 0f;
+            m_dollEyeTime = -1f;
+            m_crackTime = -1f;
+        }
+
+        void BuildEpilogueNotebook()
+        {
+            var root = new GameObject("EpilogueNotebook").transform;
+            root.SetParent(m_epilogueRoot, false);
+            root.localPosition = new Vector3(-1.5f, 0.88f, 1.3f);
+            Prop("Cover", root, Vector3.zero, new Vector3(1.0f, 0.02f, 0.7f), Unlit(new Color(0.34f, 0.12f, 0.1f)));
+            Prop("Pages", root, new Vector3(0f, 0.025f, 0f), new Vector3(0.96f, 0.05f, 0.66f), Unlit(new Color(0.97f, 0.95f, 0.87f)));
+            // 開いたページの書き込み（最後のページに一文が増えている）
+            var ink = Unlit(new Color(0.2f, 0.18f, 0.16f));
+            var red = Unlit(new Color(0.62f, 0.1f, 0.1f));
+            for (int i = 0; i < 6; i++)
+            {
+                float len = 0.2f + 0.05f * (i % 3);
+                var mat = i == 5 ? red : ink;
+                float z = -0.24f + i * 0.075f;
+                Prop("Ink" + i, root, new Vector3(0.06f + len * 0.5f, 0.055f, z), new Vector3(len, 0.004f, 0.012f), mat);
+            }
+        }
+
+        void BuildRosterBoard()
+        {
+            m_rosterBoard = new GameObject("RosterBoard").transform;
+            m_rosterBoard.SetParent(m_epilogueRoot, false);
+            // 練習メニューのホワイトボードの手前に黒板を重ねる
+            Prop("Frame", m_rosterBoard, new Vector3(-5.82f, 2.55f, 0.3f), new Vector3(0.05f, 2.02f, 3.82f), m_woodMat);
+            Prop("Board", m_rosterBoard, new Vector3(-5.77f, 2.55f, 0.3f), new Vector3(0.05f, 1.9f, 3.6f),
+                Unlit(new Color(0.11f, 0.13f, 0.12f)));
+
+            var text = ToyKit.Text3D(PresentationSettings.DefaultFont,
+                new Material(PresentationSettings.DefaultFont.material), "", m_rosterBoard,
+                new Vector2(3.3f, 1.62f), 2.6f);
+            text.transform.localPosition = new Vector3(-5.70f, 2.6f, 0.3f);
+            text.transform.localRotation = Quaternion.Euler(0f, -90f, 0f);
+            text.textWrappingMode = TextWrappingModes.Normal;
+            text.alignment = TextAlignmentOptions.TopLeft;
+            text.enableAutoSizing = true;
+            text.fontSizeMin = 1.2f;
+            text.fontSizeMax = 2.6f;
+            text.lineSpacing = 10f;
+            text.color = new Color(0.95f, 0.95f, 0.9f);
+            m_rosterText = text;
+        }
+
+        void BuildDollEye()
+        {
+            // 窓際のだるま人形。空いていたもう片方の目に、うっすらと光が差す
+            var eye = ToyKit.Primitive(PrimitiveType.Sphere, "Eye2", m_doll);
+            eye.localPosition = new Vector3(0.1f, 0.06f, -0.29f);
+            eye.localScale = new Vector3(0.07f, 0.09f, 0.04f);
+            eye.GetComponent<Renderer>().sharedMaterial = Unlit(new Color(1f, 0.86f, 0.55f));
+            m_dollEye2 = eye.GetComponent<Renderer>();
+            eye.gameObject.SetActive(false);
+
+            var go = new GameObject("DollEyeLight");
+            go.transform.SetParent(m_doll, false);
+            go.transform.localPosition = new Vector3(0.1f, 0.08f, -0.42f);
+            var light = go.AddComponent<Light>();
+            light.type = LightType.Point;
+            light.color = new Color(1f, 0.84f, 0.52f);
+            light.intensity = 0f;
+            light.range = 2.4f;
+            light.shadows = LightShadows.None;
+            m_dollEyeLight = light;
+        }
+
+        void StartDollEye()
+        {
+            if (m_dollEye2 != null)
+            {
+                m_dollEye2.gameObject.SetActive(true);
+                m_dollEye2.transform.localScale = new Vector3(0.02f, 0.03f, 0.02f);
+            }
+            if (m_dollEyeLight != null) m_dollEyeLight.intensity = 0f;
+            m_dollEyeTime = m_time;
+        }
+
+        void AnimateDollEye()
+        {
+            if (m_dollEyeTime < 0f) return;
+            float u = Mathf.Clamp01((m_time - m_dollEyeTime) / 1.4f);
+            float ease = Mathf.SmoothStep(0f, 1f, u);
+            if (m_dollEyeLight != null) m_dollEyeLight.intensity = 2.4f * ease;
+            if (m_dollEye2 != null)
+            {
+                float s = Mathf.Lerp(0.3f, 1f, ease);
+                m_dollEye2.transform.localScale = new Vector3(0.07f * s, 0.09f * s, 0.04f * s);
+            }
+        }
+
+        static void CrackLine(Color[] px, int w, int h, float x0, float y0, float x1, float y1,
+                              float thick, Color c, float alpha)
+        {
+            TitleDressingKit.Stroke(px, w, h, new Vector2(x0, y0), new Vector2(x1, y1), thick, c, alpha);
+        }
+
+        // タイトルロゴに入る「ひび」の絵（コードで描く）
+        static Sprite CrackSprite()
+        {
+            const int s = 512;
+            var t = NewTex(s, s);
+            var px = new Color[s * s];
+            for (int i = 0; i < px.Length; i++) px[i] = new Color(1f, 1f, 1f, 0f);
+
+            var rng = new System.Random(20261116);
+            float x = s * 0.52f, y = s * 0.99f;
+            float dir = 0.45f;
+            while (y > s * 0.04f)
+            {
+                float len = rng.Next(12, 30);
+                float nx = Mathf.Clamp(x + dir * len, 10f, s - 10f);
+                float ny = Mathf.Max(6f, y - len);
+                CrackLine(px, s, s, x, y, nx, ny, rng.Next(4, 7), new Color(0.62f, 0.12f, 0.06f), 0.5f);
+                CrackLine(px, s, s, x, y, nx, ny, rng.Next(1, 3), new Color(1f, 0.72f, 0.42f), 0.95f);
+                if (rng.NextDouble() < 0.24)
+                {
+                    float bx = nx + (rng.Next(0, 2) == 0 ? 1f : -1f) * rng.Next(24, 80);
+                    float by = ny - rng.Next(-14, 46);
+                    CrackLine(px, s, s, nx, ny, bx, by, rng.Next(2, 4), new Color(0.6f, 0.12f, 0.06f), 0.4f);
+                    CrackLine(px, s, s, nx, ny, bx, by, 1f, new Color(1f, 0.74f, 0.45f), 0.85f);
+                }
+                x = nx;
+                y = ny;
+                dir = Mathf.Clamp(dir + (float)(rng.NextDouble() - 0.5) * 0.9f, -1f, 1f);
+            }
+            t.SetPixels(px);
+            t.Apply();
+            return SpriteOf(t);
+        }
+
+        void BuildLogoCard()
+        {
+            var card = new GameObject("EpilogueLogo", typeof(RectTransform));
+            card.transform.SetParent(m_canvas, false);
+            var rect = (RectTransform)card.transform;
+            ToyKit.Anchor(rect, new Vector2(0.5f, 0.5f), new Vector2(0f, 40f), new Vector2(1600f, 460f));
+            m_logoGroup = card.AddComponent<CanvasGroup>();
+            var font = PresentationSettings.DefaultFont;
+
+            var main = ToyKit.UIText("Main", card.transform, font, "だるま落とし", 150f, Color.white);
+            main.fontStyle = FontStyles.Bold;
+            main.outlineWidth = 0.3f;
+            main.outlineColor = new Color32(20, 12, 8, 255);
+            ToyKit.Anchor(main.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 45f), new Vector2(1500f, 200f));
+
+            var sub = ToyKit.UIText("Sub", card.transform, font, "七転高校 だるま落とし部", 46f, new Color(1f, 0.88f, 0.65f));
+            sub.outlineWidth = 0.2f;
+            sub.outlineColor = new Color32(20, 12, 8, 255);
+            ToyKit.Anchor(sub.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, -85f), new Vector2(1200f, 70f));
+
+            var crack = ToyKit.UIImage("Crack", card.transform, new Color(1f, 1f, 1f, 0f), CrackSprite());
+            // 正方形のまま置く（横に伸ばすと線がつぶれる）
+            ToyKit.Anchor(crack, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(760f, 760f));
+            m_logoCrack = crack.GetComponent<Image>();
+            m_logoCrack.preserveAspect = true;
+
+            m_logoKnock = ToyKit.UIText("Knock", card.transform, font, "コツン", 40f, new Color(1f, 0.9f, 0.8f, 0f));
+            ToyKit.Anchor(m_logoKnock.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, 8f), new Vector2(400f, 50f));
+
+            card.SetActive(false);
+        }
+
+        void KnockLogo(StoryEpilogue ep)
+        {
+            if (m_logoCard != null)
+            {
+                m_logoCard.SetActive(true);
+                m_logoGroup.transform.SetAsLastSibling();   // 暗転より手前に出す
+                m_logoGroup.alpha = 1f;
+            }
+            if (m_logoKnock != null)
+            {
+                m_logoKnock.text = string.IsNullOrEmpty(ep.knockText) ? "コツン" : ep.knockText;
+                var c = m_logoKnock.color;
+                c.a = 0f;
+                m_logoKnock.color = c;
+            }
+            if (m_logoCrack != null)
+            {
+                var c = m_logoCrack.color;
+                c.a = 0f;
+                m_logoCrack.color = c;
+            }
+            m_crackTime = m_time;
+            m_camShake = 0.16f;
+            MenuSounds.Play(MatchSounds.Instance.BlockHitBlock, 0.75f);
+        }
+
+        void AnimateCrack()
+        {
+            if (m_crackTime < 0f) return;
+            float u = m_time - m_crackTime;
+            if (m_logoCrack != null)
+            {
+                var c = m_logoCrack.color;
+                c.a = u < 0.06f ? 1f : Mathf.Clamp01(1f - (u - 0.06f) / 1.2f);
+                m_logoCrack.color = c;
+            }
+            if (m_logoKnock != null)
+            {
+                var c = m_logoKnock.color;
+                c.a = u < 0.55f ? 1f : Mathf.Clamp01(1f - (u - 0.55f) / 0.9f);
+                m_logoKnock.color = c;
+            }
+        }
+
+        // エピローグのあいだの待ち。A で次のカットへ、B で残りを飛ばせる
+        IEnumerator EpilogueHold(float seconds)
+        {
+            float end = m_time + Mathf.Max(0.1f, seconds);
+            while (m_time < end)
+            {
+                if (MenuInput.Cancel()) { m_skipped = true; yield break; }
+                if (MenuInput.Submit() || MenuInput.AnyClick()) yield break;
+                yield return null;
+            }
+        }
+
+        List<StoryLine> LinesForScene(List<StoryLine> lines, string view, string firstView)
+        {
+            var list = new List<StoryLine>();
+            if (lines == null) return list;
+            foreach (var line in lines)
+            {
+                if (line == null) continue;
+                string scene = string.IsNullOrEmpty(line.scene) ? firstView : line.scene;
+                if (scene == view) list.Add(line);
+            }
+            return list;
+        }
+
+        void ApplyEpilogueShot(string view)
+        {
+            UseRoomCamera();
+            switch (view)
+            {
+                case "roster":
+                    SetShot(lt => P(-3.35f, 2.5f, 0.3f), lt => P(-5.75f, 2.5f, 0.3f), 42f);
+                    break;
+                case "doll":
+                    StartDollEye();
+                    SetShot(lt => P(2.65f, 1.79f, 3.45f), lt => P(2.65f, 1.66f, 4.5f), 30f);
+                    break;
+                default:
+                    SetShot(lt => P(-1.5f, 1.5f, -0.55f), lt => P(-1.5f, 0.95f, 1.3f), 34f);
+                    break;
+            }
+        }
+
+        // 新聞のあとの短いカットシーン（スキップ可）。終わったら黒い画面を残す
+        public IEnumerator PlayEpilogue(StoryChapter chapter, DialogueRunner dialogue)
+        {
+            var ep = chapter != null ? chapter.epilogue : null;
+            if (ep == null || !ep.enabled) yield break;
+
+            BuildEpilogue(ep);
+            m_epilogueOn = true;
+            m_time = 0f;
+            m_skipped = false;
+            m_advance = false;
+            m_opening = false;
+            m_stageMode = false;
+            m_venueMode = false;
+            m_finalMode = true;
+            m_finalScene = "room";
+            Show();
+            UseRoomCamera();
+            SetCaption(false);
+            SetTitle(false);
+            SetHint(false);
+            SetMemory(false);
+            SetCinema(true);
+            m_fadeGroup.alpha = 1f;
+            SetCaptionText(string.IsNullOrEmpty(ep.caption) ? "全国制覇の夜 ― 部室" : ep.caption);
+            SetShot(lt => P(-1.5f, 1.5f, -0.55f), lt => P(-1.5f, 0.95f, 1.3f), 34f);
+            yield return FadeTo(0f, 0.7f);
+            SetCaption(!string.IsNullOrEmpty(ep.caption));
+            SetHint(true);
+
+            var shots = ep.shots;
+            string firstView = "notebook";
+            if (shots != null)
+            {
+                foreach (var shot in shots)
+                {
+                    if (shot != null && !string.IsNullOrEmpty(shot.view)) { firstView = shot.view; break; }
+                }
+            }
+
+            if (shots != null)
+            {
+                foreach (var shot in shots)
+                {
+                    if (shot == null) continue;
+                    string view = string.IsNullOrEmpty(shot.view) ? "notebook" : shot.view;
+                    ApplyEpilogueShot(view);
+                    if (view == "logo")
+                    {
+                        // ロゴは黒い画面の上に出す（最後のカット）
+                        SetHint(false);
+                        yield return FadeTo(1f, 0.35f);
+                        KnockLogo(ep);
+                    }
+                    yield return EpilogueHold(Mathf.Max(1.0f, shot.seconds));
+                    if (m_skipped) break;
+
+                    var lines = LinesForScene(ep.lines, view, firstView);
+                    if (lines.Count > 0)
+                    {
+                        SetHint(false);
+                        yield return dialogue.PlayBig(chapter, lines);
+                        if (dialogue.WasSkipped) { m_skipped = true; break; }
+                        SetHint(true);
+                        yield return EpilogueHold(0.4f);
+                        if (m_skipped) break;
+                    }
+                }
+            }
+
+            SetHint(false);
+            SetCaption(false);
+            if (m_logoCard != null) m_logoCard.SetActive(false);
+            yield return FadeTo(1f, 0.6f);
+            m_epilogueOn = false;
+            ShowBlackCover();
+        }
+
         // 会話の背景にする（実際のステージをゆっくり寄る）
         public void ShowStageConversation(bool after)
         {
@@ -1512,6 +2364,9 @@ namespace Yurube.Story
 
             AnimateMembers();
             if (m_stageMode) AnimateStage();
+            AnimateBanner();
+            AnimateDollEye();
+            AnimateCrack();
 
             if (m_camera == null || m_camPos == null) return;
             float lt = m_time - m_shotStart;

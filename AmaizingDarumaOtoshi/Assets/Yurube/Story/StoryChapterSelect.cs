@@ -100,9 +100,6 @@ namespace Yurube.Story
             for (int i = 0; i < totalCount; i++)
             {
                 bool placeholder = i >= m_chapters.Count;
-                string chapterTitle = placeholder
-                    ? (i == totalCount - 1 ? "最終章「？？？」" : $"第{i}章「？？？」")
-                    : m_chapters[i].title;
                 var block = ToyKit.UIRounded("Chapter" + i, panel, Color.white, 20f);
                 ToyKit.Anchor(block, new Vector2(0.5f, 0.5f), new Vector2(0f, start + i * spacing),
                     new Vector2(1080f, blockHeight));
@@ -113,7 +110,8 @@ namespace Yurube.Story
                 m_outlines.Add(outline);
 
                 float fontSize = Mathf.Clamp(blockHeight * 0.52f, 24f, 38f);
-                var name = ToyKit.UIText("Name", block, m_font, chapterTitle, fontSize, ToyKit.Ink);
+                // 章の名前は Refresh で入れる（未解放の章は「？？？」に差し替わるため）
+                var name = ToyKit.UIText("Name", block, m_font, "", fontSize, ToyKit.Ink);
                 name.alignment = TextAlignmentOptions.Left;
                 name.fontStyle = FontStyles.Bold;
                 name.enableAutoSizing = true;
@@ -184,6 +182,20 @@ namespace Yurube.Story
             Refresh();
         }
 
+        // 段に出す名前。未実装の章は「？？？」、未解放の章は hiddenTitle があればそちら
+        string TitleFor(int index)
+        {
+            if (m_chapters == null) return "";
+            int totalCount = Mathf.Max(4, m_chapters.Count);
+            if (index >= m_chapters.Count)
+                return index == totalCount - 1 ? "最終章「？？？」" : $"第{index}章「？？？」";
+            var chapter = m_chapters[index];
+            if (chapter == null) return "";
+            if (!StoryProgress.IsUnlocked(chapter) && !string.IsNullOrEmpty(chapter.hiddenTitle))
+                return chapter.hiddenTitle;
+            return chapter.title;
+        }
+
         void Refresh()
         {
             for (int i = 0; i < m_blocks.Count; i++)
@@ -192,6 +204,8 @@ namespace Yurube.Story
                 bool cleared = !placeholder && StoryProgress.IsCleared(m_chapters[i].id);
                 bool unlocked = !placeholder && StoryProgress.IsUnlocked(m_chapters[i]);
                 bool selected = !placeholder && i == m_index;
+
+                m_titles[i].text = TitleFor(i);
 
                 m_blocks[i].color = placeholder
                     ? new Color(0.82f, 0.80f, 0.76f)
