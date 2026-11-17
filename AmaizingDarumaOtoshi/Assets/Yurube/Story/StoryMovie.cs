@@ -55,6 +55,7 @@ namespace Yurube.Story
         bool m_built, m_visible, m_skipped, m_sunset;
         bool m_opening, m_advance;
         float m_time;
+        Coroutine m_slowMo;   // 回想カットのスロー演出（Aで送ったら止める）
 
         // 直前のムービーを B でスキップしたか（章クリア済みの再プレイで、会話もまとめて飛ばすため）
         public bool WasSkipped { get; private set; }
@@ -964,7 +965,23 @@ namespace Yurube.Story
         // A：つぎへ（次のカットへ進む）
         IEnumerator At(float time)
         {
-            while (m_time < time + m_shift && !m_skipped && !m_advance) yield return null;
+            float target = time + m_shift;
+            while (m_time < target && !m_skipped && !m_advance) yield return null;
+            if (m_advance && !m_skipped)
+            {
+                // Aで早く送った分を、以降のカットの時刻から差し引く。
+                // 差し引かないと、飛ばした時間を次のカット（最後はタイトル前）で待ち直してしまい、
+                // 「Aで飛ばしたのにタイトルが出るのが遅い／長い」ことになる。
+                m_shift -= Mathf.Max(0f, target - m_time);
+
+                // 回想のスロー中にAで送った場合、次のカットまでスローのままにしない
+                if (m_slowMo != null)
+                {
+                    StopCoroutine(m_slowMo);
+                    m_slowMo = null;
+                    m_baseScale = 1f;
+                }
+            }
             m_advance = false;
         }
 
@@ -1009,6 +1026,7 @@ namespace Yurube.Story
         {
             m_time = 0f;
             m_shift = 0f;
+            m_slowMo = null;
             m_skipped = false;
             WasSkipped = false;
             m_advance = false;
@@ -1042,7 +1060,7 @@ namespace Yurube.Story
             // 3. 回想：片目のだるま（セピア・スロー）
             SetMemory(true);
             m_camShake = 0.12f;
-            StartCoroutine(SlowMo(0.35f, 1.0f));
+            m_slowMo = StartCoroutine(SlowMo(0.35f, 1.0f));
             SetShot(lt => P(2.65f, 1.76f, 3.55f - lt * 0.05f), lt => P(2.65f, 1.64f, 4.5f), 28f);
             yield return At(11.2f);
             SetMemory(false);
@@ -1075,6 +1093,7 @@ namespace Yurube.Story
         IEnumerator FinishOpening()
         {
             m_opening = false;
+            if (m_slowMo != null) { StopCoroutine(m_slowMo); m_slowMo = null; }
             SetHint(false);
             SetCaption(false);
             SetTitle(false);
