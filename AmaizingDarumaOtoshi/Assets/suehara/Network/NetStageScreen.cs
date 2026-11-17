@@ -5,7 +5,8 @@ using UnityEngine.UI;
 
 // ロビーで自分が遊びたいステージを選ぶ画面(NetSessionMenu の「ステージ」から開く)。見た目と操作はステージセレクト(ローカルの MatchSelect)と同じ:
 //  ・右にステージのマス(最後におまかせ)、左にカーソルが乗っているステージのプレビュー(動かせる見た目だけのステージ。右スティック / IJKL で見回す)
-//  ・自分のカーソルで A：そのステージに投票(試合を はじめるときに、みんなの票から抽選する)　B：もどる　Start：準備完了の切り替え
+//  ・自分のカーソルで A：そのステージに投票(試合を はじめるときに、みんなの票から抽選する)/右上のボタン　B：変えたものを保存せずロビーに戻る(開いたときの票・準備完了に戻す)
+//  ・右上の「じゅんび完了」ボタン・Start: 準備完了にしてロビーに戻る(ホスト・観戦の人は準備完了が無いので「もどる」)
 //  ・選んだマスに自分のコイン。ステージを変えると準備完了は外れる(ホストが外す)
 public class NetStageScreen : MonoBehaviour
 {
@@ -28,7 +29,9 @@ public class NetStageScreen : MonoBehaviour
     public bool IsOpen { get; private set; }
 
     NetSelectLook m_look;
-    RectTransform m_canvas, m_root, m_cursor, m_token, m_previewFrame;
+    RectTransform m_canvas, m_root, m_cursor, m_token, m_previewFrame, m_back;
+    Image m_backBg;
+    TextMeshProUGUI m_backText;
     readonly List<Tile> m_tiles = new List<Tile>();
     TextMeshProUGUI m_previewLetter, m_previewName, m_description, m_status, m_hint;
     RawImage m_previewImage;
@@ -42,6 +45,9 @@ public class NetStageScreen : MonoBehaviour
     Vector2 m_cursorPos;
     int m_openFrame;
     bool m_fogWasOn;
+    // 開いたときの票と準備完了(B で閉じたら、ここに戻す)
+    int m_openVote;
+    bool m_openReady, m_changed;
 
     public void Open()
     {
@@ -53,7 +59,20 @@ public class NetStageScreen : MonoBehaviour
         m_cursorPos = current != null ? current.rect.anchoredPosition : m_tiles.Count > 0 ? m_tiles[0].rect.anchoredPosition : Vector2.zero;
         m_previewTile = null;
         m_placed = null;
+        // B で閉じたときに戻すため、いまの票と準備完了を覚えておく
+        var local = NetMatchPlayer.Local;
+        m_openVote = current != null ? current.index : NetCharacterList.None;
+        m_openReady = local != null && local.Status == NetMatchPlayer.NetStatus.Ready;
+        m_changed = false;
         MenuSounds.Decide();
+    }
+
+    // B: この画面で変えた票を元に戻す(準備完了だったら、それも戻す)
+    void Revert(NetMatchPlayer local)
+    {
+        if (!m_changed) return;
+        local.RequestStage(m_openVote);
+        if (m_openReady && CanReady(local)) local.RequestReady(true);
     }
 
     public void Close()
@@ -93,19 +112,23 @@ public class NetStageScreen : MonoBehaviour
                 m_yaw += s.look.x * 100f * dt;
                 m_pitch = Mathf.Clamp(m_pitch - s.look.y * 45f * dt, -30f, 25f);
             }
-            if (s.b) { MenuSounds.Cancel(); Close(); return; }
-            if (s.start && !local.IsHostPlayer && local.InMatch)
+            // B: 変えたものを保存せず(元に戻して)ロビーに戻る(メニューも閉じる)
+            if (s.b) { MenuSounds.Cancel(); Revert(local); Close(); return; }
+            // 右上のボタン・Start: 準備完了にしてロビーに戻る(ホスト・観戦の人は「もどる」)
+            if (s.start || (s.a && NetSelectLook.Hit(m_canvas, m_back, m_cursorPos)))
             {
-                bool ready = local.Status != NetMatchPlayer.NetStatus.Ready;
-                local.RequestReady(ready);
-                if (ready) MenuSounds.Decide(); else MenuSounds.Cancel();
+                if (CanReady(local)) { local.RequestReady(true); MenuSounds.Decide(); }
+                else MenuSounds.Cancel();
+                Close();
+                return;
             }
-            else if (s.a)
+            if (s.a)
             {
                 var tile = TileAt(m_cursorPos);
                 if (tile != null)
                 {
                     MenuSounds.Decide();
+                    m_changed = true;
                     local.RequestStage(tile.index);
                 }
             }
@@ -128,6 +151,9 @@ public class NetStageScreen : MonoBehaviour
 
     Tile TileAt(Vector2 point) => m_tiles.Find(t => NetSelectLook.Contains(t.rect, t.size, point));
 
+    // ホスト以外で、試合に出る人だけ準備完了にできる
+    static bool CanReady(NetMatchPlayer local) => local != null && !local.IsHostPlayer && local.InMatch;
+
     void UpdateLook(NetMatchPlayer local, Tile hover, float dt)
     {
         float k = 1f - Mathf.Exp(-14f * dt);
@@ -149,12 +175,13 @@ public class NetStageScreen : MonoBehaviour
 
         // 下の状態: いま投票しているステージと、準備完了
         string vote = current == null ? "まだ えらんでいません" : current.stage != null ? current.stage.displayName : m_look.Texts.randomStage;
-        bool canReady = !local.IsHostPlayer && local.InMatch;
-        bool ready = local.Status == NetMatchPlayer.NetStatus.Ready;
-        m_status.text = $"{local.Label} の投票：{vote}" + (canReady ? (ready ? "　<color=#E8443F>じゅんびOK！</color>" : "") : "");
-        m_hint.text = canReady
-            ? "スティック：うごかす　A：投票する　Start：じゅんび完了　B：もどる"
-            : "スティック：うごかす　A：投票する　B：もどる";
+        bool canReady = CanReady(local);
+        m_status.text = $"{local.Label} の投票：{vote}";
+        m_hint.text = canReady ? "A：投票する　Start：じゅんび完了　B：もどる" : "A：投票する　B / Start：もどる";
+
+        // 右上のボタン(準備完了にしてロビーへ。ホスト・観戦の人は「もどる」)
+        NetSelectLook.SetTopButton(m_back, m_backBg, m_backText, canReady);
+        m_back.localScale = Vector3.Lerp(m_back.localScale, Vector3.one * (NetSelectLook.Hit(m_canvas, m_back, m_cursorPos) ? 1.08f : 1f), k);
     }
 
     // カーソルが乗ったステージを左の枠に映す(変わったときだけ。ステージセレクトと同じ)
@@ -255,10 +282,11 @@ public class NetStageScreen : MonoBehaviour
 
         BuildPreview();
 
-        // 操作の説明(右上。見出しと同じ高さ)
-        m_hint = ToyKit.UIText("Hint", m_root, look.Font, "", 30f, ToyKit.Ink);
+        // 右上: 「じゅんび完了」(ホスト・観戦の人は「もどる」)のボタンと、その左に操作の説明
+        m_back = look.TopButton(m_root, "Ready", 170f, 280f, out m_backBg, out m_backText);
+        m_hint = ToyKit.UIText("Hint", m_root, look.Font, "", 28f, ToyKit.Ink);
         m_hint.alignment = TextAlignmentOptions.Right;
-        ToyKit.Anchor(m_hint.rectTransform, new Vector2(1f, 1f), new Vector2(-560f, -85f), new Vector2(1040f, 44f));
+        ToyKit.Anchor(m_hint.rectTransform, new Vector2(1f, 1f), new Vector2(-760f, -85f), new Vector2(880f, 44f));
 
         var local = NetMatchPlayer.Local;
         string label = local != null ? local.Label : "1P";

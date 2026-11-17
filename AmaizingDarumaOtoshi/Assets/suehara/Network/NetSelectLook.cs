@@ -148,6 +148,35 @@ public class NetSelectLook
 
     public static string Initial(string name) => string.IsNullOrEmpty(name) ? "" : name.Substring(0, 1);
 
+    // 右上に並べるボタン(カーソルで押す。「もどる」「じゅんび完了」)。right: 画面の右端からボタンの中心まで
+    public RectTransform TopButton(Transform parent, string name, float right, float width, out Image bg, out TextMeshProUGUI text)
+    {
+        var r = ToyKit.UIImage(name, parent, Color.white, UiSprite);
+        r.GetComponent<Image>().pixelsPerUnitMultiplier = 0.4f;
+        ToyKit.Anchor(r, new Vector2(1f, 1f), new Vector2(-right, -85f), new Vector2(width, 96f));
+        var ol = r.gameObject.AddComponent<Outline>(); ol.effectColor = ToyKit.Ink; ol.effectDistance = new Vector2(3f, -3f);
+        bg = r.GetComponent<Image>();
+        text = ToyKit.UIText("Text", r, Font, "", 40f, ToyKit.Ink);
+        text.fontSharedMaterial = LetterMat;
+        text.enableAutoSizing = true; text.fontSizeMin = 20f; text.fontSizeMax = 40f;
+        ToyKit.Stretch(text.rectTransform);
+        text.rectTransform.offsetMin = new Vector2(10f, 6f);
+        text.rectTransform.offsetMax = new Vector2(-10f, -6f);
+        return r;
+    }
+
+    // 右上のボタンを「じゅんび完了」(準備完了にしてロビーへ)か「もどる」(ホスト・観戦の人)にする
+    public static void SetTopButton(RectTransform button, Image bg, TextMeshProUGUI text, bool ready)
+    {
+        bg.color = ready ? ToyKit.Palette[0] : Color.white;
+        text.color = ready ? Color.white : ToyKit.Ink;
+        text.text = ready ? "じゅんび完了！" : "もどる";
+    }
+
+    // カーソル(canvas 上の位置)が UI の上にあるか
+    public static bool Hit(RectTransform canvas, RectTransform rect, Vector2 cursor) =>
+        rect.gameObject.activeInHierarchy && RectTransformUtility.RectangleContainsScreenPoint(rect, canvas.TransformPoint(cursor), null);
+
     // ★の画像(MatchSelect と同じ5つの角の星)
     static Sprite s_star;
     public static Sprite StarSprite
@@ -201,10 +230,13 @@ public class NetSelectLook
     }
 
     // キーボード・コントローラーをまとめて読む(MatchSelect.Read と同じボタン。Enter は Start)
+    // 試すとき(MCP などでウィンドウが裏にあるとき)だけ、裏でも入力を読む
+    public static bool IgnoreFocusForTest;
+
     public static Pad Read()
     {
         var s = new Pad();
-        if (!Application.isFocused) return s;
+        if (!Application.isFocused && !IgnoreFocusForTest) return s;
         foreach (var g in Gamepad.all)
         {
             var m = g.leftStick.ReadValue();
