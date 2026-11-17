@@ -6,7 +6,7 @@ using UnityEngine.UI;
 namespace Yurube.Story
 {
     // 章選択。メインメニューの「ものがたり」から開く。
-    //  ・Resources/Story/*.json を order の小さい順に、積み木の段として下から積む
+    //  ・Resources/Story/*.json を order の小さい順に、積み木の段として上から積む（序章が一番上、最終章が一番下）
     //  ・クリア済みは色付き、未解放は灰色でロック
     //  ・A：けってい / B：もどる
     // 章を増やすときは JSON を足すだけで、この画面の並びも自動で増える。
@@ -101,7 +101,8 @@ namespace Yurube.Story
             {
                 bool placeholder = i >= m_chapters.Count;
                 var block = ToyKit.UIRounded("Chapter" + i, panel, Color.white, 20f);
-                ToyKit.Anchor(block, new Vector2(0.5f, 0.5f), new Vector2(0f, start + i * spacing),
+                // 並びは上が序章（若い章）、下が最終章。i が大きいほど下に置く
+                ToyKit.Anchor(block, new Vector2(0.5f, 0.5f), new Vector2(0f, start + (totalCount - 1 - i) * spacing),
                     new Vector2(1080f, blockHeight));
                 var image = block.GetComponent<Image>();
                 var outline = block.gameObject.AddComponent<Outline>();
@@ -160,7 +161,7 @@ namespace Yurube.Story
                 lastUnlocked = i;
                 if (!StoryProgress.IsCleared(m_chapters[i].id)) return i;
             }
-            // 全部クリア済みなら、最後に遊べる章（第2章）を選んでおく
+            // 全部クリア済みなら、最後に遊べる章（最終章）を選んでおく
             return lastUnlocked;
         }
 
@@ -170,8 +171,9 @@ namespace Yurube.Story
             if (MenuInput.Cancel()) { Close(); return; }
             if (m_chapters == null || m_chapters.Count == 0) return;
 
-            if (MenuInput.Up()) Move(1);
-            else if (MenuInput.Down()) Move(-1);
+            // 上の段（序章側）へは index を下げる、下の段（最終章側）へは上げる
+            if (MenuInput.Up()) Move(-1);
+            else if (MenuInput.Down()) Move(1);
             else if (MenuInput.Submit()) StartSelected();
         }
 
