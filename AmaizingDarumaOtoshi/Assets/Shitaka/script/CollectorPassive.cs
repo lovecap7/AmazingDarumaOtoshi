@@ -16,6 +16,7 @@ public class CollectorPassive : MonoBehaviour
     float edgeRatio;        // 範囲の端での強さ(本体のすぐ近くを1とした割合)
     float collectDistance;  // この距離まで近づいたら回収する
     float flyingPullRatio;  // 飛んでいる積み木への引力の割合(0で影響なし、1で地面と同じ)
+    const float IdleSpeedThreshold = 0.3f;  // この速さ未満なら「止まっている」とみなす(水平方向)
 
     // 回収されたときに通知する。プレイヤー側が購読して、手持ちの積み木に加える
     public event Action<BlockController> OnCollected;
@@ -49,9 +50,10 @@ public class CollectorPassive : MonoBehaviour
     {
         if (owner == null)
         {
-            //if (log) Debug.Log("[Collector] ownerがnull", this);
             return;
         }
+
+        bool idle = IsIdle();
 
         // 止まっている間だけ重くして、押されても動きにくくする。
         // 飛行中は元の質量に戻すので、打ち出しの挙動は変わらない
@@ -60,12 +62,8 @@ public class CollectorPassive : MonoBehaviour
             ownerRb.mass = owner.isFlying ? originalMass : originalMass * HeavyMultiplier;
         }
 
-        // 本体が飛んでいる間は働かない
-        if (owner.isFlying)
-        {
-            //if (log) Debug.Log("[Collector] 本体が飛行中のため停止", this);
-            return;
-        }
+        // 動いている間は引き寄せない
+        if (!idle) return;
 
         Vector3 center = transform.position;
         var handled = new HashSet<BlockController>();
@@ -150,5 +148,15 @@ public class CollectorPassive : MonoBehaviour
     {
         Gizmos.color = Color.cyan;
         Gizmos.DrawWireSphere(transform.position, range);
+    }
+
+    // 本体が止まっているか(水平方向の速さが一定未満か)
+    bool IsIdle()
+    {
+        if (ownerRb == null) return !owner.isFlying; // Rigidbodyが取れない場合の保険
+
+        Vector3 v = ownerRb.linearVelocity;
+        v.y = 0f; // 落下や積み上げの上下の動きは無視する
+        return v.sqrMagnitude < IdleSpeedThreshold * IdleSpeedThreshold;
     }
 }
