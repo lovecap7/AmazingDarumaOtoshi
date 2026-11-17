@@ -190,6 +190,30 @@ public class GameModelSettings : ScriptableObject
         return m;
     }
 
+    // Fit(src, target, uniform: true, yaw) と同じ置き方を、Transform の値（回転・拡大・位置）で返す。
+    // 頭のモデルと同じ原点で作った別のモデル（マントなど）を、Fit した頭にぴったり重ねるために使う
+    public static bool FitTransform(Mesh src, Bounds target, float yaw, out Quaternion rotation, out float scale, out Vector3 offset)
+    {
+        rotation = Quaternion.Euler(0f, yaw, 0f);
+        scale = 1f; offset = Vector3.zero;
+        if (src == null) return false;
+        Bounds b;
+        if (src.isReadable)
+        {
+            var v = src.vertices;
+            b = new Bounds(v.Length > 0 ? rotation * v[0] : Vector3.zero, Vector3.zero);
+            foreach (var p in v) b.Encapsulate(rotation * p);
+        }
+        else
+        {
+            b = src.bounds;
+            if (Mathf.Abs(yaw) > 0.01f) return false;
+        }
+        scale = Mathf.Min(target.size.x / Mathf.Max(b.size.x, 1e-5f), target.size.y / Mathf.Max(b.size.y, 1e-5f), target.size.z / Mathf.Max(b.size.z, 1e-5f));
+        offset = new Vector3(target.center.x - b.center.x * scale, target.min.y - b.min.y * scale, target.center.z - b.center.z * scale);
+        return true;
+    }
+
     // モデル（fbx）の中の最初のメッシュとマテリアル
     public static bool MeshOf(GameObject model, out Mesh mesh, out Material material)
     {

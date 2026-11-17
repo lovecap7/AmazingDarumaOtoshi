@@ -1761,7 +1761,7 @@ public class MatchSelect : MonoBehaviour
         battleButtonText.enableAutoSizing = true; battleButtonText.fontSizeMin = 20f; battleButtonText.fontSizeMax = 40f;
         ToyKit.Stretch(battleButtonText.rectTransform);
 
-        // 報酬キャラクター（だるきんぐ）は、実績を全部解除するまで一覧に出さない
+        // 報酬キャラクター（だるまおとし）は、実績を全部解除するまで一覧に出さない
         // 並べるキャラ：SelectRoster の characterOrder（空なら全キャラ）の順。ずかんも同じ順
         var characters = Yurube.Achievements.AchievementRewards.AvailableCharacters(roster.OrderedCharacters());
         int count = characters.Count + (showRandomCharacter ? 1 : 0);   // 最後にランダム

@@ -18,6 +18,13 @@ public class CharacterData : ScriptableObject
     public GameObject model;
     [Tooltip("キャラのハンマーのモデル（Model/Hammer/hammer_<id>.fbx）。試合・タイトル・ムービーで、このキャラが持つハンマーになる（空なら共通のハンマー）")]
     public GameObject hammerModel;
+    [Tooltip("頭と一緒に付けるモデル（マント・アクセサリーなど。頭のモデルと同じ原点・大きさで書き出したもの）。試合の頭と顔写真に付く。" +
+             "骨の名前が Cape_ で始まるモデル（マント）は、試合で CapeSway で揺れる")]
+    public GameObject[] extraModels;
+    [Tooltip("ハンマー（武器）の届く距離の倍率。1 = ふつうのハンマー。2 なら試合での見た目の長さも当たる距離も倍（だるきんぐの剣）")]
+    [Min(0.5f)] public float weaponReach = 1f;
+    [Tooltip("メニュー画面のランダムなだるま（頭とカーソルのハンマーが組で出る）に出すか。だるきんぐは剣がカーソルに合わないのでオフ")]
+    public bool showInMenu = true;
 
     // セレクト画面・ずかんのアイコンの背景。どのキャラも薄い水色（だるまの色が映えるように。color は使わない）
     public static readonly Color IconBackground = new Color(0.78f, 0.9f, 0.98f);

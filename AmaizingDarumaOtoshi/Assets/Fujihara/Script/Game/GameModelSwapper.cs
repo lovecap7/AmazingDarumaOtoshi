@@ -87,11 +87,38 @@ public class GameModelSwapper : MonoBehaviour
 
         if (!ghost)
         {
+            AttachExtras(body, head, mesh, target, data);
             if (mat != null) SetFirstMaterial(mr, mat);
             // ゲームは頭の色を _BaseColor で付けるが、モデルは画像に色があるので、この材質だけ白にしておく
             mr.SetPropertyBlock(white, 0);
             // モデルに顔が描いてあるので、球の目は隠す
             foreach (Transform c in head) if (c.name == "Eye") c.gameObject.SetActive(false);
+        }
+    }
+
+    // ---------------- マント・アクセサリー ----------------
+    // CharacterData.extraModels を、頭（Fit した頭のメッシュ）にぴったり重ねて付ける。
+    // マント（Cape_ の骨があるもの）には CapeSway を付けて揺らし、必殺技の溜め中は大きくなびかせる
+    void AttachExtras(Transform body, Transform head, Mesh headMesh, Bounds target, CharacterData data)
+    {
+        if (data.extraModels == null || data.extraModels.Length == 0) return;
+        if (!GameModelSettings.FitTransform(headMesh, target, settings.headYaw, out var rot, out float k, out var offset)) return;
+        foreach (var extra in data.extraModels)
+        {
+            if (extra == null) continue;
+            var go = Instantiate(extra, head, false);
+            go.name = "Extra_" + extra.name;
+            go.transform.localRotation = rot;
+            go.transform.localScale = Vector3.one * k;
+            go.transform.localPosition = offset;
+            foreach (var smr in go.GetComponentsInChildren<SkinnedMeshRenderer>(true)) smr.updateWhenOffscreen = true;
+
+            bool hasCape = false;
+            foreach (var t in go.GetComponentsInChildren<Transform>(true))
+                if (t.name.StartsWith("Cape_") && t.name.EndsWith("1")) { hasCape = true; break; }
+            if (!hasCape) continue;
+            var sway = go.AddComponent<CapeSway>();
+            go.AddComponent<CapeChargeFromSpecial>().Init(sway, body);
         }
     }
 
@@ -105,6 +132,15 @@ public class GameModelSwapper : MonoBehaviour
         if (data == null || data.hammerModel == null) return;
         var hammer = body.GetComponentInChildren<DarumaHammer>(true);
         if (hammer == null) return;
+
+        // 武器の届く距離（だるきんぐの剣は倍）。性能はこのキャラのハンマーだけの複製にして、当たる距離を伸ばす
+        float reach = Mathf.Max(0.5f, data.weaponReach);
+        if (!Mathf.Approximately(reach, 1f) && hammer.Params != null)
+        {
+            var p = Instantiate(hammer.Params);
+            p.HitReachScale *= reach;
+            hammer.Params = p;
+        }
         var pivot = hammer.transform;
         var model = ToyKit.CreateHammerModel("HammerModelHead", data.hammerModel);
         if (model == null) return;
@@ -119,7 +155,14 @@ public class GameModelSwapper : MonoBehaviour
         model.name = "HammerModel";
         model.SetParent(pivot, false);
         model.localRotation = Quaternion.Euler(0f, 0f, 90f);   // 頭を X 向きから Y 向きへ
-        model.localScale = Vector3.one * (GameHammerHeadZ / ToyKit.HammerLength);
+        float scale = GameHammerHeadZ / ToyKit.HammerLength;
+        // 届く距離を変えた武器は、先の長さが「ふつうのハンマーの先 × 倍率」になるように大きさを合わせる
+        if (!Mathf.Approximately(reach, 1f) && GameModelSettings.MeshOf(data.hammerModel, out var wMesh, out _))
+        {
+            float normalTop = GameModelSettings.MeshOf(GameModelSettings.HammerModel, out var hMesh, out _) ? hMesh.bounds.max.y : ToyKit.HammerLength + 0.3f;
+            scale *= reach * normalTop / Mathf.Max(wMesh.bounds.max.y, 0.01f);
+        }
+        model.localScale = Vector3.one * scale;
     }
 
     // ---------------- 積み木 ----------------

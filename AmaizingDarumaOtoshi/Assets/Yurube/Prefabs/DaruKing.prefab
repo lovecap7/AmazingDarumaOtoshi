@@ -765,7 +765,7 @@ MonoBehaviour:
   m_chargeDuration: 2
   m_anyButtonMinTime: 0.15
   m_chargeTurnSpeed: 90
-  m_strikeDelay: 0.5
+  m_strikeDelay: 0
   m_attackLength: 14
   m_useStageLength: 1
   m_stageOvershoot: 2

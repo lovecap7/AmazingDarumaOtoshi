@@ -5,15 +5,16 @@ namespace Yurube.Achievements
 {
     // 実績の報酬（キャラクターの解放）。
     // すべての実績（ダイヤモンドの「完全なる制覇」を含む）を解除すると、
-    // 報酬キャラクター「だるきんぐ」がキャラクターセレクトで選べるようになる。
+    // 報酬キャラクター「だるまおとし」がキャラクターセレクトで選べるようになる。
+    // （2026-11-17 Fujihara：報酬キャラをだるきんぐ → だるまおとしに変更。だるきんぐは最初から選べる）
     // 解放状態はセーブに別持ちせず、実績の解除状況から毎回求める（実績を消せば元に戻る）。
     // 「全実績」の数は固定値ではなく、いま定義されている実績の総数を見る。
     public static class AchievementRewards
     {
         // 報酬キャラクターの CharacterData.id（セレクトの一覧と同じ名前）
-        public const string RewardCharacterId = "daruking";
+        public const string RewardCharacterId = "darumaotoshi";
 
-        public static string RewardCharacterName => "だるきんぐ";
+        public static string RewardCharacterName => "だるまおとし";
 
         // 報酬キャラクターが解放済みか（全実績解除）
         public static bool IsRewardUnlocked => AchievementManager.AllUnlocked;

@@ -510,11 +510,12 @@ public class MainMenu : MonoBehaviour
     }
 
     // ランダムに選ぶだるま：SelectRoster の並び（キャラクターセレクトと同じ）のうち、頭のモデルがあり、選べるようになっているキャラ
+    // （CharacterData の「メニューに出す」がオフのキャラは出さない。だるきんぐは剣がカーソルに合わないので出さない）
     CharacterData PickDaruma()
     {
         if (roster == null) return null;
         var list = Yurube.Achievements.AchievementRewards.AvailableCharacters(roster.OrderedCharacters())
-            .FindAll(c => c != null && c.model != null);
+            .FindAll(c => c != null && c.model != null && c.showInMenu);
         return list.Count > 0 ? list[UnityEngine.Random.Range(0, list.Count)] : null;
     }
 
