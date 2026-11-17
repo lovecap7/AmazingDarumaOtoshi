@@ -138,8 +138,15 @@ public class NetSessionMenu : MonoBehaviour
 
         if (!IsOpen)
         {
+            bool busy = NetSceneFlow.IsBusy || Fader.IsBusy || NetStageLottery.IsPlaying;
+            // ホスト: ワンボタンで試合を始める(参加する人が全員準備完了か観戦のとき。キーボードは N、コントローラーは右スティックの押し込み)
+            if (CanEditRules && !busy && Net.CanStart && PressedQuickStart())
+            {
+                MenuSounds.Decide();
+                Net.StartWithLottery(BuildRules());
+            }
             // 試合中・画面の切り替え中・リザルトへ移る前は開かない
-            if (!PlayingNow && !NetSceneFlow.IsBusy && !Fader.IsBusy && !NetStageLottery.IsPlaying && PressedToggle()) Open();
+            else if (!PlayingNow && !busy && PressedToggle()) Open();
         }
         else if (PlayingNow)
         {
@@ -215,7 +222,10 @@ public class NetSessionMenu : MonoBehaviour
         }
         m_infoState.text = net != null ? $"{phase} ・ {playing}人" + (watching > 0 ? $"(観戦 {watching}人)" : "") : "";
         m_infoHint.text = net != null && !net.IsStarted
-            ? (host ? "Start：メニュー(試合を はじめる・設定)" : "ホストが はじめるのを まっています　Start：メニュー")
+            ? (host
+                ? (net.CanStart ? "N / R3：試合を はじめる　Start：メニュー"
+                   : net.NotReadyCount > 0 ? $"準備まち {net.NotReadyCount}人　Start：メニュー" : "出る人が いません　Start：メニュー")
+                : "ホストが はじめるのを まっています　Start：メニュー")
             : PlayingNow ? "" : "Start：メニュー";
         // 試合中はじゃまにならないように薄くする
         var g = m_info.GetComponent<CanvasGroup>();
@@ -666,11 +676,11 @@ public class NetSessionMenu : MonoBehaviour
 
     void UpdatePicker()
     {
-        // キャラクターセレクトと同じ見た目の画面: 操作はその画面がする。閉じたらメニューに戻る
+        // キャラクターセレクトと同じ見た目の画面: 操作はその画面がする。閉じたら(B・もどる)メニューも閉じてロビーに戻る
         if (m_picker == null)
         {
             if (!CanPick(m_screenKind)) { ClosePicker(false); return; }
-            if (!ScreenOpen) ClosePicker(false);
+            if (!ScreenOpen) Close(false);
             return;
         }
         var kind = m_picker.kind;
@@ -891,6 +901,15 @@ public class NetSessionMenu : MonoBehaviour
         foreach (var g in Gamepad.all) if (g.buttonEast.wasPressedThisFrame) return true;
         var k = Keyboard.current;
         return k != null && (k.escapeKey.wasPressedThisFrame || k.backspaceKey.wasPressedThisFrame);
+    }
+
+    // ホストのワンボタン開始: キーボードは N、コントローラーは右スティックの押し込み(ゲームの操作・メニューで使っていないボタン)
+    static bool PressedQuickStart()
+    {
+        if (!Application.isFocused) return false;
+        foreach (var g in Gamepad.all) if (g.rightStickButton.wasPressedThisFrame) return true;
+        var k = Keyboard.current;
+        return k != null && k.nKey.wasPressedThisFrame;
     }
 
     // Start(+)・キーボードは Tab(試合のポーズと同じ)
