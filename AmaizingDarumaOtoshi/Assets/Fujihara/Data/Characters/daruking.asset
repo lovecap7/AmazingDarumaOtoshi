@@ -15,8 +15,15 @@ MonoBehaviour:
   id: daruking
   displayName: "\u3060\u308B\u304D\u3093\u3050"
   color: {r: 0.55, g: 0.35, b: 0.7, a: 1}
-  portrait: {fileID: 0}
+  portrait: {fileID: 5860716244158402312, guid: b4b3e1996e5cf4644a5fd4a921df1136, type: 3}
+  model: {fileID: 919132149155446097, guid: d4e26a856c72fdb4fa59033ca57f12e5, type: 3}
+  hammerModel: {fileID: 919132149155446097, guid: fa206aaa350431d44b80ed425771030e, type: 3}
+  extraModels:
+  - {fileID: 919132149155446097, guid: 603815a439ff53544a44892c439d8b15, type: 3}
+  weaponReach: 2
+  showInMenu: 0
   prefab: {fileID: 9069936943766670842, guid: f5f7f025287ece1ed1a8a07c2d3aced3, type: 3}
+  ease: 3
   passiveColor: 0
   passiveCount: 0
   passiveName: "\u7A4D\u307F\u67282\u6BB5"

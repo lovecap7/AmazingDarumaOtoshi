@@ -28,7 +28,7 @@ public static class CharacterPortraitBaker
             if (c == null || c.model == null) continue;
             string id = string.IsNullOrEmpty(c.id) ? c.name : c.id;
             string path = $"{OutFolder}/{id}.png";
-            File.WriteAllBytes(path, Render(c.model));
+            File.WriteAllBytes(path, Render(c.model, c.extraModels));
             AssetDatabase.ImportAsset(path);
             var imp = (TextureImporter)AssetImporter.GetAtPath(path);
             imp.textureType = TextureImporterType.Sprite;
@@ -45,20 +45,25 @@ public static class CharacterPortraitBaker
         Debug.Log($"[CharacterPortraitBaker] {count} キャラの顔写真を撮りました（{OutFolder}）");
     }
 
-    static byte[] Render(GameObject model)
+    // extras：頭と一緒に写すモデル（マント・アクセサリー。頭と同じ原点で作ったもの）
+    public static byte[] Render(GameObject model, GameObject[] extras = null)
     {
         var scene = EditorSceneManager.NewPreviewScene();
         try
         {
             var go = (GameObject)Object.Instantiate(model);
             SceneManager_Move(go, scene);
-
+            // 写す範囲は頭のモデルだけで決める（マントなどで広げると、ほかのキャラより小さく写ってしまうので）
             var b = new Bounds(go.transform.position, Vector3.zero);
             bool first = true;
             foreach (var r in go.GetComponentsInChildren<Renderer>())
             {
                 if (first) { b = r.bounds; first = false; } else b.Encapsulate(r.bounds);
             }
+            if (extras != null)
+                foreach (var e in extras)
+                    if (e != null) Object.Instantiate(e, go.transform, false);
+            AddReflections();
 
             var cam = new GameObject("Camera").AddComponent<Camera>();
             SceneManager_Move(cam.gameObject, scene);
@@ -113,8 +118,65 @@ public static class CharacterPortraitBaker
         finally
         {
             EditorSceneManager.ClosePreviewScene(scene);
+            if (s_envCube != null)
+            {
+                RenderSettings.defaultReflectionMode = s_oldReflMode;
+                RenderSettings.customReflectionTexture = s_oldReflTex;
+                Object.DestroyImmediate(s_envCube);
+            }
+            s_envCube = null;
         }
     }
+
+    // 写真の中は周りに映す景色が無いので、金属（だるきんぐの金など）は暗く写ってしまう。
+    // 上が明るく下が暗い、スタジオのような景色（キューブマップ）を作って、映り込みに使う。
+    // 金属でないキャラは映り込みが弱いので、写りはほぼ変わらない
+    static Cubemap s_envCube;
+    static void AddReflections()
+    {
+        const int n = 64;
+        s_envCube = new Cubemap(n, TextureFormat.RGBA32, false);
+        var top = new Color(1.0f, 0.98f, 0.94f);
+        var horizon = new Color(0.5f, 0.42f, 0.33f);
+        var bottom = new Color(0.14f, 0.1f, 0.07f);
+        var px = new Color[n * n];
+        foreach (CubemapFace face in System.Enum.GetValues(typeof(CubemapFace)))
+        {
+            if (face == CubemapFace.Unknown) continue;
+            for (int y = 0; y < n; y++)
+                for (int x = 0; x < n; x++)
+                {
+                    float u = (x + 0.5f) / n * 2f - 1f, v = (y + 0.5f) / n * 2f - 1f;
+                    Vector3 d;
+                    switch (face)
+                    {
+                        case CubemapFace.PositiveX: d = new Vector3(1f, -v, -u); break;
+                        case CubemapFace.NegativeX: d = new Vector3(-1f, -v, u); break;
+                        case CubemapFace.PositiveY: d = new Vector3(u, 1f, v); break;
+                        case CubemapFace.NegativeY: d = new Vector3(u, -1f, -v); break;
+                        case CubemapFace.PositiveZ: d = new Vector3(u, -v, 1f); break;
+                        default: d = new Vector3(-u, -v, -1f); break;
+                    }
+                    float h = d.normalized.y;
+                    var c = h >= 0f ? Color.Lerp(horizon, top, Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(h * 1.6f))) : Color.Lerp(horizon, bottom, Mathf.Pow(-h, 0.5f));
+                    // 斜め上に明るい窓（ハイライト）を1つ
+                    var dn = d.normalized;
+                    float win = Mathf.Clamp01((Vector3.Dot(dn, new Vector3(0.5f, 0.6f, 0.6f).normalized) - 0.9f) * 12f);
+                    px[y * n + x] = Color.Lerp(c, Color.white * 1.0f, win);
+                }
+            s_envCube.SetPixels(px, face);
+        }
+        s_envCube.Apply();
+
+        // 写真用のシーンでは Reflection Probe が効かず、空の映り込み（青）が使われて金が緑っぽくなるので、
+        // 撮る間だけ全体の映り込みをこの景色にする（撮り終わったら Render の finally で元に戻す）
+        s_oldReflMode = RenderSettings.defaultReflectionMode;
+        s_oldReflTex = RenderSettings.customReflectionTexture;
+        RenderSettings.defaultReflectionMode = DefaultReflectionMode.Custom;
+        RenderSettings.customReflectionTexture = s_envCube;
+    }
+    static DefaultReflectionMode s_oldReflMode;
+    static Texture s_oldReflTex;
 
     static void SceneManager_Move(GameObject go, UnityEngine.SceneManagement.Scene scene) =>
         UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(go, scene);
