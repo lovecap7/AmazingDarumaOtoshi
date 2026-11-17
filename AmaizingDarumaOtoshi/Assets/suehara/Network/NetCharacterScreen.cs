@@ -7,8 +7,10 @@ using UnityEngine.UI;
 // ロビーで自分のキャラを変える画面(NetSessionMenu の「キャラクター」から開く)。見た目と操作はキャラクターセレクト(MatchSelect)と同じ:
 //  ・キャラのマス(キャラクターセレクトと同じ並び。まだ選べないキャラ(だるきんぐ)は出さない。最後にランダム)
 //  ・自分のカーソル(スティック・十字キー・WASD で動かす)、選んだマスにコイン、下に自分の枠(顔・名前・使いやすさの★)
-//  ・A：マスを選ぶ(すぐにホストへ頼み、体が入れ替わる)/準備完了のボタンを押す　B：もどる　Start：準備完了の切り替え
-//  ・枠の右に準備完了のボタン(ホスト以外で、試合に出る人だけ)。キャラを変えると準備完了は外れる(ホストが外す)
+//  ・A：マスを選ぶ(すぐにホストへ頼み、体が入れ替わる)/右上のボタンを押す
+//  ・B：変えたものを保存せずロビーに戻る(開いたときのキャラ・準備完了に戻す)
+//  ・右上の「じゅんび完了」ボタン・Start: 準備完了にしてロビーに戻る(ホスト・観戦の人は準備完了が無いので「もどる」)
+//    キャラを変えると準備完了は外れる(ホストが外す)
 // 自分の画面にだけ出る(ほかの人はロビーの枠で「えらんでいます」と見える)
 public class NetCharacterScreen : MonoBehaviour
 {
@@ -16,7 +18,7 @@ public class NetCharacterScreen : MonoBehaviour
     const int kSortingOrder = 55;   // メニュー(50)の上
     // キャラクターセレクト(SelectScene の MatchSelect)と同じ並べ方
     const int kColumns = 4, kRows = 2;
-    static readonly Vector2 kPanelPos = new Vector2(-120f, -345f);
+    static readonly Vector2 kPanelPos = new Vector2(0f, -345f);
     const float kPanelWidth = 420f;
 
     class Tile
@@ -30,14 +32,17 @@ public class NetCharacterScreen : MonoBehaviour
     public bool IsOpen { get; private set; }
 
     NetSelectLook m_look;
-    RectTransform m_canvas, m_root, m_cursor, m_token, m_ready;
+    RectTransform m_canvas, m_root, m_cursor, m_token, m_back;
     readonly List<Tile> m_tiles = new List<Tile>();
-    Image m_panelBg, m_portrait, m_portraitImage, m_readyBg;
-    TextMeshProUGUI m_label, m_portraitLetter, m_name, m_easeLabel, m_easeUnknown, m_ok, m_readyText, m_hint;
+    Image m_panelBg, m_portrait, m_portraitImage, m_backBg;
+    TextMeshProUGUI m_label, m_portraitLetter, m_name, m_easeLabel, m_easeUnknown, m_ok, m_backText, m_hint;
     Image[] m_stars;
     Vector2 m_cursorPos;
     int m_openFrame;
     Tile m_placed;
+    // 開いたときのキャラと準備完了(B で閉じたら、ここに戻す)
+    int m_openCharacter;
+    bool m_openRandom, m_openReady, m_changed;
 
     public void Open()
     {
@@ -49,7 +54,21 @@ public class NetCharacterScreen : MonoBehaviour
         var current = CurrentTile();
         m_cursorPos = current != null ? current.rect.anchoredPosition : kPanelPos + new Vector2(0f, 300f);
         m_placed = null;
+        // B で閉じたときに戻すため、いまのキャラと準備完了を覚えておく
+        var local = NetMatchPlayer.Local;
+        m_openCharacter = local != null ? local.CharacterIndex : NetCharacterList.None;
+        m_openRandom = NetMatchPlayer.IsRandomCharacter;
+        m_openReady = local != null && local.Status == NetMatchPlayer.NetStatus.Ready;
+        m_changed = false;
         MenuSounds.Decide();
+    }
+
+    // B: この画面で変えたキャラを元に戻す(準備完了だったら、それも戻す)
+    void Revert(NetMatchPlayer local)
+    {
+        if (!m_changed) return;
+        if (m_openCharacter != NetCharacterList.None) local.RestoreCharacter(m_openCharacter, m_openRandom);
+        if (m_openReady && CanReady(local)) local.RequestReady(true);
     }
 
     public void Close()
@@ -77,16 +96,14 @@ public class NetCharacterScreen : MonoBehaviour
             m_cursorPos.x = Mathf.Clamp(m_cursorPos.x, -930f, 930f);
             m_cursorPos.y = Mathf.Clamp(m_cursorPos.y, -510f, 510f);
 
-            if (s.b) { MenuSounds.Cancel(); Close(); return; }
-            if (s.start && CanReady(local)) ToggleReady(local);
-            else if (s.a)
+            // B: 変えたものを保存せず(元に戻して)ロビーに戻る(メニューも閉じる)
+            if (s.b) { MenuSounds.Cancel(); Revert(local); Close(); return; }
+            // 右上のボタン・Start: 準備完了にしてロビーに戻る(ホスト・観戦の人は「もどる」)
+            if (s.start || (s.a && Hit(m_back, m_cursorPos))) { ReadyAndBack(local); return; }
+            if (s.a)
             {
-                if (m_ready.gameObject.activeSelf && Hit(m_ready, m_cursorPos)) ToggleReady(local);
-                else
-                {
-                    var tile = TileAt(m_cursorPos);
-                    if (tile != null) Pick(local, tile);
-                }
+                var tile = TileAt(m_cursorPos);
+                if (tile != null) Pick(local, tile);
             }
         }
         UpdateLook(local, dt);
@@ -95,17 +112,21 @@ public class NetCharacterScreen : MonoBehaviour
     // ホスト以外で、試合に出る人だけ準備完了にできる
     static bool CanReady(NetMatchPlayer local) => local != null && !local.IsHostPlayer && local.InMatch;
 
-    void ToggleReady(NetMatchPlayer local)
+    void ReadyAndBack(NetMatchPlayer local)
     {
-        bool ready = local.Status != NetMatchPlayer.NetStatus.Ready;
-        local.RequestReady(ready);
-        if (ready) MenuSounds.Decide(); else MenuSounds.Cancel();
-        m_ready.localScale = Vector3.one * 1.15f;
+        if (CanReady(local))
+        {
+            local.RequestReady(true);
+            MenuSounds.Decide();
+        }
+        else MenuSounds.Cancel();
+        Close();
     }
 
     void Pick(NetMatchPlayer local, Tile tile)
     {
         MenuSounds.Decide();
+        m_changed = true;
         if (tile.random) local.RequestRandomCharacter();
         else
         {
@@ -173,19 +194,15 @@ public class NetCharacterScreen : MonoBehaviour
         }
         m_easeUnknown.text = shown == null ? texts.easeUnknown : "";
 
-        // 準備完了(枠の OK! と、右のボタン)
+        // 準備完了(枠の OK!)と右上のボタン(準備完了にしてロビーへ。ホスト・観戦の人は「もどる」)
         bool ready = local.Status == NetMatchPlayer.NetStatus.Ready;
         m_ok.gameObject.SetActive(ready);
         bool canReady = CanReady(local);
-        m_ready.gameObject.SetActive(canReady);
-        m_readyBg.color = ready ? ToyKit.Palette[0] : Color.white;
-        m_readyText.color = ready ? Color.white : ToyKit.Ink;
-        m_readyText.text = ready ? "じゅんびOK！\n<size=55%>もう一度で とりけし</size>" : "じゅんび完了\n<size=55%>Start でも おせる</size>";
-        bool readyHover = canReady && Hit(m_ready, m_cursorPos);
-        m_ready.localScale = Vector3.Lerp(m_ready.localScale, Vector3.one * (readyHover ? 1.06f : 1f), k);
+        NetSelectLook.SetTopButton(m_back, m_backBg, m_backText, canReady);
+        m_back.localScale = Vector3.Lerp(m_back.localScale, Vector3.one * (Hit(m_back, m_cursorPos) ? 1.08f : 1f), k);
         m_hint.text = canReady
-            ? "スティック：うごかす　A：えらぶ　Start：じゅんび完了　B：もどる"
-            : "スティック：うごかす　A：えらぶ　B：もどる";
+            ? "A：えらぶ　Start：じゅんび完了　B：もどる"
+            : "A：えらぶ　B / Start：もどる";
     }
 
     void SetPortrait(Sprite sprite, string name, Color color, string letter)
@@ -239,12 +256,12 @@ public class NetCharacterScreen : MonoBehaviour
         }
 
         BuildPanel();
-        BuildReadyButton();
 
-        // 操作の説明(右上。見出しと同じ高さ)
-        m_hint = ToyKit.UIText("Hint", m_root, look.Font, "", 30f, ToyKit.Ink);
+        // 右上: 「じゅんび完了」(ホスト・観戦の人は「もどる」)のボタンと、その左に操作の説明
+        m_back = look.TopButton(m_root, "Ready", 170f, 280f, out m_backBg, out m_backText);
+        m_hint = ToyKit.UIText("Hint", m_root, look.Font, "", 28f, ToyKit.Ink);
         m_hint.alignment = TextAlignmentOptions.Right;
-        ToyKit.Anchor(m_hint.rectTransform, new Vector2(1f, 1f), new Vector2(-560f, -85f), new Vector2(1040f, 44f));
+        ToyKit.Anchor(m_hint.rectTransform, new Vector2(1f, 1f), new Vector2(-760f, -85f), new Vector2(880f, 44f));
 
         var cursors = NetSelectLook.Layer("Cursors", m_root);
         m_token = look.MakeToken(m_root, "", Color.white);
@@ -305,22 +322,5 @@ public class NetCharacterScreen : MonoBehaviour
         m_ok.fontSharedMaterial = look.PopMat;
         m_ok.rectTransform.localRotation = Quaternion.Euler(0f, 0f, -12f);
         ToyKit.Anchor(m_ok.rectTransform, new Vector2(1f, 1f), Vector2.zero, new Vector2(160f, 80f));
-    }
-
-    // 準備完了のボタン(枠の右。カーソルで押すか、Start)
-    void BuildReadyButton()
-    {
-        var look = m_look;
-        m_ready = ToyKit.UIImage("Ready", m_root, Color.white, look.UiSprite);
-        m_ready.GetComponent<Image>().pixelsPerUnitMultiplier = 0.4f;
-        ToyKit.Anchor(m_ready, new Vector2(0.5f, 0.5f), kPanelPos + new Vector2(kPanelWidth * 0.5f + 190f, 0f), new Vector2(320f, 150f));
-        var ol = m_ready.gameObject.AddComponent<Outline>(); ol.effectColor = ToyKit.Ink; ol.effectDistance = new Vector2(3f, -3f);
-        m_readyBg = m_ready.GetComponent<Image>();
-        m_readyText = ToyKit.UIText("Text", m_ready, look.Font, "", 48f, ToyKit.Ink);
-        m_readyText.fontSharedMaterial = look.LetterMat;
-        m_readyText.enableAutoSizing = true; m_readyText.fontSizeMin = 24f; m_readyText.fontSizeMax = 48f;
-        ToyKit.Stretch(m_readyText.rectTransform);
-        m_readyText.rectTransform.offsetMin = new Vector2(12f, 8f);
-        m_readyText.rectTransform.offsetMax = new Vector2(-12f, -8f);
     }
 }

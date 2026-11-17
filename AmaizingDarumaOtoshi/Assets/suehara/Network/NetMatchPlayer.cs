@@ -270,8 +270,9 @@ public class NetMatchPlayer : NetworkBehaviour
         bool spectator = s_spectators.Contains(OwnerClientId);
         if (net != null && net.IsStarted) return m_registered ? NetStatus.Playing : spectator ? NetStatus.Spectating : NetStatus.Waiting;
         if (spectator) return NetStatus.Spectating;
-        if (m_picking) return NetStatus.Picking;
-        return m_ready ? NetStatus.Ready : NetStatus.Preparing;
+        // 準備完了なら、選ぶ画面を開いていても準備完了と出す(準備完了にして画面を閉じる途中で「えらんでいます」に戻らないように)
+        if (m_ready) return NetStatus.Ready;
+        return m_picking ? NetStatus.Picking : NetStatus.Preparing;
     }
 
     //========================================
@@ -311,6 +312,14 @@ public class NetMatchPlayer : NetworkBehaviour
         var list = NetCharacterList.Instance;
         if (list != null && list.Character(index) != null) SavedCharacterId = list.Character(index).id;
         ChooseCharacterRpc((byte)Mathf.Clamp(index, 0, NetCharacterList.None));
+    }
+
+    // この PC の人: 前のキャラに戻す(選ぶ画面を B で閉じたとき)。random: 前はランダムだった(ランダムのまま同じキャラに戻す)
+    public void RestoreCharacter(int index, bool random)
+    {
+        if (!IsOwner) return;
+        RequestCharacter(index);
+        if (random) SavedCharacterId = RandomCharacterId;
     }
 
     // この PC の人: キャラをランダムにする(キャラクターセレクトの「ランダム」と同じく、この PC で選べるキャラから1人)

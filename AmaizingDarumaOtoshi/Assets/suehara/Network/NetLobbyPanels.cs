@@ -142,10 +142,11 @@ public class NetLobbyPanels : MonoBehaviour
             p.Portrait.enabled = p.Portrait.sprite != null;
         }
 
-        // 状態
+        // 状態(ホストは準備完了が要らないので、開始待ちの間は札を出さない。ホストの印だけ)
         StatusLook(player, out string status, out Color statusColor);
         p.Status.text = status;
         p.StatusBg.color = statusColor;
+        p.StatusBg.gameObject.SetActive(!string.IsNullOrEmpty(status));
 
         // 選んだステージ(観戦・待機の人は出さない)
         var stage = list != null ? list.Stage(player.StageVote) : null;
@@ -166,8 +167,8 @@ public class NetLobbyPanels : MonoBehaviour
             case NetMatchPlayer.NetStatus.Playing: text = "試合中"; color = ToyKit.Palette[0]; break;
             case NetMatchPlayer.NetStatus.Picking: text = "えらんでいます"; color = ToyKit.Palette[2]; break;
             default:
-                // ホストは準備完了が要らない(試合を はじめる人)
-                if (player.IsHostPlayer) { text = "準備ＯＫ！"; color = ToyKit.Palette[3]; }
+                // ホストは準備完了が要らない(試合を はじめる人)ので、札を出さない
+                if (player.IsHostPlayer) { text = ""; color = Color.clear; }
                 else { text = "準備中"; color = new Color(0.45f, 0.42f, 0.4f); }
                 break;
         }
@@ -217,7 +218,7 @@ public class NetLobbyPanels : MonoBehaviour
 
         // ホストの印(右上)
         p.HostMark = ToyKit.UIRounded("Host", p.Root, ToyKit.Palette[1], 10.0f);
-        ToyKit.Anchor(p.HostMark, new Vector2(1.0f, 1.0f), new Vector2(-46.0f, 0.0f), new Vector2(84.0f, 32.0f));
+        ToyKit.Anchor(p.HostMark, new Vector2(1.0f, 1.0f), new Vector2(-50.0f, 0.0f), new Vector2(92.0f, 34.0f));
         p.HostMark.gameObject.AddComponent<Outline>().effectColor = ToyKit.Ink;
         p.Host = Text("Text", p.HostMark, "ホスト", 20.0f, Color.white, m_letterMat);
         ToyKit.Stretch(p.Host.rectTransform);
