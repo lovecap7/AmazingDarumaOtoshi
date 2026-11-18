@@ -37,11 +37,14 @@ public class NetSessionMenu : MonoBehaviour
     static MatchSetup.MatchMode s_mode = MatchSetup.MatchMode.Stock;
     static int s_stocks = 3;
     static int s_timeIndex;
+    // チーム戦(キャラクターセレクトの「チーム戦」ボタンと同じ。チームは一人ひとりが選ぶ)
+    static bool s_teams;
 
     // メニューを開いているか(開いている間はキャラクターを動かさない)
     public static bool IsOpen { get; private set; }
 
-    enum Item { Start, Ready, Spectate, Character, Stage, Mode, Stocks, Time, Leave, Close }
+    // Team: 自分のチーム(チーム戦のとき)。Teams: ルールの個人戦／チーム戦(ホスト)
+    enum Item { Start, Ready, Spectate, Character, Team, Stage, Mode, Stocks, Time, Teams, Leave, Close }
 
     NetworkManager m_nm;
     TMP_FontAsset m_font;
@@ -174,6 +177,7 @@ public class NetSessionMenu : MonoBehaviour
         stockTimeLimit = TimeLimit,
         timeLength = TimeLimit,
         ghostTimeLimit = TimeLimit,
+        teams = s_teams,
     };
 
     // ホスト: 選んでいるルールを NetMatch に入れる(さんかした人の表示にも出る)
@@ -191,13 +195,21 @@ public class NetSessionMenu : MonoBehaviour
     static string RulesText(MatchSetup.MatchRules r)
     {
         string time = "時間 " + TimeLabel(r.TimeLimit);
+        string teams = r.teams ? "チーム戦 ・ " : "";
         switch (r.mode)
         {
-            case MatchSetup.MatchMode.Stock: return $"ストック {r.stocks}機 ・ {time}";
-            case MatchSetup.MatchMode.Time: return $"タイム {TimeLabel(r.TimeLimit)}";
-            default: return $"{r.ModeName} ・ {time}";
+            case MatchSetup.MatchMode.Stock: return $"{teams}ストック {r.stocks}機 ・ {time}";
+            case MatchSetup.MatchMode.Time: return $"{teams}タイム {TimeLabel(r.TimeLimit)}";
+            default: return $"{teams}{r.ModeName} ・ {time}";
         }
     }
+
+    // 「試合を はじめる」を押せないわけ
+    static string WhyNotStart(NetMatch net) =>
+        net.NotReadyCount > 0 ? $"準備まち {net.NotReadyCount}人" : net.NeedOtherTeam ? "チーム分けが まだ" : "出る人が いません";
+
+    // チームの名前(色を付けると、選んでいる行の黄色の上で黄チームが見えないので、文字だけ)
+    static string TeamLabel(int team) => $"{NetMatchPlayer.TeamName(team)}チーム";
 
     //========================================
     // 右上の表示
@@ -223,8 +235,7 @@ public class NetSessionMenu : MonoBehaviour
         m_infoState.text = net != null ? $"{phase} ・ {playing}人" + (watching > 0 ? $"(観戦 {watching}人)" : "") : "";
         m_infoHint.text = net != null && !net.IsStarted
             ? (host
-                ? (net.CanStart ? "N / R3：試合を はじめる　Start：メニュー"
-                   : net.NotReadyCount > 0 ? $"準備まち {net.NotReadyCount}人　Start：メニュー" : "出る人が いません　Start：メニュー")
+                ? (net.CanStart ? "N / R3：試合を はじめる　Start：メニュー" : $"{WhyNotStart(net)}　Start：メニュー")
                 : "ホストが はじめるのを まっています　Start：メニュー")
             : PlayingNow ? "" : "Start：メニュー";
         // 試合中はじゃまにならないように薄くする
@@ -313,6 +324,8 @@ public class NetSessionMenu : MonoBehaviour
         if (NetCharacterList.Instance != null)
         {
             items.Add(Item.Character);
+            // チーム戦なら、試合に出る人は自分のチームを選べる
+            if (local != null && lobby && local.InMatch && NetMatchPlayer.TeamBattle) items.Add(Item.Team);
             if (NetCharacterList.Instance.stages.Count > 0) items.Add(Item.Stage);
         }
         if (CanEditRules)
@@ -321,6 +334,7 @@ public class NetSessionMenu : MonoBehaviour
             // ストックの行はいつも出しておく(モードで板の大きさが変わらないように)。ストック以外では薄くして選べない
             items.Add(Item.Stocks);
             items.Add(Item.Time);
+            items.Add(Item.Teams);
         }
         items.Add(Item.Leave);
         items.Add(Item.Close);
@@ -337,13 +351,16 @@ public class NetSessionMenu : MonoBehaviour
         m_items.AddRange(items);
 
         // 項目の数に合わせてパネルの高さを決める(上に「メニュー」、下に操作の説明)
-        const float top = 190.0f, step = 88.0f, bottom = 100.0f;
+        // 項目が多いとき(ホストのチーム戦など)は、画面(高さ 1080)に収まるように間を詰める
+        // (上の「ホスト」の札は板の上に はみ出すので、その分を残す)
+        const float top = 190.0f, bottom = 100.0f, maxHeight = 960.0f;
+        float step = Mathf.Min(88.0f, (maxHeight - top - bottom + 12.0f) / Mathf.Max(1, items.Count));
         float height = top + step * items.Count + bottom - 12.0f;
         m_panel.sizeDelta = new Vector2(680.0f, height);
         for (int i = 0; i < items.Count; i++)
         {
             var item = ToyKit.UIRounded($"Item{i}", m_panel, kItemColor, 20.0f);
-            ToyKit.Anchor(item, new Vector2(0.5f, 1.0f), new Vector2(0.0f, -top - i * step + 6.0f), new Vector2(560.0f, 74.0f));
+            ToyKit.Anchor(item, new Vector2(0.5f, 1.0f), new Vector2(0.0f, -top - i * step + 6.0f), new Vector2(560.0f, step - 14.0f));
             m_itemImages.Add(item.GetComponent<Image>());
             // 設定の行は左に名前・右に「＜ 値 ＞」(キャラクターは右にいまのキャラ)、ほかは真ん中に名前
             bool value = IsValue(items[i]) || items[i] == Item.Character || items[i] == Item.Stage
@@ -460,14 +477,14 @@ public class NetSessionMenu : MonoBehaviour
         }
     }
 
-    static bool IsValue(Item item) => item == Item.Mode || item == Item.Stocks || item == Item.Time;
+    static bool IsValue(Item item) => item == Item.Mode || item == Item.Stocks || item == Item.Time || item == Item.Teams || item == Item.Team;
 
     // ストックの行はストックのときだけ、キャラクターは開始待ちの間だけ選べる
     static bool Selectable(Item item)
     {
         if (item == Item.Start) return Net != null && Net.CanStart;
         if (item == Item.Stocks) return s_mode == MatchSetup.MatchMode.Stock;
-        if (item == Item.Character) return CanPickCharacter;
+        if (item == Item.Character || item == Item.Team) return CanPickCharacter;
         if (item == Item.Stage) return CanPickStage;
         return true;
     }
@@ -501,6 +518,12 @@ public class NetSessionMenu : MonoBehaviour
                 // タイムは「なし」を選べないので飛ばす
                 if (s_mode == MatchSetup.MatchMode.Time && kTimeLimits[s_timeIndex] <= 0.0f) s_timeIndex = (s_timeIndex + kTimeLimits.Length + delta) % kTimeLimits.Length;
                 break;
+            case Item.Teams:
+                s_teams = !s_teams;
+                break;
+            case Item.Team:
+                NetMatchPlayer.Local?.CycleTeam(delta);
+                break;
         }
     }
 
@@ -524,6 +547,8 @@ public class NetSessionMenu : MonoBehaviour
             case Item.Mode: return "モード";
             case Item.Stocks: return "ストック";
             case Item.Time: return "時間";
+            case Item.Teams: return "たたかい方";
+            case Item.Team: return "チーム";
             case Item.Leave: return IsHost ? "へやを かいさん" : "へやから ぬける";
             default: return "とじる";
         }
@@ -537,11 +562,14 @@ public class NetSessionMenu : MonoBehaviour
             case Item.Mode: return $"＜ {new MatchSetup.MatchRules { mode = s_mode }.ModeName} ＞";
             case Item.Stocks: return Selectable(item) ? $"＜ {s_stocks}機 ＞" : "ー";
             case Item.Time: return $"＜ {TimeLabel(TimeLimit)} ＞";
+            case Item.Teams: return s_teams ? "＜ チーム戦 ＞" : "＜ 個人戦 ＞";
+            case Item.Team: return NetMatchPlayer.Local != null ? $"＜ {TeamLabel(NetMatchPlayer.Local.Team)} ＞" : "";
             case Item.Character: return CanPickCharacter ? CurrentCharacterName : "試合中は 変えられません";
             case Item.Stage: return CanPickStage ? CurrentStageName : "試合中は 変えられません";
             case Item.Start:
                 if (Net == null || Net.CanStart) return "";
-                return Net.NotReadyCount > 0 ? $"準備まち {Net.NotReadyCount}人" : "出る人が いません";
+                // 左の「試合を はじめる」と重ならないように小さく
+                return $"<size=70%>{WhyNotStart(Net)}</size>";
             case Item.Ready:
                 return NetMatchPlayer.Local != null && NetMatchPlayer.Local.Status == NetMatchPlayer.NetStatus.Ready ? "ＯＫ！" : "まだ";
             case Item.Spectate:
@@ -989,6 +1017,8 @@ public class NetSessionMenu : MonoBehaviour
 
         m_infoRules = Text("Rules", m_info, "", 34.0f, Color.white, m_letterMat);
         m_infoRules.alignment = TextAlignmentOptions.Left;
+        // チーム戦のときは長くなるので、入りきらなければ小さくする
+        m_infoRules.enableAutoSizing = true; m_infoRules.fontSizeMin = 22.0f; m_infoRules.fontSizeMax = 34.0f;
         ToyKit.Anchor(m_infoRules.rectTransform, new Vector2(0.0f, 1.0f), new Vector2(270.0f, -98.0f), new Vector2(500.0f, 48.0f));
 
         m_infoState = Text("State", m_info, "", 28.0f, kPale, m_letterMat);

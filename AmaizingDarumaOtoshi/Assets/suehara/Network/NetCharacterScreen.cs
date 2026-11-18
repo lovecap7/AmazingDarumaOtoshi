@@ -8,7 +8,8 @@ using UnityEngine.UI;
 //  ・キャラのマス(キャラクターセレクトと同じ並び。まだ選べないキャラ(だるきんぐ)は出さない。最後にランダム)
 //  ・自分のカーソル(スティック・十字キー・WASD で動かす)、選んだマスにコイン、下に自分の枠(顔・名前・使いやすさの★)
 //  ・A：マスを選ぶ(すぐにホストへ頼み、体が入れ替わる)/右上のボタンを押す
-//  ・B：変えたものを保存せずロビーに戻る(開いたときのキャラ・準備完了に戻す)
+//  ・チーム戦: 枠の色がチームの色になり、旗を A で押すと 赤 → 青 → 緑 → 黄(キャラクターセレクトと同じ)
+//  ・B：変えたものを保存せずロビーに戻る(開いたときのキャラ・チーム・準備完了に戻す)
 //  ・右上の「じゅんび完了」ボタン・Start: 準備完了にしてロビーに戻る(ホスト・観戦の人は準備完了が無いので「もどる」)
 //    キャラを変えると準備完了は外れる(ホストが外す)
 // 自分の画面にだけ出る(ほかの人はロビーの枠で「えらんでいます」と見える)
@@ -32,17 +33,17 @@ public class NetCharacterScreen : MonoBehaviour
     public bool IsOpen { get; private set; }
 
     NetSelectLook m_look;
-    RectTransform m_canvas, m_root, m_cursor, m_token, m_back;
+    RectTransform m_canvas, m_root, m_cursor, m_token, m_back, m_flag;
     readonly List<Tile> m_tiles = new List<Tile>();
-    Image m_panelBg, m_portrait, m_portraitImage, m_backBg;
+    Image m_panelBg, m_portrait, m_portraitImage, m_backBg, m_flagCloth;
     TextMeshProUGUI m_label, m_portraitLetter, m_name, m_easeLabel, m_easeUnknown, m_ok, m_backText, m_hint;
     Image[] m_stars;
     Vector2 m_cursorPos;
     int m_openFrame;
     Tile m_placed;
-    // 開いたときのキャラと準備完了(B で閉じたら、ここに戻す)
-    int m_openCharacter;
-    bool m_openRandom, m_openReady, m_changed;
+    // 開いたときのキャラ・チームと準備完了(B で閉じたら、ここに戻す)
+    int m_openCharacter, m_openTeam;
+    bool m_openRandom, m_openReady, m_changed, m_teamChanged;
 
     public void Open()
     {
@@ -59,17 +60,22 @@ public class NetCharacterScreen : MonoBehaviour
         m_openCharacter = local != null ? local.CharacterIndex : NetCharacterList.None;
         m_openRandom = NetMatchPlayer.IsRandomCharacter;
         m_openReady = local != null && local.Status == NetMatchPlayer.NetStatus.Ready;
-        m_changed = false;
+        m_openTeam = local != null ? local.Team : 0;
+        m_changed = m_teamChanged = false;
         MenuSounds.Decide();
     }
 
-    // B: この画面で変えたキャラを元に戻す(準備完了だったら、それも戻す)
+    // B: この画面で変えたキャラ・チームを元に戻す(準備完了だったら、それも戻す)
     void Revert(NetMatchPlayer local)
     {
-        if (!m_changed) return;
-        if (m_openCharacter != NetCharacterList.None) local.RestoreCharacter(m_openCharacter, m_openRandom);
+        if (!m_changed && !m_teamChanged) return;
+        if (m_changed && m_openCharacter != NetCharacterList.None) local.RestoreCharacter(m_openCharacter, m_openRandom);
+        if (m_teamChanged) local.RequestTeam(m_openTeam);
         if (m_openReady && CanReady(local)) local.RequestReady(true);
     }
+
+    // チーム戦の旗を出すか(チーム戦で、試合に出る人)
+    static bool ShowFlag(NetMatchPlayer local) => NetMatchPlayer.TeamBattle && local != null && local.InMatch;
 
     public void Close()
     {
@@ -100,7 +106,15 @@ public class NetCharacterScreen : MonoBehaviour
             if (s.b) { MenuSounds.Cancel(); Revert(local); Close(); return; }
             // 右上のボタン・Start: 準備完了にしてロビーに戻る(ホスト・観戦の人は「もどる」)
             if (s.start || (s.a && Hit(m_back, m_cursorPos))) { ReadyAndBack(local); return; }
-            if (s.a)
+            // チーム戦の旗: 赤 → 青 → 緑 → 黄(キャラクターセレクトと同じ)
+            if (s.a && ShowFlag(local) && Hit(m_flag, m_cursorPos))
+            {
+                local.CycleTeam(1);
+                m_teamChanged = true;
+                MenuSounds.Cursor();
+                m_flag.localScale = Vector3.one * 1.3f;
+            }
+            else if (s.a)
             {
                 var tile = TileAt(m_cursorPos);
                 if (tile != null) Pick(local, tile);
@@ -174,8 +188,13 @@ public class NetCharacterScreen : MonoBehaviour
         m_token.GetComponent<Image>().color = color;
         m_token.localScale = Vector3.Lerp(m_token.localScale, Vector3.one, k);
 
-        // 枠: 選んでいるキャラ(まだならカーソルが乗っているキャラを薄く)
-        m_panelBg.color = Color.Lerp(color, Color.white, 0.55f);
+        // 枠: 選んでいるキャラ(まだならカーソルが乗っているキャラを薄く)。チーム戦では枠の色がチームの色になり、旗が出る
+        bool flag = ShowFlag(local);
+        var teamColor = NetMatchPlayer.TeamColor(local.Team);
+        m_panelBg.color = Color.Lerp(flag ? teamColor : color, Color.white, 0.55f);
+        m_flag.gameObject.SetActive(flag);
+        m_flagCloth.color = teamColor;
+        m_flag.localScale = Vector3.Lerp(m_flag.localScale, Vector3.one * (Hit(m_flag, m_cursorPos) ? 1.12f : 1f), k);
         m_label.text = local.Label;
         m_label.color = color;
         var texts = m_look.Texts;
@@ -200,9 +219,10 @@ public class NetCharacterScreen : MonoBehaviour
         bool canReady = CanReady(local);
         NetSelectLook.SetTopButton(m_back, m_backBg, m_backText, canReady);
         m_back.localScale = Vector3.Lerp(m_back.localScale, Vector3.one * (Hit(m_back, m_cursorPos) ? 1.08f : 1f), k);
+        string choose = flag ? "A：えらぶ(旗でチーム)" : "A：えらぶ";
         m_hint.text = canReady
-            ? "A：えらぶ　Start：じゅんび完了　B：もどる"
-            : "A：えらぶ　B / Start：もどる";
+            ? $"{choose}　Start：じゅんび完了　B：もどる"
+            : $"{choose}　B / Start：もどる";
     }
 
     void SetPortrait(Sprite sprite, string name, Color color, string letter)
@@ -230,12 +250,7 @@ public class NetCharacterScreen : MonoBehaviour
 
         // キャラのマス(キャラクターセレクトと同じく、まだ選べないキャラは出さない。最後にランダム)
         var list = NetCharacterList.Instance;
-        var roster = list != null ? list.roster : null;
-        var characters = roster != null
-            ? Yurube.Achievements.AchievementRewards.AvailableCharacters(roster.OrderedCharacters())
-            : new List<CharacterData>();
-        // ネット対戦で出せない(NetCharacterList に無い)キャラは並べない
-        characters.RemoveAll(c => c == null || list.IndexOf(c.id) == NetCharacterList.None);
+        var characters = list != null ? list.SelectableCharacters() : new List<CharacterData>();
         int count = characters.Count + 1;
         var grid = NetSelectLook.GridLayout(count, kColumns, new Vector2(1760f, 430f), new Vector2(205f, 205f), 16f, 310f, kRows, true, true);
         for (int i = 0; i < count; i++)
@@ -273,7 +288,7 @@ public class NetCharacterScreen : MonoBehaviour
         m_root.gameObject.SetActive(false);
     }
 
-    // 自分の枠(キャラクターセレクトのプレイヤーの枠と同じ。CPU・チームの部分は無し)
+    // 自分の枠(キャラクターセレクトのプレイヤーの枠と同じ。CPU の部分は無し。チーム戦の旗は同じ場所)
     void BuildPanel()
     {
         var look = m_look;
@@ -283,6 +298,10 @@ public class NetCharacterScreen : MonoBehaviour
         r.GetComponent<Image>().pixelsPerUnitMultiplier = 0.4f;
         var ol = r.gameObject.AddComponent<Outline>(); ol.effectColor = ToyKit.Ink; ol.effectDistance = new Vector2(3f, -3f);
         m_panelBg = r.GetComponent<Image>();
+
+        // チーム戦の旗(名前の右。キャラクターセレクトと同じ場所・大きさ)
+        m_flag = NetLobbyPanels.MakeFlag(r, new Vector2(0f, 1f), new Vector2(200f, -42f), 1f, out m_flagCloth);
+        m_flag.gameObject.SetActive(false);
 
         m_label = ToyKit.UIText("Label", r, look.Font, "1P", 60f, Color.white);
         m_label.fontSharedMaterial = look.LetterMat;

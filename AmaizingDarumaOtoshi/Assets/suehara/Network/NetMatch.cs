@@ -18,6 +18,7 @@ public class NetMatch : NetworkBehaviour
     {
         public byte Mode, Stocks;
         public float StockTime, TimeLength, GhostTime;
+        public bool Teams;   // チーム戦(チームは NetMatchPlayer.Team)
 
         public void NetworkSerialize<T>(BufferSerializer<T> s) where T : IReaderWriter
         {
@@ -26,9 +27,10 @@ public class NetMatch : NetworkBehaviour
             s.SerializeValue(ref StockTime);
             s.SerializeValue(ref TimeLength);
             s.SerializeValue(ref GhostTime);
+            s.SerializeValue(ref Teams);
         }
 
-        public bool Equals(RulesData o) => Mode == o.Mode && Stocks == o.Stocks && StockTime == o.StockTime && TimeLength == o.TimeLength && GhostTime == o.GhostTime;
+        public bool Equals(RulesData o) => Mode == o.Mode && Stocks == o.Stocks && StockTime == o.StockTime && TimeLength == o.TimeLength && GhostTime == o.GhostTime && Teams == o.Teams;
     }
 
     public struct ClockData : INetworkSerializable, IEquatable<ClockData>
@@ -198,7 +200,7 @@ public class NetMatch : NetworkBehaviour
     // 抽選から試合が始まるまでの間(ルール・キャラ・ステージを変えられない)
     public bool IsLotteryRunning => m_lottery.Value;
 
-    // ホスト: 試合を始められるか(試合に出る人が1人以上いて、ホスト以外の出る人が全員準備完了)
+    // ホスト: 試合を始められるか(試合に出る人が1人以上いて、ホスト以外の出る人が全員準備完了。チーム戦なら2チーム以上に分かれている)
     public bool CanStart
     {
         get
@@ -210,8 +212,19 @@ public class NetMatch : NetworkBehaviour
                 playing++;
                 if (!p.IsHostPlayer && !p.IsReady) return false;
             }
-            return playing > 0;
+            return playing > 0 && !NeedOtherTeam;
         }
+    }
+
+    // チーム戦で、試合に出る人が全員同じチーム(キャラクターセレクトと同じく、2チーム以上に分かれないと始められない)
+    public bool NeedOtherTeam => m_rules.Value.Teams && TeamsInPlay() < 2;
+
+    // チーム戦で、試合に出る人が何チームに分かれているか(ホスト・クライアントとも。NetMatchPlayer.All を見る)
+    public static int TeamsInPlay()
+    {
+        var used = new HashSet<int>();
+        foreach (var p in NetMatchPlayer.All) if (p != null && p.InMatch) used.Add(p.Team);
+        return used.Count;
     }
 
     // ホスト: 試合に出る人のうち、まだ準備完了でない人の数(ホストを除く)
@@ -421,6 +434,7 @@ public class NetMatch : NetworkBehaviour
         StockTime = r.stockTimeLimit,
         TimeLength = r.timeLength,
         GhostTime = r.ghostTimeLimit,
+        Teams = r.teams,
     };
 
     static MatchSetup.MatchRules ToRules(RulesData d) => new MatchSetup.MatchRules
@@ -430,6 +444,7 @@ public class NetMatch : NetworkBehaviour
         stockTimeLimit = d.StockTime,
         timeLength = d.TimeLength > 0.0f ? d.TimeLength : 120.0f,
         ghostTimeLimit = d.GhostTime,
+        teams = d.Teams,
     };
 
     //========================================
@@ -462,7 +477,8 @@ public class NetMatch : NetworkBehaviour
             counts[i] = (byte)count;
             for (int b = 0; b < count; b++) colors.Add((byte)stack.Get(b).Color);
         }
-        FinishedRpc((byte)result.Reason, result.Winner != null ? (sbyte)result.Winner.Index : (sbyte)-1, order, ranks, counts, colors.ToArray());
+        FinishedRpc((byte)result.Reason, result.Winner != null ? (sbyte)result.Winner.Index : (sbyte)-1, order, ranks, counts, colors.ToArray(),
+                    result.IsTeamBattle, (sbyte)result.WinnerTeam);
 
         // DarumaMatch が自分でシーンを読み直さないようにする(リザルト画面が元に戻す)
         DarumaMatch.AutoReturnToSelect = false;
@@ -474,10 +490,11 @@ public class NetMatch : NetworkBehaviour
     }
 
     [Rpc(SendTo.NotServer)]
-    void FinishedRpc(byte reason, sbyte winner, byte[] order, byte[] ranks, byte[] counts, byte[] colors)
+    void FinishedRpc(byte reason, sbyte winner, byte[] order, byte[] ranks, byte[] counts, byte[] colors, bool teamBattle, sbyte winnerTeam)
     {
         if (m_match == null) return;
-        var result = new DarumaMatch.MatchResult { Reason = (DarumaMatch.FinishReason)reason };
+        // チーム戦: 勝ったチーム(リザルトの「〇チーム の勝ち」)。一人ひとりのチームは NetMatchPlayer が Entry.team に入れてある
+        var result = new DarumaMatch.MatchResult { Reason = (DarumaMatch.FinishReason)reason, IsTeamBattle = teamBattle, WinnerTeam = winnerTeam };
         var blockColors = new Dictionary<MatchPlayer, List<Color>>();
         int next = 0;
         for (int i = 0; i < order.Length; i++)

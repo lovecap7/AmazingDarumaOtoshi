@@ -23,9 +23,10 @@ public class NetLobbyPanels : MonoBehaviour
         public NetMatchPlayer Player;
         public RectTransform Root;
         public Outline Outline;
-        public Image Tag, Portrait, StatusBg;
+        public Image Bg, Tag, Portrait, StatusBg;
         public TextMeshProUGUI Label, Name, Status, Stage, Host;
-        public RectTransform HostMark;
+        public RectTransform HostMark, Flag;
+        public Image FlagCloth;
         public int ShownCharacter = -2;
     }
 
@@ -128,9 +129,17 @@ public class NetLobbyPanels : MonoBehaviour
         var player = p.Player;
         var list = NetCharacterList.Instance;
         Color color = player.Color;
-        p.Outline.effectColor = color;
         p.Tag.color = color;
         p.Label.text = player.Label;
+
+        // チーム戦: 枠のふちをチームの色にし、チームの旗を出す(キャラクターセレクトと同じ。観戦・待機の人は試合に出ないので出さない)
+        bool team = NetMatchPlayer.TeamBattle && player.InMatch;
+        var teamColor = NetMatchPlayer.TeamColor(player.Team);
+        p.Outline.effectColor = team ? teamColor : color;
+        p.Outline.effectDistance = team ? new Vector2(4.0f, -4.0f) : new Vector2(1.0f, -1.0f);
+        p.Bg.color = team ? Color.Lerp(new Color(0.08f, 0.06f, 0.05f, 0.82f), teamColor, 0.35f) : new Color(0.08f, 0.06f, 0.05f, 0.72f);
+        p.Flag.gameObject.SetActive(team);
+        p.FlagCloth.color = teamColor;
 
         // 顔とキャラ名(変わったときだけ)
         if (p.ShownCharacter != player.CharacterIndex)
@@ -179,6 +188,7 @@ public class NetLobbyPanels : MonoBehaviour
     {
         var p = new Panel { Player = player };
         p.Root = ToyKit.UIImage($"Panel_{player.Label}", parent, new Color(0.08f, 0.06f, 0.05f, 0.72f));
+        p.Bg = p.Root.GetComponent<Image>();
         p.Outline = p.Root.gameObject.AddComponent<Outline>();
 
         var tag = ToyKit.UIImage("Tag", p.Root, player.Color);
@@ -222,7 +232,29 @@ public class NetLobbyPanels : MonoBehaviour
         p.HostMark.gameObject.AddComponent<Outline>().effectColor = ToyKit.Ink;
         p.Host = Text("Text", p.HostMark, "ホスト", 20.0f, Color.white, m_letterMat);
         ToyKit.Stretch(p.Host.rectTransform);
+
+        // チーム戦の旗(名札のすぐ右。枠の上は必殺技のゲージと重なるので、枠の中に置く。チーム戦のときだけ)
+        p.Flag = MakeFlag(p.Root, new Vector2(0.0f, 1.0f), new Vector2(115.0f, -18.0f), 0.5f, out p.FlagCloth);
         return p;
+    }
+
+    // キャラクターセレクトと同じチームの旗(白い竿に、チームの色の旗)。scale: 大きさ(1 でキャラクターセレクトと同じ 64)
+    public static RectTransform MakeFlag(RectTransform parent, Vector2 anchor, Vector2 pos, float scale, out Image cloth)
+    {
+        var flag = new GameObject("Flag", typeof(RectTransform)).GetComponent<RectTransform>();
+        flag.SetParent(parent, false);
+        ToyKit.Anchor(flag, anchor, pos, new Vector2(64.0f, 64.0f));
+        flag.localScale = Vector3.one * scale;
+        var hit = ToyKit.UIImage("Hit", flag, Color.clear);   // 押せる広さ
+        ToyKit.Stretch(hit);
+        var pole = ToyKit.UIImage("Pole", flag, new Color(0.95f, 0.93f, 0.88f));
+        ToyKit.Anchor(pole, new Vector2(0.5f, 0.5f), new Vector2(-20.0f, 0.0f), new Vector2(7.0f, 60.0f));
+        var po = pole.gameObject.AddComponent<Outline>(); po.effectColor = ToyKit.Ink; po.effectDistance = new Vector2(2.0f, -2.0f);
+        var c = ToyKit.UIImage("Cloth", flag, Color.white, NetCharacterList.Instance != null ? NetCharacterList.Instance.uiSprite : null);
+        ToyKit.Anchor(c, new Vector2(0.5f, 0.5f), new Vector2(8.0f, 12.0f), new Vector2(50.0f, 34.0f));
+        var co = c.gameObject.AddComponent<Outline>(); co.effectColor = ToyKit.Ink; co.effectDistance = new Vector2(2.0f, -2.0f);
+        cloth = c.GetComponent<Image>();
+        return flag;
     }
 
     static RectTransform Layer(string name, Transform parent)
