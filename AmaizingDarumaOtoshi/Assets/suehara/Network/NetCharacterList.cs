@@ -74,6 +74,18 @@ public class NetCharacterList : ScriptableObject
     // この PC で選べるか(だるきんぐは実績をすべて解除するまで選べない。キャラクターセレクトと同じ)
     public bool IsAvailable(int index) => Yurube.Achievements.AchievementRewards.IsAvailable(Character(index));
 
+    // この PC のキャラを選ぶ画面に並べるキャラ(キャラクターセレクトと同じ並び・同じく、まだ選べないキャラは出さない)。
+    // ランダムもこの中から選ぶ(キャラクターセレクトのランダムと同じ)
+    public List<CharacterData> SelectableCharacters()
+    {
+        var characters = roster != null
+            ? Yurube.Achievements.AchievementRewards.AvailableCharacters(roster.OrderedCharacters())
+            : new List<CharacterData>();
+        // ネット対戦で出せない(この一覧に無い)キャラは並べない
+        characters.RemoveAll(c => c == null || IndexOf(c.id) == None);
+        return characters;
+    }
+
     // ホスト: 試合で使うキャラのデータ。DarumaMatch はデータの prefab を出すので、prefab をネット用に差し替えた複製を返す
     // (名前・顔のモデル・id などはそのまま。ネット用プレハブが無いキャラは prefab を空にして基本のだるまで出す)
     public CharacterData HostData(int index)

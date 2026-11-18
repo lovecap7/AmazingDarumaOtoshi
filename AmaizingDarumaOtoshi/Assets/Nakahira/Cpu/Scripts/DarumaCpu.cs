@@ -6,7 +6,7 @@ namespace Nakahira
     // 試合では MatchPlayer と同じGameObjectに付ける(操作する体は MatchPlayer から取る)。
     // キャラクターに直接付けた場合はそのキャラクターを動かす
     //
-    // 知る(CpuPerception) → 必殺技(CpuSpecial。ゲージが満タンなら撃つ) → 決める(ここ) → 状態(積む・逃げる・殴る・撃つ・攻めに行く・待つ) → とっさの反応(CpuReflex。弾が来たら割り込む)
+    // 知る(CpuPerception) → 必殺技(CpuSpecial。ゲージが満タンなら撃つ) → 決める(ここ) → 状態(積む・逃げる・殴る・撃つ・攻めに行く・待つ・必殺技・牌を集める) → とっさの反応(CpuReflex。弾が来たら割り込む)
     // → 動きの部品(道をたどる・跳んで拾う)
     // 決める:ThinkInterval ごとに各状態のやりたさを比べ、一番高い状態にする
     //  ・今の状態には StateStickiness を足す(ころころ変えない)
@@ -36,6 +36,8 @@ namespace Nakahira
         readonly CpuSpecial m_special = new CpuSpecial();
         // 状態「必殺技」(撃てる所まで近づく。CpuSpecial を使うので Awake で作る)
         CpuSpecialState m_specialState;
+        // 状態「牌を集める」(Stage22 の牌あつめ。必殺技を撃ちに近づきたいときはそちらを先にするので Awake で作る)
+        CpuMahjongState m_mahjong;
         // 前のフレームで動かしていた幽霊(幽霊になり直したら考え直す)
         DarumaGhost m_lastGhost;
         CpuState[] m_states;
@@ -76,7 +78,8 @@ namespace Nakahira
         private void Awake()
         {
             m_specialState = new CpuSpecialState(m_special, m_melee);
-            m_states = new CpuState[] { m_collect, m_flee, m_melee, m_shot, m_approach, m_wait, m_specialState };
+            m_mahjong = new CpuMahjongState(c => m_special.IsFollowing || m_special.WantsApproach(c));
+            m_states = new CpuState[] { m_collect, m_flee, m_melee, m_shot, m_approach, m_wait, m_specialState, m_mahjong };
             m_isEngagedWith = IsEngagedWith;
         }
 
@@ -183,6 +186,10 @@ namespace Nakahira
 
             // とっさの反応:飛んでくる弾に、どの状態の最中でも割り込む
             m_reflex.Apply(m_context, ref cmd);
+            // 牌あつめの卓(Stage22)のツモ:ふたが開いている間、卓の上にいれば中央と逆へ歩いて吸い込みに逆らう(移動だけ置き換える)
+            //  (その前の、ふたの縁が点滅している間は、ふたの上から降りる・乗らない)
+            CpuMahjong.ApplyLidWarning(m_context, ref cmd);
+            CpuMahjong.ApplyResistFlow(m_context, ref cmd);
             return cmd;
         }
 

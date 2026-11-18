@@ -12,6 +12,7 @@ namespace Nakahira
         Beam,       // あかだるのトロンのビーム(触れると1段減る。0段なら即死)
         Sword,      // だるきんぐのエクスカリバーの予定の線(詠唱が終わると線の上は即死)
         IceCrack,   // 割れる氷(Stage21)の点滅中のタイル(1秒で抜けて奈落。必殺技ではなくステージのもの。2026-11-18)
+        GiantTile,  // 牌あつめの卓(Stage22)の、巨大な牌の落下予告(下敷きになると無敵でも即死。ステージのもの。2026-11-18)
     }
 
     // 円の危ない場所(隕石の予告円・毒沼)
@@ -171,6 +172,22 @@ namespace Nakahira
                     HalfWidth = sword.AttackWidth * 0.5f,
                 });
             }
+            // 巨大な牌の落下予告(上から見た長方形。長い向きの線にして、太さを短い向きの半分にする。線の両端は長方形の端まで)
+            var table = CpuMahjong.Table;
+            if (table != null && table.TryGetCpuPonDrop(out Vector3 ponCenter, out Vector2 ponHalf))
+            {
+                bool alongX = ponHalf.x >= ponHalf.y;
+                Vector3 axis = alongX ? new Vector3(ponHalf.x, 0.0f, 0.0f) : new Vector3(0.0f, 0.0f, ponHalf.y);
+                s_segments.Add(new CpuHazardSegment
+                {
+                    Source = table,
+                    Kind = CpuHazardKind.GiantTile,
+                    Owner = null,
+                    A = ponCenter - axis,
+                    B = ponCenter + axis,
+                    HalfWidth = alongX ? ponHalf.y : ponHalf.x,
+                });
+            }
         }
     }
 
@@ -225,7 +242,8 @@ namespace Nakahira
                 if (!Notice(h.Source, now, reaction)) continue;
                 if (Mathf.Abs(Mathf.Min(h.A.y, h.B.y) - selfY) > kMaxHeightGap) continue;
                 // 必殺技で無敵の間は、ビーム・エクスカリバーを気にしない(無敵で防げる。切れそうになったら避け始める)
-                if (golden > c.Params.GoldenHazardMargin) continue;
+                // (巨大な牌の下敷きは無敵でも即死するので、無敵の間も避ける)
+                if (h.Kind != CpuHazardKind.GiantTile && golden > c.Params.GoldenHazardMargin) continue;
                 m_segments.Add(h);
             }
 
@@ -270,7 +288,7 @@ namespace Nakahira
         // 入っていると即死する危ない場所か(移動床の乗り降り中でも出る)
         public static bool IsLethal(CpuHazardKind kind)
         {
-            return kind == CpuHazardKind.Meteor || kind == CpuHazardKind.Sword || kind == CpuHazardKind.IceCrack;
+            return kind == CpuHazardKind.Meteor || kind == CpuHazardKind.Sword || kind == CpuHazardKind.IceCrack || kind == CpuHazardKind.GiantTile;
         }
 
         // 点 p が危ない場所の中(離れておく距離 + extra を含む)か

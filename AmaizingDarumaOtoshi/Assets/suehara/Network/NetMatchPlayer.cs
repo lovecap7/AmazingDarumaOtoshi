@@ -39,6 +39,7 @@ public class NetMatchPlayer : NetworkBehaviour
         public NetworkObjectReference Body;
         public byte Character;   // キャラの番号(NetCharacterList の並び。NetCharacterList.None なら基本のだるま)
         public byte StageVote;   // 選んだステージの番号(NetCharacterList.stages の並び。NetCharacterList.None ならおまかせ)
+        public byte Team;        // チーム戦のチーム(0 赤・1 青・2 緑・3 黄。個人戦でも持っておく)
 
         public void NetworkSerialize<T>(BufferSerializer<T> s) where T : IReaderWriter
         {
@@ -48,6 +49,7 @@ public class NetMatchPlayer : NetworkBehaviour
             s.SerializeValue(ref Index);
             s.SerializeValue(ref Character);
             s.SerializeValue(ref StageVote);
+            s.SerializeValue(ref Team);
             s.SerializeValue(ref State);
             s.SerializeValue(ref Stocks);
             s.SerializeValue(ref Score);
@@ -66,7 +68,7 @@ public class NetMatchPlayer : NetworkBehaviour
         public bool Equals(Snapshot o) =>
             Ready == o.Ready && Status == o.Status && InMatch == o.InMatch && Index == o.Index && State == o.State && Stocks == o.Stocks && Score == o.Score &&
             Knocks == o.Knocks && Knocked == o.Knocked && KOs == o.KOs && Falls == o.Falls && SelfOuts == o.SelfOuts &&
-            Rank == o.Rank && Stack == o.Stack && RespawnLeft == o.RespawnLeft && Character == o.Character && StageVote == o.StageVote &&
+            Rank == o.Rank && Stack == o.Stack && RespawnLeft == o.RespawnLeft && Character == o.Character && StageVote == o.StageVote && Team == o.Team &&
             HasBody == o.HasBody && (!HasBody || Body.Equals(o.Body));
     }
 
@@ -89,12 +91,15 @@ public class NetMatchPlayer : NetworkBehaviour
     // キャラを「ランダム」にしたときの SavedCharacterId(試合のシーンに入るたびに、この PC で選べるキャラから選び直す)
     const string RandomCharacterId = "*random";
     public static bool IsRandomCharacter => SavedCharacterId == RandomCharacterId;
+    // この PC の人が選んだチーム(-1 なら選んでいない。番号から決まるチームのまま)。キャラと同じく部屋にいる間だけ覚えておく
+    public static int SavedTeam { get; private set; } = -1;
 
     // 部屋に入る(ホストになる・さんかする)ときに呼ぶ
     public static void ResetChoices()
     {
         SavedCharacterId = DefaultCharacterId;
         SavedStageId = "";
+        SavedTeam = -1;
         s_spectators.Clear();
     }
 
@@ -143,12 +148,21 @@ public class NetMatchPlayer : NetworkBehaviour
     int m_stageVote = NetCharacterList.None;
     public int StageVote => m_stageVote;
 
+    // チーム戦のチーム(0 赤・1 青・2 緑・3 黄)。最初はキャラクターセレクトと同じく番号から(1P 赤、2P 青…)。ホストが決めて配る
+    int m_team;
+    public int Team => m_team;
+    public static string TeamName(int team) => MatchSetup.TeamNames[((team % MatchSetup.TeamCount) + MatchSetup.TeamCount) % MatchSetup.TeamCount];
+    public static Color TeamColor(int team) => MatchSetup.TeamColors[((team % MatchSetup.TeamCount) + MatchSetup.TeamCount) % MatchSetup.TeamCount];
+    // いまチーム戦か(ホストが選んでいるルール)
+    public static bool TeamBattle => NetMatch.Instance != null && NetMatch.Instance.RulesValue.Teams;
+
     public override void OnNetworkSpawn()
     {
         Player = gameObject.AddComponent<MatchPlayer>();
         All.Add(this);
         if (IsServer)
         {
+            m_team = Index % MatchSetup.TeamCount;
             // 最初はあかだる(その人が別のキャラを選んでいれば、このあと届く頼みで入れ替わる)
             var list = NetCharacterList.Instance;
             int first = list != null ? list.IndexOf(DefaultCharacterId) : NetCharacterList.None;
@@ -172,6 +186,7 @@ public class NetMatchPlayer : NetworkBehaviour
             }
             int stage = list != null ? list.StageIndexOf(SavedStageId) : NetCharacterList.None;
             if (stage != NetCharacterList.None) RequestStage(stage);
+            if (SavedTeam >= 0) RequestTeam(SavedTeam);
         }
     }
 
@@ -185,7 +200,7 @@ public class NetMatchPlayer : NetworkBehaviour
             Debug.LogError("[NetMatchPlayer] DarumaMatch がありません");
             return;
         }
-        var entry = new MatchSetup.Entry { playerIndex = Index, deviceName = "Net" };
+        var entry = new MatchSetup.Entry { playerIndex = Index, deviceName = "Net", team = TeamBattle ? m_team : -1 };
         var list = NetCharacterList.Instance;
         if (list != null && list.Character(m_character) != null) entry.character = list.HostData(m_character);
         match.AddNetPlayer(Player, entry, GetComponent<NetworkCommandSource>());
@@ -302,6 +317,32 @@ public class NetMatchPlayer : NetworkBehaviour
     }
 
     //========================================
+    // チームの選択(チーム戦。開始待ちの間だけ。キャラクターセレクトの旗と同じく 赤 → 青 → 緑 → 黄)
+    //========================================
+
+    // この PC の人: チームを選ぶ
+    public void RequestTeam(int team)
+    {
+        if (!IsOwner) return;
+        team = ((team % MatchSetup.TeamCount) + MatchSetup.TeamCount) % MatchSetup.TeamCount;
+        SavedTeam = team;
+        ChooseTeamRpc((byte)team);
+    }
+
+    // この PC の人: 次(delta = 1)・前(-1)のチームにする
+    public void CycleTeam(int delta) => RequestTeam(m_team + delta);
+
+    [Rpc(SendTo.Server)]
+    void ChooseTeamRpc(byte team, RpcParams rpc = default)
+    {
+        if (rpc.Receive.SenderClientId != OwnerClientId || team >= MatchSetup.TeamCount) return;
+        var net = NetMatch.Instance;
+        if (net == null || net.IsStarted || net.IsLotteryRunning) return;
+        if (team != m_team) m_ready = false;   // 変えたら準備完了は外れる
+        m_team = team;
+    }
+
+    //========================================
     // キャラの選択(開始待ちの間だけ変えられる)
     //========================================
 
@@ -328,11 +369,9 @@ public class NetMatchPlayer : NetworkBehaviour
         if (!IsOwner) return;
         var list = NetCharacterList.Instance;
         if (list == null) return;
+        // 選ぶ画面に並んでいるキャラから選ぶ(キャラクターセレクトのランダムと同じ。並びに無い試作のキャラは出さない)
         var choices = new System.Collections.Generic.List<int>();
-        for (int i = 0; i < list.Count; i++)
-        {
-            if (list.Character(i) != null && list.IsAvailable(i)) choices.Add(i);
-        }
+        foreach (var c in list.SelectableCharacters()) choices.Add(list.IndexOf(c.id));
         if (choices.Count == 0) return;
         SavedCharacterId = RandomCharacterId;
         ChooseCharacterRpc((byte)choices[UnityEngine.Random.Range(0, choices.Count)]);
@@ -377,6 +416,8 @@ public class NetMatchPlayer : NetworkBehaviour
     {
         var p = Player;
         m_status = ServerStatus();
+        // チーム(DarumaMatch は Entry.team で味方・勝ち負けを決める。個人戦は -1。試合中はルールもチームも変わらない)
+        if (m_registered && p.Entry != null) p.Entry.team = TeamBattle ? m_team : -1;
         var s = new Snapshot
         {
             Ready = true,
@@ -385,6 +426,7 @@ public class NetMatchPlayer : NetworkBehaviour
             Index = (byte)Index,
             Character = (byte)m_character,
             StageVote = (byte)m_stageVote,
+            Team = (byte)m_team,
             State = (byte)p.State,
             Stocks = (sbyte)Mathf.Clamp(p.Stocks, sbyte.MinValue, sbyte.MaxValue),
             Score = (short)p.Score,
@@ -426,6 +468,7 @@ public class NetMatchPlayer : NetworkBehaviour
         m_status = (NetStatus)s.Status;
         m_inMatch = s.InMatch;
         m_stageVote = s.StageVote;
+        m_team = s.Team;
 
         // 試合に参加している人だけ DarumaMatch に並べる(観戦・待機の人は HUD・カメラに出さない)
         if (s.InMatch && !m_registered)
@@ -456,6 +499,8 @@ public class NetMatchPlayer : NetworkBehaviour
             Player.Entry.character = list != null ? list.Character(m_character) : null;
         }
 
+        // チーム(リザルトの「〇チーム」・味方の判定に使う。個人戦は -1)
+        if (Player.Entry != null) Player.Entry.team = TeamBattle ? m_team : -1;
         Player.NetApply(s.Stocks, s.Score, s.Knocks, s.Knocked, s.KOs, s.Falls, s.SelfOuts, s.Rank, s.Stack, s.RespawnLeft);
 
         // 体は別に届くので、まだ届いていなければ次のフレームでもう一度探す
