@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 // キーボードで遊ぶプレイヤーの操作（本編の操作設定はゲームパッドのみなので、セレクトでキーボード参加した人用）
-//   WASD / 矢印：移動　Space：ジャンプ　J：薙ぎ払い　K：股抜きショット
+//   WASD / 矢印：移動　Space：ジャンプ　J：薙ぎ払い　K：股抜きショット　左Shift：ダッシュ
 // DarumaInputHandler と同じく、スティック（キー）の向きはカメラ基準に直す。
 public class KeyboardDarumaInput : MonoBehaviour, IDarumaCommandSource
 {
@@ -25,6 +25,7 @@ public class KeyboardDarumaInput : MonoBehaviour, IDarumaCommandSource
             Jump = k.spaceKey.wasPressedThisFrame,
             Sweep = k.jKey.wasPressedThisFrame,
             Shot = k.kKey.wasPressedThisFrame,
+            Dash = k.leftShiftKey.isPressed, // ダッシュ(suehara)
         };
     }
 
