@@ -14,6 +14,7 @@ namespace Nakahira
         InputAction m_jump;
         InputAction m_sweep;
         InputAction m_shot;
+        InputAction m_dash; // ダッシュ(suehara)
 
         private void Awake()
         {
@@ -22,6 +23,7 @@ namespace Nakahira
             m_jump = actions.FindAction("Jump", true);
             m_sweep = actions.FindAction("Sweep", true);
             m_shot = actions.FindAction("Shot", true);
+            m_dash = actions.FindAction("Dash", true); // ダッシュ(suehara)
         }
 
         private void Start()
@@ -37,6 +39,7 @@ namespace Nakahira
                 Jump = m_jump.WasPressedThisFrame(),
                 Sweep = m_sweep.WasPressedThisFrame(),
                 Shot = m_shot.WasPressedThisFrame(),
+                Dash = m_dash.IsPressed(), // ダッシュ(suehara)
             };
         }
 

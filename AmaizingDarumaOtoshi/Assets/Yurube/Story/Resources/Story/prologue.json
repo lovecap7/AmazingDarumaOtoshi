@@ -36,7 +36,7 @@
     { "speaker": "midaru", "text": "まずは基本から。左スティックで歩いて、Aボタンでジャンプです", "condition": "MoveAndJump", "count": 1 },
     { "speaker": "midaru", "text": "そこに落ちている積み木。近づいて拾うと、頭に積めます。積み木は、攻撃を受け止める『鎧』です", "condition": "Stack", "count": 1 },
     { "speaker": "midaru", "text": "Xボタンでハンマー、Bボタンで積み木を飛ばせます。どちらか一度、やってみましょう", "condition": "Attack", "count": 1 },
-    { "speaker": "midaru", "text": "積み木が0のときに攻撃されると、そのまま落ちてしまいます。10個まで積めますが、増えるほど動きは遅くなります", "condition": "DialogueDone" },
+    { "speaker": "midaru", "text": "積み木が0のときに攻撃されると、そのまま落ちてしまいます。積み木は10個まで積めます", "condition": "DialogueDone" },
     { "speaker": "midaru", "text": "落ちても、ストックが残っていれば復活できます。ストックは3つ。相手のストックを0にしたら勝ちです", "condition": "DialogueDone" }
   ],
   "matchStart": [
