@@ -17,8 +17,31 @@ namespace Yurube.Story
         [SerializeField, Range(0f, 0.9f)] float m_dimAlpha = 0.62f;
         [Tooltip("必殺技の覚醒イベントが、対戦開始から自動で起きるまでの秒数（保険。ストックが残り1になれば早く起きる）")]
         [SerializeField, Min(5f)] float m_awakeningSeconds = 90f;
+        [Tooltip("序章ゲージチュートリアル：手順1のあと時間経過の説明を出すまでの秒数（仮の初期値は15秒）")]
+        [SerializeField, Min(1f)] float m_gaugeTimeHintSeconds = 15f;
         [Tooltip("チュートリアルCPUの積み木の上限（0 なら章データの cpuBlockLimit を使う）")]
         [SerializeField, Min(0)] int m_tutorialCpuBlockLimit;
+        [Tooltip("会話カメラが S_DOLL_FAR（窓際の人形）へ寄るときのブレンド秒数")]
+        [SerializeField, Min(0.05f)] float m_dollFarBlendSeconds = 0.8f;
+        [Tooltip("だるま人形がカタと小さく揺れる往復の秒数")]
+        [SerializeField, Min(0.05f)] float m_dollShakeSeconds = 0.5f;
+
+        [System.Serializable]
+        public struct MemberStackConfig
+        {
+            public string id;
+            [Min(0)] public int stackCount;
+        }
+
+        [Header("会話の部員見た目")]
+        [Tooltip("会話シーン（部室）での各キャラクターの積み木段数（仮の見た目。初期値は3段）")]
+        [SerializeField] MemberStackConfig[] m_roomMemberStacks = new[]
+        {
+            new MemberStackConfig { id = "kidaru", stackCount = 3 },
+            new MemberStackConfig { id = "midaru", stackCount = 3 },
+            new MemberStackConfig { id = "akadaru", stackCount = 3 },
+            new MemberStackConfig { id = "aodaru", stackCount = 3 },
+        };
 
         [Header("打ち返しチュートリアル")]
         [Tooltip("プレイヤーへ向かう積み木が来ないとき、補助で飛ばすまでの秒数")]
@@ -54,7 +77,20 @@ namespace Yurube.Story
         public float SmallSeconds => Mathf.Max(0.5f, m_smallSeconds);
         public float DimAlpha => Mathf.Clamp(m_dimAlpha, 0f, 0.9f);
         public float AwakeningSeconds => Mathf.Max(5f, m_awakeningSeconds);
+        public float GaugeTimeHintSeconds => m_gaugeTimeHintSeconds > 0f ? m_gaugeTimeHintSeconds : 15f;
         public int TutorialCpuBlockLimit => Mathf.Max(0, m_tutorialCpuBlockLimit);
+        public float DollFarBlendSeconds => m_dollFarBlendSeconds > 0f ? m_dollFarBlendSeconds : 0.8f;
+        public float DollShakeSeconds => m_dollShakeSeconds > 0f ? m_dollShakeSeconds : 0.5f;
+
+        public int GetRoomMemberStackCount(string id, int fallback = 3)
+        {
+            if (m_roomMemberStacks == null || string.IsNullOrEmpty(id)) return fallback;
+            foreach (var c in m_roomMemberStacks)
+            {
+                if (c.id == id) return Mathf.Max(0, c.stackCount);
+            }
+            return fallback;
+        }
         public float ReflectAssistSeconds => Mathf.Max(3f, m_reflectAssistSeconds);
         public float ReflectAssistSpeed => Mathf.Max(1f, m_reflectAssistSpeed);
         public float ChainHintSeconds => Mathf.Max(3f, m_chainHintSeconds);

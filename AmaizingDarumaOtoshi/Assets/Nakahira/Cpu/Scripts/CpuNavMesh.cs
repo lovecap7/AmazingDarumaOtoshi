@@ -12,6 +12,8 @@ namespace Nakahira
     // ステージの床の配置が変わったら MarkDirty を呼ぶと、次に道を聞かれたときに作り直す
     // 動くギミックは焼き込まない:せり上がり塀・扇風機は当たり判定がある間だけ切り抜き(CpuGimmickObstacle)、
     // 移動床は乗り場から乗って行く道として使う(CpuMovingFloors / CpuRide)
+    // 割れる氷は床として焼き込み、点滅し始めてから戻りきるまで切り抜く(CpuIceHoles)
+    // 牌あつめの卓の中央のふたは床として焼き込み、開いている間だけ切り抜く。巨大な牌は焼き込まず切り抜きで扱う(CpuMahjong)
     // プレイヤーを送るワープゲートの中は歩けないエリアにし、入り口から入って行く道として使う(CpuWarpGates / CpuRide)
     public static class CpuNavMesh
     {
@@ -141,6 +143,14 @@ namespace Nakahira
             return false;
         }
 
+        // pos(水平)の真下近くがナビメッシュの上か(壁際・穴の縁・切り抜いた所は、体の半径ぶん外れる)
+        public static bool IsOnNavMesh(Vector3 pos, float tolerance = 0.3f)
+        {
+            EnsureBuilt();
+            if (!NavMesh.SamplePosition(pos, out NavMeshHit hit, kStartSampleRadius, NavMesh.AllAreas)) return false;
+            return FlatDistance(hit.position, pos) <= tolerance;
+        }
+
         private static void EnsureBuilt()
         {
             if (!s_dirty && s_instance.valid) return;
@@ -163,9 +173,12 @@ namespace Nakahira
                 return col.isTrigger
                     || col.GetComponentInParent<TumikiBlock>() != null
                     || col.GetComponentInParent<DarumaCharacter>() != null
-                    || IsDynamicGimmick(col);
+                    || IsDynamicGimmick(col)
+                    || CpuMahjong.IsExcludedFromNavMesh(col);
             });
             AddHazards();
+            AddFallenIceTiles();
+            CpuMahjong.AddLidSources(s_sources);
 
             NavMeshBuildSettings settings = NavMesh.GetSettingsByID(0);
             // 体の半径ぶん床の縁から離れた道になる(奈落ぎわを歩かない)
@@ -196,6 +209,36 @@ namespace Nakahira
         {
             foreach (var wall in Object.FindObjectsByType<Nakagawa.RisingWallGimmick>()) AttachObstacles(wall);
             foreach (var fan in Object.FindObjectsByType<Nakagawa.FanGimmick>()) AttachObstacles(fan);
+            // 割れる氷:落ちたタイルを、落ち始めてから戻りきるまで切り抜く(2026-11-18)
+            foreach (var ice in Object.FindObjectsByType<Nakagawa.IceFloorGimmick>()) CpuIceHoles.Attach(ice);
+            // 牌あつめの卓:中央のふたが開いている間と、着地した巨大な牌を切り抜く(2026-11-18)
+            CpuMahjong.AttachObstacles();
+        }
+
+        // 割れる氷で、ナビメッシュを作るときに落ちていた(当たり判定が切れていた)タイルも床として焼き込む
+        // (焼き込まないと、戻ったあとも穴のままになる。落ちている間の穴は CpuIceHoles が切り抜く)
+        private static void AddFallenIceTiles()
+        {
+            foreach (var ice in Object.FindObjectsByType<Nakagawa.IceFloorGimmick>())
+            {
+                foreach (var t in ice.Tiles)
+                {
+                    if (!(t.Collider is MeshCollider mc) || mc.sharedMesh == null || t.Root == null) continue;
+                    if (mc.enabled && mc.gameObject.activeInHierarchy) continue;   // 当たり判定があるものは CollectSources が拾う
+                    Transform parent = t.Root.parent;
+                    Matrix4x4 local = Matrix4x4.TRS(t.BasePosition, Quaternion.identity, t.Root.localScale);
+                    Matrix4x4 root = parent != null ? parent.localToWorldMatrix * local : local;
+                    // 当たり判定が Root と別のオブジェクトに付いていれば、その位置関係も掛ける
+                    Matrix4x4 offset = mc.transform == t.Root ? Matrix4x4.identity : t.Root.worldToLocalMatrix * mc.transform.localToWorldMatrix;
+                    s_sources.Add(new NavMeshBuildSource
+                    {
+                        shape = NavMeshBuildSourceShape.Mesh,
+                        sourceObject = mc.sharedMesh,
+                        transform = root * offset,
+                        area = 0,
+                    });
+                }
+            }
         }
 
         private static void AttachObstacles(Component gimmick)

@@ -23,10 +23,22 @@ namespace Yurube
 
         public static bool WasPressed(DarumaCharacter character)
         {
+            return WasPressedInternal(character, ignorePause: false);
+        }
+
+        // ストーリー用(Yurube): チュートリアルでゲームを止めている間（timeScale = 0）でも Y / L 入力を受ける
+        public static bool WasPressedIgnoringPause(DarumaCharacter character)
+        {
+            return WasPressedInternal(character, ignorePause: true);
+        }
+
+        static bool WasPressedInternal(DarumaCharacter character, bool ignorePause)
+        {
             if (character == null) return false;
-            if (Suspended || StoryLocked) return false;
+            if (StoryLocked) return false;
+            if (!ignorePause && Suspended) return false;
             // ポーズ中は必殺技を出さない（ポーズ画面の後ろで発動してしまうため）
-            if (DarumaMatch.Current != null && DarumaMatch.Current.IsPaused) return false;
+            if (!ignorePause && DarumaMatch.Current != null && DarumaMatch.Current.IsPaused) return false;
 
             if (DarumaMatch.Current != null)
             {

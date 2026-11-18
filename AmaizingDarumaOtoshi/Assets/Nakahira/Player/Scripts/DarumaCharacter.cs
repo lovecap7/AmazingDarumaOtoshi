@@ -79,9 +79,6 @@ namespace Nakahira
     {
         [Header("移動")]
         [SerializeField] float m_baseMoveSpeed = 6.0f;
-        // 1段積むごとに遅くなる量
-        [SerializeField] float m_speedLossPerBlock = 0.3f;
-        [SerializeField] float m_minMoveSpeed = 2.5f;
         [SerializeField] float m_turnSpeed = 15.0f;
 
         [Header("ジャンプ")]
@@ -139,6 +136,11 @@ namespace Nakahira
         bool m_isSuspended;           // 一時的に止めている(ワープの移動中など)
         Vector3 m_suspendedVelocity;  // 止めたときの速度(解除すると戻す)
 
+        // ダッシュ(suehara)
+        readonly DashStamina m_dashStamina = new DashStamina();
+        DashStaminaGauge m_staminaGauge;
+        bool m_dashHeld;
+
         public DarumaStack Stack => m_stack;
         public Collider Body => m_body;
         public Rigidbody Rigidbody => m_rb;
@@ -156,7 +158,10 @@ namespace Nakahira
         // 股抜きショットを始められるか。地上にいて、先に押されたジャンプが実行待ちでないこと
         public bool CanStartShot => m_isGrounded && !m_jumpRequested;
         public bool IsInvincible => m_invincibleTimer > 0.0f;
-        public float MoveSpeed => Mathf.Max(m_minMoveSpeed, m_baseMoveSpeed - m_stack.Count * m_speedLossPerBlock);
+        public float MoveSpeed => m_baseMoveSpeed;
+        // ダッシュ(suehara): 走っているか / 残りのスタミナ(0〜1)
+        public bool IsDashing => m_dashStamina.IsDashing;
+        public float StaminaRatio => m_dashStamina.Ratio;
         public JumpParams JumpParams => m_jumpParams;
         public DarumaHammer Hammer => m_hammer;
         // ステージのギミック用(Nakagawa): 今の操作命令の供給元(読むだけ)。止めている間(SetSuspended)にギミックが入力を読むのに使う
@@ -235,6 +240,7 @@ namespace Nakahira
             // 前の供給元の入力が残らないようにする
             m_moveDirection = Vector3.zero;
             m_jumpRequested = false;
+            m_dashHeld = false; // ダッシュ(suehara)
         }
 
         // 操作命令を受け取る(将来ネットワークから受け取る場合もここを使う)
@@ -247,6 +253,7 @@ namespace Nakahira
             Vector2 move = Vector2.ClampMagnitude(command.Move, 1.0f);
             if (MovementInverted) move = -move;
             m_moveDirection = new Vector3(move.x, 0.0f, move.y);
+            m_dashHeld = command.Dash; // ダッシュ(suehara)
             if (command.Jump && !MovementOnly) m_jumpRequested = true;
             if (command.Sweep && !MovementOnly) m_hammer.TrySweep();
             if (command.Shot && !MovementOnly && m_hammer.TryShot()) FaceMoveDirection();
@@ -357,6 +364,7 @@ namespace Nakahira
             Vector3 horizontal = MovementLocked
                 ? Vector3.zero
                 : moveDir * MoveSpeed * Mathf.Max(0.0f, MoveSpeedMultiplier);
+            horizontal *= UpdateDash(moveDir, dt); // ダッシュ(suehara)
             v.x = horizontal.x;
             v.z = horizontal.z;
 
@@ -371,6 +379,17 @@ namespace Nakahira
                 if (MaxTurnDegreesPerSecond > 0.0f) next = Quaternion.RotateTowards(m_rb.rotation, next, MaxTurnDegreesPerSecond * dt);
                 m_rb.MoveRotation(next);
             }
+        }
+
+        // ダッシュ(suehara): スタミナを更新し、このステップの移動速度の倍率を返す
+        private float UpdateDash(Vector3 moveDir, float dt)
+        {
+            DashParams param = DashParams.Instance;
+            bool wantDash = m_dashHeld && !MovementLocked && moveDir.sqrMagnitude > 0.01f;
+            bool dashing = m_dashStamina.Tick(wantDash, dt, param);
+            // ゲージは初めてスタミナが減ったときに作る(走らないキャラクターには作らない)
+            if (m_staminaGauge == null && m_dashStamina.Ratio < 1.0f) m_staminaGauge = DashStaminaGauge.Create(this, m_dashStamina);
+            return dashing ? param.SpeedMultiplier : 1.0f;
         }
 
         private void UpdateJump(ref Vector3 v)

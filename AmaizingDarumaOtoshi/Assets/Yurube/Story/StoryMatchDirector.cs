@@ -21,6 +21,10 @@ namespace Yurube.Story
     {
         const string MenuSceneName = "MenuScene";
 
+        [Header("序章ゲージチュートリアル")]
+        [Tooltip("手順1（積んだ説明）のあと、時間経過の説明を出すまでの秒数（仮の初期値は15秒）")]
+        [SerializeField, Min(1f)] float m_gaugeTimeHintSeconds = 15f;
+
         DarumaMatch m_match;
         DialogueRunner m_dialogue;
         StoryMovie m_movie;
@@ -45,6 +49,24 @@ namespace Yurube.Story
         int m_smallGen;
         // プレイヤーの弾が相手に当たってから、連鎖が起きるまでを受け付ける時間
         float m_chainOpponentHitUntil = -1f;
+
+        // 序章の必殺技ゲージチュートリアル（手順0〜4）
+        bool m_gaugeHooked;
+        bool m_gaugeStackHintDone;
+        bool m_gaugeHitHintDone;
+        bool m_gaugeTimeHintDone;
+        bool m_gaugeFullTriggered;
+        float m_gaugeStackHintAt = -1f;
+
+        bool IsPrologueGaugeTutorial => m_chapter != null && m_chapter.rules != null && m_chapter.rules.awakening;
+        float GaugeTimeHintSeconds
+        {
+            get
+            {
+                var s = StorySettings.Instance;
+                return s != null ? s.GaugeTimeHintSeconds : Mathf.Max(1f, m_gaugeTimeHintSeconds);
+            }
+        }
 
         // チュートリアルから使う
         public MatchPlayer Player => m_player;
@@ -114,15 +136,15 @@ namespace Yurube.Story
             // 章の設定で CPU の必殺技を止められる（チュートリアルでは止める）
             if (m_chapter.rules != null && !m_chapter.rules.cpuSpecial) CpuSpecial.Disabled = true;
             SpecialGaugeHUD.Suppressed = false;
-            // ゲージを見せる章は最初から見せる（序章・第1章は見せ場まで隠す）
+            // ゲージを見せる章は最初から見せる（第1章は見せ場まで隠す）
             bool gaugeFromStart = m_chapter.rules == null || m_chapter.rules.gaugeFromStart;
             SpecialGaugeHUD.Visible = gaugeFromStart || StorySession.AwakeningDone;
-            // ゲージを見せない章は、見せ場（覚醒）まで必殺技も撃てない扱いにする
-            // （隠れているのに撃てると不自然なので、表示と解禁をそろえる）
-            SpecialInput.StoryLocked = !gaugeFromStart && !StorySession.AwakeningDone;
+            // 序章では操作チュートリアル中はゲージを溜めず、練習試合開始後に溜める。満タンになるまで撃てない
+            SpecialGauge.StoryGainScale = IsPrologueGaugeTutorial ? 0.0f : -1.0f;
+            SpecialInput.StoryLocked = (IsPrologueGaugeTutorial || !gaugeFromStart) && !StorySession.AwakeningDone;
 
             m_dialogue = DialogueRunner.Create();
-            m_dialogue.LineStarted += OnStoryLineStarted;
+            m_dialogue.StoryLineStarted += OnStoryLineStarted;
             m_movie = StoryMovie.Create(m_chapter);
             // シーンが明けた瞬間にチュートリアルステージが見えないよう、黒いムービー画面で覆っておく
             m_movie.SetBlack();
@@ -153,7 +175,9 @@ namespace Yurube.Story
             IwaBlock.WallBroken -= OnIwaWallBroken;
             TumikiBlock.Hit -= OnBlockHitForChain;
             AchievementEvents.Chain -= OnChainForStory;
-            if (m_dialogue != null) m_dialogue.LineStarted -= OnStoryLineStarted;
+            UnhookPrologueGauge();
+            SpecialGauge.StoryGainScale = -1.0f;
+            if (m_dialogue != null) m_dialogue.StoryLineStarted -= OnStoryLineStarted;
             if (m_movie != null) Destroy(m_movie.gameObject);
 
             // ポーズメニューからタイトルへ戻った等：ストーリーを中断し、次の試合に影響を残さない
@@ -185,7 +209,10 @@ namespace Yurube.Story
             // 会話中（止めている間）は出さない。閉じたあとに改めて判定する
             if (m_dialogue != null && (m_dialogue.IsShowing || (m_match != null && m_match.IsPaused))) return;
 
-            TryStartAwakening();
+            if (IsPrologueGaugeTutorial)
+                UpdatePrologueGaugeTimeHint();
+            else
+                TryStartAwakening();
             TryStartSpecialEvent();
         }
 
@@ -496,6 +523,7 @@ namespace Yurube.Story
                 {
                     if (m_finalMode) yield return PlayFinalBefore();
                     else yield return m_dialogue.PlayBig(m_chapter, m_chapter.before);
+                    m_movie.EndConversation(false);
                 }
                 StorySession.MarkIntroPlayed();
                 m_dialogue.SetDimAlpha(0.62f);
@@ -530,6 +558,142 @@ namespace Yurube.Story
             // ここから試合開始。覚醒イベントの保険の秒数はここから数える
             m_matchRunning = true;
             m_matchStartTime = Time.unscaledTime;
+
+            if (IsPrologueGaugeTutorial)
+            {
+                SpecialGauge.StoryGainScale = 1.0f;
+                if (!StorySession.AwakeningDone)
+                    StartCoroutine(StartPrologueGaugeTutorial());
+            }
+        }
+
+        //========================================
+        // 序章：必殺技ゲージのチュートリアル（手順0〜4）
+        //========================================
+
+        void HookPrologueGauge()
+        {
+            if (m_gaugeHooked) return;
+            m_gaugeHooked = true;
+            SpecialGauge.Gained += OnPrologueGaugeGained;
+        }
+
+        void UnhookPrologueGauge()
+        {
+            if (!m_gaugeHooked) return;
+            m_gaugeHooked = false;
+            SpecialGauge.Gained -= OnPrologueGaugeGained;
+        }
+
+        IEnumerator StartPrologueGaugeTutorial()
+        {
+            HookPrologueGauge();
+
+            // 手順0：「練習試合、開始！」の小窓が消えたあと、あかだるの一言を出す
+            yield return new WaitForSecondsRealtime(2.2f);
+            float waitUntil = Time.unscaledTime + 2.0f;
+            while (m_dialogue != null && m_dialogue.IsShowing && Time.unscaledTime < waitUntil) yield return null;
+
+            if (m_finishedHandled || m_gaugeFullTriggered || m_awakeningRunning) yield break;
+            if (!m_gaugeStackHintDone && !m_gaugeHitHintDone && m_dialogue != null)
+            {
+                yield return m_dialogue.PlaySmall("akadaru", "新入り相手に必殺技は使わん！", m_chapter, 2.8f);
+            }
+        }
+
+        void OnPrologueGaugeGained(SpecialGauge gauge, float added, SpecialGauge.GainReason reason)
+        {
+            if (m_finishedHandled || !m_matchRunning || StorySession.AwakeningDone) return;
+            if (gauge == null || m_player == null || gauge.Character != m_player.Character) return;
+
+            // 手順4（満タン）は、手順1〜3の途中でも最優先で実行する
+            if (gauge.IsFull && !m_gaugeFullTriggered)
+            {
+                m_gaugeFullTriggered = true;
+                StartCoroutine(PrologueFullSpecialPrompt(gauge));
+                return;
+            }
+
+            if (m_gaugeFullTriggered || m_awakeningRunning) return;
+
+            // 手順1：積み木を積んだとき
+            if (!m_gaugeStackHintDone && reason == SpecialGauge.GainReason.StackBlock)
+            {
+                m_gaugeStackHintDone = true;
+                m_gaugeStackHintAt = Time.unscaledTime;
+                if (m_dialogue != null)
+                {
+                    m_dialogue.StartCoroutine(m_dialogue.PlaySmall("midaru", "積むと10pt入ります。100ptで必殺技です。", m_chapter, 3.2f));
+                }
+                return;
+            }
+
+            // 手順2：ハンマーで直接殴ってダメージを与えたとき
+            if (!m_gaugeHitHintDone && reason == SpecialGauge.GainReason.DirectHit)
+            {
+                m_gaugeHitHintDone = true;
+                if (m_dialogue != null)
+                {
+                    m_dialogue.StartCoroutine(m_dialogue.PlaySmall("midaru", "ハンマーで直接殴ると15pt。……データ通りです。", m_chapter, 3.2f));
+                }
+            }
+        }
+
+        // 手順3：手順1のあと一定時間（既定15秒）が経ったら時間経過の説明を出す
+        void UpdatePrologueGaugeTimeHint()
+        {
+            if (!m_matchRunning || StorySession.AwakeningDone) return;
+            if (m_gaugeTimeHintDone || m_gaugeFullTriggered || m_awakeningRunning) return;
+            if (!m_gaugeStackHintDone || m_gaugeStackHintAt < 0f) return;
+            if (Time.unscaledTime - m_gaugeStackHintAt < GaugeTimeHintSeconds) return;
+
+            m_gaugeTimeHintDone = true;
+            if (m_dialogue != null)
+            {
+                m_dialogue.StartCoroutine(m_dialogue.PlaySmall("midaru", "近くに敵がいる間や、動いている間も少しずつ溜まります。戦うこと自体が、溜める行為です。", m_chapter, 3.8f));
+            }
+        }
+
+        // 手順4：満タンになった瞬間にゲームを止め、[Y]で必殺技を発動させる（そのまま黄金化演出へ）
+        IEnumerator PrologueFullSpecialPrompt(SpecialGauge gauge)
+        {
+            m_awakeningRunning = true;
+            UnhookPrologueGauge();
+
+            SetStoryPaused(true);
+            if (m_dialogue != null)
+            {
+                m_dialogue.CloseSmallWindow();
+                m_dialogue.ShowObjective(m_chapter, "kidaru", "[Y]で必殺技！");
+            }
+            SpecialInput.StoryLocked = false;
+
+            // 同じフレームの押下で暴発しないよう 1 フレーム待つ
+            yield return null;
+
+            while (!m_finishedHandled)
+            {
+                if (m_player == null || m_player.Character == null) break;
+                if (SpecialInput.WasPressedIgnoringPause(m_player.Character))
+                {
+                    SetStoryPaused(false);
+                    var special = m_player.Character.GetComponent<KidaruSpecial>();
+                    if (special != null && special.TryActivate())
+                    {
+                        StorySession.AwakeningDone = true;
+                        Debug.Log("[Story] 序章ゲージチュートリアル完了（黄金化発動）");
+                    }
+                    break;
+                }
+                yield return null;
+            }
+
+            if (m_dialogue != null)
+            {
+                m_dialogue.HideObjective();
+            }
+            if (!m_finishedHandled && m_match != null && m_match.IsPaused) SetStoryPaused(false);
+            m_awakeningRunning = false;
         }
 
         // 章のチュートリアル用に CPU の積み木の上限を下げる（0 なら何もしない）
@@ -668,10 +832,10 @@ namespace Yurube.Story
             AchievementEvents.Chain += OnChainForStory;
         }
 
-        void OnStoryLineStarted(string speakerId)
+        void OnStoryLineStarted(StoryLine line)
         {
-            // 会話中にカメラを話者へ寄せる（会場・控室・決勝の舞台で、顔がウィンドウに隠れないように）
-            if (m_movie != null) m_movie.FocusSpeaker(speakerId);
+            // 会話の1行ごとにショットIDの切り替えや話者へのカメラ寄せを行う
+            if (m_movie != null) m_movie.OnDialogueLine(line);
         }
 
         // プレイヤーの弾が相手（CPU）に当たった。このあと抜けた積み木が連鎖すれば「相手の積み木を崩した」
@@ -972,7 +1136,11 @@ namespace Yurube.Story
             m_finishedHandled = true;
             // その場で試合を止めて、敗北の台詞 → リトライへ
             StopEventLines();
-            if (m_dialogue != null) m_dialogue.HideObjective();
+            UnhookPrologueGauge();
+            if (m_dialogue != null)
+            {
+                m_dialogue.HideObjective();
+            }
             SetStoryPaused(true);
             // 試合は止めるが、敗北の台詞の音は鳴らす
             AudioListener.pause = false;
@@ -1049,6 +1217,7 @@ namespace Yurube.Story
             m_finishedHandled = true;
             // 出しかけの小窓の台詞は止める（リザルトに重ねない）
             StopEventLines();
+            UnhookPrologueGauge();
             bool won = result != null && result.Winner != null && !result.Winner.IsCpu;
 
             // 念のため：会話用に止めていたら解く
@@ -1092,6 +1261,7 @@ namespace Yurube.Story
             else m_movie.ShowConversation(true);
             yield return m_movie.FadeIn(0.6f);
             yield return m_dialogue.PlayBig(m_chapter, m_chapter.after, OnAfterLine);
+            m_movie.EndConversation(true);
             // 横断幕が掲げられたのを少し見せる
             if (!string.IsNullOrEmpty(m_chapter.bannerText)) yield return new WaitForSecondsRealtime(1.4f);
 

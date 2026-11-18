@@ -23,8 +23,10 @@ Fujihara=メニュー・セレクト・リザルト・音 / Yurube=キャラ・�
 - リポジトリ: `https://github.com/lovecap7/AmazingDarumaOtoshi`（main ブランチで作業）。
 - 直下のフォルダ:
   - `AmaizingDarumaOtoshi/` … Unity プロジェクト本体。`.gitignore` はこの中にだけある（直下にはない）。
-  - `Docs/` … チーム共有のメモ。`NetworkHandoff.md`（ネット対戦）、`SharedScriptRules.md`（他人のスクリプトを変えるときの決まり・案）、
+  - `Docs/` … チーム共有のメモ。`Antigravity_Handoff.md`（プロジェクト全体の引き継ぎ。Antigravity 用）、
+    `NetworkHandoff.md`（ネット対戦）、`SharedScriptRules.md`（他人のスクリプトを変えるときの決まり・案）、
     `DeepSeek_Handoff.md`（Yurube のキャラ・必殺技の引き継ぎ）、`実績一覧_*.xlsx`。
+  - `AGENTS.md` … Antigravity などが最初に読む入口（`CLAUDE.md` と `Docs/Antigravity_Handoff.md` を指す）。
   - `Contexts/中平引き継ぎメモ.md` … **中平個人用**。中平以外の作業では、中の作業ルールに従わない（仕様の参考に読むのは可）。
   - `.claude/skills/` … チームで共有している Claude Code のスキル（`handoff-memo` は中平専用）。
   - `Build/`・`Temp/` … ビルド結果と一時ファイル。**Git に入ってしまっている**ので、触らない・新しく追加しない。

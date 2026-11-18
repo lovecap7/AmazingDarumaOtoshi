@@ -94,7 +94,8 @@ namespace Nakahira
         float m_prevSweepYaw;          // 前のステップでのハンマーの角度
         bool m_shotFired;
         readonly HashSet<Object> m_hitThisSwing = new HashSet<Object>();
-        readonly Collider[] m_overlaps = new Collider[32];
+        // 空中で振ると調べる範囲が縦に伸びるので、床・壁で埋まらないように多めに持つ
+        readonly Collider[] m_overlaps = new Collider[64];
 
         // 薙ぎ払いが積み木・キャラクターに当たった(カメラの揺れ・効果音など演出用)
         public static event System.Action<HammerHitInfo> Hit;
@@ -108,6 +109,8 @@ namespace Nakahira
         public HammerParams Params { get => m_params; set => m_params = value; }
         // 当たり判定が届く距離(見た目のハンマーの長さ × 倍率)
         float HitReach => (m_armLength + m_hammerHalfWidth) * m_params.HitReachScale;
+        // 持ち主が空中にいるとき、当たる高さを足元より下へ広げる深さ(ジャンプの頂点からでも地上の相手に届く)。地上・幽霊は 0
+        float AirHitDepth => m_character != null && !m_character.IsGrounded ? m_character.JumpParams.Height : 0.0f;
         public bool IsShooting => m_action == Action.Shot;
         public bool IsSweeping => m_action == Action.Sweep;
         // 今の動作(薙ぎ払い・股抜きショット)を始めてから進んだ時間(秒)。ボタンを押したフレームではまだ 0
@@ -286,7 +289,9 @@ namespace Nakahira
             Vector3 pivot = m_root.TransformPoint(new Vector3(0.0f, m_sweepHeight, 0.0f));
             float maxReach = HitReach + Mathf.Max(TumikiBlock.kRadius, DarumaCharacter.kBodyRadius);
 
-            int count = Physics.OverlapSphereNonAlloc(pivot, maxReach, m_overlaps, ~0, QueryTriggerInteraction.Ignore);
+            // 空中で振ったときは足元の相手も調べる(地上では球と同じ範囲)
+            Vector3 pivotBottom = pivot + Vector3.down * AirHitDepth;
+            int count = Physics.OverlapCapsuleNonAlloc(pivot, pivotBottom, maxReach, m_overlaps, ~0, QueryTriggerInteraction.Ignore);
             for (int i = 0; i < count; i++)
             {
                 Collider col = m_overlaps[i];
@@ -305,13 +310,24 @@ namespace Nakahira
                 var other = col.GetComponentInParent<DarumaCharacter>();
                 if (other != null && !m_hitThisSwing.Contains(other))
                 {
-                    // キャラクターは最下段の中心の高さで判定する(ジャンプで避けられる)
+                    if (!CanHitCharacter(other)) continue;
+                    // キャラクターは最下段の中心の高さで判定する
                     Vector3 target = other.transform.position + Vector3.up * m_sweepHeight;
                     if (!TryGetCrossing(target, DarumaCharacter.kBodyRadius, yaw, prevYaw, out float bearing, out _)) continue;
                     m_hitThisSwing.Add(other);
                     HitCharacter(other, bearing);
                 }
             }
+        }
+
+        // 持ち主と相手の状態から、この相手に薙ぎ払いが当たるか
+        //  空中で振ったとき: 積み木を1個も積んでいない相手には当たらない
+        //  地上で振ったとき: 空中にいる相手には当たらない
+        //  幽霊が振ったとき: 制限なし
+        private bool CanHitCharacter(DarumaCharacter other)
+        {
+            if (m_character == null) return true;
+            return m_character.IsGrounded ? other.IsGrounded : other.Stack.Count > 0;
         }
 
         // 対象がハンマーの通過範囲に入ったか。bearing: 持ち主から見た対象の角度(右が+)、dist: 水平距離
@@ -321,7 +337,9 @@ namespace Nakahira
             bearing = Mathf.Atan2(local.x, local.z) * Mathf.Rad2Deg;
             dist = new Vector2(local.x, local.z).magnitude;
 
-            if (Mathf.Abs(local.y - m_sweepHeight) > m_hitHeightRange) return false;
+            // 下だけ、空中で振ったときに広げる
+            float heightDiff = local.y - m_sweepHeight;
+            if (heightDiff > m_hitHeightRange || heightDiff < -m_hitHeightRange - AirHitDepth) return false;
             if (dist > HitReach + targetRadius) return false;
 
             // ハンマーの太さの分だけ角度に余裕を持たせる

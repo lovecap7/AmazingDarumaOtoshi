@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Yurube.Achievements
 {
-    // 実績の一覧（40個）。
+    // 実績の一覧（43個）。
     // 実績を増やすときは CreateDefaults() に1行足すだけでよい。判定は AchievementMetric を見て
     // AchievementManager が共通で行うので、ほかのコードを直す必要はない。
     // ID はセーブに残るので、一度出したら変えない（変えると解除済みが消える）。
@@ -55,7 +55,7 @@ namespace Yurube.Achievements
             return null;
         }
 
-        // ---------------- 20個の通常実績 ＋ 4個のメタ実績（レアリティ制覇）＋ 1個の最高位 ＋ 1個のシークレット ＋ 追加13個 ----------------
+        // ---------------- 20個の通常実績 ＋ 4個のメタ実績（レアリティ制覇）＋ 1個の最高位 ＋ 1個のシークレット ＋ 追加13個 ＋ ストーリー4個 ----------------
         // 引数：ID、名前、ポエム、カテゴリー、解除条件、条件の種類、目標数、レアリティ
         static List<AchievementDefinition> CreateDefaults()
         {
