@@ -7,7 +7,7 @@
   "sceneName": "AllStages",
   "playerCharacter": "kidaru",
   "clearKey": "Story.Clear.prologue",
-  "rules": { "mode": "Stock", "stocks": 3, "timeLimit": 0, "cpuSpecial": false, "awakening": true, "gaugeFromStart": false, "cpuBlockLimit": 6 },
+  "rules": { "mode": "Stock", "stocks": 3, "timeLimit": 0, "cpuSpecial": false, "awakening": true, "gaugeFromStart": true, "cpuBlockLimit": 6 },
   "cpu": [
     { "character": "midaru", "level": 1, "stocks": 2 }
   ],
@@ -18,19 +18,19 @@
     { "id": "kidaru", "name": "きだる", "color": "#E8C64B" }
   ],
   "before": [
-    { "speaker": "", "direction": true, "text": "（部室。ホワイトボードには「練習メニュー：素振り1000回／積み上げ100段／走り込み！」とある）" },
-    { "speaker": "kidaru", "text": "あの、ここがだるま落とし部ですか？ おにぎりが出るって聞いて来ました！" },
-    { "speaker": "akadaru", "text": "おにぎり……？ まあいい！ ようこそ、七転高校だるま落とし部へ！ オレは主将のあかだるだ！" },
-    { "speaker": "aodaru", "text": "……副主将。あおだる" },
-    { "speaker": "midaru", "text": "分析担当のみだるです（眼鏡をクイッ）。おにぎりなら、部費の0.8%で用意してあります" },
-    { "speaker": "akadaru", "text": "部訓は『一撃入魂』！ 目標は全国制覇だ！ さっそく練習試合といくぞ！" },
-    { "speaker": "kidaru", "text": "ええっ、いきなりですか！？ ぼく、やり方がわかりませんっ" },
-    { "speaker": "midaru", "text": "問題ありません。私が説明します" },
-    { "speaker": "", "direction": true, "text": "（ふと、窓際のだるま人形に目が止まる）", "eventId": "doll_shake" },
-    { "speaker": "kidaru", "text": "あれ？ あのだるまさん、目が片方しか入ってないですね" },
-    { "speaker": "akadaru", "text": "先代から続く願掛けだるまだ。全国制覇したら、もう片方の目を入れる決まりなんだ" },
-    { "speaker": "midaru", "text": "……いつからそこにあるのか、記録がありません。データの欠損です（眼鏡をクイッ）" },
-    { "speaker": "kidaru", "text": "ふしぎです！" }
+    { "speaker": "", "direction": true, "shot": "S_WHITEBOARD", "text": "（部室。ホワイトボードには「練習メニュー：素振り1000回／積み上げ100段／走り込み！」とある）" },
+    { "speaker": "kidaru", "shot": "S_KIDARU", "text": "あの、ここがだるま落とし部ですか？ おにぎりが出るって聞いて来ました！" },
+    { "speaker": "akadaru", "shot": "S_AKA", "text": "おにぎり……？ まあいい！ ようこそ、七転高校だるま落とし部へ！ オレは主将のあかだるだ！" },
+    { "speaker": "aodaru", "shot": "S_AO", "text": "……副主将。あおだる" },
+    { "speaker": "midaru", "shot": "S_MI", "text": "分析担当のみだるです（眼鏡をクイッ）。おにぎりなら、部費の0.8%で用意してあります" },
+    { "speaker": "akadaru", "shot": "S_AKA", "text": "部訓は『一撃入魂』！ 目標は全国制覇だ！ さっそく練習試合といくぞ！" },
+    { "speaker": "kidaru", "shot": "S_KIDARU", "text": "ええっ、いきなりですか！？ ぼく、やり方がわかりませんっ" },
+    { "speaker": "midaru", "shot": "S_MI", "text": "問題ありません。私が説明します" },
+    { "speaker": "", "direction": true, "shot": "S_DOLL_FAR", "text": "（ふと、窓際のだるま人形に目が止まる）" },
+    { "speaker": "kidaru", "shot": "S_DOLL_EYE", "text": "あれ？ あのだるまさん、目が片方しか入ってないですね" },
+    { "speaker": "akadaru", "shot": "", "text": "先代から続く願掛けだるまだ。全国制覇したら、もう片方の目を入れる決まりなんだ" },
+    { "speaker": "midaru", "shot": "S_MI", "text": "……いつからそこにあるのか、記録がありません。データの欠損です（眼鏡をクイッ）" },
+    { "speaker": "kidaru", "shot": "S_ROOM_WIDE", "text": "ふしぎです！" }
   ],
   "tutorial": [
     { "speaker": "midaru", "text": "まずは基本から。左スティックで歩いて、Aボタンでジャンプです", "condition": "MoveAndJump", "count": 1 },
@@ -56,16 +56,16 @@
     { "speaker": "midaru", "text": "そこ、甘いですよ" }
   ],
   "defeat": [
-    { "speaker": "akadaru", "text": "まだまだだが、その根性は買うぞ！" }
+    { "speaker": "akadaru", "shot": "S_AKA", "text": "まだまだだが、その根性は買うぞ！" }
   ],
   "after": [
-    { "speaker": "akadaru", "text": "うむ、いい動きだ！ 新入りにしては根性がある！" },
-    { "speaker": "aodaru", "text": "……明日から、走る" },
-    { "speaker": "kidaru", "text": "ええっ！ 走るんですか！？" },
-    { "speaker": "midaru", "text": "うちの練習メニューの実施率は100%です" },
-    { "speaker": "kidaru", "text": "ぼく、がんばります！ おにぎりのために！" },
-    { "speaker": "akadaru", "text": "おう！ 全国制覇のためにな！" },
-    { "speaker": "", "direction": true, "text": "（誰もいなくなった部室。窓際のだるま人形が、カタ、と小さく揺れた）", "eventId": "doll_shake" }
+    { "speaker": "akadaru", "shot": "S_AKA", "text": "うむ、いい動きだ！ 新入りにしては根性がある！" },
+    { "speaker": "aodaru", "shot": "S_AO", "text": "……明日から、走る" },
+    { "speaker": "kidaru", "shot": "S_KIDARU", "text": "ええっ！ 走るんですか！？" },
+    { "speaker": "midaru", "shot": "S_MI", "text": "うちの練習メニューの実施率は100%です" },
+    { "speaker": "kidaru", "shot": "S_KIDARU", "text": "ぼく、がんばります！ おにぎりのために！" },
+    { "speaker": "akadaru", "shot": "S_AKA", "text": "おう！ 全国制覇のためにな！" },
+    { "speaker": "", "direction": true, "shot": "S_EMPTY_ROOM", "text": "（誰もいなくなった部室。窓際のだるま人形が、カタ、と小さく揺れた）", "eventId": "doll_shake" }
   ],
   "newspaper": {
     "header": "だるま新聞",

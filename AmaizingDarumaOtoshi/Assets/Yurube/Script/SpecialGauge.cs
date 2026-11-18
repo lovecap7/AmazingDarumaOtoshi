@@ -20,6 +20,8 @@ namespace Yurube
 
         [Tooltip("最大ポイント・得る量(キャラごと)。空なら初期値で動く")]
         [SerializeField] SpecialGaugeParams m_params;
+        [Tooltip("序章チュートリアル用のゲージ獲得倍率（序章でのみ有効。初期値は 1.0）")]
+        [SerializeField, Min(0.0f)] float m_prologueGainScale = 1.0f;
 
         static SpecialGaugeParams s_fallback;
 
@@ -67,6 +69,8 @@ namespace Yurube
         public string StatusOverride => Time.frameCount - m_statusFrame <= 2 ? m_status : null;
         // ネット対戦のクライアント: 自分では溜めず、ホストの値を受け取るだけ(NetworkDarumaCharacter が立てる)
         public bool NetDriven { get; set; }
+        // ストーリー用(Yurube): 序章チュートリアル中の獲得倍率（0以上なら有効、-1 なら通常どおり無効）
+        public static float StoryGainScale { get; set; } = -1.0f;
 
         // 必殺技を発動してゲージを消費した（実績・演出用。発動した瞬間に1回だけ来る）
         public static event Action<SpecialGauge> Consumed;
@@ -77,6 +81,7 @@ namespace Yurube
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         static void ResetStatics()
         {
+            StoryGainScale = -1.0f;
             Consumed = null;
             Gained = null;
         }
@@ -221,6 +226,10 @@ namespace Yurube
         // ポイントを足す(満タンで止まる)
         public void Add(float points, GainReason reason = GainReason.Other)
         {
+            if (StoryGainScale >= 0.0f && reason != GainReason.Carry && reason != GainReason.Other)
+            {
+                points *= StoryGainScale * Mathf.Max(0.0f, m_prologueGainScale);
+            }
             if (points <= 0.0f || IsFull) return;
             float before = m_points;
             m_points = Mathf.Min(MaxPoints, m_points + points);

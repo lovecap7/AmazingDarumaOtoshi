@@ -252,6 +252,11 @@ $git = Get-ChildItem "$env:LOCALAPPDATA\GitHubDesktop\app-*\resources\app\git\cm
   `rules`（mode / stocks / timeLimit / cpuSpecial / awakening / gaugeFromStart / cpuBlockLimit）
   `cpu[]` `speakers[]` `before` `after` `defeat` `tutorial` `cutscene` `newspaper` `epilogue`
   ほか、初回だけの掛け合い（`reflectFirst` `chainFirst` `yellowExtra` `cpuTaunts` `startLines` `outLines` など）。
+- 会話1行（`StoryLine`）の項目: `speaker`（空ならナレーション）/ `text` / `direction` / `eventId` / `portrait` / `scene`、
+  **2026-11-18 に追加** `expression`（表情）/ `shot`（ショットID）/ `se`（効果音）。
+  `shot` は `StoryMovie` の `ShotDefinition`（対象の `Transform` 基準）でカメラを切り替える（`S_ROOM_WIDE` / `S_WHITEBOARD` / `S_KIDARU` / `S_AKA` / `S_AO` / `S_MI` / `S_DOLL_FAR` / `S_DOLL_EYE` / `S_EMPTY_ROOM`）。`expression` と `se` はまだ未使用。JSON に書かなければ空になり、直前のショットを維持する。
+- 会話の入力: `DialogueRunner` は**1回の押下を1回の操作にだけ使う**（同じフレームの A を二重に使わない）。
+  以前は A 1回で2行進み、全章で台詞が1行おきに抜けていた（2026-11-18 修正）。
 - 章選択: `StoryChapterSelect.cs`。メニューの「ものがたり」から開く。
   `Resources/Story/*.json` を `order` 順に積み木の段として並べる（**JSON を足すだけで増える**）。
 - 開始: `StoryLauncher.Start(chapterId)` が `MatchSetup` を作り、`Nakagawa.StageSwitcher.RequestStage` で
@@ -405,6 +410,9 @@ dotnet $csc @response.rsp
 13. **日本語の文字化け**: PowerShell の既定 cp932 で `.cs` を読むと壊れて見える。ファイル読み込み機能か `-Encoding utf8` を使う。
 14. **Unity が裏にあるとコンパイルされない**。編集後は Unity をクリックしてもらう。
 15. **ビルドに入れるシーンを勝手に増減しない**（`ProjectSettings/EditorBuildSettings.asset` は共有設定）。
+16. **`MenuInput.Submit()` などは「このフレームで押されたか」を返す**（何回呼んでも同じフレームなら true）。
+    コルーチンで「押したら次へ」を続けて書くと、1回の押下で何段も進む。押下を使ったフレームを覚えて二重に使わない
+    （`DialogueRunner` の `AdvancePressed` / `SkipPressed` が例）。
 
 ---
 
