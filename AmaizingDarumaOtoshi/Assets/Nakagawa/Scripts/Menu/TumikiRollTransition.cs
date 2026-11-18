@@ -13,7 +13,8 @@ using UnityEngine.UI;
 // 起動時に Fader.Transition へ自動で入る（Enabled = false にすると黒いフェードだけになる）。
 public class TumikiRollTransition : ISceneTransition
 {
-    public static bool Enabled = true;
+    // 今は使わない（シーン遷移はすべて白フェード。SceneFadeStyle を参照）。true に戻すと積み木の演出が復活する
+    public static bool Enabled = false;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     static void Register()

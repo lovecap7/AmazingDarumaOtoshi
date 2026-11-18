@@ -44,6 +44,26 @@ public class Fader : MonoBehaviour
     // 必殺技ゲージなど OnGUI の UI を黒フェードと一緒に消すのに使う。
     public static float BlackAlpha => instance != null ? instance.m_blackAlpha : 0.0f;
 
+    // フェードの色(Nakagawa)。既定は黒。起動時（BeforeSceneLoad）などに入れておく（途中で変えてもすぐ反映される）。
+    // 名前は BlackAlpha・"Black" のままだが、色を変えたときはその色で画面を覆っている濃さになる
+    static Color s_fadeColor = Color.black;
+    Image m_fadeImage;
+    public static Color FadeColor
+    {
+        get => s_fadeColor;
+        set
+        {
+            s_fadeColor = value;
+            if (instance != null && instance.m_fadeImage != null) instance.m_fadeImage.color = value;
+        }
+    }
+
+    // フェードの時間(Nakagawa)。0 以下なら既定（FadeOutTime / FadeInTime）を使う
+    public static float FadeOutDuration = 0f;
+    public static float FadeInDuration = 0f;
+    static float OutTime => FadeOutDuration > 0f ? FadeOutDuration : FadeOutTime;
+    static float InTime => FadeInDuration > 0f ? FadeInDuration : FadeInTime;
+
     // シーン遷移の演出。null で黒いフェード。起動時（BeforeSceneLoad）などに入れておく
     public static ISceneTransition Transition
     {
@@ -133,7 +153,8 @@ public class Fader : MonoBehaviour
         rect.offsetMax = Vector2.zero;
 
         var image = imageObject.AddComponent<Image>();
-        image.color = Color.black;
+        image.color = s_fadeColor;   // 既定は黒（FadeColor で変えられる）(Nakagawa)
+        m_fadeImage = image;
 
         // 差し替えの演出を入れる場所（黒い画像より手前）
         root = new GameObject("Transition", typeof(RectTransform)).GetComponent<RectTransform>();
@@ -166,7 +187,7 @@ public class Fader : MonoBehaviour
     {
         busy = true;
         Current();   // 演出の部品は先に作っておく（起動直後は黒いフェード）
-        yield return Fade(1f, 0f, FadeInTime);
+        yield return Fade(1f, 0f, InTime);
         busy = false;
     }
 
@@ -195,7 +216,7 @@ public class Fader : MonoBehaviour
             group.blocksRaycasts = true;
             yield return t.Cover();   // 隠す
         }
-        else yield return Fade(0f, 1f, FadeOutTime);   // 暗くする
+        else yield return Fade(0f, 1f, OutTime);   // 暗くする
 
         // 隠れて止まってから、読み込みと有効化をまとめて行う
         Application.backgroundLoadingPriority = ThreadPriority.High;
@@ -223,7 +244,7 @@ public class Fader : MonoBehaviour
             yield return t.Reveal();   // 見せる
             group.blocksRaycasts = false;
         }
-        else yield return Fade(1f, 0f, FadeInTime);    // 明るくする
+        else yield return Fade(1f, 0f, InTime);    // 明るくする
 
         busy = false;
     }
