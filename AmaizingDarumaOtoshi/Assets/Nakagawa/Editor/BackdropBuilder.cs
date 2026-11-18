@@ -12,7 +12,8 @@ namespace Nakagawa.EditorTools
     // ステージの背景(StageBackdrop のプレハブ)を Assets/Nakagawa/Backdrops に作る。背景を増やすときは Definitions に足す
     // 背景は当たり判定のない飾りだけで作り、ステージの外(床の外側・下)に置く
     // ステージへの紐づけは StageEntry の「Backdrop」(まとめたシーン)か、StageBuilder の定義(ステージのシーン)で行う
-    public static class BackdropBuilder
+    // (Stage25〜 の作り込んだ背景は BackdropBuilder.Detailed.cs)
+    public static partial class BackdropBuilder
     {
         public const string kBackdropDir = "Assets/Nakagawa/Backdrops";
         const string kMaterialDir = kBackdropDir + "/Materials";
@@ -33,6 +34,17 @@ namespace Nakagawa.EditorTools
         }
 
         public static string PrefabPath(string id) => $"{kBackdropDir}/Backdrop_{id}.prefab";
+
+        // id の背景だけを定義から作り直す(ほかの背景はそのまま)
+        public static StageBackdrop Rebuild(string id)
+        {
+            foreach (var def in Definitions())
+            {
+                if (def.Id == id) return Build(def);
+            }
+            Debug.LogError($"[BackdropBuilder] 背景 {id} の定義がありません");
+            return null;
+        }
 
         // id の背景のプレハブ。なければ定義から作る(定義もなければ null)
         public static StageBackdrop LoadOrBuild(string id)
@@ -237,6 +249,21 @@ namespace Nakagawa.EditorTools
                     Title = "宇宙ステーション",
                     Description = "金属のパネルを張った宇宙ステーションの区画。ステージは積んだ金属の板の上にあり、まわりには操作盤・酸素ボンベ・ロボットアーム・宇宙服のヘルメット・コンテナ・ケーブルがあり、奥の大窓からは星空と地球が見える。",
                     Build = BuildSpace,
+                },
+                // 作り込んだ背景(BackdropBuilder.Detailed.cs)。メッシュ・テクスチャもコードで作る
+                new BackdropDef
+                {
+                    Id = kKakizomeId,
+                    Title = "書き初めの座卓",
+                    Description = "お正月の和室の座卓の上。ステージは重ねた半紙の束の上にあり、まわりには硯・墨・筆置きと筆・水滴・お手本・書き終えた半紙が置いてあり、奥には床の間の掛け軸と鏡餅が見える。",
+                    Build = BuildKakizome,
+                },
+                new BackdropDef
+                {
+                    Id = kHanabiEngawaId,
+                    Title = "花火の夜の縁側",
+                    Description = "夏の夜の縁側。ステージは縁側に置いた木の箱の上にあり、まわりには蚊取り線香・うちわ・すいかの皿・花火の袋・ろうそくが置いてあり、奥には明かりのともる障子、庭の先には夜空と遠くの打ち上げ花火が見える。",
+                    Build = BuildHanabiEngawa,
                 },
             };
         }

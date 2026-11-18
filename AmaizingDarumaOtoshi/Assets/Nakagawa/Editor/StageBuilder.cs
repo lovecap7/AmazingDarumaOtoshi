@@ -95,6 +95,16 @@ namespace Nakagawa.EditorTools
             BuildIntoCombined(def => InNumberRange(def.Id, kStagePrefix, 21, 24));
         }
 
+        // ミニゲーム由来のギミックの本編ステージ(Stage25〜26: 墨の筆跡・ねずみ花火)だけを作り直す。他のステージはそのまま
+        // 計画は MinigameStagePlans.md。背景(Kakizome・HanabiEngawa)も作り直してから組み立てる
+        [MenuItem("Nakagawa/Stages/Build Stages 25-26 Into AllStages")]
+        public static void BuildStages25To26()
+        {
+            BackdropBuilder.Rebuild("Kakizome");
+            BackdropBuilder.Rebuild("HanabiEngawa");
+            BuildIntoCombined(def => InNumberRange(def.Id, kStagePrefix, 25, 26));
+        }
+
         // 本編のステージのうち、番号が from〜to のものだけを作り直す(ほかのステージを足したときにも使える)
         public static void BuildMainStageRange(int from, int to)
         {
@@ -163,6 +173,8 @@ namespace Nakagawa.EditorTools
         const string kCruiseBackdrop = "Cruise";
         const string kRuinsBackdrop = "Ruins";
         const string kSpaceBackdrop = "Space";
+        const string kKakizomeBackdrop = "Kakizome";
+        const string kHanabiEngawaBackdrop = "HanabiEngawa";
 
         class StageDef
         {
@@ -2309,6 +2321,54 @@ namespace Nakagawa.EditorTools
             sandbagStage.Backdrop = kClubroomBackdrop;
             sandbagStage.SpawnIntervalScale = 1.6f;
 
+            // ミニゲーム由来のギミックの本編ステージ(Stage25〜26)。計画は MinigameStagePlans.md
+
+            Add("書き初めの半紙", 24,
+                "お正月の座卓に広げた書き初めの半紙の上。北と南を文鎮が押さえ、東西の端は座卓からはみ出した崖。歩いた跡と、打った積み木の通り道に、自分の色の墨の線が引かれる。下敷きがのぞく補給所には墨が付かない。",
+                "墨の線は、引いた本人が通り過ぎて足元から離れると「速い道」になる(立ち止まっていても、まっすぐ歩いても速くならない)。補給所への道を一度引いておき、あとからその道を走って積み木を集める。" +
+                "積むほど筆が細くなり、軽い人ほど太い道を引けるので、積んだ人は道を作りにくく、軽い人に回り込まれる。撃った積み木は一直線に墨の線を引き、文鎮で跳ね返るとその先まで伸びる。" +
+                "相手の道を撃ち抜いて上書きするのも、自分の逃げ道を先に引いておくのも、ショット1本でできる。墨は10秒で乾くので、道は最近通った所だけになる。",
+                c =>
+                {
+                    c.Arena(0, 0, 28, 20, true, true, false, false);
+                    // 下敷き(墨が付かない床)。補給所と同じ形
+                    var feltRects = new[] { new Rect(-3, 6.5f, 6, 2), new Rect(-3, -8.5f, 6, 2), new Rect(10.5f, -2, 2, 4), new Rect(-12.5f, -2, 2, 4) };
+                    var feltCircles = new[] { new Vector3(0, 0, 2.5f), new Vector3(7, 0, 1.5f), new Vector3(-7, 0, 1.5f) };
+                    c.InkTrail(new Rect(-14, -10, 28, 20), feltRects, feltCircles);
+                    c.AreaCircle(0, 0, 2.5f);
+                    c.AreaRect(0, 7.5f, 6, 2);
+                    c.AreaRect(0, -7.5f, 6, 2);
+                    c.AreaCircle(7, 0, 1.5f);
+                    c.AreaCircle(-7, 0, 1.5f);
+                    c.AreaRect(11.5f, 0, 2, 4);
+                    c.AreaRect(-11.5f, 0, 2, 4);
+                    c.Spawns(new Vector2(-8, -5), new Vector2(8, 5), new Vector2(-8, 5), new Vector2(8, -5));
+                }).Backdrop = kKakizomeBackdrop;
+
+            Add("縁側のねずみ花火", 24,
+                "花火の夜の縁側。北は雨戸、東西は柱、南は庭へ落ちる崖。板の上に水を張ったバケツが2つと、庭寄りに水風船(バンパー)が2つ。ねずみ花火の火種が、いちばん高く積んだ人に付く。",
+                "開始から15秒たつと、いちばん高く積んだ人の頭でねずみ花火が回り出す。持っている人は少し速くなり、積み木かハンマーでだれかを崩すと火種がその人に移る。" +
+                "10秒の時間切れで、持っている人の積み木が上から1つずつ爆発してはじけ飛び(頭だけならやられる)、まわりへの流れ弾になる。次の火種は15秒後。ほかの人はバケツの柱を回って逃げ、積み木を撃って近寄らせない。" +
+                "庭寄りに逃げると水風船にはじかれて崖へ飛ばされるので、逃げ道は北側に偏る。勝っている人ほど火種を押し付けられるので、積みすぎは損になる。",
+                c =>
+                {
+                    c.Arena(0, 0, 28, 20, true, false, true, true);
+                    c.Bucket(-6, 1, 1.25f, 1.5f);
+                    c.Bucket(6, 1, 1.25f, 1.5f);
+                    c.WaterBalloon(-3, -4.5f, 1.25f);
+                    c.WaterBalloon(3, -4.5f, 1.25f);
+                    c.NezumiHanabi();
+                    c.AreaCircle(0, 0, 2.5f);
+                    c.AreaCircle(-10, 1, 1.5f);
+                    c.AreaCircle(10, 1, 1.5f);
+                    c.AreaRect(-5, 8, 5, 2);
+                    c.AreaRect(5, 8, 5, 2);
+                    c.AreaRect(-5, -7.5f, 5, 2);
+                    c.AreaRect(5, -7.5f, 5, 2);
+                    // 2人のときに使う最初の2か所は、左右で同じ条件になる組
+                    c.Spawns(new Vector2(-11, -3), new Vector2(11, -3), new Vector2(-11, 5), new Vector2(11, 5));
+                }).Backdrop = kHanabiEngawaBackdrop;
+
             //----------------------------------------
             // 追加ギミックの確認用ステージ(GimmickDebugStage01〜)。背景なし・種類の数の制限なし
             //----------------------------------------
@@ -2963,6 +3023,121 @@ namespace Nakagawa.EditorTools
                 SpawnerLinks.Add((bag, "m_spawner"));
                 Blockers.Add(new Vector3(x, z, radius + 0.1f));
                 Count("サンドバッグ");
+            }
+
+            //---- 本編 Stage25〜 のミニゲーム由来のギミック ----
+
+            // 墨の筆跡。area: 墨が付く範囲。feltRects / feltCircles(x, z, 半径): 下敷き(墨が付かない床。見た目もフェルトにする)
+            public void InkTrail(Rect area, Rect[] feltRects, Vector3[] feltCircles)
+            {
+                var root = new GameObject("InkTrail");
+                root.transform.SetParent(Gimmicks, false);
+                root.transform.position = new Vector3(area.center.x, 0, area.center.y);
+
+                // 下敷き(床の上に薄く重ねた見た目だけ)
+                var felt = Load<Material>("Assets/Nakagawa/Backdrops/Materials/Kakizome_Felt.mat");
+                if (felt == null) felt = LitMaterial("InkFelt", new Color(0.21f, 0.24f, 0.33f), 0.05f);
+                var feltRoot = new GameObject("Shitajiki").transform;
+                feltRoot.SetParent(root.transform, false);
+                foreach (var r in feltRects)
+                {
+                    var go = Primitive(PrimitiveType.Cube, feltRoot, "Felt", Vector3.zero, new Vector3(r.width, 0.01f, r.height), felt);
+                    go.transform.position = new Vector3(r.center.x, 0.005f, r.center.y);
+                    go.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                }
+                foreach (var cc in feltCircles)
+                {
+                    var go = Primitive(PrimitiveType.Cylinder, feltRoot, "Felt", Vector3.zero, new Vector3(cc.z * 2, 0.005f, cc.z * 2), felt);
+                    go.transform.position = new Vector3(cc.x, 0.005f, cc.y);
+                    go.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                }
+
+                // 墨を描く板(床の少し上)
+                var overlay = Primitive(PrimitiveType.Quad, root.transform, "InkOverlay", new Vector3(0, 0.02f, 0), new Vector3(area.width, area.height, 1), InkMaterial());
+                overlay.transform.localRotation = Quaternion.Euler(90, 0, 0);
+                var renderer = overlay.GetComponent<Renderer>();
+                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                renderer.receiveShadows = false;
+
+                var ink = root.AddComponent<InkTrailGimmick>();
+                var so = new SerializedObject(ink);
+                so.FindProperty("m_size").vector2Value = area.size;
+                so.FindProperty("m_overlay").objectReferenceValue = renderer;
+                var rects = so.FindProperty("m_noPaintRects");
+                rects.arraySize = feltRects.Length;
+                for (int i = 0; i < feltRects.Length; i++) rects.GetArrayElementAtIndex(i).rectValue = feltRects[i];
+                var circles = so.FindProperty("m_noPaintCircles");
+                circles.arraySize = feltCircles.Length;
+                for (int i = 0; i < feltCircles.Length; i++) circles.GetArrayElementAtIndex(i).vector3Value = feltCircles[i];
+                so.ApplyModifiedPropertiesWithoutUndo();
+                Count("墨の筆跡");
+            }
+
+            static Material InkMaterial()
+            {
+                const string path = kMaterialDir + "/InkTrail.mat";
+                var shader = Shader.Find("Nakagawa/InkTrail");
+                var mat = Load<Material>(path);
+                if (mat == null)
+                {
+                    EnsureFolder(kMaterialDir);
+                    mat = new Material(shader);
+                    AssetDatabase.CreateAsset(mat, path);
+                }
+                else if (shader != null && mat.shader != shader) mat.shader = shader;
+                return mat;
+            }
+
+            // ねずみ花火(ステージ全体で1つ。場所は持っている人に付いていく)
+            public void NezumiHanabi()
+            {
+                var root = new GameObject("NezumiHanabi");
+                root.transform.SetParent(Gimmicks, false);
+                root.AddComponent<NezumiHanabiGimmick>();
+                Count("ねずみ花火");
+            }
+
+            // 水を張ったバケツ(柱。飛んでいる積み木は跳ね返る)。ギミックの種類には数えない
+            public void Bucket(float x, float z, float radius, float height)
+            {
+                var root = new GameObject("Bucket");
+                root.transform.SetParent(Gimmicks, false);
+                root.transform.position = new Vector3(x, 0, z);
+                var cap = root.AddComponent<CapsuleCollider>();
+                cap.radius = radius;
+                cap.height = Mathf.Max(height, radius * 2) + 0.5f;
+                cap.center = new Vector3(0, cap.height * 0.5f, 0);
+                root.AddComponent<ReflectWall>();
+                root.isStatic = true;
+
+                var metal = LitMaterial("BucketMetal", new Color(0.52f, 0.54f, 0.55f), 0.7f);
+                var metalDark = LitMaterial("BucketMetalDark", new Color(0.38f, 0.4f, 0.41f), 0.75f);
+                var water = LitMaterial("BucketWater", new Color(0.16f, 0.22f, 0.26f), 0.95f);
+                var visual = new GameObject("Visual").transform;
+                visual.SetParent(root.transform, false);
+                Primitive(PrimitiveType.Cylinder, visual, "Body", new Vector3(0, height * 0.5f, 0), new Vector3(radius * 2, height * 0.5f, radius * 2), metal);
+                Primitive(PrimitiveType.Cylinder, visual, "BandLow", new Vector3(0, height * 0.25f, 0), new Vector3(radius * 2 + 0.06f, 0.05f, radius * 2 + 0.06f), metalDark);
+                Primitive(PrimitiveType.Cylinder, visual, "Rim", new Vector3(0, height - 0.04f, 0), new Vector3(radius * 2 + 0.12f, 0.06f, radius * 2 + 0.12f), metalDark);
+                Primitive(PrimitiveType.Cylinder, visual, "Water", new Vector3(0, height - 0.12f, 0), new Vector3(radius * 1.9f, 0.04f, radius * 1.9f), water);
+                Primitive(PrimitiveType.Capsule, visual, "Handle", new Vector3(0, height + 0.35f, 0), new Vector3(0.08f, radius * 0.95f, 0.08f), metalDark).transform.localRotation = Quaternion.Euler(0, 0, 90);
+                Blockers.Add(new Vector3(x, z, radius + 0.1f));
+            }
+
+            // 水風船に見立てたバンパー(色を彩度の低い水色にする)
+            public void WaterBalloon(float x, float z, float scale)
+            {
+                Bumper(x, z, scale);
+                var bumper = Gimmicks.GetChild(Gimmicks.childCount - 1).GetComponent<BumperGimmick>();
+                if (bumper == null) return;
+                bumper.name = "WaterBalloon";
+                var so = new SerializedObject(bumper);
+                var renderer = so.FindProperty("m_renderer").objectReferenceValue as Renderer;
+                // 既定のバンパーの縁と上の飾り(黄色)は、黄色が「予兆」の意味なので、結び目の色(くすんだ白)にする
+                var knot = LitMaterial("WaterBalloonKnot", new Color(0.82f, 0.84f, 0.84f), 0.6f);
+                foreach (var r in bumper.GetComponentsInChildren<Renderer>(true)) r.sharedMaterial = knot;
+                if (renderer != null) renderer.sharedMaterial = LitMaterial("WaterBalloon", new Color(0.66f, 0.76f, 0.8f), 0.9f);
+                so.FindProperty("m_flashColor").colorValue = new Color(0.95f, 0.97f, 1.0f);
+                so.ApplyModifiedPropertiesWithoutUndo();
             }
 
             static GameObject Primitive(PrimitiveType type, Transform parent, string name, Vector3 localPos, Vector3 localScale, Material mat)
