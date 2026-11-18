@@ -149,7 +149,12 @@ namespace Nakahira
         };
         static readonly Color CpuColor = new Color(0.55f, 0.55f, 0.58f);
 
-        public static Color ColorFor(MatchSetup.Entry e) => e.isCpu ? CpuColor : PlayerColors[e.playerIndex % PlayerColors.Length];
+        public static Color ColorFor(MatchSetup.Entry e)
+        {
+            // チーム戦では、チームの色(CPUもチームの色にする)
+            if (MatchSetup.Rules.teams && e.team >= 0) return MatchSetup.TeamColors[e.team % MatchSetup.TeamCount];
+            return e.isCpu ? CpuColor : PlayerColors[e.playerIndex % PlayerColors.Length];
+        }
 
         // ストック数。Entry に個別の指定があればそれを優先する（ストーリーのチュートリアル用）
         int StocksFor(MatchSetup.Entry entry) =>

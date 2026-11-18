@@ -55,9 +55,38 @@ namespace Yurube.Story
 
         // 1行を表示し始めた（話者ID。ト書きは空）。会話中にカメラを話者へ寄せる演出用
         public event Action<string> LineStarted;
+        // 1行を表示し始めた（行データ全体。ショットIDなどを使ったカメラ切り替え用）
+        public event Action<StoryLine> StoryLineStarted;
 
         // 操作バナーを目立たせる（連鎖の詰まり防止）
         bool m_objectiveEmphasis;
+
+        // 会話の入力を最後に受け取ったフレーム。
+        // MenuInput は「このフレームで押されたか」を返すので、同じフレームで2回見ると
+        // A を1回押しただけで「全文表示」と「次へ」や、次の行の分まで進んでしまう（1行おきに台詞が抜けていた）。
+        // 1回の押下は1回の操作にだけ使う。
+        int m_inputFrame = -1;
+
+        bool InputFree => Time.frameCount != m_inputFrame;
+        void ConsumeInput() => m_inputFrame = Time.frameCount;
+
+        // A／Enter／クリック（このフレームでまだ使っていない押下だけ）
+        bool AdvancePressed()
+        {
+            if (!InputFree) return false;
+            if (!(MenuInput.Submit() || MenuInput.AnyClick())) return false;
+            ConsumeInput();
+            return true;
+        }
+
+        // B／Esc（このフレームでまだ使っていない押下だけ）
+        bool SkipPressed()
+        {
+            if (!InputFree) return false;
+            if (!MenuInput.Cancel()) return false;
+            ConsumeInput();
+            return true;
+        }
 
         //========================================
         // 作る
@@ -411,10 +440,12 @@ namespace Yurube.Story
             yield return FadeGroup(m_bigGroup, 0f, 1f, 0.15f);
 
             int index = 0;
+            bool firstPrepared = first != null;
             foreach (var line in lines)
             {
                 if (line == null) { index++; continue; }
-                yield return ShowLine(chapter, line, big: true, index, onLine);
+                yield return ShowLine(chapter, line, big: true, index, onLine, firstPrepared);
+                firstPrepared = false;
                 index++;
                 if (m_skipped) break;
             }
@@ -682,6 +713,7 @@ namespace Yurube.Story
         {
             bool direction = line.direction || string.IsNullOrEmpty(line.speaker);
             ApplySpeaker(chapter, line.speaker, big);
+            StoryLineStarted?.Invoke(line);
             LineStarted?.Invoke(line.speaker);
 
             var text = big ? m_bigText : m_smallText;
@@ -694,9 +726,9 @@ namespace Yurube.Story
         }
 
         IEnumerator ShowLine(StoryChapter chapter, StoryLine line, bool big, int index = -1,
-                             Action<int, StoryLine> onLine = null)
+                             Action<int, StoryLine> onLine = null, bool alreadyPrepared = false)
         {
-            PrepareLine(chapter, line, big);
+            if (!alreadyPrepared) PrepareLine(chapter, line, big);
             var text = big ? m_bigText : m_smallText;
 
             // 行を出し始めたことを外へ知らせる（横断幕など、台詞に合わせて起こす演出用）
@@ -709,21 +741,21 @@ namespace Yurube.Story
             float shown = 0f;
             while (shown < total)
             {
-                if (MenuInput.Cancel()) { m_skipped = true; text.maxVisibleCharacters = total; yield break; }
-                if (MenuInput.Submit() || MenuInput.AnyClick()) break;   // 全文表示
+                if (SkipPressed()) { m_skipped = true; text.maxVisibleCharacters = total; yield break; }
+                if (AdvancePressed()) break;   // 全文表示（この押下では次へ進まない）
                 shown += m_charsPerSecond * Time.unscaledDeltaTime;
                 text.maxVisibleCharacters = Mathf.Clamp(Mathf.FloorToInt(shown), 0, total);
                 yield return null;
             }
             text.maxVisibleCharacters = total;
 
-            // 表示し終わったら次へ（入力待ち）
+            // 表示し終わったら次へ（入力待ち。全文表示に使った押下とは別の押下を待つ）
             if (big)
             {
                 while (true)
                 {
-                    if (MenuInput.Cancel()) { m_skipped = true; yield break; }
-                    if (MenuInput.Submit() || MenuInput.AnyClick()) break;
+                    if (SkipPressed()) { m_skipped = true; yield break; }
+                    if (AdvancePressed()) break;
                     yield return null;
                 }
             }

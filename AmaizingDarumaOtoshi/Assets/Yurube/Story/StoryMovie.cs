@@ -37,12 +37,56 @@ namespace Yurube.Story
         RectTransform m_hintPlate;
         TextMeshProUGUI m_titleMain, m_titleSub, m_caption;
 
+        [Header("会話カメラ・演出")]
+        [Tooltip("S_DOLL_FAR（窓際の人形）へ寄るときのブレンド秒数")]
+        [SerializeField, Min(0.05f)] float m_dollFarBlendSeconds = 0.8f;
+        [Tooltip("S_EMPTY_ROOM で無人の部室を見せてから人形へ寄り始めるまでの秒数")]
+        [SerializeField, Min(0f)] float m_emptyRoomHoldSeconds = 0.35f;
+        [Tooltip("だるま人形がカタと小さく揺れる往復の秒数")]
+        [SerializeField, Min(0.05f)] float m_dollShakeSeconds = 0.5f;
+        [Tooltip("だるま人形が揺れる最大角度（度）")]
+        [SerializeField, Min(0.5f)] float m_dollShakeAngle = 8f;
+        [Tooltip("だるま人形が揺れるときの効果音（未設定なら鳴らさない）")]
+        [SerializeField] AudioClip m_dollShakeSe;
+        [Tooltip("会話シーン（部室）での各キャラクターの積み木段数（仮の見た目。初期値は3段）")]
+        [SerializeField] StorySettings.MemberStackConfig[] m_roomMemberStacks = new[]
+        {
+            new StorySettings.MemberStackConfig { id = "kidaru", stackCount = 3 },
+            new StorySettings.MemberStackConfig { id = "midaru", stackCount = 3 },
+            new StorySettings.MemberStackConfig { id = "akadaru", stackCount = 3 },
+            new StorySettings.MemberStackConfig { id = "aodaru", stackCount = 3 },
+        };
+
+        // ショットIDをキーに、対象の Transform 基準でカメラ位置・注視点・画角を登録する
+        [System.Serializable]
+        public class ShotDefinition
+        {
+            public string id;
+            public Transform target;
+            public Vector3 positionOffset;
+            public Vector3 lookOffset;
+            public float fov = 40f;
+            public bool useTargetRotation; // true なら target の向き基準でオフセットを計算
+            public bool blend;             // true ならブレンド移動（S_DOLL_FAR）
+            public bool sway;              // true なら全景のゆったりした呼吸揺れ
+            public int memberVisibility;   // 1: 4人を表示 / -1: 4人を非表示 / 0: 直前の状態を維持
+        }
+
+        [SerializeField] List<ShotDefinition> m_shotList = new List<ShotDefinition>();
+        readonly Dictionary<string, ShotDefinition> m_shots = new Dictionary<string, ShotDefinition>();
+        string m_currentShotId = "";
+        float m_blendDuration;
+        float m_blendFromFov = 42f;
+        Coroutine m_emptyRoomRoutine;
+        float m_dollShakeStart = -1f;
+
         Material m_wallMat, m_floorMat, m_woodMat, m_whiteMat, m_inkMat;
         Material m_skyDay, m_skySunset, m_sunPatchMat;
         Transform m_skyQuad;
         Renderer m_sunPatch;
         Light m_sun, m_fill;
         Transform m_doll;
+        Transform m_whiteboard;
 
         class Member
         {
@@ -78,6 +122,8 @@ namespace Yurube.Story
         bool m_finalMode;
         string m_finalScene = "";                 // "room" / "stage"
         readonly Dictionary<string, Member> m_roomMembers = new Dictionary<string, Member>();
+        // 差し替え前の古い会話用だるま（削除せず非表示で残す）
+        readonly List<Member> m_legacyRoomMembers = new List<Member>();
         Transform m_offerNotebook;                // 控室で差し出す分厚いノート
         Transform m_epilogueRoot;                 // エピローグ用の小道具（まとめて消す）
         bool m_epilogueBuilt;
@@ -132,6 +178,13 @@ namespace Yurube.Story
             if (m_built) return;
             m_built = true;
 
+            var settings = StorySettings.Instance;
+            if (settings != null)
+            {
+                m_dollFarBlendSeconds = settings.DollFarBlendSeconds;
+                m_dollShakeSeconds = settings.DollShakeSeconds;
+            }
+
             m_root = new GameObject("StoryMovieSet").transform;
             m_root.position = SetOrigin;
 
@@ -139,16 +192,20 @@ namespace Yurube.Story
             BuildRoom();
             BuildProps();
             BuildMembers();
+            RegisterRoomShots();
             BuildLights();
             BuildDust();
             BuildCamera();
             BuildPost();
             BuildScreen();
+            StoryData.EventPlayed -= OnStoryEventPlayed;
+            StoryData.EventPlayed += OnStoryEventPlayed;
             Hide();
         }
 
         void OnDestroy()
         {
+            StoryData.EventPlayed -= OnStoryEventPlayed;
             RestoreRunner();
             if (m_camera != null) m_camera.targetTexture = null;
             RenderTexture.active = null;
@@ -371,7 +428,7 @@ namespace Yurube.Story
         {
             // 白板（左の壁）。練習メニューを書いておく
             Box("BoardFrame", new Vector3(-5.87f, 2.55f, 0.3f), new Vector3(0.05f, 2.0f, 3.8f), m_inkMat);
-            Box("Board", new Vector3(-5.83f, 2.55f, 0.3f), new Vector3(0.06f, 1.9f, 3.6f), m_whiteMat);
+            m_whiteboard = Box("Board", new Vector3(-5.83f, 2.55f, 0.3f), new Vector3(0.06f, 1.9f, 3.6f), m_whiteMat);
             // TMPの3D文字はfontSize 1 ≈ 0.1m なので、白板に読める大きさにするには3前後必要
             var boardText = TitleDressingKit.Text(m_root, PresentationSettings.DefaultFont,
                 "練習メニュー\n素振り1000回\n積み上げ100段\n走り込み！",
@@ -512,15 +569,474 @@ namespace Yurube.Story
 
         void BuildMembers()
         {
-            // 部室の4人。id を付けておくと、会話のときに話者へカメラを寄せられる
-            AddMember(new Vector3(-1.9f, 0f, 0.05f), 14f, new Color(0.95f, 0.78f, 0.18f), 0.92f, true,
-                m_root, "kidaru", m_roomMembers);    // きだる
-            AddMember(new Vector3(1.4f, 0f, 0.35f), -14f, new Color(0.28f, 0.62f, 0.32f), 0.92f, false,
-                m_root, "midaru", m_roomMembers);    // みだる
-            AddMember(new Vector3(-0.2f, 0f, 2.45f), 2f, new Color(0.85f, 0.22f, 0.18f), 0.95f, true,
-                m_root, "akadaru", m_roomMembers);   // あかだる
-            AddMember(new Vector3(2.9f, 0f, 2.25f), -10f, new Color(0.2f, 0.42f, 0.85f), 0.95f, false,
-                m_root, "aodaru", m_roomMembers);    // あおだる
+            // 差し替え前の古い会話用だるま（戻せるように削除せず非表示で残す）
+            AddLegacyRoomMember(new Vector3(-1.9f, 0f, 0.05f), 14f, new Color(0.95f, 0.78f, 0.18f), 0.92f, true);
+            AddLegacyRoomMember(new Vector3(1.4f, 0f, 0.35f), -14f, new Color(0.28f, 0.62f, 0.32f), 0.92f, false);
+            AddLegacyRoomMember(new Vector3(-0.2f, 0f, 2.45f), 2f, new Color(0.85f, 0.22f, 0.18f), 0.95f, true);
+            AddLegacyRoomMember(new Vector3(2.9f, 0f, 2.25f), -10f, new Color(0.2f, 0.42f, 0.85f), 0.95f, false);
+
+            // 部室の4人（本編と同じ見た目のだるま・積み木・ハンマー。+Z が正面なので旧向き + 180°）
+            AddGameRoomMember("kidaru", new Vector3(-1.9f, 0f, 0.05f), 194f, Nakahira.TumikiColor.Yellow, new Color(0.95f, 0.78f, 0.18f));
+            AddGameRoomMember("midaru", new Vector3(1.4f, 0f, 0.35f), 166f, Nakahira.TumikiColor.Green, new Color(0.28f, 0.62f, 0.32f));
+            AddGameRoomMember("akadaru", new Vector3(-0.2f, 0f, 2.45f), 182f, Nakahira.TumikiColor.Red, new Color(0.85f, 0.22f, 0.18f));
+            AddGameRoomMember("aodaru", new Vector3(2.9f, 0f, 2.25f), 170f, Nakahira.TumikiColor.Blue, new Color(0.2f, 0.42f, 0.85f));
+        }
+
+        void AddLegacyRoomMember(Vector3 pos, float yaw, Color color, float scale, bool happy)
+        {
+            var m = AddMember(pos, yaw, color, scale, happy, m_root, null, m_roomMembers);
+            m_members.Remove(m);
+            m_legacyRoomMembers.Add(m);
+            if (m.root != null)
+            {
+                m.root.name = "Member_Legacy";
+                m.root.gameObject.SetActive(false);
+            }
+        }
+
+        int GetMemberStackCount(string id)
+        {
+            var settings = StorySettings.Instance;
+            if (settings != null) return settings.GetRoomMemberStackCount(id, 3);
+            if (m_roomMemberStacks != null)
+            {
+                foreach (var c in m_roomMemberStacks)
+                {
+                    if (c.id == id) return Mathf.Max(0, c.stackCount);
+                }
+            }
+            return 3;
+        }
+
+        static CharacterData FindCharacterData(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return null;
+            var modelSettings = GameModelSettings.Current;
+            var roster = modelSettings != null ? modelSettings.roster : null;
+            if (roster == null)
+            {
+                var ach = Yurube.Achievements.AchievementSettings.Instance;
+                roster = ach != null ? ach.Roster : null;
+            }
+            if (roster == null || roster.characters == null) return null;
+            foreach (var c in roster.characters)
+            {
+                if (c != null && c.id == id) return c;
+            }
+            return null;
+        }
+
+        static readonly Bounds s_unitBounds = new Bounds(Vector3.zero, Vector3.one);
+
+        // 本編のだるまの見た目（頭・積み木・ハンマー）だけを、物理・AI・操作・ゲージなしで生成する
+        Member AddGameRoomMember(string id, Vector3 pos, float yaw, Nakahira.TumikiColor tumikiColor, Color fallbackColor)
+        {
+            var m = new Member { basePos = pos, phase = m_members.Count * 1.7f };
+            var root = new GameObject("Member_" + id).transform;
+            root.SetParent(m_root, false);
+            root.localPosition = pos;
+            root.localRotation = Quaternion.Euler(0f, yaw, 0f);
+
+            var visual = new GameObject("Visual").transform;
+            visual.SetParent(root, false);
+            var stackRoot = new GameObject("Stack").transform;
+            stackRoot.SetParent(visual, false);
+
+            var gms = GameModelSettings.Current;
+            var data = FindCharacterData(id);
+            int stackCount = GetMemberStackCount(id);
+
+            // 積み木（本編と同じサイズ：高さ 0.5m、幅・奥行 1.0m）
+            Mesh fittedBlockMesh = null;
+            Material blockMat = null;
+            if (gms != null && gms.UseTsumiki)
+            {
+                // Tumiki.prefab の Cylinder (1, 0.25, 1) は半径 0.5 / 高さ 2 の円柱なので、ローカルの bounds は size(1, 2, 1)
+                var cylBounds = new Bounds(Vector3.zero, new Vector3(1f, 2f, 1f));
+                fittedBlockMesh = GameModelSettings.Fit(gms.tsumikiMesh, cylBounds, false, 0f);
+                blockMat = gms.TsumikiMaterial(tumikiColor);
+            }
+            if (blockMat == null) blockMat = ToyKit.Lit(fallbackColor, 0.4f);
+
+            for (int i = 0; i < stackCount; i++)
+            {
+                var b = new GameObject("Block_" + i);
+                b.transform.SetParent(stackRoot, false);
+                b.transform.localPosition = new Vector3(0f, Nakahira.TumikiBlock.kHeight * (i + 0.5f), 0f);
+                b.transform.localScale = new Vector3(1f, 0.25f, 1f);
+                var mf = b.AddComponent<MeshFilter>();
+                var mr = b.AddComponent<MeshRenderer>();
+                if (fittedBlockMesh != null)
+                {
+                    mf.sharedMesh = fittedBlockMesh;
+                }
+                else
+                {
+                    var tempCyl = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                    mf.sharedMesh = tempCyl.GetComponent<MeshFilter>().sharedMesh;
+                    Destroy(tempCyl);
+                }
+                mr.sharedMaterial = blockMat;
+            }
+
+            // 頭（本編の Head と同じ位置・サイズ：y = stackCount * 0.5 + 0.45, scale = 0.9）
+            var head = new GameObject("Head").transform;
+            head.SetParent(visual, false);
+            head.localPosition = new Vector3(0f, stackCount * Nakahira.TumikiBlock.kHeight + 0.45f, 0f);
+            head.localScale = Vector3.one * 0.9f;
+            var headMf = head.gameObject.AddComponent<MeshFilter>();
+            var headMr = head.gameObject.AddComponent<MeshRenderer>();
+
+            bool headSwapped = false;
+            if (gms != null && data != null && data.model != null && GameModelSettings.MeshOf(data.model, out var headMesh, out var headMat))
+            {
+                var fittedHead = GameModelSettings.Fit(headMesh, s_unitBounds, true, gms.headYaw);
+                if (fittedHead != null)
+                {
+                    headMf.sharedMesh = fittedHead;
+                    headMr.sharedMaterial = headMat != null ? headMat : ToyKit.Lit(fallbackColor, 0.5f);
+                    headSwapped = true;
+
+                    // 装飾（マントなど）があれば見た目だけ装着する
+                    if (data.extraModels != null && data.extraModels.Length > 0
+                        && GameModelSettings.FitTransform(headMesh, s_unitBounds, gms.headYaw, out var extraRot, out float extraScale, out var extraOffset))
+                    {
+                        foreach (var extra in data.extraModels)
+                        {
+                            if (extra == null) continue;
+                            var ex = Instantiate(extra, head, false);
+                            ex.name = "Extra_" + extra.name;
+                            ex.transform.localRotation = extraRot;
+                            ex.transform.localScale = Vector3.one * extraScale;
+                            ex.transform.localPosition = extraOffset;
+                            foreach (var smr in ex.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+                                smr.updateWhenOffscreen = true;
+                        }
+                    }
+                }
+            }
+            if (!headSwapped)
+            {
+                var tempSphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                headMf.sharedMesh = tempSphere.GetComponent<MeshFilter>().sharedMesh;
+                Destroy(tempSphere);
+                headMr.sharedMaterial = ToyKit.Lit(fallbackColor, 0.5f);
+            }
+
+            // ハンマー（本編の HammerPivot と同じ位置・サイズ）
+            GameObject hammerSrc = data != null && data.hammerModel != null ? data.hammerModel : GameModelSettings.HammerModel;
+            if (hammerSrc != null)
+            {
+                var pivot = new GameObject("HammerPivot").transform;
+                pivot.SetParent(root, false);
+                pivot.localPosition = new Vector3(0.6f, 0.6f, 0f);
+                pivot.localRotation = Quaternion.Euler(-30f, 0f, 0f);
+                var hammerModel = ToyKit.CreateHammerModel("HammerModelHead", hammerSrc);
+                if (hammerModel != null)
+                {
+                    hammerModel.name = "HammerModel";
+                    hammerModel.SetParent(pivot, false);
+                    hammerModel.localRotation = Quaternion.Euler(0f, 0f, 90f);
+                    float scale = 1.2f / ToyKit.HammerLength;
+                    hammerModel.localScale = Vector3.one * scale;
+                }
+            }
+
+            m.root = root;
+            m.head = head;
+            m_members.Add(m);
+            m_roomMembers[id] = m;
+            return m;
+        }
+
+        //========================================
+        // 会話ショットの登録・切り替え（Transform 参照）
+        //========================================
+
+        Transform RoomMemberTransform(string id)
+        {
+            var m = RoomMember(id);
+            return m != null ? m.root : m_root;
+        }
+
+        void RegisterShot(ShotDefinition def)
+        {
+            if (def == null || string.IsNullOrEmpty(def.id)) return;
+            m_shots[def.id] = def;
+            m_shotList.Add(def);
+        }
+
+        void RegisterRoomShots()
+        {
+            m_shots.Clear();
+            m_shotList.Clear();
+
+            // S_ROOM_WIDE：4人が並ぶ全景（本編サイズ3段＋頭に合わせて高さ・引きを調整）
+            RegisterShot(new ShotDefinition
+            {
+                id = "S_ROOM_WIDE",
+                target = m_root,
+                positionOffset = new Vector3(0.1f, 2.15f, -5.0f),
+                lookOffset = new Vector3(0f, 0.85f, 2.2f),
+                fov = 44f,
+                sway = true,
+                memberVisibility = 1,
+            });
+
+            // S_WHITEBOARD：ホワイトボードのアップ（導入カットの位置をホワイトボード基準で流用）
+            RegisterShot(new ShotDefinition
+            {
+                id = "S_WHITEBOARD",
+                target = m_whiteboard != null ? m_whiteboard : m_root,
+                positionOffset = new Vector3(3.43f, -0.35f, 1.5f),
+                lookOffset = new Vector3(0.13f, -0.35f, 0.1f),
+                fov = 38f,
+                memberVisibility = 1,
+            });
+
+            // S_KIDARU：きだるのバストアップ（入口側。+Z 正面から撮る）
+            RegisterShot(new ShotDefinition
+            {
+                id = "S_KIDARU",
+                target = RoomMemberTransform("kidaru"),
+                useTargetRotation = true,
+                positionOffset = new Vector3(0f, 1.95f, 2.75f),
+                lookOffset = new Vector3(0f, 1.45f, 0f),
+                fov = 38f,
+                memberVisibility = 1,
+            });
+
+            // S_AKA：あかだるのバストアップ（+Z 正面から撮る）
+            RegisterShot(new ShotDefinition
+            {
+                id = "S_AKA",
+                target = RoomMemberTransform("akadaru"),
+                useTargetRotation = true,
+                positionOffset = new Vector3(0f, 1.95f, 2.75f),
+                lookOffset = new Vector3(0f, 1.45f, 0f),
+                fov = 38f,
+                memberVisibility = 1,
+            });
+
+            // S_AO：あおだるのバストアップ（+Z 正面から撮る）
+            RegisterShot(new ShotDefinition
+            {
+                id = "S_AO",
+                target = RoomMemberTransform("aodaru"),
+                useTargetRotation = true,
+                positionOffset = new Vector3(0f, 1.95f, 2.75f),
+                lookOffset = new Vector3(0f, 1.45f, 0f),
+                fov = 38f,
+                memberVisibility = 1,
+            });
+
+            // S_MI：みだるのバストアップ（+Z 正面から撮る）
+            RegisterShot(new ShotDefinition
+            {
+                id = "S_MI",
+                target = RoomMemberTransform("midaru"),
+                useTargetRotation = true,
+                positionOffset = new Vector3(0f, 1.95f, 2.75f),
+                lookOffset = new Vector3(0f, 1.45f, 0f),
+                fov = 38f,
+                memberVisibility = 1,
+            });
+
+            // S_DOLL_FAR：窓際の人形（引き気味。0.8秒程度のブレンドで寄る）
+            RegisterShot(new ShotDefinition
+            {
+                id = "S_DOLL_FAR",
+                target = m_doll != null ? m_doll : m_root,
+                positionOffset = new Vector3(-1.35f, 0.35f, -2.6f),
+                lookOffset = new Vector3(-0.2f, -0.22f, 0f),
+                fov = 36f,
+                blend = true,
+                memberVisibility = 0,
+            });
+
+            // S_DOLL_EYE：人形の片目のアップ（導入カットの位置を人形基準で流用）
+            RegisterShot(new ShotDefinition
+            {
+                id = "S_DOLL_EYE",
+                target = m_doll != null ? m_doll : m_root,
+                positionOffset = new Vector3(0f, 0.10f, -0.95f),
+                lookOffset = new Vector3(0f, -0.08f, 0f),
+                fov = 28f,
+                memberVisibility = 0,
+            });
+
+            // S_EMPTY_ROOM：キャラクター非表示の部室
+            RegisterShot(new ShotDefinition
+            {
+                id = "S_EMPTY_ROOM",
+                target = m_root,
+                positionOffset = new Vector3(0.1f, 2.15f, -5.0f),
+                lookOffset = new Vector3(0f, 0.85f, 2.2f),
+                fov = 44f,
+                sway = true,
+                memberVisibility = -1,
+            });
+        }
+
+        void SetRoomMembersVisible(bool visible)
+        {
+            foreach (var kv in m_roomMembers)
+            {
+                if (kv.Value != null && kv.Value.root != null)
+                    kv.Value.root.gameObject.SetActive(visible);
+            }
+        }
+
+        void EvaluateShot(ShotDefinition def, float lt, out Vector3 pos, out Vector3 look)
+        {
+            Transform t = def.target != null ? def.target : m_root;
+            Vector3 anchor = t != null ? t.position : SetOrigin;
+            // 部員の呼吸アニメでカメラ自体が上下に揺れないよう、部室直下のキャラは床の高さを基準にする
+            if (m_root != null && t != null && t != m_root && t.parent == m_root && def.useTargetRotation)
+                anchor.y = m_root.position.y;
+
+            if (def.useTargetRotation && t != null)
+            {
+                Vector3 fwd = t.forward;
+                fwd.y = 0f;
+                if (fwd.sqrMagnitude < 0.0001f) fwd = Vector3.forward;
+                fwd.Normalize();
+                Quaternion rot = Quaternion.LookRotation(fwd, Vector3.up);
+                pos = anchor + rot * def.positionOffset;
+                look = anchor + rot * def.lookOffset;
+            }
+            else
+            {
+                pos = anchor + def.positionOffset;
+                look = anchor + def.lookOffset;
+            }
+
+            if (def.sway)
+            {
+                pos += new Vector3(0.09f * Mathf.Sin(lt * 0.11f), 0f, 0.05f * Mathf.Sin(lt * 0.07f));
+            }
+
+            // 壁の外へ出ないように部室内に収める
+            if (m_root != null)
+            {
+                Vector3 local = pos - m_root.position;
+                local.x = Mathf.Clamp(local.x, -5.4f, 5.4f);
+                local.z = Mathf.Clamp(local.z, -4.65f, 4.4f);
+                pos = m_root.position + local;
+            }
+        }
+
+        void ApplyShotDefinition(ShotDefinition def, float blendSeconds = 0f)
+        {
+            if (def == null) return;
+            m_currentShotId = def.id;
+
+            if (def.memberVisibility > 0) SetRoomMembersVisible(true);
+            else if (def.memberVisibility < 0) SetRoomMembersVisible(false);
+
+            UseRoomCamera();
+
+            if (blendSeconds > 0.01f && m_camera != null && m_camPos != null && m_camLook != null)
+            {
+                float curLt = m_time - m_shotStart;
+                Vector3 fromPos = m_camPos(curLt);
+                Vector3 fromLook = m_camLook(curLt);
+                m_blendFromFov = m_camera.fieldOfView;
+                m_blendDuration = blendSeconds;
+
+                SetShot(
+                    lt =>
+                    {
+                        EvaluateShot(def, lt, out var toPos, out _);
+                        float u = m_blendDuration > 0.01f ? Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(lt / m_blendDuration)) : 1f;
+                        return Vector3.Lerp(fromPos, toPos, u);
+                    },
+                    lt =>
+                    {
+                        EvaluateShot(def, lt, out _, out var toLook);
+                        float u = m_blendDuration > 0.01f ? Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(lt / m_blendDuration)) : 1f;
+                        return Vector3.Lerp(fromLook, toLook, u);
+                    },
+                    def.fov);
+            }
+            else
+            {
+                m_blendDuration = 0f;
+                SetShot(
+                    lt => { EvaluateShot(def, lt, out var p, out _); return p; },
+                    lt => { EvaluateShot(def, lt, out _, out var l); return l; },
+                    def.fov);
+            }
+        }
+
+        // ショットIDでカメラを切り替える。空なら直前のショットを維持、未登録なら警告を出して維持する
+        public void ApplyConversationShot(string shotId)
+        {
+            if (string.IsNullOrEmpty(shotId)) return;
+            if (!m_shots.TryGetValue(shotId, out var def) || def == null)
+            {
+                Debug.LogWarning("[Story] 未登録のショットIDです: " + shotId);
+                return;
+            }
+
+            StopEmptyRoomSequence();
+
+            if (shotId == "S_EMPTY_ROOM")
+            {
+                ApplyShotDefinition(def, 0f);
+                m_emptyRoomRoutine = StartCoroutine(EmptyRoomToDollRoutine());
+                return;
+            }
+
+            float blend = def.blend ? Mathf.Max(0.05f, m_dollFarBlendSeconds) : 0f;
+            ApplyShotDefinition(def, blend);
+        }
+
+        // S_EMPTY_ROOM：4人を非表示にした部室を見せ、表示中に S_DOLL_FAR へ寄って人形を小さく揺らす
+        IEnumerator EmptyRoomToDollRoutine()
+        {
+            float hold = Mathf.Max(0f, m_emptyRoomHoldSeconds);
+            if (hold > 0f)
+            {
+                float until = m_time + hold;
+                while (m_time < until) yield return null;
+            }
+
+            if (m_shots.TryGetValue("S_DOLL_FAR", out var dollFar) && dollFar != null)
+            {
+                float blend = Mathf.Max(0.05f, m_dollFarBlendSeconds);
+                ApplyShotDefinition(dollFar, blend);
+                // 人形へ寄り切るころに合わせて、カタ、と小さく揺らす
+                float waitBeforeShake = blend * 0.65f;
+                float shakeAt = m_time + waitBeforeShake;
+                while (m_time < shakeAt) yield return null;
+            }
+
+            TriggerDollShake();
+            m_emptyRoomRoutine = null;
+        }
+
+        void StopEmptyRoomSequence()
+        {
+            if (m_emptyRoomRoutine != null)
+            {
+                StopCoroutine(m_emptyRoomRoutine);
+                m_emptyRoomRoutine = null;
+            }
+        }
+
+        void OnStoryEventPlayed(string eventId)
+        {
+            if (eventId != "doll_shake") return;
+            // S_EMPTY_ROOM の行では EmptyRoomToDollRoutine 内で寄りに合わせて揺らすので重複させない
+            if (m_emptyRoomRoutine != null) return;
+            TriggerDollShake();
+        }
+
+        public void TriggerDollShake()
+        {
+            m_dollShakeStart = m_time;
+            if (m_dollShakeSe != null) MenuSounds.Play(m_dollShakeSe, 0.8f);
         }
 
         //========================================
@@ -610,19 +1126,39 @@ namespace Yurube.Story
             for (int i = 0; i < m_members.Count; i++)
             {
                 var m = m_members[i];
-                if (m.root == null) continue;
+                if (m.root == null || !m.root.gameObject.activeInHierarchy) continue;
                 m.root.localPosition = m.basePos + Vector3.up * (0.012f * Mathf.Sin(m_time * 1.7f + m.phase));
                 if (m.head != null)
                     m.head.localRotation = Quaternion.Euler(0f, 0f, 1.2f * Mathf.Sin(m_time * 0.8f + m.phase));
             }
 
-            // だるま人形が揺れたら、ゆっくり戻す
+            // だるま人形の小さな往復揺れ（m_dollShakeSeconds 秒で往復して止まる）
             if (m_doll != null)
             {
-                float z = m_doll.localEulerAngles.z;
-                if (z > 180f) z -= 360f;
-                if (Mathf.Abs(z) > 0.01f)
-                    m_doll.localRotation = Quaternion.Euler(0f, 0f, Mathf.MoveTowards(z, 0f, Time.unscaledDeltaTime * 16f));
+                if (m_dollShakeStart >= 0f)
+                {
+                    float duration = Mathf.Max(0.05f, m_dollShakeSeconds);
+                    float elapsed = m_time - m_dollShakeStart;
+                    if (elapsed < duration)
+                    {
+                        float u = elapsed / duration;
+                        float damp = 1f - u * 0.45f;
+                        float angle = Mathf.Sin(u * Mathf.PI * 2f) * m_dollShakeAngle * damp;
+                        m_doll.localRotation = Quaternion.Euler(0f, 0f, angle);
+                    }
+                    else
+                    {
+                        m_doll.localRotation = Quaternion.identity;
+                        m_dollShakeStart = -1f;
+                    }
+                }
+                else
+                {
+                    float z = m_doll.localEulerAngles.z;
+                    if (z > 180f) z -= 360f;
+                    if (Mathf.Abs(z) > 0.01f)
+                        m_doll.localRotation = Quaternion.Euler(0f, 0f, Mathf.MoveTowards(z, 0f, Time.unscaledDeltaTime * 16f));
+                }
             }
         }
 
@@ -810,6 +1346,11 @@ namespace Yurube.Story
 
         public void Hide()
         {
+            StopEmptyRoomSequence();
+            m_blendDuration = 0f;
+            m_dollShakeStart = -1f;
+            if (m_doll != null) m_doll.localRotation = Quaternion.identity;
+            SetRoomMembersVisible(true);
             RestoreRunner();
             m_stageMode = false;
             m_venueMode = false;
@@ -837,6 +1378,11 @@ namespace Yurube.Story
         // 会話（前）のあと、ステージが見えるまでのつなぎに使う（ステージが一瞬映るのを防ぐ）。
         public void HideViewKeepBlack()
         {
+            StopEmptyRoomSequence();
+            m_blendDuration = 0f;
+            m_dollShakeStart = -1f;
+            if (m_doll != null) m_doll.localRotation = Quaternion.identity;
+            SetRoomMembersVisible(true);
             RestoreRunner();
             m_stageMode = false;
             m_venueMode = false;
@@ -890,6 +1436,11 @@ namespace Yurube.Story
         public void ShowConversation(bool sunset)
         {
             Show();
+            StopEmptyRoomSequence();
+            m_blendDuration = 0f;
+            m_dollShakeStart = -1f;
+            if (m_doll != null) m_doll.localRotation = Quaternion.identity;
+            SetRoomMembersVisible(true);
             m_stageMode = false;
             m_opening = false;
             m_advance = false;
@@ -900,11 +1451,50 @@ namespace Yurube.Story
             SetTitle(false);
             SetHint(false);
 
-            // 会話中は、部員たちを写したまま、ゆっくり深呼吸するようにカメラを動かす
-            SetShot(
-                lt => P(0.1f + 0.09f * Mathf.Sin(lt * 0.11f), 1.85f, -4.6f + 0.05f * Mathf.Sin(lt * 0.07f)),
-                lt => P(0f, 0.55f, 2.2f),
-                42f);
+            // 最初の行にショットIDがあれば最初からその画にしておく（暗転明けの一瞬の画飛びを防ぐ）
+            string initialShot = "S_ROOM_WIDE";
+            var lines = m_chapter != null ? (sunset ? m_chapter.after : m_chapter.before) : null;
+            if (lines != null)
+            {
+                foreach (var l in lines)
+                {
+                    if (l == null) continue;
+                    if (!string.IsNullOrEmpty(l.shot) && m_shots.ContainsKey(l.shot)) initialShot = l.shot;
+                    break;
+                }
+            }
+            if (m_shots.TryGetValue(initialShot, out var def) && def != null)
+            {
+                ApplyShotDefinition(def, 0f);
+            }
+            else
+            {
+                SetShot(
+                    lt => P(0.1f + 0.09f * Mathf.Sin(lt * 0.11f), 1.85f, -4.6f + 0.05f * Mathf.Sin(lt * 0.07f)),
+                    lt => P(0f, 0.55f, 2.2f),
+                    42f);
+            }
+        }
+
+        // 会話が終わったとき（B でスキップされたときも含む）に、途中のブレンドや演出を正しい終端状態に整える
+        public void EndConversation(bool afterConversation)
+        {
+            bool wasEmptyRoom = m_emptyRoomRoutine != null || m_currentShotId == "S_EMPTY_ROOM";
+            StopEmptyRoomSequence();
+            m_dollShakeStart = -1f;
+            if (m_doll != null) m_doll.localRotation = Quaternion.identity;
+
+            if (afterConversation && wasEmptyRoom && m_shots.TryGetValue("S_DOLL_FAR", out var dollFar) && dollFar != null)
+            {
+                SetRoomMembersVisible(false);
+                ApplyShotDefinition(dollFar, 0f);
+            }
+            else
+            {
+                m_blendDuration = 0f;
+                if (!afterConversation) SetRoomMembersVisible(true);
+                ApplyShotNow();
+            }
         }
 
         public IEnumerator FadeIn(float duration)
@@ -1635,6 +2225,23 @@ namespace Yurube.Story
             if (scene == "stage") ShowFinalConversation(true);
             else ShowFinalConversation(false);
             yield return FadeTo(0f, fade + 0.15f);
+        }
+
+        // 会話の1行が始まったときのカメラ処理。
+        //  ・行に shot（ショットID）が指定されていれば、そのショットへ切り替える
+        //  ・shot が空なら、第2章・最終章は従来どおり話者へ寄せ、序章・第1章は直前のショットを維持する
+        public void OnDialogueLine(StoryLine line)
+        {
+            if (m_epilogueOn || !m_visible) return;
+            if (line != null && !string.IsNullOrEmpty(line.shot))
+            {
+                ApplyConversationShot(line.shot);
+                return;
+            }
+            if (m_venueMode || m_finalMode)
+            {
+                FocusSpeaker(line != null ? line.speaker : null);
+            }
         }
 
         // 会話の話者へカメラを寄せる（章ごとの背景に合わせる）
@@ -2400,7 +3007,13 @@ namespace Yurube.Story
                 m_camera.transform.rotation = Quaternion.LookRotation(dir);
             }
             m_fovPunch = Mathf.MoveTowards(m_fovPunch, 0f, Time.unscaledDeltaTime * 45f);
-            m_camera.fieldOfView = Mathf.Max(1f, m_shotFov - m_fovPunch);
+            float fov = m_shotFov;
+            if (m_blendDuration > 0.01f)
+            {
+                float u = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(lt / m_blendDuration));
+                fov = Mathf.Lerp(m_blendFromFov, m_shotFov, u);
+            }
+            m_camera.fieldOfView = Mathf.Max(1f, fov - m_fovPunch);
         }
     }
 }

@@ -8,10 +8,12 @@ namespace Yurube.Story
     // Assets/Yurube/Story/Resources/Story/<章ID>.json を読み込む。コードを変えずに台詞を足せる。
     //  ・speaker が空、または direction=true の行はト書き（小さめの字で出す／イベントだけ起こす）
     //  ・eventId を付けると、その行を表示したときに演出イベントを起こせる（例：doll_shake）
+    //  ・expression / shot / se は1行ごとの表情・カメラのカット・効果音の指定（項目だけ。今は未使用）
+    //    JSON に書かなければ空になるので、今までの台本はそのまま読める
     [Serializable]
     public class StoryLine
     {
-        public string speaker;      // 話者ID（speakers の id）。空ならト書き
+        public string speaker;      // 話者ID（speakers の id）。空ならト書き（ナレーション）
         public string text;         // 本文
         public bool direction;      // ト書きにする（台詞ではなく演出の指示）
         public string eventId;      // 演出イベントID（例：doll_shake）
@@ -19,6 +21,13 @@ namespace Yurube.Story
         // この行を出す場面（最終章用）。"room" = 控室 / "stage" = 決勝の舞台
         // エピローグではカット名（"notebook" / "roster" / "doll" / "logo"）として使う
         public string scene;
+        // 表情（例：smile / surprised）。空なら通常。※まだ表示には使っていない
+        public string expression;
+        // ショットID（この行を出すときのカメラのカット名）。空なら切り替えない。※まだ使っていない
+        // （カットシーン用の StoryShot とは別。会話の1行ごとのカット指定）
+        public string shot;
+        // 効果音（この行を出した瞬間に鳴らす音の名前）。空なら鳴らさない。※まだ使っていない
+        public string se;
     }
 
     [Serializable]
@@ -322,11 +331,14 @@ namespace Yurube.Story
             else Debug.Log("[Story] イベント: " + eventId);
         }
 
-        // 窓際のだるま人形を揺らす（人形のオブジェクトが無くても音とログだけで動く）
+        // 窓際のだるま人形を揺らす（StoryMovie 側で往復アニメーションを行う。無い場合のフォールバック）
         static void DollShake()
         {
-            var doll = GameObject.Find("Doll");
-            if (doll != null) doll.transform.localRotation = Quaternion.Euler(0f, 0f, 12f);
+            if (EventPlayed == null)
+            {
+                var doll = GameObject.Find("Doll");
+                if (doll != null) doll.transform.localRotation = Quaternion.Euler(0f, 0f, 12f);
+            }
             Debug.Log("[Story] だるま人形が カタ、と揺れた");
         }
     }
