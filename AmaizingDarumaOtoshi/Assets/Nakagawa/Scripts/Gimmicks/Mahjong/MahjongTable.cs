@@ -61,8 +61,12 @@ namespace Nakagawa
         [SerializeField] Material m_backMaterial;   // 背(緑)
         [SerializeField] float m_fallHeight = 9.0f;
         [SerializeField] float m_gravity = 30.0f;
-        [SerializeField] float m_popUpSpeed = 5.5f;
-        [SerializeField] float m_popSideSpeed = 2.2f;
+        // 攻撃を受けた・やられたときに落とした牌が飛び散る速さ(上・横)と、向きのばらつき(度)
+        // (上 8・横 8.8 で約 6m 先に落ちる。前は上 5.5・横 2.2 で約 1m だったので、殴り合いのそばに落ちて拾い合いを繰り返していた。
+        //  中平が頼んで変えた 2026-11-18。前の m_popUpSpeed・m_popSideSpeed は使わないので消した)
+        [SerializeField] float m_scatterUpSpeed = 8.0f;
+        [SerializeField] float m_scatterSideSpeed = 8.8f;
+        [SerializeField, Range(0.0f, 180.0f)] float m_scatterAngle = 30.0f;
 
         [Header("牌の当たり(重さ)")]
         // 牌の当たりの半径(上から見た円で近似)
@@ -296,6 +300,78 @@ namespace Nakagawa
         bool Aiming => m_phase == Phase.Fly || m_phase == Phase.Aim;
         bool LidOpen => m_phase == Phase.Open || m_phase == Phase.Flow || m_phase == Phase.Close;
         float TileRestY => Center.y + MahjongTileArt.HalfHeight;
+
+        //========================================
+        // CPU 用(中平。2026-11-18。読み取るだけで、動きは変えない)
+        //========================================
+
+        // CPU が見る場の牌1枚
+        public struct CpuFieldTile
+        {
+            public object Key;          // 同じ牌か見分ける(フレームをまたいで同じ)
+            public Vector3 Position;    // 降る予告・落ちている間は落ちる所の上
+            public bool Pickable;       // 床にあって、今拾える
+            public float TimeLeft;      // 消えるまで(秒。床にある牌だけ。それ以外は寿命いっぱい)
+            public float SinceLanded;   // 床に着いてからの時間(秒。降る予告・落ちている間は負)
+        }
+
+        // 場の牌(降る予告・落ちている・床にある)を result に入れる
+        public void GetCpuFieldTiles(List<CpuFieldTile> result)
+        {
+            result.Clear();
+            foreach (var t in m_field)
+            {
+                if (t.Lost) continue;
+                result.Add(new CpuFieldTile
+                {
+                    Key = t,
+                    Position = t.Position,
+                    Pickable = t.State == 2 && t.NoPickup <= 0.0f,
+                    TimeLeft = t.State == 2 ? m_tileLifetime - t.Age : m_tileLifetime,
+                    SinceLanded = t.State == 2 ? t.Age : -1.0f,
+                });
+            }
+        }
+
+        // 手持ちの枚数と、上限
+        public int CpuHandCount(MatchPlayer p) => p != null && m_hands.TryGetValue(p, out var hand) ? hand.Count : 0;
+        public int CpuMaxHand => m_maxHand;
+        // 牌に触れたとみなす距離(水平)
+        public float CpuPickupRadius => m_pickupRadius;
+        // 卓の中心(床の上面の高さ)・遊べる範囲の大きさ・中央のふたの大きさ
+        public Vector3 CpuCenter => Center;
+        public Vector2 CpuTableSize => m_tableSize;
+        public Vector2 CpuLidSize => m_lidSize;
+        // ふたが開いている(開き始めてから閉じ終わるまで。中央が穴)
+        public bool CpuLidOpen => LidOpen;
+        // 「ツモ！」のあと、ふたの縁が点滅している(このあと開く)
+        public bool CpuLidWarning => m_phase == Phase.Announce;
+        // 中央へ流している最中か・流されない人(発動した人)
+        public bool CpuFlowing => m_phase == Phase.Flow;
+        public MatchPlayer CpuFlowImmune => m_trigger;
+        // ふたの当たり判定(ナビメッシュでは開き具合に関係なく床として焼き込む)
+        public Collider CpuLidCollider => m_lidCollider;
+
+        // 巨大な牌の落下予告(ねらっている間・落ちてくる間)。並びの中心(床の高さ)と、上から見た大きさの半分
+        public bool TryGetCpuPonDrop(out Vector3 center, out Vector2 half)
+        {
+            bool active = m_phase == Phase.Aim || m_phase == Phase.GiantDrop;
+            center = (m_phase == Phase.GiantDrop ? PonCenter : AimCenter) + new Vector3(0, 0, m_ponFootprintOffsetZ);
+            half = PonHalfSize;
+            return active && m_trigger != null;
+        }
+
+        // 着地して障害物になっている巨大な牌の当たり判定(穴に落ちたものは除く)
+        public void GetCpuSolidGiants(List<BoxCollider> result)
+        {
+            result.Clear();
+            if (!m_giantsSolid) return;
+            foreach (var g in m_giants)
+            {
+                if (g.Gone || g.Collider == null || !g.Collider.enabled || !g.Visual.gameObject.activeInHierarchy) continue;
+                result.Add(g.Collider);
+            }
+        }
 
         private void Awake()
         {
@@ -795,10 +871,12 @@ namespace Nakagawa
             dir = dir.sqrMagnitude > 0.0001f ? dir.normalized : Random.insideUnitSphere;
             dir.y = 0.0f;
             dir = dir.sqrMagnitude > 0.0001f ? dir.normalized : Vector3.forward;
+            // 飛び散る向きを少しばらつかせる(中平 2026-11-18)
+            dir = Quaternion.Euler(0.0f, Random.Range(-m_scatterAngle, m_scatterAngle), 0.0f) * dir;
             var t = new FieldTile
             {
                 Kind = kind, Position = from + Vector3.up * 1.2f, State = 1, NoPickup = m_pickupDelay,
-                Velocity = dir * m_popSideSpeed + Vector3.up * m_popUpSpeed, Yaw = Random.Range(0.0f, 360.0f), YawSpeed = Random.Range(-360.0f, 360.0f),
+                Velocity = dir * m_scatterSideSpeed + Vector3.up * m_scatterUpSpeed, Yaw = Random.Range(0.0f, 360.0f), YawSpeed = Random.Range(-360.0f, 360.0f),
             };
             m_field.Add(t);
         }

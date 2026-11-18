@@ -275468,6 +275468,10 @@ PrefabInstance:
       propertyPath: m_size.y
       value: 0.1
       objectReference: {fileID: 0}
+    - target: {fileID: 2389428790276458744, guid: 27c031d383e21e547bd97944a25903ed, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 2628973582213515090, guid: 27c031d383e21e547bd97944a25903ed, type: 3}
       propertyPath: m_Name
       value: SpawnArea_1_Circle

@@ -3,7 +3,7 @@ using UnityEngine;
 namespace Nakahira
 {
     // 危ない場所(隕石の予告円・ビーム・エクスカリバーの予定の線)から出る・入らない。状態の操作のあとに割り込む(1人の CPU につき1つ)
-    //  ・中にいる:外へ出られる一番近い向きへ走る(途中に床がない向きは選ばない)
+    //  ・中にいる:外へ出られる一番近い向きへ走る(途中に床がない向き・ナビメッシュの外(壁・穴)へ出る向きは選ばない)
     //  ・外にいる:進む先が危ない場所なら、中へ入る向きの分を消して縁に沿って動く(沿えなければ止まる)
     // 気づいている危ない場所だけ(CpuHazards。出てから HazardReaction 秒たったもの)
     // 毒沼で移動が反転していても直さない(人と同じく、出ようとして中心へ走ってしまう。2026-11-09 決定)
@@ -106,6 +106,9 @@ namespace Nakahira
             float depth = c.Params.GroundProbeDepth;
             float bestCost = float.MaxValue;
             Vector3 best = Vector3.zero;
+            // 今ナビメッシュの上にいれば、壁・穴へ向かう向きも選ばない(卓の壁際で、壁へ向かって出ようとして下敷きにならないように。2026-11-18)
+            // (移動床の上などナビメッシュの外にいるときは、床があるかだけで決める)
+            bool checkNavMesh = CpuNavMesh.IsOnNavMesh(pos, 0.6f);
             for (int k = 0; k < kDirections; k++)
             {
                 float angle = k * Mathf.PI * 2.0f / kDirections;
@@ -119,6 +122,7 @@ namespace Nakahira
                     Vector3 p = pos + dir * t;
                     if (!CpuSensor.HasGround(p, depth)) break;
                     if (CpuNavMesh.IsNearHazard(p, DarumaCharacter.kBodyRadius)) break;
+                    if (checkNavMesh && !CpuNavMesh.IsOnNavMesh(p)) break;
                     if (hazards.IsInside(p, kExitMargin)) continue;
                     // 出た先の 1m 先にも床がある(縁ぎりぎりで止まって落ちないように)
                     if (!CpuSensor.HasGround(p + dir * 1.0f, depth)) break;
