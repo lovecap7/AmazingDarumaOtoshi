@@ -61940,7 +61940,9 @@ MonoBehaviour:
   m_fuseTime: 10
   m_cooldown: 15
   m_minTimeOnPass: 2
-  m_passBackBlock: 1
+  m_passBackBlock: 0.5
+  m_passDuration: 0.5
+  m_passArcHeight: 1.5
   m_warningTime: 3
   m_holderSpeed: 1.2
   m_scatterSpeed: 9
@@ -62026,6 +62028,27 @@ MonoBehaviour:
     ShockwaveColor: {r: 1, g: 0.95, b: 0.85, a: 0.6}
     ShockwaveRadius: 4
     ShockwaveTime: 0.35
+  m_shotSparks:
+    Enabled: 1
+    Material: {fileID: 0}
+    Additive: 1
+    ColorA: {r: 1, g: 0.97, b: 0.88, a: 1}
+    ColorB: {r: 0.95, g: 0.82, b: 0.55, a: 1}
+    Count: 8
+    Speed: {x: 1.5, y: 3.5}
+    Size: {x: 0.07, y: 0.15}
+    Lifetime: {x: 0.2, y: 0.4}
+    Gravity: 1.5
+    Shape: 0
+    ShapeSize: {x: 0.4, y: 0, z: 0}
+    ConeAngle: 25
+    Stretch: 1
+    Shockwave: 0
+    ShockwaveColor: {r: 1, g: 1, b: 1, a: 1}
+    ShockwaveRadius: 1.5
+    ShockwaveTime: 0.3
+  m_shotSparkInterval: 0.04
+  m_shotWheelSize: 0.55
   m_warningSparks:
     Enabled: 1
     Material: {fileID: 0}
