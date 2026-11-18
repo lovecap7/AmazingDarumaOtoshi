@@ -4,13 +4,14 @@ using Yurube;
 
 namespace Nakahira
 {
-    // 危ない場所の種類(どれも必殺技が作るもの)
+    // 危ない場所の種類(必殺技が作るものと、ステージのもの)
     public enum CpuHazardKind
     {
         Meteor,     // いわだるの隕石の予告円(入っていると即死)
         Swamp,      // へびだるの毒沼(入ると遅くなり、移動が反転する。出ようとはするが反転は直さないので、中心へ向かってしまう)
         Beam,       // あかだるのトロンのビーム(触れると1段減る。0段なら即死)
         Sword,      // だるきんぐのエクスカリバーの予定の線(詠唱が終わると線の上は即死)
+        IceCrack,   // 割れる氷(Stage21)の点滅中のタイル(1秒で抜けて奈落。必殺技ではなくステージのもの。2026-11-18)
     }
 
     // 円の危ない場所(隕石の予告円・毒沼)
@@ -45,6 +46,7 @@ namespace Nakahira
         static readonly List<HebiPoisonSwamp> s_swamps = new List<HebiPoisonSwamp>();
         static readonly List<TronProjectile> s_beams = new List<TronProjectile>();
         static readonly List<DaruKingSpecial> s_swords = new List<DaruKingSpecial>();
+        static readonly List<Nakagawa.IceFloorGimmick> s_ices = new List<Nakagawa.IceFloorGimmick>();
         static readonly List<CpuHazardCircle> s_circles = new List<CpuHazardCircle>();
         static readonly List<CpuHazardSegment> s_segments = new List<CpuHazardSegment>();
         static readonly List<(Vector3 a, Vector3 b, float width)> s_boxes = new List<(Vector3 a, Vector3 b, float width)>();
@@ -64,6 +66,7 @@ namespace Nakahira
             s_swamps.Clear();
             s_beams.Clear();
             s_swords.Clear();
+            s_ices.Clear();
             s_circles.Clear();
             s_segments.Clear();
         }
@@ -84,6 +87,8 @@ namespace Nakahira
                 s_beams.AddRange(Object.FindObjectsByType<TronProjectile>(FindObjectsInactive.Exclude));
                 s_swords.Clear();
                 s_swords.AddRange(Object.FindObjectsByType<DaruKingSpecial>(FindObjectsInactive.Exclude));
+                s_ices.Clear();
+                s_ices.AddRange(Object.FindObjectsByType<Nakagawa.IceFloorGimmick>(FindObjectsInactive.Exclude));
             }
 
             s_circles.Clear();
@@ -111,6 +116,26 @@ namespace Nakahira
                     Center = swamp.transform.position,
                     Radius = swamp.Radius,
                 });
+            }
+            // 割れる氷の点滅中のタイル(六角形の内接円。離れておく距離で体の半径ぶん広がる)
+            foreach (var ice in s_ices)
+            {
+                if (ice == null) continue;
+                foreach (var t in ice.Tiles)
+                {
+                    if (t.Solid || t.Root == null || t.Points == null || t.Points.Length < 3) continue;
+                    if (t.State != Nakagawa.IceFloorGimmick.TileState.Warning) continue;
+                    Vector2 center = CpuIceHoles.Centroid(t.Points);
+                    Vector3 top = CpuIceHoles.BaseWorldPosition(t);
+                    s_circles.Add(new CpuHazardCircle
+                    {
+                        Source = t.Root,
+                        Kind = CpuHazardKind.IceCrack,
+                        Owner = null,
+                        Center = new Vector3(top.x + center.x, top.y, top.z + center.y),
+                        Radius = CpuIceHoles.InnerRadius(t.Points, center),
+                    });
+                }
             }
 
             s_segments.Clear();
@@ -245,7 +270,7 @@ namespace Nakahira
         // 入っていると即死する危ない場所か(移動床の乗り降り中でも出る)
         public static bool IsLethal(CpuHazardKind kind)
         {
-            return kind == CpuHazardKind.Meteor || kind == CpuHazardKind.Sword;
+            return kind == CpuHazardKind.Meteor || kind == CpuHazardKind.Sword || kind == CpuHazardKind.IceCrack;
         }
 
         // 点 p が危ない場所の中(離れておく距離 + extra を含む)か
