@@ -369,5 +369,11 @@ namespace Nakahira
         [Range(1.0f, 30.0f)] public float GhostBatAimTolerance = 8.0f;
         [Tooltip("弾く位置に着けないまま、この時間(秒)たったらあきらめる")]
         [Min(0.5f)] public float GhostBatGiveUpTime = 4.0f;
+
+        [Header("ステージ:牌あつめ(Stage22 こたつの全自動卓。2026-11-18)")]
+        [Tooltip("状態「牌を集める」のやりたさ。逃げる(0.8)より低く、殴る + StateStickiness(0.75)より高い(殴っている最中でも牌が出たら取りに行く)")]
+        [Range(0.0f, 1.0f)] public float MahjongScore = 0.78f;
+        [Tooltip("牌が床に着いてから気づくまでの遅れに、危ない場所に気づく遅れ(HazardReaction)へ足す時間(秒)。降る予告・落ちている途中の牌は狙わない(人は落ちきるまで見えにくいので)")]
+        [Min(0.0f)] public float MahjongNoticeExtra = 0.4f;
     }
 }
