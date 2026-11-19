@@ -587,6 +587,12 @@ public class ResultTowerScreen : MonoBehaviour
         Play(SoundSynth.ScoreUp, 0.6f, 1f);
 
         yield return Wait(0.5f);
+        // チーム戦のタイムは、積み木が積み終わったあとで、右の数字をチーム合計にする(積み木は個人の点数)
+        if (isTeam && mode == MatchSetup.MatchMode.Time && towers.Count > 0)
+        {
+            countText.text = towers[0].entry.teamScore + CountUnit;
+            countPunch = 1f;
+        }
         resultGroup.alpha = 1f;
         StartCoroutine(PunchUI(resultText.rectTransform));
         shake = 0.25f;

@@ -80,6 +80,7 @@ public static class ResultData
         public int stocks = -1;         // 残りストック（ストックモード以外は -1）
         public int score;               // 点数（タイムモード）
         public int team = -1;           // チーム(0 赤〜3 黄)。個人戦は -1
+        public int teamScore;           // チーム戦では、チームの点数の合計。個人戦は score と同じ
     }
 
     public static readonly List<Entry> Ranking = new List<Entry>();   // 1位から順
@@ -101,6 +102,14 @@ public static class ResultData
         foreach (var p in result.Ranking)
         {
             if (p == null) continue;
+            // チーム戦では、同じチームの人の点数を合計する
+            int teamScore = p.Score;
+            if (result.IsTeamBattle && p.Entry != null && p.Entry.team >= 0)
+            {
+                teamScore = 0;
+                foreach (var q in result.Ranking)
+                    if (q != null && q.Entry != null && q.Entry.team == p.Entry.team) teamScore += q.Score;
+            }
             var entry = new Entry
             {
                 label = p.Label,
@@ -114,6 +123,7 @@ public static class ResultData
                 stocks = p.Stocks,
                 score = p.Score,
                 team = p.Entry.team,
+                teamScore = teamScore,
             };
             var stack = p.Stack;
             if (stack != null)
