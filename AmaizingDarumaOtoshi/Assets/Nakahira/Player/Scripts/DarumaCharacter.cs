@@ -221,6 +221,8 @@ namespace Nakahira
             m_commandSource = GetComponent<IDarumaCommandSource>();
             m_stack.Changed += UpdateBodyCollider;
             UpdateBodyCollider();
+            // 体の見た目の動き(歩く・跳ぶ・着地など)。キャラのプレハブを変えずに全キャラへ付ける。調整値は JumpParams.Motion
+            if (GetComponent<DarumaMotion>() == null) gameObject.AddComponent<DarumaMotion>();
         }
 
         private void Update()
@@ -646,6 +648,8 @@ namespace Nakahira
         }
 
         public Vector3 HorizontalVelocity => m_baseHorizontal;
+        // 前のステップで、自分で歩いた水平の速度(ギミックで流された分・はじかれた分を除く。体の動き DarumaMotion 用)
+        public Vector3 WalkVelocity => new Vector3(m_lastVelocity.x, 0.0f, m_lastVelocity.z);
 
         public void RequestSpeedScale(float scale)
         {

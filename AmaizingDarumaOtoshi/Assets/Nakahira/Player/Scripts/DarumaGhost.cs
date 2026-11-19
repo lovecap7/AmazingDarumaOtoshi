@@ -71,7 +71,12 @@ namespace Nakahira
         private void Awake()
         {
             m_hitStop = GetComponent<HitStop>();
+            // 浮いている揺れ(見た目だけ)。調整値は GhostParams の「浮いている揺れ」
+            if (GetComponent<DarumaGhostMotion>() == null) gameObject.AddComponent<DarumaGhostMotion>();
         }
+
+        // 幽霊の性能(体の動き DarumaGhostMotion が揺れの値を読む)
+        public GhostParams Params => m_params;
 
         public Transform Visual => m_visual;
         public GhostAppearParams AppearParams => m_appearParams;

@@ -207,9 +207,14 @@ namespace Nakahira
             }
         }
 
+        // 持ち主の体の見た目の動き(DarumaMotion・DarumaGhostMotion)。支点の位置に体の揺れを足す(傾けない)
+        // 見た目だけ(当たり判定は持ち主の位置から計算しているので変わらない)。null なら揺らさない
+        public IDarumaBodyMotion BodyMotion { get; set; }
+
         private void Update()
         {
             GetPose(out Vector3 pos, out Quaternion rot);
+            if (BodyMotion != null) pos += BodyMotion.GetOffset(pos.y);
             transform.localPosition = pos;
             transform.localRotation = rot;
             UpdateTrail();

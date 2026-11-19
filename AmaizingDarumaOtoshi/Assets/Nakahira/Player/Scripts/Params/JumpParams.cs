@@ -15,6 +15,10 @@ namespace Nakahira
         [Tooltip("落下中の重力倍率。大きいほどストンと落ちる")]
         [Min(0.01f)] public float FallGravityMultiplier = 1.0f;
 
+        [Header("見た目の動き")]
+        [Tooltip("歩く・跳ぶ・着地などの体の動き(見た目だけ)。空なら動かない")]
+        public DarumaMotionParams Motion;
+
         // 上昇中の重力の強さ
         public float Gravity => 2.0f * Height / (TimeToApex * TimeToApex);
         // ジャンプの初速
