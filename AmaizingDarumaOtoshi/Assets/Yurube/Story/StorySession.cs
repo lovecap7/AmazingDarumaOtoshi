@@ -7,6 +7,8 @@ namespace Yurube.Story
     public static class StoryProgress
     {
         const string KeyPrefix = "Story.Clear.";
+        const string UnlockKeyPrefix = "Story.Unlock.";
+        const string UnlockSeenKeyPrefix = "Story.UnlockSeen.";
 
         // 章をクリア済みか
         public static bool IsCleared(string chapterId)
@@ -15,25 +17,89 @@ namespace Yurube.Story
             return PlayerPrefs.GetInt(KeyPrefix + chapterId, 0) == 1;
         }
 
-        // 章が遊べるか（解放条件の章をクリア済みか）
+        // 章が遊べるか（解放済みとして保存されているか、または解放条件の章をクリア済みか）
         public static bool IsUnlocked(StoryChapter chapter)
         {
             if (chapter == null) return false;
+            if (PlayerPrefs.GetInt(UnlockKeyPrefix + chapter.id, 0) == 1) return true;
             return string.IsNullOrEmpty(chapter.requiredChapter) || IsCleared(chapter.requiredChapter);
         }
 
-        // 章クリアを記録する（新聞まで見終わったとき）
-        public static void MarkCleared(string chapterId)
+        public static bool IsUnlocked(string chapterId)
+        {
+            if (string.IsNullOrEmpty(chapterId)) return false;
+            if (PlayerPrefs.GetInt(UnlockKeyPrefix + chapterId, 0) == 1) return true;
+            var chapter = StoryData.Load(chapterId);
+            return chapter != null && IsUnlocked(chapter);
+        }
+
+        // 章の解放を保存する
+        public static void MarkUnlocked(string chapterId)
         {
             if (string.IsNullOrEmpty(chapterId)) return;
-            PlayerPrefs.SetInt(KeyPrefix + chapterId, 1);
+            PlayerPrefs.SetInt(UnlockKeyPrefix + chapterId, 1);
             PlayerPrefs.Save();
-            Debug.Log("[Story] 章クリアを保存: " + chapterId);
+        }
+
+        // 解放演出を再生済みか
+        public static bool HasSeenUnlockAnim(string chapterId)
+        {
+            if (string.IsNullOrEmpty(chapterId)) return true;
+            return PlayerPrefs.GetInt(UnlockSeenKeyPrefix + chapterId, 0) == 1;
+        }
+
+        public static void MarkUnlockAnimSeen(string chapterId)
+        {
+            if (string.IsNullOrEmpty(chapterId)) return;
+            PlayerPrefs.SetInt(UnlockSeenKeyPrefix + chapterId, 1);
+            PlayerPrefs.Save();
+        }
+
+        // 章クリアを記録する（新聞まで見終わったとき）。
+        // 戻り値：このクリアで初めて解放された次の章ID（なければ null）
+        public static string MarkCleared(string chapterId)
+        {
+            if (string.IsNullOrEmpty(chapterId)) return null;
+            string newlyUnlockedId = null;
+
+            // クリア前に未解放だった章のうち、この章のクリアで解放されるものを探す
+            var all = StoryData.LoadAll();
+            var wasUnlocked = new HashSet<string>();
+            foreach (var c in all)
+            {
+                if (c != null && IsUnlocked(c)) wasUnlocked.Add(c.id);
+            }
+
+            PlayerPrefs.SetInt(KeyPrefix + chapterId, 1);
+            MarkUnlocked(chapterId);
+
+            foreach (var c in all)
+            {
+                if (c == null || c.requiredChapter != chapterId) continue;
+                MarkUnlocked(c.id);
+                if (!wasUnlocked.Contains(c.id) && !HasSeenUnlockAnim(c.id) && newlyUnlockedId == null)
+                    newlyUnlockedId = c.id;
+            }
+
+            PlayerPrefs.Save();
+            Debug.Log("[Story] 章クリアを保存: " + chapterId + (newlyUnlockedId != null ? "（新規解放: " + newlyUnlockedId + "）" : ""));
+            return newlyUnlockedId;
+        }
+
+        // 全章クリア済みか（最終章クリア判定用）
+        public static bool IsAllCleared()
+        {
+            var all = StoryData.LoadAll();
+            if (all.Count == 0) return false;
+            foreach (var c in all)
+            {
+                if (c != null && !IsCleared(c.id)) return false;
+            }
+            return true;
         }
 
         // 物語が途中か（1章以上クリアしていて、まだクリアしていない章がある）。
         // メニューの初期カーソルを「ものがたり」にする判定に使う。全章クリア後は false。
-        // 最終章（4枠目）がまだ実装されていない間は、第2章までクリアしても「途中」扱いにする。
         public static bool HasStoryInProgress()
         {
             const int PlannedChapterSlots = 4;   // 序章＋第1章＋第2章＋最終章
@@ -49,8 +115,31 @@ namespace Yurube.Story
             }
             if (!anyCleared) return false;
             if (anyUncleared) return true;
-            // 実装済みの章はすべてクリア。最終章の枠が残っているなら、まだ物語の途中
             return chapterCount < PlannedChapterSlots;
+        }
+
+        // 全章を解放する（デバッグ用）
+        public static void UnlockAll()
+        {
+            foreach (var chapter in StoryData.LoadAll())
+            {
+                if (chapter == null) continue;
+                MarkUnlocked(chapter.id);
+                MarkUnlockAnimSeen(chapter.id);
+            }
+            PlayerPrefs.Save();
+            Debug.Log("[Story] 全章を解放しました（デバッグ）");
+        }
+
+        // 全章のセーブを初期化する（デバッグ用。序章のみ解放に戻る）
+        public static void ResetAll()
+        {
+            foreach (var chapter in StoryData.LoadAll())
+            {
+                if (chapter != null) Clear(chapter.id);
+            }
+            PlayerPrefs.Save();
+            Debug.Log("[Story] 章の進行を初期化しました（デバッグ）");
         }
 
         // 記録を消す（デバッグ用）
@@ -58,6 +147,8 @@ namespace Yurube.Story
         {
             if (string.IsNullOrEmpty(chapterId)) return;
             PlayerPrefs.DeleteKey(KeyPrefix + chapterId);
+            PlayerPrefs.DeleteKey(UnlockKeyPrefix + chapterId);
+            PlayerPrefs.DeleteKey(UnlockSeenKeyPrefix + chapterId);
             PlayerPrefs.Save();
         }
     }
@@ -83,6 +174,24 @@ namespace Yurube.Story
         public static bool MatchStartPlayed { get; set; }
         // 敗北した回数（デバッグ表示用）
         public static int RetryCount { get; private set; }
+        // 章クリア後にメニューへ戻った際、自動で章選択画面を開くフラグ
+        public static bool ReturnToChapterSelect { get; set; }
+        // 章クリアで新しく解放された章ID（章選択で解放演出を再生するため）
+        public static string PendingUnlockChapterId { get; set; }
+
+        public static bool ConsumeReturnToChapterSelect()
+        {
+            bool v = ReturnToChapterSelect;
+            ReturnToChapterSelect = false;
+            return v;
+        }
+
+        public static string ConsumePendingUnlockChapter()
+        {
+            string id = PendingUnlockChapterId;
+            PendingUnlockChapterId = null;
+            return id;
+        }
 
         // 初回だけの演出を覚えておく（章ID + 種類）
         static readonly HashSet<string> s_events = new HashSet<string>();
@@ -108,6 +217,8 @@ namespace Yurube.Story
             LastStandPlayed = false;
             MatchStartPlayed = false;
             RetryCount = 0;
+            ReturnToChapterSelect = false;
+            PendingUnlockChapterId = null;
             s_events.Clear();
         }
 
@@ -122,6 +233,8 @@ namespace Yurube.Story
             LastStandPlayed = false;
             MatchStartPlayed = false;
             RetryCount = 0;
+            ReturnToChapterSelect = false;
+            PendingUnlockChapterId = null;
             s_events.Clear();
         }
 

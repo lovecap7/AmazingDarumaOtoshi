@@ -1271,7 +1271,9 @@ namespace Yurube.Story
             // 新聞まで見終わったら、章クリアの実績とセーブを記録する。
             // このあとのエピローグを途中で終了しても、進行が失われないようにする
             AchievementManager.ReportStoryCleared(m_chapter.id);
-            StoryProgress.MarkCleared(m_chapter.id);
+            string newlyUnlocked = StoryProgress.MarkCleared(m_chapter.id);
+            if (!string.IsNullOrEmpty(newlyUnlocked))
+                StorySession.PendingUnlockChapterId = newlyUnlocked;
             if (AchievementManager.PendingCount > 0)
             {
                 var clearCanvas = ToyKit.CreateOverlayCanvas("StoryClearAchievements", 45);
@@ -1293,6 +1295,7 @@ namespace Yurube.Story
             else m_movie.SetBlack();
 
             StorySession.End();
+            StorySession.ReturnToChapterSelect = true;
             DarumaMatch.AutoReturnToSelect = true;
             m_leavingForRetry = true;
             Fader.Load(MenuSceneName);

@@ -352,6 +352,8 @@ public class MainMenu : MonoBehaviour
 
     void Start()
     {
+        // ストーリー用(Yurube): 章クリア直後に戻った場合は自動で章選択画面を開く
+        bool returnToChapterSelect = Yurube.Story.StorySession.ConsumeReturnToChapterSelect();
         // ストーリー用(Yurube): 物語が途中なら「ものがたり」を最初に選んでおく（全章クリア後は「たたかう」）
         if (Yurube.Story.StoryProgress.HasStoryInProgress())
         {
@@ -370,7 +372,7 @@ public class MainMenu : MonoBehaviour
         int n = blocks.Length;
         dropAt = new float[n];
         dropLanded = new bool[n];
-        if (dropIn)
+        if (dropIn && !returnToChapterSelect)
         {
             // 下の積み木（やめる）から順に、上から降ってきて積み上がる。最後に顔
             phase = Phase.Intro;
@@ -385,6 +387,8 @@ public class MainMenu : MonoBehaviour
             for (int i = 0; i < n; i++) { dropAt[i] = -100f; dropLanded[i] = true; }
         }
         StartCoroutine(FadeIn());
+        // ストーリー用(Yurube): 章クリア直後に戻った場合は自動で章選択画面を開く
+        if (returnToChapterSelect) Yurube.Story.StoryChapterSelect.Open(this);
     }
 
     // 始まりの間、ハンマーは画面の左の外で待つ

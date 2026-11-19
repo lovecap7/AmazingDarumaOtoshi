@@ -25,6 +25,8 @@ namespace Yurube.Story
         [SerializeField, Min(0.05f)] float m_dollFarBlendSeconds = 0.8f;
         [Tooltip("だるま人形がカタと小さく揺れる往復の秒数")]
         [SerializeField, Min(0.05f)] float m_dollShakeSeconds = 0.5f;
+        [Tooltip("章選択画面で、次の章が初めて解放されるときの演出秒数")]
+        [SerializeField, Min(0.2f)] float m_unlockAnimSeconds = 1.4f;
 
         [System.Serializable]
         public struct MemberStackConfig
@@ -81,6 +83,7 @@ namespace Yurube.Story
         public int TutorialCpuBlockLimit => Mathf.Max(0, m_tutorialCpuBlockLimit);
         public float DollFarBlendSeconds => m_dollFarBlendSeconds > 0f ? m_dollFarBlendSeconds : 0.8f;
         public float DollShakeSeconds => m_dollShakeSeconds > 0f ? m_dollShakeSeconds : 0.5f;
+        public float UnlockAnimSeconds => m_unlockAnimSeconds > 0.1f ? m_unlockAnimSeconds : 1.4f;
 
         public int GetRoomMemberStackCount(string id, int fallback = 3)
         {

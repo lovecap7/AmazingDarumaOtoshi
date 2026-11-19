@@ -172,6 +172,7 @@ namespace Yurube.Story
     {
         public string id;
         public string title;            // 章の名前（例：序章「はじまりは、おにぎり」）
+        public string subtitle;         // サブタイトル（任意。空なら title から表示）
         // 未解放のあいだ伏せる名前（最終章の「？？？」）。空なら title をそのまま出す
         public string hiddenTitle;
         // 章選択の並び順（小さいほど下の段）と、解放に必要な章ID
