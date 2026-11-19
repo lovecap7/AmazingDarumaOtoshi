@@ -83,7 +83,8 @@ public class DashStaminaGauge : MonoBehaviour
         if (!m_canvas.enabled) return;
 
         m_fill.anchorMax = new Vector2(ratio, 1.0f);
-        m_fillImage.color = m_stamina.IsExhausted ? kExhaustedColor : ratio < 0.3f ? kLowColor : kNormalColor;
+        // 黄色はジャンプできない残量
+        m_fillImage.color = m_stamina.IsExhausted ? kExhaustedColor : ratio < DashParams.Instance.JumpCostRatio ? kLowColor : kNormalColor;
 
         // カメラから見てキャラクターの手前に出す(体や積み木に隠れないように)
         Transform view = cam.transform;

@@ -140,6 +140,8 @@ namespace Nakahira
         readonly DashStamina m_dashStamina = new DashStamina();
         DashStaminaGauge m_staminaGauge;
         bool m_dashHeld;
+        bool m_blinkRequested;
+        float m_blinkCooldown;
 
         public DarumaStack Stack => m_stack;
         public Collider Body => m_body;
@@ -162,6 +164,8 @@ namespace Nakahira
         // ダッシュ(suehara): 走っているか / 残りのスタミナ(0〜1)
         public bool IsDashing => m_dashStamina.IsDashing;
         public float StaminaRatio => m_dashStamina.Ratio;
+        // ダッシュ(suehara): ジャンプでスタミナを使うか(ローカルの人の操作だけ。CPU・ネット対戦・デモは使わない)
+        private bool UsesJumpStamina => m_commandSource is DarumaInputHandler || m_commandSource is KeyboardDarumaInput;
         public JumpParams JumpParams => m_jumpParams;
         public DarumaHammer Hammer => m_hammer;
         // ステージのギミック用(Nakagawa): 今の操作命令の供給元(読むだけ)。止めている間(SetSuspended)にギミックが入力を読むのに使う
@@ -241,6 +245,7 @@ namespace Nakahira
             m_moveDirection = Vector3.zero;
             m_jumpRequested = false;
             m_dashHeld = false; // ダッシュ(suehara)
+            m_blinkRequested = false;
         }
 
         // 操作命令を受け取る(将来ネットワークから受け取る場合もここを使う)
@@ -254,6 +259,7 @@ namespace Nakahira
             if (MovementInverted) move = -move;
             m_moveDirection = new Vector3(move.x, 0.0f, move.y);
             m_dashHeld = command.Dash; // ダッシュ(suehara)
+            if (command.Blink) m_blinkRequested = true;
             if (command.Jump && !MovementOnly) m_jumpRequested = true;
             if (command.Sweep && !MovementOnly) m_hammer.TrySweep();
             if (command.Shot && !MovementOnly && m_hammer.TryShot()) FaceMoveDirection();
@@ -283,6 +289,7 @@ namespace Nakahira
             }
 
             m_isGrounded = CheckGrounded();
+            UpdateBlink(); // ダッシュ(suehara)
 
             // 本来の速度で計算し、最後に時間の倍率を掛けてRigidbodyに渡す(ヒットストップ中はスローになる)
             float timeScale = LocalTimeScale;
@@ -386,10 +393,32 @@ namespace Nakahira
         {
             DashParams param = DashParams.Instance;
             bool wantDash = m_dashHeld && !MovementLocked && moveDir.sqrMagnitude > 0.01f;
-            bool dashing = m_dashStamina.Tick(wantDash, dt, param);
+            bool dashing = m_dashStamina.Tick(wantDash, m_isGrounded, dt, param);
             // ゲージは初めてスタミナが減ったときに作る(走らないキャラクターには作らない)
             if (m_staminaGauge == null && m_dashStamina.Ratio < 1.0f) m_staminaGauge = DashStaminaGauge.Create(this, m_dashStamina);
             return dashing ? param.SpeedMultiplier : 1.0f;
+        }
+
+        // ダッシュ(suehara): ブリンク。移動の向き(スティックを倒していなければ向いている向き)へ瞬間移動する
+        // 速さ・向きはそのまま。壁もすり抜けるが、壁の中・ステージの範囲の外には出ない(手前で止まる)
+        private void UpdateBlink()
+        {
+            if (m_blinkCooldown > 0.0f) m_blinkCooldown -= Time.fixedDeltaTime * LocalTimeScale;
+            if (!m_blinkRequested) return;
+            m_blinkRequested = false;
+            if (MovementLocked || m_hammer.IsShooting || m_blinkCooldown > 0.0f) return;
+
+            DashParams param = DashParams.Instance;
+            Vector3 dir = m_moveDirection.sqrMagnitude > 0.0001f ? m_moveDirection : transform.forward;
+            StageArea area = DarumaMatch.Current != null ? DarumaMatch.Current.StageArea : null;
+            Vector3 from = m_rb.position;
+            if (!DashBlink.FindDestination(from, dir, param.BlinkDistance, kBodyRadius, m_body.height, area, m_rb, out Vector3 to)) return;
+            if (!m_dashStamina.TryConsume(param.BlinkCostRatio, param)) return;
+
+            m_blinkCooldown = param.BlinkCooldown;
+            m_rb.position = to;
+            transform.position = to;
+            DashBlinkEffect.Play(from, to, m_body.height);
         }
 
         private void UpdateJump(ref Vector3 v)
@@ -401,6 +430,12 @@ namespace Nakahira
             if (!m_isGrounded) return;
             // 股抜きショットを振っている間はジャンプできない(空中で弾が出ないように)
             if (m_hammer.IsShooting) return;
+            // ダッシュ(suehara): 人が操作するキャラクターのジャンプはスタミナを使う。足りなければ跳べない
+            if (UsesJumpStamina)
+            {
+                DashParams param = DashParams.Instance;
+                if (!m_dashStamina.TryConsume(param.JumpCostRatio, param)) return;
+            }
 
             v.y = m_jumpParams.JumpSpeed;
             // 次の接地判定を待たずに空中扱いにする(直後のショットを防ぐ)
@@ -456,6 +491,8 @@ namespace Nakahira
             float speed = block.HorizontalVelocity.magnitude;
             int countBefore = m_stack.Count;
             Pickup(block);
+            // ダッシュ(suehara): 積み木に乗ると、ジャンプ1回分のスタミナが回復する
+            m_dashStamina.Recover(DashParams.Instance.JumpCostRatio);
             // パッシブ(だるきんぐの上限など)が段の変化に反応して外した分も含めて、段が増えたかを見る
             AnyPickedUp?.Invoke(new TumikiPickupInfo(this, block, wasHarmful, speed, m_stack.Count > countBefore));
             // 同じステップで複数の積み木に触れても1つだけ拾う

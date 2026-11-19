@@ -12,6 +12,7 @@ namespace Nakahira
         public bool Sweep;    // このフレームで薙ぎ払いが押されたか
         public bool Shot;     // このフレームで股抜きショットが押されたか
         public bool Dash;     // ダッシュボタンを押している間 true (ダッシュ(suehara))
+        public bool Blink;    // このフレームでダッシュボタンが素早く2回押された (ダッシュ(suehara))
     }
 
     // 操作命令の供給元。ゲームパッド入力・敵AI・ネットワーク同期などが実装する

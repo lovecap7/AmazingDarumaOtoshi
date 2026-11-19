@@ -17,3 +17,8 @@ MonoBehaviour:
   RecoverSeconds: 3
   RecoverDelay: 0.5
   RestartRatio: 0.3
+  JumpCostRatio: 0.2
+  BlinkDistance: 6
+  BlinkCostRatio: 0.5
+  BlinkCooldown: 0.5
+  BlinkDoubleTapWindow: 0.25

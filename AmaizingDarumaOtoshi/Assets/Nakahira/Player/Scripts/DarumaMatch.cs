@@ -127,6 +127,8 @@ namespace Nakahira
         [SerializeField, Min(0.0f)] float m_respawnAppearTime = 0.8f;
         // 幽霊が復活するとき、幽霊の位置から出現ポイントまで魂が飛ぶ時間(GhostReviveSoulEffect)。そのあと上の出現演出が始まる(0 なら飛ばない)
         [SerializeField, Min(0.0f)] float m_reviveTravelTime = 0.7f;
+        // 復活したとき(ストック・タイムの復活、幽霊からの復活)に、最初から積んでおくランダムな色の積み木の数(0 なら頭だけ)(suehara)
+        [SerializeField, Min(0)] int m_respawnStartBlocks = 3;
 
         [Header("開始のカウントダウン")]
         // カウントダウンの秒数(3 なら 3, 2, 1。0 ならすぐ始める)。シーンのフェードが明けてから数え始める
@@ -736,7 +738,38 @@ namespace Nakahira
         void RespawnNow(MatchPlayer p, Vector3 pos)
         {
             SpawnMatchCharacter(p, pos, true);
+            StackRespawnBlocks(p.Character);
             PlayerRespawned?.Invoke(p);
+        }
+
+        // 復活したキャラクターに、ランダムな色の積み木を積んでおく(suehara)
+        // ネット対戦では積まない(クライアントに配る仕組みがまだないため)
+        private void StackRespawnBlocks(DarumaCharacter character)
+        {
+            if (character == null || m_respawnStartBlocks <= 0 || IsNetworked) return;
+            TumikiBlock prefab = m_tumikiPrefab;
+            if (prefab == null)
+            {
+                var spawner = FindAnyObjectByType<Nakagawa.TumikiSpawner>();
+                if (spawner != null) prefab = spawner.Prefab;
+            }
+            if (prefab == null) return;
+
+            // きだるのパッシブ(黄色を積むと1個増える)は拾ったときだけ働くよう、積む間は止めておく
+            var kidaru = character.GetComponent<Yurube.KidaruPassive>();
+            bool kidaruWasEnabled = kidaru != null && kidaru.enabled;
+            if (kidaruWasEnabled) kidaru.enabled = false;
+
+            // だるきんぐなど、上限が少ないキャラクターは上限まで
+            int count = Mathf.Min(m_respawnStartBlocks, character.Stack.MaxCount);
+            for (int i = 0; i < count; i++)
+            {
+                TumikiBlock block = Instantiate(prefab, character.transform.position, character.transform.rotation);
+                block.SetColor((TumikiColor)UnityEngine.Random.Range(0, 4));
+                character.Stack.AddBottom(block);
+            }
+
+            if (kidaruWasEnabled) kidaru.enabled = true;
         }
 
         // 出現演出が終わった人を出す

@@ -3,11 +3,12 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 // キーボードで遊ぶプレイヤーの操作（本編の操作設定はゲームパッドのみなので、セレクトでキーボード参加した人用）
-//   WASD / 矢印：移動　Space：ジャンプ　J：薙ぎ払い　K：股抜きショット　左Shift：ダッシュ
+//   WASD / 矢印：移動　Space：ジャンプ　J：薙ぎ払い　K：股抜きショット　左Shift：ダッシュ(素早く2回でブリンク)
 // DarumaInputHandler と同じく、スティック（キー）の向きはカメラ基準に直す。
 public class KeyboardDarumaInput : MonoBehaviour, IDarumaCommandSource
 {
     Transform m_camera;
+    readonly DoubleTapDetector m_blinkTap = new DoubleTapDetector(); // ダッシュ(suehara): ブリンク
 
     public DarumaCommand ReadCommand()
     {
@@ -26,6 +27,7 @@ public class KeyboardDarumaInput : MonoBehaviour, IDarumaCommandSource
             Sweep = k.jKey.wasPressedThisFrame,
             Shot = k.kKey.wasPressedThisFrame,
             Dash = k.leftShiftKey.isPressed, // ダッシュ(suehara)
+            Blink = m_blinkTap.Update(k.leftShiftKey.wasPressedThisFrame, DashParams.Instance.BlinkDoubleTapWindow), // ダッシュ(suehara)
         };
     }
 

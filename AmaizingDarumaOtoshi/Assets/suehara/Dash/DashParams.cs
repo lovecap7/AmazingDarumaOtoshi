@@ -15,6 +15,18 @@ public class DashParams : ScriptableObject
     [Min(0.0f)] public float RecoverDelay = 0.5f;
     [Tooltip("スタミナ切れのあと、再び走れるようになるスタミナの割合(0〜1)")]
     [Range(0.0f, 1.0f)] public float RestartRatio = 0.3f;
+    [Tooltip("ジャンプ1回で消費するスタミナの割合(0〜1)。残りがこれより少ないとジャンプできない。積み木に乗ると同じ量だけ回復する")]
+    [Range(0.0f, 1.0f)] public float JumpCostRatio = 0.2f;
+
+    [Header("ブリンク(ダッシュボタンを素早く2回押す)")]
+    [Tooltip("瞬間移動する距離(m)。壁もすり抜けるが、壁の中・ステージの範囲の外に出る場合は手前で止まる")]
+    [Min(0.5f)] public float BlinkDistance = 6.0f;
+    [Tooltip("ブリンク1回で消費するスタミナの割合(0〜1)。残りがこれより少ないと出ない")]
+    [Range(0.0f, 1.0f)] public float BlinkCostRatio = 0.5f;
+    [Tooltip("ブリンクしてから次に使えるまでの時間(秒)")]
+    [Min(0.0f)] public float BlinkCooldown = 0.5f;
+    [Tooltip("2回押しとみなす、1回目から2回目までの時間(秒)")]
+    [Min(0.05f)] public float BlinkDoubleTapWindow = 0.25f;
 
     static DashParams s_instance;
 

@@ -15,6 +15,7 @@ namespace Nakahira
         InputAction m_sweep;
         InputAction m_shot;
         InputAction m_dash; // ダッシュ(suehara)
+        readonly DoubleTapDetector m_blinkTap = new DoubleTapDetector(); // ダッシュ(suehara): ブリンク
 
         private void Awake()
         {
@@ -40,6 +41,7 @@ namespace Nakahira
                 Sweep = m_sweep.WasPressedThisFrame(),
                 Shot = m_shot.WasPressedThisFrame(),
                 Dash = m_dash.IsPressed(), // ダッシュ(suehara)
+                Blink = m_blinkTap.Update(m_dash.WasPressedThisFrame(), DashParams.Instance.BlinkDoubleTapWindow), // ダッシュ(suehara)
             };
         }
 
