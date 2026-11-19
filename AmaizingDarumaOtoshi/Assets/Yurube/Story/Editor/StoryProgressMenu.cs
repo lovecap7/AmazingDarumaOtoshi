@@ -10,11 +10,13 @@ public static class StoryProgressMenu
     [MenuItem("Yurube/ストーリー/進行をリセット（全章）")]
     static void ResetAll()
     {
-        foreach (var chapter in StoryData.LoadAll())
-        {
-            if (chapter != null) StoryProgress.Clear(chapter.id);
-        }
-        Debug.Log("[Story] 章の進行をリセットしました");
+        StoryProgress.ResetAll();
+    }
+
+    [MenuItem("Yurube/ストーリー/全章を解放する")]
+    static void UnlockAll()
+    {
+        StoryProgress.UnlockAll();
     }
 
     [MenuItem("Yurube/ストーリー/序章をクリア済みにする")]
