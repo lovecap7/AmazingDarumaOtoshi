@@ -265,6 +265,14 @@ namespace Nakagawa.EditorTools
                     Description = "夏の夜の縁側。ステージは縁側に置いた木の箱の上にあり、まわりには蚊取り線香・うちわ・すいかの皿・花火の袋・ろうそくが置いてあり、奥には明かりのともる障子、庭の先には夜空と遠くの打ち上げ花火が見える。",
                     Build = BuildHanabiEngawa,
                 },
+                // ステージの見た目を変えた背景(BackdropBuilder.StageSurfaces.cs)
+                new BackdropDef
+                {
+                    Id = kIceSeaId,
+                    Title = "冷たい海",
+                    Description = "流氷の浮かぶ冷たい海。ステージの氷の盤は支えなしで海に浮かび、割れない床は岩。まわりには小さな氷のかけらが漂い、水平線には氷山と雪の山並みが見える。",
+                    Build = BuildIceSea,
+                },
             };
         }
 

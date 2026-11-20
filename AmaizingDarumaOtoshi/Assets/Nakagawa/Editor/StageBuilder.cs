@@ -16,7 +16,8 @@ namespace Nakagawa.EditorTools
     // 各ステージはこのファイルの定義(床・壁・ギミック・積み木の生成エリア・出現位置・説明)から作るので、数値を直して作り直せる
     // 床はすべて同じ高さ(段差なし)。床の穴・壁のない縁は奈落(落ちると脱落)
     // 開いているシーンには触れない(別のシーンを追加で開いて組み立て、保存して閉じる)
-    public static class StageBuilder
+    // (ステージごとの床・壁の作り込み(Dress)は StageBuilder.Dressing.cs)
+    public static partial class StageBuilder
     {
         const string kStageDir = "Assets/Nakagawa/Stages";
         const string kDocPath = kStageDir + "/StageList.md";
@@ -146,6 +147,7 @@ namespace Nakagawa.EditorTools
 
             WriteDocument(defs);
             AssetDatabase.Refresh();
+            BackdropBuilder.RestoreEmissionKeywords();
             Debug.Log($"[StageBuilder] {targets.Count}ステージを {kCombinedPath} に作りました\n" + report);
         }
 
@@ -175,12 +177,15 @@ namespace Nakagawa.EditorTools
         const string kSpaceBackdrop = "Space";
         const string kKakizomeBackdrop = "Kakizome";
         const string kHanabiEngawaBackdrop = "HanabiEngawa";
+        const string kIceSeaBackdrop = "IceSea";
 
         class StageDef
         {
             public string Id, Title, Concept, Flow;
             public int MaxBlocks = 24;
             public Action<Ctx> Build;
+            // 床・壁の重なりを直したあとに行う見た目の作り込み(枠の飾り・小物など。当たり判定は足さない)。なければ何もしない
+            public Action<Ctx> Dress;
             public string Layout; // 生成後に埋める
             // 背景の id(BackdropBuilder の定義)。なければ背景なし
             public string Backdrop;
@@ -2254,9 +2259,10 @@ namespace Nakagawa.EditorTools
                     c.AreaCircle(-7.2f, -8.3f, 1.5f);
                     // 出現位置は、3枚の床の真ん中(3枚が接する頂点)
                     c.Spawns(spawnFloors.ToArray());
-                }).Backdrop = kChanomaBackdrop;
+                    // 冷たい海に浮かぶ氷の盤(支えなし)。割れない床は岩(背景 IceSea の床のマテリアル)
+                }).Backdrop = kIceSeaBackdrop;
 
-            Add("こたつの全自動卓", 24,
+            var mahjongStage = Add("こたつの全自動卓", 24,
                 "お茶の間のこたつに置いた全自動麻雀卓。全周が縁(壁)の卓の上に、空から4種類の牌が降ってくる。中央の 9×9m はふたで、ふだんは床。",
                 "牌(東・南・西・北)は触れると取れ、攻撃を受けると手持ちから1枚落とす(やられると全部)。場の牌は積み木に当たると弾かれる。" +
                 "同じ牌3枚(ポン)か4種を1枚ずつそろえると、牌が空に集まって巨大になり、ポンの形で中央のふたの上に落ちてくる(近くの人ははじかれる)。" +
@@ -2277,14 +2283,19 @@ namespace Nakagawa.EditorTools
                     c.AreaRect(-11.5f, 0, 3, 6);
                     c.AreaRect(0, 0, 7.5f, 7.5f);
                     c.Spawns(new Vector2(-7, -7), new Vector2(7, -7), new Vector2(-7, 7), new Vector2(7, 7));
-                }).Backdrop = kChanomaBackdrop;
+                });
+            mahjongStage.Backdrop = kChanomaBackdrop;
+            // 卓の縁(緑の縁取り + 木目の二重)・各辺の点数表示とプレイヤー表記・点棒入れ
+            mahjongStage.Dress = c => c.DressMahjongTable(26, 26);
 
-            Add("決勝の特設ステージ", 24,
+            var finalStage = Add("決勝の特設ステージ", 24,
                 "スタジアムの特設ステージ。南北だけ壁があり、東西は崖。左右の広い床(せり上がり塀)が、交互に高台へせり上がっては下がる。",
                 "上がっている側は高台と盾になり、下がっている側は見通しが開く。上がった床の側面で弾が跳ね返るので、中央の通路は跳弾が多い。" +
                 "床が上がる前に乗っていれば一緒に持ち上がり、高台から撃ち下ろせる(高さ1.5mなので、積み木の少ない人は下から跳び乗れる)。東西の崖が落下の場所。",
                 c =>
                 {
+                    // 床はパネルの継ぎ目が見える特設ステージの床(遠近感が分かる程度の控えめな模様)
+                    c.FloorMaterial = StadiumStageFloorMaterial(28, 22);
                     c.Arena(0, 0, 28, 20, true, true, false, false);
                     // 左右の床が半周期ずれて交互に上下する(1周 8.3秒 = 床3 + 予兆1 + 上昇0.5 + 壁3 + 下降0.8)
                     // 大きさは 6×7.5m(案の 8×10m の 3/4。中心の位置と高さ 1.5m は同じ)
@@ -2298,7 +2309,10 @@ namespace Nakagawa.EditorTools
                     c.AreaRect(12.25f, 0, 3, 8);
                     c.AreaRect(-12.25f, 0, 3, 8);
                     c.Spawns(new Vector2(-9, 7.5f), new Vector2(9, -7.5f), new Vector2(-9, -7.5f), new Vector2(9, 7.5f));
-                }).Backdrop = kStadiumBackdrop;
+                });
+            finalStage.Backdrop = kStadiumBackdrop;
+            // 床の縁の LED の帯と、四隅の照明トラス
+            finalStage.Dress = c => c.DressFinalStage();
 
             var sandbagStage = Add("部室のサンドバッグ", 16,
                 "だるま落とし部の部室。全周が壁の部屋の中央に、大きなサンドバッグが立っている。",
@@ -2323,7 +2337,7 @@ namespace Nakagawa.EditorTools
 
             // ミニゲーム由来のギミックの本編ステージ(Stage25〜26)。計画は MinigameStagePlans.md
 
-            Add("書き初めの半紙", 24,
+            var kakizomeStage = Add("書き初めの半紙", 24,
                 "お正月の座卓に広げた書き初めの半紙の上。北と南を文鎮が押さえ、東西の端は座卓からはみ出した崖。歩いた跡と、打った積み木の通り道に、自分の色の墨の線が引かれる。下敷きがのぞく補給所には墨が付かない。",
                 "墨の線は、引いた本人が通り過ぎて足元から離れると「速い道」になる(立ち止まっていても、まっすぐ歩いても速くならない)。補給所への道を一度引いておき、あとからその道を走って積み木を集める。" +
                 "積むほど筆が細くなり、軽い人ほど太い道を引けるので、積んだ人は道を作りにくく、軽い人に回り込まれる。撃った積み木は一直線に墨の線を引き、文鎮で跳ね返るとその先まで伸びる。" +
@@ -2343,7 +2357,10 @@ namespace Nakagawa.EditorTools
                     c.AreaRect(11.5f, 0, 2, 4);
                     c.AreaRect(-11.5f, 0, 2, 4);
                     c.Spawns(new Vector2(-8, -5), new Vector2(8, 5), new Vector2(-8, 5), new Vector2(8, -5));
-                }).Backdrop = kKakizomeBackdrop;
+                });
+            kakizomeStage.Backdrop = kKakizomeBackdrop;
+            // 北と南の壁を文鎮に見立てる
+            kakizomeStage.Dress = c => c.DressBunchinWalls();
 
             Add("縁側のねずみ花火", 24,
                 "花火の夜の縁側。北は雨戸、東西は柱、南は庭へ落ちる崖。板の上に水を張ったバケツが2つと、庭寄りに水風船(バンパー)が2つ。ねずみ花火の火種が、いちばん高く積んだ人に付く。",
@@ -2445,7 +2462,7 @@ namespace Nakagawa.EditorTools
 
         // ステージ1つ分の組み立てと、配置の検証(床の上か・ギミックと重なっていないか)を座標の計算で行う
         // (開いている他のシーンの物と混ざらないよう、物理演算は使わない)
-        class Ctx
+        partial class Ctx
         {
             public Scene Scene;
             public Transform Stage, Gimmicks, Areas;
@@ -3378,6 +3395,7 @@ namespace Nakagawa.EditorTools
             def.Build(c);
             // 重なった床・壁の同じ平面の面はちらつくので、重ならないように分ける・縮める
             StageGeometryFixer.Fix(c.Stage);
+            def.Dress?.Invoke(c);
 
             Rect bounds = c.Bounds();
             Vector3 center = new Vector3(bounds.center.x, 0, bounds.center.y);
