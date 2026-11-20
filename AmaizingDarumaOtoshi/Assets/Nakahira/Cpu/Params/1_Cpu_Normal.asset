@@ -29,6 +29,8 @@ MonoBehaviour:
   TargetDistanceWeight: 1
   TargetDistanceRange: 10
   TargetRuleWeight: 0.5
+  TargetCrowdRadius: 4
+  TargetCrowdPenalty: 0.5
   MeleeScore: 0.65
   MeleeEnterDistance: 3
   MeleeChaseDistance: 6
@@ -57,6 +59,9 @@ MonoBehaviour:
   PlayfulScatterChancePerSecond: 0.5
   ApproachScore: 0.45
   WaitScore: 0.3
+  NearFightDistance: 6
+  NearFightStackGap: 2
+  NearFightScore: 0.55
   WaitDangerRadius: 10
   WaitGhostWeight: 1.5
   WaitStrongerWeight: 1
