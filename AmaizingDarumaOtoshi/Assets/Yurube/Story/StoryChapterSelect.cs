@@ -219,14 +219,17 @@ namespace Yurube.Story
             return -1;
         }
 
-        // カーソルの初期位置：解放済みで最新の章
+        // カーソルの初期位置：未クリアで解放済みの最初の章（すべてクリア済みなら最後に解放された章）
         int DefaultIndex()
         {
             int lastUnlocked = 0;
             if (m_chapters == null) return 0;
             for (int i = 0; i < m_chapters.Count; i++)
             {
-                if (StoryProgress.IsUnlocked(m_chapters[i])) lastUnlocked = i;
+                var c = m_chapters[i];
+                if (c == null || !StoryProgress.IsUnlocked(c)) continue;
+                if (!StoryProgress.IsCleared(c.id)) return i;
+                lastUnlocked = i;
             }
             return lastUnlocked;
         }
@@ -284,7 +287,8 @@ namespace Yurube.Story
             if (forceLocked || !StoryProgress.IsUnlocked(chapter))
             {
                 if (!string.IsNullOrEmpty(chapter.hiddenTitle)) return chapter.hiddenTitle;
-                if (chapter.order <= 0) return "序章「？？？」";
+                if (chapter.order < 0) return "プロローグ「？？？」";
+                if (chapter.order == 0) return "序章「？？？」";
                 return index == totalCount - 1 ? "最終章「？？？」" : $"第{chapter.order}章「？？？」";
             }
             return chapter.title;

@@ -7,12 +7,20 @@ namespace Yurube.Story
     public static class StoryNewspaperArt
     {
         static Sprite s_sprite;
+        static Sprite s_preludeSprite;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        static void Reset() => s_sprite = null;
-
-        public static Sprite Create()
+        static void Reset()
         {
+            s_sprite = null;
+            s_preludeSprite = null;
+        }
+
+        public static Sprite Create() => Create(null);
+
+        public static Sprite Create(string artId)
+        {
+            if (artId == "prelude") return CreatePreludeArt();
             if (s_sprite != null) return s_sprite;
 
             const int w = 1180, h = 320;
@@ -117,6 +125,100 @@ namespace Yurube.Story
             s_sprite = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 100f);
             s_sprite.name = "StoryNewspaperArt";
             return s_sprite;
+        }
+
+        // プロローグ用：「8年前 王冠大会 決勝会場」のモノクロ写真風（暗い会場と舞台上の古い槌）
+        static Sprite CreatePreludeArt()
+        {
+            if (s_preludeSprite != null) return s_preludeSprite;
+
+            const int w = 1180, h = 320;
+            var px = new Color[w * h];
+            var darkBg = new Color(0.14f, 0.14f, 0.15f);
+            for (int i = 0; i < px.Length; i++) px[i] = darkBg;
+
+            var rng = new System.Random(20261120);
+            var ink = new Color(0.08f, 0.08f, 0.09f);
+            var mid = new Color(0.32f, 0.31f, 0.30f);
+            var floorLight = new Color(0.56f, 0.54f, 0.50f);
+            var wood = new Color(0.46f, 0.42f, 0.36f);
+            var woodDark = new Color(0.24f, 0.21f, 0.18f);
+
+            // 奥の観客席の段差（暗いグラデーション）
+            for (int row = 0; row < 5; row++)
+            {
+                int y = 170 + row * 24;
+                Rect(px, w, h, 20, y, w - 40, 14, Color.Lerp(mid, ink, 0.55f + row * 0.08f));
+            }
+
+            // 競技場の舞台床（中央にスポットの残照）
+            Rect(px, w, h, 80, 12, w - 160, 150, mid);
+            Ellipse(px, w, h, w / 2, 92, 420, 62, floorLight);
+            Ellipse(px, w, h, w / 2, 92, 260, 38, new Color(0.74f, 0.72f, 0.67f));
+
+            // 舞台の縁（積み木の塔の台座ライン）
+            Rect(px, w, h, 80, 156, w - 160, 8, ink);
+            for (int x = 140; x < w - 140; x += 120)
+            {
+                Rect(px, w, h, x, 146, 60, 12, Color.Lerp(mid, ink, 0.4f));
+            }
+
+            // 床に転がる一本の古い槌（柄と槌頭を斜めに配置）
+            ThickLine(px, w, h, 495, 76, 655, 114, 14, ink);
+            ThickLine(px, w, h, 495, 76, 655, 114, 9, wood);
+            // 槌の頭（円柱風の横倒し）
+            ThickLine(px, w, h, 636, 144, 678, 84, 34, ink);
+            ThickLine(px, w, h, 636, 144, 678, 84, 26, woodDark);
+            ThickLine(px, w, h, 642, 136, 672, 92, 16, wood);
+            // 影
+            Ellipse(px, w, h, 590, 74, 95, 12, new Color(0.16f, 0.16f, 0.17f));
+
+            // 新聞写真の枠・ハーフトーン・粒子
+            for (int i = 0; i < 3200; i++)
+            {
+                int x = rng.Next(w), y = rng.Next(h);
+                int at = y * w + x;
+                px[at] = Color.Lerp(px[at], i % 2 == 0 ? Color.white : ink, 0.08f);
+            }
+            for (int y = 0; y < h; y += 5)
+                for (int x = 0; x < w; x += 5)
+                {
+                    int at = y * w + x;
+                    px[at] = Color.Lerp(px[at], ink, 0.05f);
+                }
+            Frame(px, w, h, 6, 2, ink);
+
+            for (int i = 0; i < px.Length; i++)
+            {
+                var c = px[i];
+                float lum = c.r * 0.299f + c.g * 0.587f + c.b * 0.114f;
+                lum = Mathf.Clamp01((lum - 0.5f) * 1.18f + 0.5f);
+                px[i] = new Color(lum, lum, lum, 1f);
+            }
+
+            var tex = new Texture2D(w, h, TextureFormat.RGBA32, false)
+            {
+                name = "StoryNewspaperArt_Prelude",
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+            };
+            tex.SetPixels(px);
+            tex.Apply();
+            s_preludeSprite = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 100f);
+            s_preludeSprite.name = "StoryNewspaperArt_Prelude";
+            return s_preludeSprite;
+        }
+
+        static void ThickLine(Color[] px, int w, int h, float x0, float y0, float x1, float y1, int diameter, Color c)
+        {
+            int r = Mathf.Max(1, diameter / 2);
+            float dist = Vector2.Distance(new Vector2(x0, y0), new Vector2(x1, y1));
+            int steps = Mathf.Max(1, Mathf.CeilToInt(dist));
+            for (int i = 0; i <= steps; i++)
+            {
+                float u = i / (float)steps;
+                Disc(px, w, h, Mathf.RoundToInt(Mathf.Lerp(x0, x1, u)), Mathf.RoundToInt(Mathf.Lerp(y0, y1, u)), r, c);
+            }
         }
 
         // 半透明で重ねる（紙吹雪用）

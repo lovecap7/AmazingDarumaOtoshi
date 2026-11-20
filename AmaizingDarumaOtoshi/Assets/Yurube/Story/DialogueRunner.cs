@@ -28,7 +28,7 @@ namespace Yurube.Story
         static readonly Color Ink = ToyKit.Ink;
 
         TMP_FontAsset m_font;
-        RectTransform m_root, m_bigPanel, m_smallPanel, m_newsPanel, m_objectivePanel, m_koPanel;
+        RectTransform m_root, m_bigPanel, m_bigPlate, m_smallPanel, m_newsPanel, m_objectivePanel, m_koPanel;
         Image m_dim, m_portrait, m_koDim, m_portraitFace;
         Image m_smallPortrait, m_smallFace;
         TextMeshProUGUI m_bigName, m_bigText, m_smallName, m_smallText, m_hint;
@@ -44,6 +44,7 @@ namespace Yurube.Story
         bool m_skipped;
         bool m_smallShowing;
         bool m_bigShowing;
+        bool m_compactLayout;
         // いま出している小窓のコルーチン。新しい小窓が来たら止めて、すぐ切り替える
         Coroutine m_smallRoutine;
 
@@ -243,6 +244,7 @@ namespace Yurube.Story
             // 名前の札
             var plate = ToyKit.UIRounded("Plate", panel, ToyKit.Palette[1], 16f);
             ToyKit.Anchor(plate, new Vector2(0f, 1f), new Vector2(300f, -46f), new Vector2(340f, 62f));
+            m_bigPlate = plate;
             m_bigName = ToyKit.UIText("Name", plate, m_font, "", 36f, Color.white);
             m_bigName.fontStyle = FontStyles.Bold;
             m_bigName.enableAutoSizing = true;
@@ -473,6 +475,55 @@ namespace Yurube.Story
             m_dimAlpha = Mathf.Clamp01(alpha);
         }
 
+        // 試合のない章（プロローグ等）向けに、背景カットシーンを遮らないよう会話ウィンドウを画面最下部に小さく配置する
+        public void SetCompactBottomLayout(bool compact)
+        {
+            Build();
+            m_compactLayout = compact;
+            ApplyBigPanelLayout(hidePortrait: false);
+        }
+
+        void ApplyBigPanelLayout(bool hidePortrait)
+        {
+            if (m_bigPanel == null) return;
+            var bg = m_bigPanel.GetComponent<Image>();
+            if (m_compactLayout)
+            {
+                if (bg != null) bg.color = new Color(PanelColor.r, PanelColor.g, PanelColor.b, 0.90f);
+                ToyKit.Anchor(m_bigPanel, new Vector2(0.5f, 0f), new Vector2(0f, 96f), new Vector2(1500f, 200f));
+                if (m_portrait != null)
+                    ToyKit.Anchor(m_portrait.rectTransform, new Vector2(0f, 0.5f), new Vector2(105f, 0f), new Vector2(144f, 144f));
+                if (m_bigPlate != null)
+                    ToyKit.Anchor(m_bigPlate, new Vector2(0f, 1f), new Vector2(hidePortrait ? 206f : 360f, -38f), new Vector2(320f, 48f));
+                if (m_bigText != null)
+                {
+                    var textRect = m_bigText.rectTransform;
+                    textRect.anchorMin = textRect.anchorMax = new Vector2(0f, 1f);
+                    textRect.pivot = new Vector2(0f, 1f);
+                    float left = hidePortrait ? 48f : 204f;
+                    textRect.anchoredPosition = new Vector2(left, -72f);
+                    textRect.sizeDelta = new Vector2(1500f - left - 44f, 114f);
+                }
+            }
+            else
+            {
+                if (bg != null) bg.color = PanelColor;
+                ToyKit.Anchor(m_bigPanel, new Vector2(0.5f, 0f), new Vector2(0f, 280f), new Vector2(1460f, 340f));
+                if (m_portrait != null)
+                    ToyKit.Anchor(m_portrait.rectTransform, new Vector2(0f, 0.5f), new Vector2(140f, 20f), new Vector2(210f, 210f));
+                if (m_bigPlate != null)
+                    ToyKit.Anchor(m_bigPlate, new Vector2(0f, 1f), new Vector2(300f, -46f), new Vector2(340f, 62f));
+                if (m_bigText != null)
+                {
+                    var textRect = m_bigText.rectTransform;
+                    textRect.anchorMin = textRect.anchorMax = new Vector2(0f, 1f);
+                    textRect.pivot = new Vector2(0f, 1f);
+                    textRect.anchoredPosition = new Vector2(300f, -100f);
+                    textRect.sizeDelta = new Vector2(1120f, 190f);
+                }
+            }
+        }
+
         // 対戦中の「いま何をすればいいか」を上に出す（操作のあいだ残す）
         public void ShowObjective(StoryChapter chapter, string speakerId, string text)
         {
@@ -583,7 +634,7 @@ namespace Yurube.Story
         {
             m_smallShowing = true;
 
-            ApplySpeaker(chapter, speakerId, big: false);
+            ApplySpeaker(chapter, speakerId, big: false, hidePortrait: false);
             m_smallText.text = text;
             m_smallPanel.gameObject.SetActive(true);
             yield return FadeGroup(m_smallGroup, m_smallGroup.alpha, 1f, 0.12f);
@@ -641,7 +692,7 @@ namespace Yurube.Story
 
             // 画像が指定されていなければ、新聞用のイラストをコードで描く
             Sprite art = string.IsNullOrEmpty(paper.image) ? null : Resources.Load<Sprite>(paper.image);
-            if (art == null) art = StoryNewspaperArt.Create();
+            if (art == null) art = StoryNewspaperArt.Create(paper.art);
             m_newsImage.sprite = art;
             m_newsImage.color = Color.white;
             m_newsImage.type = Image.Type.Simple;
@@ -712,14 +763,18 @@ namespace Yurube.Story
         void PrepareLine(StoryChapter chapter, StoryLine line, bool big)
         {
             bool direction = line.direction || string.IsNullOrEmpty(line.speaker);
-            ApplySpeaker(chapter, line.speaker, big);
+            bool hidePortrait = line.portrait == "none";
+            if (big) ApplyBigPanelLayout(hidePortrait);
+            ApplySpeaker(chapter, line.speaker, big, hidePortrait);
             StoryLineStarted?.Invoke(line);
             LineStarted?.Invoke(line.speaker);
 
             var text = big ? m_bigText : m_smallText;
             text.text = line.text;
             // ト書きは小さめ・薄めにして、台詞と区別する
-            text.fontSize = direction ? (big ? 28f : 24f) : (big ? 38f : 30f);
+            float bigSize = m_compactLayout ? (direction ? 25f : 34f) : (direction ? 28f : 38f);
+            text.fontSize = big ? bigSize : (direction ? 24f : 30f);
+            if (big) text.fontSizeMax = bigSize;
             text.color = direction ? new Color(Ink.r, Ink.g, Ink.b, 0.75f) : Ink;
             text.maxVisibleCharacters = 0;
             text.ForceMeshUpdate();
@@ -761,7 +816,7 @@ namespace Yurube.Story
             }
         }
 
-        void ApplySpeaker(StoryChapter chapter, string speakerId, bool big)
+        void ApplySpeaker(StoryChapter chapter, string speakerId, bool big, bool hidePortrait = false)
         {
             bool direction = string.IsNullOrEmpty(speakerId);
             string name = direction ? "" : StoryData.SpeakerName(chapter, speakerId);
@@ -774,7 +829,8 @@ namespace Yurube.Story
                 plate.gameObject.SetActive(!direction);
                 plate.color = direction ? new Color(color.r, color.g, color.b, 0.5f) : color;
 
-                var sprite = direction ? null : StoryData.Portrait(chapter, speakerId);
+                if (m_portrait != null) m_portrait.gameObject.SetActive(!hidePortrait);
+                var sprite = direction || hidePortrait ? null : StoryData.Portrait(chapter, speakerId);
                 if (m_portraitFace != null)
                 {
                     m_portraitFace.enabled = sprite != null;
@@ -785,9 +841,12 @@ namespace Yurube.Story
                         m_portraitFace.preserveAspect = true;
                     }
                 }
-                m_portrait.color = sprite != null
-                    ? new Color(0.92f, 0.88f, 0.8f)
-                    : direction ? new Color(color.r, color.g, color.b, 0.35f) : color;
+                if (m_portrait != null)
+                {
+                    m_portrait.color = sprite != null
+                        ? new Color(0.92f, 0.88f, 0.8f)
+                        : direction ? new Color(color.r, color.g, color.b, 0.35f) : color;
+                }
             }
             else
             {

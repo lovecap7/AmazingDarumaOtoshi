@@ -22,6 +22,8 @@ namespace Yurube.Story
         static readonly Vector3 SetOrigin = new Vector3(5000f, 0f, 0f);
         // 第2章の全国大会会場（鳥居の前）のセット。部室とは別の場所に作る
         static readonly Vector3 VenueOrigin = new Vector3(5200f, 0f, 0f);
+        // プロローグの8年前の王冠大会 決勝会場のセット
+        static readonly Vector3 ArenaOrigin = new Vector3(5400f, 0f, 0f);
         // 画面の並び（HUD 15 < ムービー 44 < 実績カード 45 < 会話 60）
         const int CanvasOrder = 44;
 
@@ -117,6 +119,21 @@ namespace Yurube.Story
         bool m_venueBuilt;
         Transform m_venueRoot;
         readonly Dictionary<string, Member> m_venueMembers = new Dictionary<string, Member>();
+
+        // プロローグ（八年前の槌音）：8年前の王冠大会 決勝会場
+        bool m_arenaMode;
+        bool m_arenaBuilt;
+        Transform m_arenaRoot;
+        Transform m_arenaFatherShadow, m_arenaKingShadow, m_arenaBoyShadow;
+        Transform m_arenaShotBlock;
+        Transform[] m_arenaKingBlocks;
+        Vector3[] m_arenaKingBlockBasePos;
+        Transform m_arenaFloorHammer;
+        readonly List<Light> m_arenaLights = new List<Light>();
+        readonly List<float> m_arenaLightBase = new List<float>();
+        float m_arenaCollapseStart = -1f;
+        float m_arenaHammerRollStart = -1f;
+        Coroutine m_arenaFadeRoutine;
 
         // 最終章：控室（部室セット）と決勝の舞台を行き来する
         bool m_finalMode;
@@ -216,6 +233,7 @@ namespace Yurube.Story
             }
             if (m_root != null) Destroy(m_root.gameObject);
             if (m_venueRoot != null) Destroy(m_venueRoot.gameObject);
+            if (m_arenaRoot != null) Destroy(m_arenaRoot.gameObject);
             if (m_camera != null) Destroy(m_camera.gameObject);
             if (m_screen != null) Destroy(m_screen);
             if (m_volume != null) Destroy(m_volume.gameObject);
@@ -916,8 +934,8 @@ namespace Yurube.Story
                 pos += new Vector3(0.09f * Mathf.Sin(lt * 0.11f), 0f, 0.05f * Mathf.Sin(lt * 0.07f));
             }
 
-            // 壁の外へ出ないように部室内に収める
-            if (m_root != null)
+            // 壁の外へ出ないように部室内に収める（会場セット・ステージでは制限しない）
+            if (!m_arenaMode && m_root != null && (def.target == null || def.target == m_root || def.target.IsChildOf(m_root)))
             {
                 Vector3 local = pos - m_root.position;
                 local.x = Mathf.Clamp(local.x, -5.4f, 5.4f);
@@ -931,10 +949,16 @@ namespace Yurube.Story
             if (def == null) return;
             m_currentShotId = def.id;
 
-            if (def.memberVisibility > 0) SetRoomMembersVisible(true);
-            else if (def.memberVisibility < 0) SetRoomMembersVisible(false);
-
-            UseRoomCamera();
+            if (!m_arenaMode)
+            {
+                if (def.memberVisibility > 0) SetRoomMembersVisible(true);
+                else if (def.memberVisibility < 0) SetRoomMembersVisible(false);
+                UseRoomCamera();
+            }
+            else
+            {
+                UseArenaCamera();
+            }
 
             if (blendSeconds > 0.01f && m_camera != null && m_camPos != null && m_camLook != null)
             {
@@ -1355,7 +1379,11 @@ namespace Yurube.Story
             m_stageMode = false;
             m_venueMode = false;
             m_finalMode = false;
+            m_arenaMode = false;
             m_finalScene = "";
+            m_arenaCollapseStart = -1f;
+            m_arenaHammerRollStart = -1f;
+            if (m_arenaFadeRoutine != null) { StopCoroutine(m_arenaFadeRoutine); m_arenaFadeRoutine = null; }
             m_bannerStart = -1f;
             m_dollEyeTime = -1f;
             m_crackTime = -1f;
@@ -1387,7 +1415,11 @@ namespace Yurube.Story
             m_stageMode = false;
             m_venueMode = false;
             m_finalMode = false;
+            m_arenaMode = false;
             m_finalScene = "";
+            m_arenaCollapseStart = -1f;
+            m_arenaHammerRollStart = -1f;
+            if (m_arenaFadeRoutine != null) { StopCoroutine(m_arenaFadeRoutine); m_arenaFadeRoutine = null; }
             m_visible = false;
             m_opening = false;
             m_advance = false;
@@ -1625,7 +1657,11 @@ namespace Yurube.Story
             m_stageMode = false;
             m_venueMode = false;
             m_finalMode = false;
+            m_arenaMode = false;
             m_finalScene = "";
+            m_arenaCollapseStart = -1f;
+            m_arenaHammerRollStart = -1f;
+            if (m_arenaFadeRoutine != null) { StopCoroutine(m_arenaFadeRoutine); m_arenaFadeRoutine = null; }
             Show();
             m_fadeGroup.alpha = 1f;
             SetCaption(false);
@@ -2236,6 +2272,12 @@ namespace Yurube.Story
             if (line != null && !string.IsNullOrEmpty(line.shot))
             {
                 ApplyConversationShot(line.shot);
+                if (m_arenaMode && !string.IsNullOrEmpty(line.cue)) ApplyPreludeCue(line.cue);
+                return;
+            }
+            if (m_arenaMode && line != null && !string.IsNullOrEmpty(line.cue))
+            {
+                ApplyPreludeCue(line.cue);
                 return;
             }
             if (m_venueMode || m_finalMode)
@@ -2990,6 +3032,7 @@ namespace Yurube.Story
 
             AnimateMembers();
             if (m_stageMode) AnimateStage();
+            if (m_arenaMode) AnimateArena();
             AnimateBanner();
             AnimateDollEye();
             AnimateCrack();
@@ -3014,6 +3057,417 @@ namespace Yurube.Story
                 fov = Mathf.Lerp(m_blendFromFov, m_shotFov, u);
             }
             m_camera.fieldOfView = Mathf.Max(1f, fov - m_fovPunch);
+        }
+
+        //========================================
+        // プロローグ（八年前の槌音）：王冠大会 決勝会場
+        //========================================
+
+        Vector3 A(float x, float y, float z) => ArenaOrigin + new Vector3(x, y, z);
+
+        Transform ArenaPrim(PrimitiveType type, string name, Transform parent, Vector3 localPos, Vector3 scale, Material mat, Vector3 euler = default)
+        {
+            var t = ToyKit.Primitive(type, name, parent);
+            t.localPosition = localPos;
+            t.localScale = scale;
+            t.localRotation = Quaternion.Euler(euler);
+            t.GetComponent<Renderer>().sharedMaterial = mat;
+            t.GetComponent<Renderer>().shadowCastingMode = ShadowCastingMode.Off;
+            return t;
+        }
+
+        void UseArenaCamera()
+        {
+            if (m_camera == null) return;
+            m_camera.clearFlags = CameraClearFlags.SolidColor;
+            m_camera.backgroundColor = new Color(0.025f, 0.025f, 0.04f);
+            m_camera.farClipPlane = 120f;
+        }
+
+        void BuildArena()
+        {
+            if (m_arenaBuilt) return;
+            m_arenaBuilt = true;
+
+            m_arenaRoot = new GameObject("StoryArenaSet").transform;
+            m_arenaRoot.position = ArenaOrigin;
+
+            var shadowMat = ToyKit.Lit(new Color(0.03f, 0.03f, 0.04f), 0.05f);
+            var darkFloorMat = ToyKit.Lit(new Color(0.28f, 0.24f, 0.20f), 0.25f);
+            var towerBlockMat = ToyKit.Lit(new Color(0.36f, 0.27f, 0.19f), 0.25f);
+            var towerBandMat = ToyKit.Lit(new Color(0.46f, 0.34f, 0.23f), 0.25f);
+            var seatMat = ToyKit.Lit(new Color(0.12f, 0.12f, 0.16f), 0.1f);
+            var audienceMat = Unlit(new Color(0.04f, 0.04f, 0.06f));
+            var redHatMat = ToyKit.Lit(new Color(0.72f, 0.11f, 0.11f), 0.2f);
+            var crownMat = ToyKit.Lit(new Color(0.32f, 0.24f, 0.10f), 0.4f);
+            var kingBlockMat = ToyKit.Lit(new Color(0.55f, 0.35f, 0.70f), 0.3f);
+            var fatherBlockMat = ToyKit.Lit(new Color(0.68f, 0.16f, 0.16f), 0.3f);
+            var hammerWoodMat = ToyKit.Lit(new Color(0.45f, 0.28f, 0.15f), 0.3f);
+            var hammerHeadMat = ToyKit.Lit(new Color(0.26f, 0.21f, 0.18f), 0.45f);
+
+            // 舞台：巨大な積み木の塔の頂上（上面 y = 0）
+            ArenaPrim(PrimitiveType.Cylinder, "StageTop", m_arenaRoot, new Vector3(0f, -0.25f, 0f), new Vector3(9.6f, 0.25f, 9.6f), darkFloorMat);
+            for (int tier = 0; tier < 4; tier++)
+            {
+                float y = -0.8f - tier * 0.9f;
+                float r = 9.2f + tier * 0.6f;
+                var mat = tier % 2 == 0 ? towerBlockMat : towerBandMat;
+                ArenaPrim(PrimitiveType.Cylinder, "TowerTier_" + tier, m_arenaRoot, new Vector3(0f, y, 0f), new Vector3(r, 0.42f, r), mat);
+            }
+
+            // 周囲の暗い観客席段差（奥・左・右）
+            for (int step = 0; step < 3; step++)
+            {
+                float y = 0.6f + step * 1.1f;
+                float z = 8.4f + step * 1.6f;
+                ArenaPrim(PrimitiveType.Cube, "StandBack_" + step, m_arenaRoot, new Vector3(0f, y, z), new Vector3(22f, 1.0f, 1.8f), seatMat);
+                ArenaPrim(PrimitiveType.Cube, "StandLeft_" + step, m_arenaRoot, new Vector3(-9.2f - step * 1.5f, y, 1.5f), new Vector3(1.8f, 1.0f, 16f), seatMat);
+            }
+
+            // 客席の影（数人の観客シルエット）
+            for (int i = -4; i <= 4; i++)
+            {
+                if (i == -3) continue;
+                ArenaPrim(PrimitiveType.Sphere, "Audience_" + i, m_arenaRoot, new Vector3(i * 1.8f, 1.45f, 8.2f), new Vector3(0.75f, 0.85f, 0.75f), audienceMat);
+            }
+
+            // 客席の隅の「赤い帽子の少年」（黒シルエット＋赤い帽子）
+            var boy = new GameObject("BoySeat").transform;
+            boy.SetParent(m_arenaRoot, false);
+            boy.localPosition = new Vector3(-6.4f, 0.95f, -4.6f);
+            boy.localRotation = Quaternion.Euler(0f, 52f, 0f);
+            ArenaPrim(PrimitiveType.Cylinder, "BoyBody", boy, new Vector3(0f, 0.35f, 0f), new Vector3(0.62f, 0.35f, 0.62f), shadowMat);
+            ArenaPrim(PrimitiveType.Sphere, "BoyHead", boy, new Vector3(0f, 0.92f, 0f), new Vector3(0.72f, 0.68f, 0.72f), shadowMat);
+            // 赤い帽子（クラウン＋つば）
+            ArenaPrim(PrimitiveType.Sphere, "RedCap", boy, new Vector3(0f, 1.18f, 0f), new Vector3(0.74f, 0.42f, 0.74f), redHatMat);
+            ArenaPrim(PrimitiveType.Cube, "RedCapBrim", boy, new Vector3(0f, 1.08f, 0.34f), new Vector3(0.56f, 0.08f, 0.34f), redHatMat);
+            m_arenaBoyShadow = boy;
+
+            // 舞台上の影1：父（左側、右向き）
+            var father = new GameObject("FatherShadow").transform;
+            father.SetParent(m_arenaRoot, false);
+            father.localPosition = new Vector3(-2.3f, 0f, 0f);
+            father.localRotation = Quaternion.Euler(0f, 90f, 0f);
+            ArenaPrim(PrimitiveType.Cylinder, "Stack0", father, new Vector3(0f, 0.25f, 0f), new Vector3(0.95f, 0.24f, 0.95f), shadowMat);
+            ArenaPrim(PrimitiveType.Cylinder, "Stack1", father, new Vector3(0f, 0.75f, 0f), new Vector3(0.95f, 0.24f, 0.95f), shadowMat);
+            ArenaPrim(PrimitiveType.Sphere, "Head", father, new Vector3(0f, 1.42f, 0f), new Vector3(0.95f, 0.9f, 0.95f), shadowMat);
+            // 構えた槌のシルエット
+            var fHammer = new GameObject("Hammer").transform;
+            fHammer.SetParent(father, false);
+            fHammer.localPosition = new Vector3(0.62f, 0.7f, 0.25f);
+            fHammer.localRotation = Quaternion.Euler(22f, 0f, -15f);
+            ArenaPrim(PrimitiveType.Cylinder, "Handle", fHammer, new Vector3(0f, 0.45f, 0f), new Vector3(0.11f, 0.52f, 0.11f), shadowMat);
+            ArenaPrim(PrimitiveType.Cylinder, "Head", fHammer, new Vector3(0f, 0.96f, 0f), new Vector3(0.34f, 0.28f, 0.34f), shadowMat, new Vector3(0f, 0f, 90f));
+            m_arenaFatherShadow = father;
+
+            // 舞台上の影2：だるきんぐ（右側、左向き）＋たった二つの積み木
+            var king = new GameObject("KingShadow").transform;
+            king.SetParent(m_arenaRoot, false);
+            king.localPosition = new Vector3(2.3f, 0f, 0f);
+            king.localRotation = Quaternion.Euler(0f, -90f, 0f);
+            var kBlock0 = ArenaPrim(PrimitiveType.Cylinder, "KingBlock0", m_arenaRoot, new Vector3(2.3f, 0.25f, 0f), new Vector3(1.0f, 0.24f, 1.0f), kingBlockMat);
+            var kBlock1 = ArenaPrim(PrimitiveType.Cylinder, "KingBlock1", m_arenaRoot, new Vector3(2.3f, 0.75f, 0f), new Vector3(1.0f, 0.24f, 1.0f), kingBlockMat);
+            m_arenaKingBlocks = new[] { kBlock0, kBlock1 };
+            m_arenaKingBlockBasePos = new[] { kBlock0.localPosition, kBlock1.localPosition };
+
+            var kingBody = new GameObject("KingBody").transform;
+            kingBody.SetParent(king, false);
+            ArenaPrim(PrimitiveType.Sphere, "Head", kingBody, new Vector3(0f, 1.45f, 0f), new Vector3(1.0f, 0.95f, 1.0f), shadowMat);
+            ArenaPrim(PrimitiveType.Cube, "Cape", kingBody, new Vector3(0f, 0.75f, -0.42f), new Vector3(1.1f, 1.25f, 0.12f), shadowMat, new Vector3(14f, 0f, 0f));
+            ArenaPrim(PrimitiveType.Cylinder, "CrownBase", kingBody, new Vector3(0f, 1.96f, 0f), new Vector3(0.55f, 0.12f, 0.55f), crownMat);
+            for (int p = 0; p < 3; p++)
+            {
+                ArenaPrim(PrimitiveType.Cube, "CrownPeak" + p, kingBody, new Vector3((p - 1) * 0.18f, 2.12f, 0f), new Vector3(0.11f, 0.22f, 0.11f), crownMat);
+            }
+            m_arenaKingShadow = king;
+
+            // 父が放つ連鎖用積み木
+            m_arenaShotBlock = ArenaPrim(PrimitiveType.Cylinder, "FatherShotBlock", m_arenaRoot, new Vector3(-1.3f, 0.25f, 0f), new Vector3(0.95f, 0.24f, 0.95f), fatherBlockMat);
+            m_arenaShotBlock.gameObject.SetActive(false);
+
+            // 明転時に床を転がる一本の古い槌
+            var floorHammer = new GameObject("FloorHammer").transform;
+            floorHammer.SetParent(m_arenaRoot, false);
+            floorHammer.localPosition = new Vector3(-0.15f, 0.22f, 0.15f);
+            ArenaPrim(PrimitiveType.Cylinder, "Handle", floorHammer, new Vector3(0f, 0f, -0.45f), new Vector3(0.11f, 0.55f, 0.11f), hammerWoodMat, new Vector3(90f, 0f, 0f));
+            ArenaPrim(PrimitiveType.Cylinder, "Head", floorHammer, new Vector3(0f, 0f, 0.18f), new Vector3(0.40f, 0.34f, 0.40f), hammerHeadMat, new Vector3(0f, 0f, 90f));
+            floorHammer.gameObject.SetActive(false);
+            m_arenaFloorHammer = floorHammer;
+
+            // 会場の照明（舞台と客席隅のコントラストが出る明るさ）
+            m_arenaLights.Clear();
+            m_arenaLightBase.Clear();
+            AddArenaLight("ArenaSpotCenter", new Vector3(0f, 6.2f, 0f), new Color(1.0f, 0.92f, 0.78f), 26f, 22f);
+            AddArenaLight("ArenaBackRim", new Vector3(0f, 4.2f, 6.5f), new Color(0.60f, 0.70f, 0.96f), 14f, 22f);
+            AddArenaLight("ArenaBoyFill", new Vector3(-5.4f, 3.6f, -3.5f), new Color(0.95f, 0.88f, 0.80f), 11f, 14f);
+
+            RegisterArenaShots();
+        }
+
+        void AddArenaLight(string name, Vector3 localPos, Color color, float intensity, float range)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(m_arenaRoot, false);
+            go.transform.localPosition = localPos;
+            var l = go.AddComponent<Light>();
+            l.type = LightType.Point;
+            l.color = color;
+            l.intensity = intensity;
+            l.range = range;
+            l.shadows = LightShadows.None;
+            m_arenaLights.Add(l);
+            m_arenaLightBase.Add(intensity);
+        }
+
+        void RegisterArenaShots()
+        {
+            if (m_shots.ContainsKey("S_ARENA_FAR")) return;
+
+            // S_ARENA_FAR：巨大な積み木の塔の舞台と2つの影・客席隅の少年を、会話UIより上の領域に収めた会場全景
+            RegisterShot(new ShotDefinition
+            {
+                id = "S_ARENA_FAR",
+                target = m_arenaRoot,
+                positionOffset = new Vector3(-2.6f, 5.2f, -12.5f),
+                lookOffset = new Vector3(-1.0f, -1.9f, 0f),
+                fov = 46f,
+                sway = true,
+            });
+
+            // S_BOY_SEAT：客席の隅の赤い帽子の少年を手前に、奥の舞台を会話UIより上に映すショット
+            RegisterShot(new ShotDefinition
+            {
+                id = "S_BOY_SEAT",
+                target = m_arenaRoot,
+                positionOffset = new Vector3(-8.2f, 2.7f, -6.8f),
+                lookOffset = new Vector3(-1.2f, -0.75f, 0f),
+                fov = 43f,
+            });
+
+            // S_BLACKOUT：暗転中のショット（映像は暗幕で完全に隠す）
+            RegisterShot(new ShotDefinition
+            {
+                id = "S_BLACKOUT",
+                target = m_arenaRoot,
+                positionOffset = new Vector3(0f, 4.0f, -10f),
+                lookOffset = new Vector3(0f, 0.5f, 0f),
+                fov = 44f,
+            });
+
+            // S_HAMMER_FLOOR：床に転がる古い槌を会話UIより上に大きく映し、奥の客席隅に少年の影を残すショット
+            RegisterShot(new ShotDefinition
+            {
+                id = "S_HAMMER_FLOOR",
+                target = m_arenaRoot,
+                positionOffset = new Vector3(2.1f, 1.65f, 2.3f),
+                lookOffset = new Vector3(-1.2f, -0.55f, -0.6f),
+                fov = 42f,
+            });
+        }
+
+        void ResetArenaState()
+        {
+            BuildArena();
+            m_arenaCollapseStart = -1f;
+            m_arenaHammerRollStart = -1f;
+            if (m_arenaFadeRoutine != null) { StopCoroutine(m_arenaFadeRoutine); m_arenaFadeRoutine = null; }
+
+            if (m_arenaFatherShadow != null) m_arenaFatherShadow.gameObject.SetActive(true);
+            if (m_arenaKingShadow != null)
+            {
+                m_arenaKingShadow.gameObject.SetActive(true);
+                m_arenaKingShadow.localPosition = new Vector3(2.3f, 0f, 0f);
+            }
+            if (m_arenaBoyShadow != null) m_arenaBoyShadow.gameObject.SetActive(true);
+            if (m_arenaShotBlock != null)
+            {
+                m_arenaShotBlock.gameObject.SetActive(false);
+                m_arenaShotBlock.localPosition = new Vector3(-1.3f, 0.25f, 0f);
+            }
+            if (m_arenaKingBlocks != null)
+            {
+                for (int i = 0; i < m_arenaKingBlocks.Length; i++)
+                {
+                    if (m_arenaKingBlocks[i] == null) continue;
+                    m_arenaKingBlocks[i].gameObject.SetActive(true);
+                    m_arenaKingBlocks[i].localPosition = m_arenaKingBlockBasePos[i];
+                    m_arenaKingBlocks[i].localRotation = Quaternion.identity;
+                }
+            }
+            if (m_arenaFloorHammer != null) m_arenaFloorHammer.gameObject.SetActive(false);
+            SetArenaLightsScale(1f);
+        }
+
+        void SetArenaLightsScale(float scale)
+        {
+            for (int i = 0; i < m_arenaLights.Count; i++)
+            {
+                if (m_arenaLights[i] != null) m_arenaLights[i].intensity = m_arenaLightBase[i] * scale;
+            }
+        }
+
+        // プロローグ開始時のテロップ導入（A：つぎへ / B：スキップ）
+        public IEnumerator PlayPreludeIntro(StoryChapter chapter)
+        {
+            ResetArenaState();
+            m_time = 0f;
+            m_shift = 0f;
+            m_skipped = false;
+            WasSkipped = false;
+            m_advance = false;
+            m_baseScale = 1f;
+            m_opening = true;
+            m_stageMode = false;
+            m_venueMode = false;
+            m_finalMode = false;
+            m_arenaMode = true;
+
+            Show();
+            UseArenaCamera();
+            m_fadeGroup.alpha = 1f;
+            SetMemory(false);
+            SetCinema(false);
+            SetCaption(false);
+            SetTitle(false);
+            SetHint(true);
+            SetCaptionText(chapter != null && chapter.cutscene != null && !string.IsNullOrEmpty(chapter.cutscene.caption)
+                ? chapter.cutscene.caption
+                : "八年前 ― 王冠大会 決勝");
+
+            if (m_shots.TryGetValue("S_ARENA_FAR", out var farShot))
+                ApplyShotDefinition(farShot, 0f);
+
+            yield return FadeTo(0f, 0.6f);
+            SetCaption(true);
+            yield return Hold(2.8f);
+
+            if (!m_skipped)
+            {
+                yield return FadeTo(0.45f, 0.35f);
+                var card = (RectTransform)m_titleGroup.transform;
+                card.localScale = Vector3.one * 1.05f;
+                SetTitle(true);
+                yield return Tween(0.7f, u => card.localScale = Vector3.one * Mathf.Lerp(1.05f, 1f, u));
+                yield return Hold(1.2f);
+                SetTitle(false);
+                if (!m_skipped) yield return FadeTo(0f, 0.35f);
+            }
+
+            m_opening = false;
+            SetHint(false);
+            SetCaption(false);
+            SetTitle(false);
+            m_advance = false;
+            WasSkipped = m_skipped;
+            if (m_skipped)
+            {
+                m_fadeGroup.alpha = 0f;
+                m_skipped = false;
+            }
+        }
+
+        void ApplyPreludeCue(string cue)
+        {
+            switch (cue)
+            {
+                case "tower_collapse":
+                    m_arenaCollapseStart = m_time;
+                    if (m_arenaShotBlock != null)
+                    {
+                        m_arenaShotBlock.gameObject.SetActive(true);
+                        m_arenaShotBlock.localPosition = new Vector3(-1.3f, 0.25f, 0f);
+                    }
+                    break;
+
+                case "blackout":
+                case "keep_blackout":
+                    if (m_arenaFadeRoutine != null) { StopCoroutine(m_arenaFadeRoutine); m_arenaFadeRoutine = null; }
+                    SetArenaLightsScale(0f);
+                    if (m_fadeGroup != null) m_fadeGroup.alpha = 1f;
+                    // 暗転中に舞台の上で何が起きたか見えないよう、2つの影をここで退場させておく
+                    if (m_arenaFatherShadow != null) m_arenaFatherShadow.gameObject.SetActive(false);
+                    if (m_arenaKingShadow != null) m_arenaKingShadow.gameObject.SetActive(false);
+                    if (m_arenaShotBlock != null) m_arenaShotBlock.gameObject.SetActive(false);
+                    if (m_arenaKingBlocks != null)
+                    {
+                        foreach (var b in m_arenaKingBlocks)
+                            if (b != null) b.gameObject.SetActive(false);
+                    }
+                    break;
+
+                case "lights_on_hammer":
+                    if (m_arenaFatherShadow != null) m_arenaFatherShadow.gameObject.SetActive(false);
+                    if (m_arenaKingShadow != null) m_arenaKingShadow.gameObject.SetActive(false);
+                    if (m_arenaFloorHammer != null)
+                    {
+                        m_arenaFloorHammer.gameObject.SetActive(true);
+                        m_arenaFloorHammer.localPosition = new Vector3(-1.25f, 0.22f, -0.35f);
+                        m_arenaFloorHammer.localRotation = Quaternion.Euler(8f, 18f, 0f);
+                    }
+                    m_arenaHammerRollStart = m_time;
+                    SetArenaLightsScale(0.85f);
+                    if (m_arenaFadeRoutine != null) StopCoroutine(m_arenaFadeRoutine);
+                    m_arenaFadeRoutine = StartCoroutine(FadeArenaIn(0.65f));
+                    break;
+            }
+        }
+
+        IEnumerator FadeArenaIn(float duration)
+        {
+            yield return FadeTo(0f, duration);
+            m_arenaFadeRoutine = null;
+        }
+
+        void AnimateArena()
+        {
+            // 積み木の連鎖崩壊アニメーション
+            if (m_arenaCollapseStart >= 0f)
+            {
+                float t = m_time - m_arenaCollapseStart;
+                if (t < 0.26f)
+                {
+                    float u = Mathf.Clamp01(t / 0.26f);
+                    if (m_arenaShotBlock != null)
+                        m_arenaShotBlock.localPosition = Vector3.Lerp(new Vector3(-1.3f, 0.25f, 0f), new Vector3(1.55f, 0.25f, 0f), u);
+                }
+                else
+                {
+                    if (m_arenaShotBlock != null && m_arenaShotBlock.gameObject.activeSelf)
+                        m_arenaShotBlock.gameObject.SetActive(false);
+
+                    float u = Mathf.Clamp01((t - 0.26f) / 0.65f);
+                    if (m_arenaKingBlocks != null && m_arenaKingBlocks.Length >= 2)
+                    {
+                        if (m_arenaKingBlocks[0] != null)
+                        {
+                            m_arenaKingBlocks[0].localPosition = m_arenaKingBlockBasePos[0] + new Vector3(u * 2.4f, -u * u * 1.4f, u * 1.8f);
+                            m_arenaKingBlocks[0].localRotation = Quaternion.Euler(u * 140f, 0f, -u * 180f);
+                            if (u >= 1f) m_arenaKingBlocks[0].gameObject.SetActive(false);
+                        }
+                        if (m_arenaKingBlocks[1] != null)
+                        {
+                            m_arenaKingBlocks[1].localPosition = m_arenaKingBlockBasePos[1] + new Vector3(u * 1.8f, Mathf.Sin(u * Mathf.PI) * 0.8f - u * u * 1.9f, -u * 2.1f);
+                            m_arenaKingBlocks[1].localRotation = Quaternion.Euler(-u * 170f, u * 90f, u * 120f);
+                            if (u >= 1f) m_arenaKingBlocks[1].gameObject.SetActive(false);
+                        }
+                    }
+                    if (m_arenaKingShadow != null)
+                    {
+                        m_arenaKingShadow.localPosition = new Vector3(2.3f, -1.0f * u, 0f);
+                    }
+                    if (u >= 1f) m_arenaCollapseStart = -1f;
+                }
+            }
+
+            // 床に転がる一本の古い槌（転がりながら減速して止まる）
+            if (m_arenaHammerRollStart >= 0f && m_arenaFloorHammer != null)
+            {
+                float u = Mathf.Clamp01((m_time - m_arenaHammerRollStart) / 1.35f);
+                float ease = 1f - Mathf.Pow(1f - u, 3f);
+                m_arenaFloorHammer.localPosition = Vector3.Lerp(new Vector3(-1.25f, 0.22f, -0.35f), new Vector3(-0.15f, 0.22f, 0.15f), ease);
+                m_arenaFloorHammer.localRotation = Quaternion.Euler(8f, Mathf.Lerp(18f, 68f, ease), Mathf.Lerp(0f, 290f, ease));
+                if (u >= 1f) m_arenaHammerRollStart = -1f;
+            }
         }
     }
 }

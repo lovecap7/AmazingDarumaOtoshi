@@ -1,0 +1,80 @@
+{
+  "id": "prelude",
+  "order": -1,
+  "requiredChapter": "",
+  "title": "プロローグ「八年前の槌音」",
+  "subtitle": "八年前の槌音",
+  "stageId": "",
+  "sceneName": "",
+  "playerCharacter": "",
+  "clearKey": "Story.Clear.prelude",
+  "noMatch": true,
+  "cutscene": {
+    "type": "prelude",
+    "caption": "八年前 ― 王冠大会 決勝"
+  },
+  "speakers": [
+    { "id": "father", "name": "父", "color": "#6E1414" },
+    { "id": "akadaru_kid", "name": "幼きあかだる", "color": "#B91C1C" },
+    { "id": "daruking", "name": "だるきんぐ", "color": "#8C59B3" }
+  ],
+  "before": [
+    {
+      "speaker": "",
+      "direction": true,
+      "shot": "S_ARENA_FAR",
+      "se": "cheer",
+      "text": "大歓声。巨大な積み木の塔でできた舞台の上で、2つの影が向かい合っている。客席の隅に、赤い帽子の少年。"
+    },
+    {
+      "speaker": "father",
+      "shot": "S_BOY_SEAT",
+      "text": "見てろよ、息子。これが、一撃入魂だ！"
+    },
+    {
+      "speaker": "",
+      "direction": true,
+      "shot": "S_ARENA_FAR",
+      "cue": "tower_collapse",
+      "se": "silence,collapse",
+      "text": "父の放った積み木が連鎖し、王のたった二つの積み木が崩れていく。会場が一瞬、静まり返る。"
+    },
+    {
+      "speaker": "daruking",
+      "shot": "S_ARENA_FAR",
+      "text": "……ありえぬ。余が、負けるなど"
+    },
+    {
+      "speaker": "",
+      "direction": true,
+      "shot": "S_BLACKOUT",
+      "cue": "blackout",
+      "se": "murmur,metal_hit",
+      "portrait": "none",
+      "text": "会場の照明が一斉に落ちる。観客席はどよめくが、暗闇で舞台の上に何が起きたのか誰にも見えない。鋭い金属音。少年の叫び声だけが響く。"
+    },
+    {
+      "speaker": "akadaru_kid",
+      "shot": "S_BLACKOUT",
+      "cue": "keep_blackout",
+      "portrait": "none",
+      "text": "父さん！！"
+    },
+    {
+      "speaker": "",
+      "direction": true,
+      "shot": "S_HAMMER_FLOOR",
+      "cue": "lights_on_hammer",
+      "se": "murmur",
+      "text": "明かりが戻ったとき、舞台の上には床を転がる一本の古い槌だけが残っている。観客席のざわめきの中、少年だけが立ち尽くす。"
+    }
+  ],
+  "newspaper": {
+    "header": "だるま新聞（号外）",
+    "headline": "元王者候補、競技場で不慮の事故 ／ 王冠大会は予定どおり閉幕へ",
+    "body": "王冠大会の決勝戦の最中、競技場で照明が落ちる事故があった。協会は『不慮の事故』と発表し、大会は予定どおり閉幕した。",
+    "image": "",
+    "art": "prelude",
+    "caption": "8年前 王冠大会 決勝会場"
+  }
+}

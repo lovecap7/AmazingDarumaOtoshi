@@ -102,7 +102,7 @@ namespace Yurube.Story
         // メニューの初期カーソルを「ものがたり」にする判定に使う。全章クリア後は false。
         public static bool HasStoryInProgress()
         {
-            const int PlannedChapterSlots = 4;   // 序章＋第1章＋第2章＋最終章
+            const int PlannedChapterSlots = 5;   // プロローグ＋序章＋第1章＋第2章＋最終章
             int chapterCount = 0;
             bool anyCleared = false;
             bool anyUncleared = false;

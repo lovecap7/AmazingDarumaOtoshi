@@ -19,6 +19,13 @@ public static class StoryProgressMenu
         StoryProgress.UnlockAll();
     }
 
+    [MenuItem("Yurube/ストーリー/プロローグをクリア済みにする")]
+    static void ClearPrelude()
+    {
+        StoryProgress.MarkCleared(StoryLauncher.PreludeId);
+        Debug.Log("[Story] プロローグをクリア済みにしました");
+    }
+
     [MenuItem("Yurube/ストーリー/序章をクリア済みにする")]
     static void ClearPrologue()
     {

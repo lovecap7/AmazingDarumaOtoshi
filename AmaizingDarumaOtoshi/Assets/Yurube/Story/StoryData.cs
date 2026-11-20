@@ -26,8 +26,10 @@ namespace Yurube.Story
         // ショットID（この行を出すときのカメラのカット名）。空なら切り替えない。※まだ使っていない
         // （カットシーン用の StoryShot とは別。会話の1行ごとのカット指定）
         public string shot;
-        // 効果音（この行を出した瞬間に鳴らす音の名前）。空なら鳴らさない。※まだ使っていない
+        // 効果音（この行を出した瞬間に鳴らす音の名前）。空なら鳴らさない
         public string se;
+        // 演出キュー（例：tower_collapse / blackout / keep_blackout / lights_on_hammer）。空なら何もしない
+        public string cue;
     }
 
     [Serializable]
@@ -136,6 +138,7 @@ namespace Yurube.Story
         public string headline;         // 見出し
         public string body;             // 本文（空でもよい）
         public string image;            // 画像（Resources のパス。空なら新聞用の絵を作る）
+        public string art;              // コード描画の種類（空なら通常 / "prelude" ならプロローグ用）
         public string caption;          // 写真のキャプション（空なら出さない）
         // 紙面の隅の小さな囲み記事（最終章）。空なら出さない
         public string subHeader;
@@ -178,11 +181,14 @@ namespace Yurube.Story
         // 章選択の並び順（小さいほど下の段）と、解放に必要な章ID
         public int order;
         public string requiredChapter;  // 空なら最初から遊べる
-        public string stageId;          // StageInfo の Id（例：DebugStage31）
+        public string stageId;          // StageInfo の Id（例：DebugStage31）。空かつ CPU なしなら試合のない章
         public string sceneName = "AllStages";
         public string playerCharacter = "kidaru";
         public string playerDevice;     // 空なら ゲームパッド→キーボード の順で自動
         public string clearKey;         // 章クリアの保存キー（例：Story.Clear.prologue）
+        public bool noMatch;            // 試合なしの演出のみの章なら true
+
+        public bool HasMatch => !noMatch && !(string.IsNullOrEmpty(stageId) && (cpu == null || cpu.Count == 0));
         public StoryRules rules = new StoryRules();
         public List<StoryCpu> cpu = new List<StoryCpu>();
         public List<StorySpeaker> speakers = new List<StorySpeaker>();

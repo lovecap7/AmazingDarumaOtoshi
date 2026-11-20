@@ -12,6 +12,7 @@ namespace Yurube.Story
     // 対戦の開始そのものは既存の DarumaMatch / MatchSetup の仕組みをそのまま使う。
     public static class StoryLauncher
     {
+        public const string PreludeId = "prelude";
         public const string PrologueId = "prologue";
 
         // 序章を最初から始める
@@ -27,6 +28,14 @@ namespace Yurube.Story
             {
                 Debug.LogWarning("[Story] まだ解放されていません: " + chapterId
                     + "（" + chapter.requiredChapter + " をクリアで解放）");
+                return;
+            }
+
+            // 試合のない章（プロローグ等）は対戦シーンへ移らず、そのまま演出を再生する
+            if (!chapter.HasMatch)
+            {
+                Debug.Log("[Story] 演出章を開始: " + chapterId);
+                StoryDramaDirector.StartChapter(chapter);
                 return;
             }
 
