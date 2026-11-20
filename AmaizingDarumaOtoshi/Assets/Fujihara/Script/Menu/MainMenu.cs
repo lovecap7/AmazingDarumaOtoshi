@@ -264,7 +264,7 @@ public class MainMenu : MonoBehaviour
     Material letterMat;
 
     // ---- 積み木の状態 ----
-    int cursor;
+    int cursor = 0;
     float[] offsetX, scaleNow;
     int outIdx = -1;                    // 叩き出されている項目
     float impactTime = -100f, returnTime = -100f, dockTime = -100f;
@@ -354,16 +354,6 @@ public class MainMenu : MonoBehaviour
     {
         // ストーリー用(Yurube): 章クリア直後に戻った場合は自動で章選択画面を開く
         bool returnToChapterSelect = Yurube.Story.StorySession.ConsumeReturnToChapterSelect();
-        // ストーリー用(Yurube): 物語が途中なら「ものがたり」を最初に選んでおく（全章クリア後は「たたかう」）
-        if (Yurube.Story.StoryProgress.HasStoryInProgress())
-        {
-            for (int i = 0; i < ItemCount; i++)
-            {
-                if (Kind(i) != ItemKind.Story) continue;
-                cursor = i;
-                break;
-            }
-        }
         BuildStage();
         camLook = browseShot.look; camDist = browseShot.distance; camWidth = browseShot.width;
         camPos = CamPosition();
