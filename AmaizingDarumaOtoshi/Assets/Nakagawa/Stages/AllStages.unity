@@ -145411,7 +145411,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &531566413
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -329224,6 +329224,7 @@ MonoBehaviour:
   m_addDebugView: 1
   m_respawnAppearTime: 0.8
   m_reviveTravelTime: 0.7
+  m_respawnStartBlocks: 3
   m_startCountdown: 3
   m_countdownInDirectPlay: 0
   m_friendlyFire: 0
@@ -553796,7 +553797,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &2054039974
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -574316,7 +574317,7 @@ MonoBehaviour:
   - {fileID: 1702510222}
   - {fileID: 1874005870}
   - {fileID: 1630005113}
-  m_startIndex: 19
+  m_startIndex: 21
   m_debugInConfiguredMatch: 0
   m_match: {fileID: 1218044441}
   m_spawnPoints:
