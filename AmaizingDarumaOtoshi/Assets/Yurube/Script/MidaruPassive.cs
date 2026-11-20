@@ -44,7 +44,8 @@ namespace Yurube
             {
                 var block = m_overlaps[i].GetComponentInParent<TumikiBlock>();
                 if (block == null) continue;
-                if (block.Color != TumikiColor.Green) continue;
+                // 色の性能を撤廃(Fujihara 2026-11-20): IgnoreColors なら、どの色の積み木もホーミングする
+                if (!TumikiColorUtil.IgnoreColors && block.Color != TumikiColor.Green) continue;
                 if (block.CurrentState != TumikiBlock.State.Flying) continue;
                 // 自分が飛ばした積み木だけ(他の人の緑はそのまま)
                 if (!ReferenceEquals(block.Owner, m_character)) continue;

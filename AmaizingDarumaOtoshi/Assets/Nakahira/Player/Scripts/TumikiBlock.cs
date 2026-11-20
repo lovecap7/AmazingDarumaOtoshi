@@ -175,6 +175,9 @@ namespace Nakahira
         // 飛んでいる積み木が他の積み木・キャラクターに当たった(カメラの揺れ・効果音など演出用。積み木側の処理の直前に呼ぶ)
         public static event Action<TumikiHitInfo> Hit;
 
+        // 崩れたときの破片の色を外から決める(Fujihara 2026-11-20: 木の積み木の見た目用。null なら積み木の色)
+        public static Func<TumikiBlock, Color> ShatterColorOverride;
+
         // シーン上で有効な積み木すべて(CPU が拾う積み木を探すのに使う)
         public static IReadOnlyList<TumikiBlock> All => s_all;
         static readonly List<TumikiBlock> s_all = new List<TumikiBlock>();
@@ -185,6 +188,7 @@ namespace Nakahira
         {
             DefaultImpactBehavior = TumikiBreakImpact.Instance;
             Hit = null;
+            ShatterColorOverride = null;   // Fujihara 2026-11-20
             s_all.Clear();
         }
 
@@ -805,8 +809,10 @@ namespace Nakahira
             var r = GetComponentInChildren<Renderer>();
             if (r != null)
             {
+                // 見た目の色(Fujihara 2026-11-20): 木の積み木を持ち主の色に染めているときは、破片もその色にする(未設定なら今までどおり)
+                Color shatterColor = ShatterColorOverride != null ? ShatterColorOverride(this) : TumikiColorUtil.ToUnityColor(m_color);
                 TumikiShatter.Spawn(transform.position, transform.rotation, m_breakVelocity,
-                    r.sharedMaterial, TumikiColorUtil.ToUnityColor(m_color),
+                    r.sharedMaterial, shatterColor,
                     m_shatterDuration, m_shatterPieces, m_shatterSpread);
             }
             DetachEffects();

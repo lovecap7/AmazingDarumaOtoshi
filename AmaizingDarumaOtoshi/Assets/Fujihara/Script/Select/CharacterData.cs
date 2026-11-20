@@ -35,8 +35,8 @@ public class CharacterData : ScriptableObject
     [Tooltip("使いやすさ（★の数）。キャラクターセレクトの枠に出る")]
     [Range(1, 5)] public int ease = 3;
 
-    [Header("パッシブ（ずかんでは「[赤][赤][赤] → 効果」の形で出る）")]
-    [Tooltip("条件になる積み木の色")]
+    [Header("パッシブ")]
+    [Tooltip("（今は使っていない）条件になる積み木の色。積み木の色の性能は撤廃した（TumikiColorUtil.IgnoreColors）")]
     public Nakahira.TumikiColor passiveColor = Nakahira.TumikiColor.Red;
     [Tooltip("条件になる積み木の数（0 なら条件なし＝いつも）")]
     [Range(0, 9)] public int passiveCount = 3;

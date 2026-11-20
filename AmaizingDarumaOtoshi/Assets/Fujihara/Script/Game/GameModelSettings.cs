@@ -30,6 +30,29 @@ public class GameModelSettings : ScriptableObject
     [Tooltip("柄なしの積み木のマテリアル（赤・青・緑・黄の順）")]
     public Material[] plainMaterials = new Material[4];
 
+    [Header("木の積み木（試合）")]
+    [Tooltip("オン：試合の積み木を木の積み木にして、最後に積んだ人・打った人の色に染める（まだ誰も触っていない積み木は木の色のまま）。" +
+             "オフ：上の色ごとの積み木（赤・青・緑・黄）")]
+    public bool woodTsumiki = true;
+    [Tooltip("木の積み木の形（Model/Tsumiki/Wood/tsumiki_wood.fbx）")]
+    public Mesh woodMesh;
+    [Tooltip("木の積み木のマテリアル（Model/Tsumiki/Wood/tsumiki_wood.mat）")]
+    public Material woodMaterial;
+    [Tooltip("プレイヤーの色に染める濃さ（0：木の色のまま、1：プレイヤーの色をそのまま掛ける）")]
+    [Range(0f, 1f)] public float woodTint = 0.85f;
+    [Tooltip("染める色を明るくする倍率（木の色に掛けると暗くなるので、少し明るくする）")]
+    [Range(1f, 2f)] public float woodTintBrightness = 1.25f;
+
+    public bool UseWood => useModels && woodTsumiki && woodMesh != null && woodMaterial != null;
+
+    // プレイヤーの色から、木の積み木に掛ける色を作る
+    public Color WoodTintFor(Color player)
+    {
+        var c = Color.Lerp(Color.white, player * woodTintBrightness, woodTint);
+        c.a = 1f;
+        return c;
+    }
+
     static GameModelSettings s_loaded;
     static bool s_tried;
 
@@ -42,7 +65,7 @@ public class GameModelSettings : ScriptableObject
         }
     }
 
-    public bool UseTsumiki => useModels && tsumikiMesh != null;
+    public bool UseTsumiki => useModels && (tsumikiMesh != null || UseWood);
 
     // その色の積み木のマテリアル（無ければ null）
     public Material TsumikiMaterial(TumikiColor color)

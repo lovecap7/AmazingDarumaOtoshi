@@ -88,6 +88,8 @@ namespace Nakahira
         // 指定した色の積み木の数(キャラクターのパッシブ用)
         public int CountColor(TumikiColor color)
         {
+            // 色の性能を撤廃(Fujihara 2026-11-20): どの色の積み木も数える
+            if (TumikiColorUtil.IgnoreColors) return m_blocks.Count;
             int n = 0;
             foreach (var b in m_blocks)
             {
