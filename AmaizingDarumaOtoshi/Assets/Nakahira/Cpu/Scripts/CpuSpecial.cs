@@ -88,6 +88,8 @@ namespace Nakahira
         public int BlackoutCounterCount { get; private set; }
         // ゲージが満タンか(デバッグ表示用)
         public bool IsReady => m_gauge != null && m_gauge.IsFull;
+        // 撃つ向きへ向き直っている最中か(この間はハンマーを振らない)
+        public bool IsAiming => m_aiming;
 
         public void Reset()
         {

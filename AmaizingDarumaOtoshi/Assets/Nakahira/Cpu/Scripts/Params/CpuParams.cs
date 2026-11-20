@@ -88,6 +88,12 @@ namespace Nakahira
         [Range(0.0f, 1.0f)] public float StrafeChance = 0.6f;
         [Tooltip("殴り合いの最中に、この距離(m)以内で相手の間合いの外にある積み木は拾う")]
         [Min(0.0f)] public float MeleePickupRadius = 1.5f;
+        [Tooltip("追っている途中(相手が間合いの外)に、すぐそばの別の相手の点数がこれだけ高ければ、狙いを乗り換える")]
+        [Min(0.0f)] public float MeleeRetargetMargin = 0.3f;
+        [Tooltip("どの状態の最中でも、ハンマーが届く所に背を向けた相手がいれば振る確率(1 ならいつも)")]
+        [Range(0.0f, 1.0f)] public float BackSwingChance = 1.0f;
+        [Tooltip("背を向けた相手を叩く確率が外れたとき、次に決め直すまでの時間(秒)")]
+        [Min(0.0f)] public float BackSwingRetryInterval = 0.3f;
 
         [Header("殴る:焦り(集中度の割合が高いと、無意味に連打してしまう)")]
         [Tooltip("集中度の割合がこれを超えると焦り始める(焦りは 0〜1。割合 1 で最大)")]
@@ -120,6 +126,10 @@ namespace Nakahira
         [Min(0)] public int NearFightStackGap = 2;
         [Tooltip("近くの相手と戦いに行くのやりたさ。積む(CollectScore)より高く、殴る・撃つより低く")]
         [Range(0.0f, 1.0f)] public float NearFightScore = 0.55f;
+        [Tooltip("自分の周りに気を配る:何かへ向かっている途中、道の距離がこれ(m)以内の相手を見る。有利・同格なら戦いに行き、少し不利なら狙っている積み木を譲る")]
+        [Min(0.0f)] public float RivalAwareDistance = 4.0f;
+        [Tooltip("周りの有利・同格な相手と戦いに行くのやりたさ。積むを続けたい点(CollectScore + StateStickiness)より高く")]
+        [Range(0.0f, 1.0f)] public float RivalFightScore = 0.62f;
         [Tooltip("待つ場所を選ぶとき、この距離(m)以内の相手を数える(近いほど重い)")]
         [Min(0.1f)] public float WaitDangerRadius = 10.0f;
         [Tooltip("待つ場所を選ぶときの相手の重み:幽霊")]

@@ -49,6 +49,9 @@ MonoBehaviour:
   DodgeMoveChance: 0.6
   StrafeChance: 0.6
   MeleePickupRadius: 1.5
+  MeleeRetargetMargin: 0.3
+  BackSwingChance: 1
+  BackSwingRetryInterval: 0.3
   PanicStart: 0.4
   PanicSwingInterval: 0.05
   PanicReachSlack: 1.5
@@ -61,7 +64,9 @@ MonoBehaviour:
   WaitScore: 0.3
   NearFightDistance: 6
   NearFightStackGap: 2
-  NearFightScore: 0.55
+  NearFightScore: 0.65
+  RivalAwareDistance: 4
+  RivalFightScore: 0.65
   WaitDangerRadius: 10
   WaitGhostWeight: 1.5
   WaitStrongerWeight: 1
@@ -141,6 +146,8 @@ MonoBehaviour:
   GoldenHazardMargin: 0.5
   TronRange: 12
   ExcaliburConfirmHalfWidth: 0.8
+  ExcaliburSoloAfter: 5
+  ExcaliburLineupDistance: 4
   AllySpacing: 3
   AllySpacingWeight: 1
   BlackoutCounterChance: 0.35
@@ -170,3 +177,5 @@ MonoBehaviour:
   GhostBatSearch: 10
   GhostBatAimTolerance: 8
   GhostBatGiveUpTime: 4
+  MahjongScore: 0.78
+  MahjongNoticeExtra: 0.4

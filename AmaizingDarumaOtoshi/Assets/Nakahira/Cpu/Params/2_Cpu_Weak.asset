@@ -49,6 +49,9 @@ MonoBehaviour:
   DodgeMoveChance: 0.4
   StrafeChance: 0.6
   MeleePickupRadius: 1.5
+  MeleeRetargetMargin: 0.3
+  BackSwingChance: 1
+  BackSwingRetryInterval: 0.3
   PanicStart: 0.4
   PanicSwingInterval: 0.05
   PanicReachSlack: 1.5
@@ -62,6 +65,8 @@ MonoBehaviour:
   NearFightDistance: 6
   NearFightStackGap: 2
   NearFightScore: 0.55
+  RivalAwareDistance: 4
+  RivalFightScore: 0.62
   WaitDangerRadius: 10
   WaitGhostWeight: 1.5
   WaitStrongerWeight: 1

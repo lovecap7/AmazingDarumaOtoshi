@@ -34,6 +34,7 @@ namespace Nakahira
         readonly CpuGhost m_ghost = new CpuGhost();
         readonly CpuHazardGuard m_hazardGuard = new CpuHazardGuard();
         readonly CpuSpecial m_special = new CpuSpecial();
+        readonly CpuBackSwing m_backSwing = new CpuBackSwing();
         // 状態「必殺技」(撃てる所まで近づく。CpuSpecial を使うので Awake で作る)
         CpuSpecialState m_specialState;
         // 状態「牌を集める」(Stage22 の牌あつめ。必殺技を撃ちに近づきたいときはそちらを先にするので Awake で作る)
@@ -69,6 +70,9 @@ namespace Nakahira
         public int SpecialCount => m_special.ActivatedCount;
         // あおだるの暗転返しをした回数(テスト用)
         public int BlackoutCounterCount => m_special.BlackoutCounterCount;
+        // 背中を見せた相手を、殴る以外の状態の最中に叩いた回数(テスト用)
+        public int BackSwingCount => m_backSwing.SwingCount;
+        public float LastBackSwingTime => m_backSwing.LastSwingTime;
         // 集中度(認識の疲れ)の割合(デバッグ表示用)
         public float LoadRatio => m_params != null ? m_context.LoadRatio : 0.0f;
 
@@ -175,6 +179,8 @@ namespace Nakahira
 
             // 必殺技を撃つ向きへ向き直っている最中(あかだる)は、状態の動きを置き換える
             m_special.OverrideAim(ref cmd);
+            // 背中を見せた相手を叩く:どの状態の最中でも、届く所に背を向けた相手がいれば振る(殴るの最中・必殺技の向き直り中は除く)
+            if (m_current != m_melee && !m_special.IsAiming) m_backSwing.Apply(m_context, ref cmd);
             // チーム戦:歩いているとき、近くの味方から離れる向きへずらす(積むの最中は、積み木へ跳ぶ狙いを崩さないよう除く)
             if (m_current != m_collect) CpuAllySpacing.Apply(m_context, ref cmd);
             // 移動床の乗り降り:乗り場で待つ・乗っている間は移動を置き換える

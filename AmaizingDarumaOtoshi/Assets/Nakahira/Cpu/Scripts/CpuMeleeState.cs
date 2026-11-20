@@ -16,7 +16,7 @@ namespace Nakahira
         // 相手の動きを先読みする時間(秒)
         const float kLeadTime = 0.15f;
         // 正面からこの角度(度)以内に相手がいれば振る(ハンマーは左右 110° まで届く。横へ動きながら右の相手を叩けるように)
-        const float kSwingAngle = 100.0f;
+        internal const float kSwingAngle = 100.0f;
         // 相手の振り始めから、この時間(秒)以内ならかわす(それより後に気づいても間に合わない)
         const float kDodgeWindow = 0.15f;
         // 間合いの中で向きを合わせるための、ごく小さい移動入力(止まっていると向きが変わらないため)
@@ -50,6 +50,8 @@ namespace Nakahira
         MatchPlayer m_target;
         float m_nextSwingTime;
         float m_chaseTime;
+        // 狙う相手を選び直すまでの時間(追っている途中の乗り換え)
+        float m_retargetTimer;
         bool m_lastTargetSweeping;
         float m_targetSwingStart = -1.0f;
         // 最後に振った時刻と、相手の段数(自分の一撃で 1段 → 0段にしたかを見る)
@@ -95,6 +97,7 @@ namespace Nakahira
             CpuOpponent o = ChooseTarget(c);
             m_target = o != null ? o.Player : null;
             m_chaseTime = 0.0f;
+            m_retargetTimer = 0.0f;
             m_dodgeTime = -1.0f;
             m_counterReady = false;
             m_lastTargetSweeping = false;
@@ -126,6 +129,7 @@ namespace Nakahira
         {
             CpuOpponent o = m_target != null ? c.Perception.Find(m_target) : null;
             if (!CanContinue(c, o)) return false;
+            o = Retarget(c, o);
 
             // 首だけなのに相手がこちらを向いている:うかつに打ち合わず、相手の間合いの外まで離れる
             // (離れ切ったら CanContinue が false になって終わる。相手の振りはかわす)
@@ -304,11 +308,39 @@ namespace Nakahira
         // 相手を選ぶ・続ける
         //========================================
 
+        // 追っている途中(相手が間合いの外)なら、もっと狙いやすい相手へ乗り換える(2026-11-20。設計メモ 11)
+        // 同じ相手を 2 人で追って並走しているときなど、すぐそばの相手の方が点数が MeleeRetargetMargin 以上高ければ乗り換える
+        // (間合いの中で殴り合っている相手からは乗り換えない)
+        private CpuOpponent Retarget(CpuContext c, CpuOpponent o)
+        {
+            m_retargetTimer -= c.DeltaTime;
+            if (m_retargetTimer > 0.0f) return o;
+            m_retargetTimer = c.Params.ThinkInterval;
+            if (o.FlatDistance <= c.Self.Hammer.CharacterHitDistance) return o;
+
+            CpuOpponent best = ChooseTarget(c, out float bestScore);
+            if (best == null || best == o) return o;
+            float current = CpuAttackTarget.Score(c, o, o.PathDistance) + c.Params.StateStickiness;
+            if (bestScore < current + c.Params.MeleeRetargetMargin) return o;
+
+            m_target = best.Player;
+            m_chaseTime = 0.0f;
+            m_lastTargetStack = best.StackCount;
+            m_lastTargetSweeping = false;
+            m_counterReady = false;
+            m_dodgeCircle = false;
+            m_hasDodgeMove = false;
+            m_route.Clear();
+            return best;
+        }
+
         // 殴り合いを始められる相手のうち、攻めの点数が一番高い相手(いなければ null)
-        private CpuOpponent ChooseTarget(CpuContext c)
+        private CpuOpponent ChooseTarget(CpuContext c) => ChooseTarget(c, out _);
+
+        private CpuOpponent ChooseTarget(CpuContext c, out float bestScore)
         {
             CpuOpponent best = null;
-            float bestScore = float.MinValue;
+            bestScore = float.MinValue;
             foreach (var o in c.Perception.Opponents)
             {
                 if (o.IsGhost || o.IsInvincible) continue;
@@ -356,7 +388,7 @@ namespace Nakahira
 
         // 自分が相手の背中側(相手の薙ぎ払いが届かない角度)にいるか
         // ハンマーは正面から右 SweepStartYaw → 左 SweepEndYaw まで振る。自分の体の太さの分だけ広めに見る
-        private static bool IsBehind(CpuContext c, CpuOpponent o)
+        internal static bool IsBehind(CpuContext c, CpuOpponent o)
         {
             float bearing = BearingFromOpponent(c, o, out _);
             DarumaHammer hammer = o.Character.Hammer;

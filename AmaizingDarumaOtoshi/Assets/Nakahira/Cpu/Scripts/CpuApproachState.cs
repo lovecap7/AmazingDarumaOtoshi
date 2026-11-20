@@ -12,8 +12,14 @@ namespace Nakahira
     //  ・近くの相手と戦いに行く(2026-11-20):道の距離 NearFightDistance 以内の相手には、積み木があっても、
     //    相手の方が NearFightStackGap 段まで多くても攻めに行く(やりたさ NearFightScore。積むより高い)。
     //    自分が首だけ(0 段)のときは行かない。弱い相手だけを狙って、倒したら解散する、にならないように
+    //  ・自分の周りに気を配る(2026-11-20。設計メモ 11):積み木へ向かっている途中なども、道の距離 RivalAwareDistance 以内の
+    //    有利・同格な相手がいれば、その相手と戦いに行く(やりたさ RivalFightScore。積むを続けたい点より高い。ほかの相手より先に選ぶ)。
+    //    少し不利な相手には積み木を譲る(CpuBlockSearch.ShouldYield)。同じ積み木へ並んで走らないように
     public class CpuApproachState : CpuState
     {
+        // 周りの相手(IsRivalFight)を、ほかの相手より先に選ぶための点(攻めの点数の幅より十分大きい)
+        const float kRivalPriority = 10.0f;
+
         readonly CpuPathFollower m_route = new CpuPathFollower();
         NavMeshPath m_queryPath;   // MonoBehaviour の初期化中には作れないので、使うときに作る
         MatchPlayer m_target;
@@ -29,12 +35,13 @@ namespace Nakahira
             // 今の状態に足す StateStickiness 込みでも、殴る・撃つより低くなるようにしておく(近づいたら必ず引き継ぐ)
             // きだるの黄金化中は、積むより攻めを選ぶ(逃げずに攻め続ける)
             // 狙う相手が近くの相手と戦いに行く(だけで選べる)なら、積むより高い NearFightScore
-            CpuOpponent target = m_target != null ? c.Perception.Find(m_target) : null;
-            if (!IsValidTarget(c, target)) target = ChooseTarget(c);
+            // 周りの有利・同格な相手と戦いに行くなら RivalFightScore(ChooseTarget はその相手を先に選ぶ)
+            CpuOpponent target = ChooseTarget(c);
             if (target == null) return 0.0f;
             if (c.IsGolden) return c.Params.GoldenAttackScore;
             float score = ShouldApproach(c) && IsAdvantage(c, target) ? c.Params.ApproachScore : 0.0f;
             if (IsNearFight(c, target)) score = Mathf.Max(score, c.Params.NearFightScore);
+            if (IsRivalFight(c, target)) score = Mathf.Max(score, c.Params.RivalFightScore);
             return score;
         }
 
@@ -94,6 +101,7 @@ namespace Nakahira
                 if (!c.IsGolden && !CpuBlockSearch.AvoidsThreats(c, m_queryPath, c.Params.CollectThreatClearance)) continue;
                 float score = CpuAttackTarget.Score(c, o, length);
                 if (o.Player == m_target) score += c.Params.StateStickiness;
+                if (IsRivalFight(c, o)) score += kRivalPriority;   // 周りの相手を先に選ぶ
                 if (score > bestScore)
                 {
                     bestScore = score;
@@ -113,7 +121,7 @@ namespace Nakahira
         {
             if (o == null || o.IsGhost || o.IsInvincible || o.Character == null) return false;
             if (o.PathDistance <= c.Params.MeleeEnterDistance) return false;
-            if (IsNearFight(c, o)) return true;
+            if (IsNearFight(c, o) || IsRivalFight(c, o)) return true;
             if (!ShouldApproach(c)) return false;
             if (c.IsGolden) return true;   // 黄金化中は不利な相手にも攻めに行く
             return IsAdvantage(c, o);
@@ -136,6 +144,16 @@ namespace Nakahira
             if (o.PathDistance > p.NearFightDistance) return false;
             int gap = Mathf.Min(p.NearFightStackGap, p.FleeStackGap - 1);
             return o.StackDiff >= -gap || c.IgnoresStackGap;
+        }
+
+        // 周りの相手と戦いに行く相手か:道の距離 RivalAwareDistance 以内で、自分が有利・同格(段数の差 ≥ 0)
+        // (自分が首だけのときは行かない)
+        private static bool IsRivalFight(CpuContext c, CpuOpponent o)
+        {
+            CpuParams p = c.Params;
+            if (p.RivalAwareDistance <= 0.0f || c.Self.Stack.Count == 0) return false;
+            if (o.PathDistance > p.RivalAwareDistance) return false;
+            return o.StackDiff >= 0 || c.IgnoresStackGap;
         }
 
         public override void DrawGizmos(CpuContext c)

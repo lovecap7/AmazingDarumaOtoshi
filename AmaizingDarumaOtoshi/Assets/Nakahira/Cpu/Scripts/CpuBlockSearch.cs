@@ -24,6 +24,8 @@ namespace Nakahira
 
         // 取り合いで、積み木までの距離の差がこれ(m)未満なら同じ距離とみなす
         const float kTieDistance = 0.3f;
+        // そばの少し不利な相手に譲るのは、相手の方が積み木までこの距離(m)より遠くないとき(同じくらいの距離なら譲る)
+        const float kRivalYieldSlack = 1.0f;
 
         static readonly Vector3[] s_corners = new Vector3[64];
 
@@ -101,6 +103,23 @@ namespace Nakahira
                 if (theirDistance < myDistance - kTieDistance) return true;
                 if (myDistance < theirDistance - kTieDistance) continue;
                 if (o.Player.Index < myIndex) return true;
+            }
+            return RivalTakesFirst(c, blockPos, myDistance);
+        }
+
+        // 自分のそば(道の距離 RivalAwareDistance 以内)にいる少し不利な(自分より段数が多い)相手が、
+        // その積み木に自分と同じくらいか先に着きそうなら譲る(2026-11-20。設計メモ 11)
+        // (積み木のそばに来るまで気づかず、同じ積み木へ並んで走ってしまわないように。有利・同格なら戦いに行く(CpuApproachState))
+        private static bool RivalTakesFirst(CpuContext c, Vector3 blockPos, float myDistance)
+        {
+            CpuParams p = c.Params;
+            if (p.RivalAwareDistance <= 0.0f) return false;
+            foreach (var o in c.Perception.Opponents)
+            {
+                if (o.IsGhost || o.Character == null) continue;
+                if (o.StackDiff >= 0 || o.PathDistance > p.RivalAwareDistance) continue;
+                float theirDistance = CpuContext.FlatDistance(o.Position, blockPos);
+                if (theirDistance <= myDistance + kRivalYieldSlack) return true;
             }
             return false;
         }
