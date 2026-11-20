@@ -34,6 +34,21 @@ public class GameModelSwapper : MonoBehaviour
         settings = GameModelSettings.Current;
         white = new MaterialPropertyBlock();
         white.SetColor(BaseColorId, Color.white);
+        // 木の積み木が崩れたときの破片は、染めた色（誰も触っていなければ木の色）にする
+        if (settings != null && settings.UseWood) TumikiBlock.ShatterColorOverride = WoodColorOf;
+    }
+
+    void OnDestroy()
+    {
+        if (TumikiBlock.ShatterColorOverride == (System.Func<TumikiBlock, Color>)WoodColorOf) TumikiBlock.ShatterColorOverride = null;
+    }
+
+    // 破片の色：木の積み木に掛けている色（破片も木のマテリアルなので、木目にこの色が掛かる）
+    Color WoodColorOf(TumikiBlock b)
+    {
+        foreach (var w in woods)
+            if (w.block == b) return w.owner != null ? settings.WoodTintFor(w.owner.Color) : Color.white;
+        return Color.white;
     }
 
     void LateUpdate()
@@ -178,6 +193,20 @@ public class GameModelSwapper : MonoBehaviour
         var mr = visual.GetComponent<MeshRenderer>();
         if (mf == null || mr == null || mf.sharedMesh == null) return;
 
+        // 木の積み木：形とマテリアルを木にして、持ち主（積んだ人・打った人）が変わるたびに色を付け直す（Update）
+        if (settings.UseWood)
+        {
+            var woodFitted = GameModelSettings.Fit(settings.woodMesh, mf.sharedMesh.bounds, false, 0f);
+            if (woodFitted == null) return;
+            mf.sharedMesh = woodFitted;
+            SetFirstMaterial(mr, settings.woodMaterial);
+            var mpb = new MaterialPropertyBlock();
+            mpb.SetColor(BaseColorId, Color.white);
+            mr.SetPropertyBlock(mpb, 0);
+            woods.Add(new Wood { block = b, renderer = mr, mpb = mpb, owner = null });
+            return;
+        }
+
         var fitted = GameModelSettings.Fit(settings.tsumikiMesh, mf.sharedMesh.bounds, false, 0f);
         if (fitted == null) return;
         var mat = settings.TsumikiMaterial(b.Color);
@@ -192,8 +221,46 @@ public class GameModelSwapper : MonoBehaviour
     struct Tracked { public TumikiBlock block; public Renderer renderer; public TumikiColor color; }
     readonly List<Tracked> tracked = new List<Tracked>();
 
+    // ---------------- 木の積み木の色 ----------------
+    // 積まれている間は、積んでいるだるまのプレイヤーの色。打たれて飛んでいる間は、打った（撃った）プレイヤーの色。
+    // 落ちて止まったら、最後の色のまま。まだ誰も触っていなければ木の色
+    class Wood { public TumikiBlock block; public Renderer renderer; public MaterialPropertyBlock mpb; public MatchPlayer owner; }
+    readonly List<Wood> woods = new List<Wood>();
+
+    void UpdateWoods()
+    {
+        var match = DarumaMatch.Current;
+        for (int i = woods.Count - 1; i >= 0; i--)
+        {
+            var w = woods[i];
+            if (w.block == null || w.renderer == null) { woods.RemoveAt(i); continue; }
+            if (match == null) continue;
+            MatchPlayer owner = null;
+            if (w.block.CurrentState == TumikiBlock.State.Stacked)
+            {
+                var c = w.block.GetComponentInParent<DarumaCharacter>();
+                if (c != null) owner = PlayerOf(match, c);
+            }
+            else if (w.block.CurrentState == TumikiBlock.State.Flying && w.block.Owner != null)
+                owner = PlayerOf(match, w.block.Owner as Component);
+            if (owner == null || owner == w.owner) continue;
+            w.owner = owner;
+            w.mpb.SetColor(BaseColorId, settings.WoodTintFor(owner.Color));
+            w.renderer.SetPropertyBlock(w.mpb, 0);
+        }
+    }
+
+    static MatchPlayer PlayerOf(DarumaMatch match, Component who)
+    {
+        if (who == null) return null;
+        foreach (var p in match.Players)
+            if (p != null && ((p.Character != null && p.Character == who) || (p.Ghost != null && p.Ghost == who))) return p;
+        return null;
+    }
+
     void Update()
     {
+        UpdateWoods();
         // 色が変わった積み木（特殊な積み木など）のマテリアルを付け直す
         for (int i = tracked.Count - 1; i >= 0; i--)
         {

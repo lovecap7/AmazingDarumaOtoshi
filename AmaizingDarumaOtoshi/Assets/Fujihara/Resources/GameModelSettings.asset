@@ -28,6 +28,11 @@ MonoBehaviour:
   - {fileID: 2100000, guid: 02a492f4e4ac5ff4dbcb47d88726187b, type: 2}
   - {fileID: 2100000, guid: 025cc94517bc975459a7b9cab953bfae, type: 2}
   - {fileID: 2100000, guid: c80c67b4cf110ec4283bc0423e510b3d, type: 2}
+  woodTsumiki: 1
+  woodMesh: {fileID: 34385103238166030, guid: 05940b0b742472b4e84bef5411921489, type: 3}
+  woodMaterial: {fileID: 2100000, guid: 0ab4d3ff7289fec44a63db700f8660fe, type: 2}
+  woodTint: 0.85
+  woodTintBrightness: 1.25
   hammerModel: {fileID: 919132149155446097, guid: faa948f28f6fc704d87f40ee7a0fe706, type: 3}
   useHammerModel: 1
   cursorHammerModel: {fileID: 919132149155446097, guid: 0c938ca9e2ea039479fdb8caa53f4edb, type: 3}

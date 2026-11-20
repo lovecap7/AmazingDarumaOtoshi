@@ -352,6 +352,8 @@ namespace Nakahira
             float angle = bearing;
             float speed = m_params.SweepLaunchSpeed;
             int returnCount = 0;
+            // 打ち返す前の持ち主(=打ってきた相手)。打ち返した積み木はこの相手を追いかける(suehara)
+            IDarumaAttacker shooter = block.Owner;
 
             // 攻撃判定のある積み木だけ「打ち返し」。攻撃判定のない動いている積み木は落ちている積み木と同じ扱い
             if (block.IsHarmful)
@@ -365,8 +367,26 @@ namespace Nakahira
             block.Launch(ToWorldDirection(angle), speed, m_owner, null, returnCount);
             // 打ち返した積み木はしばらく自分に当たらない(壁や連鎖で跳ね返ってきても安全)
             if (returnCount > 0) block.ExtendIgnore(m_params.ReturnImmunityTime);
+            if (returnCount > 0) BeginReturnHoming(block, shooter);
             BeginHitStop(block, null, returnCount);
             Hit?.Invoke(new HammerHitInfo(this, m_owner, block, block.transform.position, false, returnCount));
+        }
+
+        // 打ち返した積み木を、打ってきた相手へ追いかけさせる(suehara)
+        // 相手が生存者でない(幽霊・ギミックが飛ばした積み木)、自分、味方のときは追いかけない
+        private void BeginReturnHoming(TumikiBlock block, IDarumaAttacker shooter)
+        {
+            if (m_params.ReturnHomingTurnSpeed <= 0.0f || m_params.ReturnHomingDuration <= 0.0f) return;
+            var target = shooter as DarumaCharacter;
+            if (target == null || target.IsEliminated || ReferenceEquals(shooter, m_owner)) return;
+            DarumaMatch match = DarumaMatch.Current;
+            if (match != null && match.IsFriendly(m_owner, target)) return;
+
+            var homing = block.GetComponent<Yurube.TumikiHoming>();
+            if (homing == null) homing = block.gameObject.AddComponent<Yurube.TumikiHoming>();
+            // 打ち返した人が生存者なら、追う相手を見失ったときに自分を狙わないよう撃った人として渡す
+            homing.Begin(m_character, m_params.ReturnHomingTurnSpeed, m_params.ReturnHomingDuration, false);
+            homing.SetPreferredTarget(target);
         }
 
         // 飛んできた積み木を打ち返す角度(持ち主の正面から。右が+)。決め方は HammerParams.ReturnAimMode

@@ -36,6 +36,10 @@ namespace Nakahira
         [Min(1.0f)] public float ReturnHitStopGrowth = 1.6f;
         [Tooltip("打ち返しのヒットストップの上限(秒)")]
         [Min(0.0f)] public float ReturnHitStopMax = 2.0f;
+        [Tooltip("打ち返した積み木が、打ってきた相手を追いかけて1秒あたりに曲がれる角度(度/秒)。0 なら追いかけない(suehara)")]
+        [Min(0.0f)] public float ReturnHomingTurnSpeed = 270.0f;
+        [Tooltip("打ち返した積み木が、打ってきた相手を追いかける時間(秒)(suehara)")]
+        [Min(0.0f)] public float ReturnHomingDuration = 1.5f;
 
         [Header("弾速")]
         [Tooltip("股抜きショットで打ち出す弾速")]
