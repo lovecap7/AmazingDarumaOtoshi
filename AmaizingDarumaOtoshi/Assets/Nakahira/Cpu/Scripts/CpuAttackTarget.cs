@@ -17,7 +17,28 @@ namespace Nakahira
             CpuParams p = c.Params;
             float stack = 1.0f - Mathf.Clamp01(o.StackCount / kMaxStack);
             float near = 1.0f - Mathf.Clamp01(distance / Mathf.Max(0.01f, p.TargetDistanceRange));
-            return p.TargetStackWeight * stack + p.TargetDistanceWeight * near + p.TargetRuleWeight * RuleScore(c.Player, o.Player);
+            return p.TargetStackWeight * stack + p.TargetDistanceWeight * near + p.TargetRuleWeight * RuleScore(c.Player, o.Player)
+                - p.TargetCrowdPenalty * CrowdCount(c, o);
+        }
+
+        // その相手がもう狙われているか:そばにいる、その相手の敵の生存者(自分を除く)の数(2026-11-20)
+        // 弱い相手に全員で群がらないように、もう囲まれている相手は点を下げる(ほかの相手と戦いに行く)
+        private static int CrowdCount(CpuContext c, CpuOpponent o)
+        {
+            CpuParams p = c.Params;
+            var match = DarumaMatch.Current;
+            if (p.TargetCrowdPenalty <= 0.0f || p.TargetCrowdRadius <= 0.0f || match == null || o.Player == null) return 0;
+            float r2 = p.TargetCrowdRadius * p.TargetCrowdRadius;
+            int count = 0;
+            foreach (var other in match.Players)
+            {
+                if (other == null || other == c.Player || other == o.Player) continue;
+                if (other.Character == null || match.AreTeammates(other, o.Player)) continue;
+                Vector3 d = other.Character.transform.position - o.Position;
+                d.y = 0.0f;
+                if (d.sqrMagnitude <= r2) count++;
+            }
+            return count;
         }
 
         // ルールで目立つ度合い(0〜1)。ストック:残りストックが多いほど / タイム:持ち点が多いほど / ゴースト:なし

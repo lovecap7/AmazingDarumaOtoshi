@@ -47,6 +47,10 @@ namespace Nakahira
         [Min(0.1f)] public float TargetDistanceRange = 10.0f;
         [Tooltip("ルールで目立つ相手(ストック・持ち点が多い)ほど足す点の重み")]
         [Min(0.0f)] public float TargetRuleWeight = 0.5f;
+        [Tooltip("ほかの人(自分以外の、その相手の敵の生存者)がこの距離(m)以内にいる相手は、もう狙われているとみなす")]
+        [Min(0.0f)] public float TargetCrowdRadius = 4.0f;
+        [Tooltip("もう狙われている相手の点数から、そばにいるほかの人 1 人ごとに引く点(群がらないように)")]
+        [Min(0.0f)] public float TargetCrowdPenalty = 0.5f;
 
         [Header("殴る")]
         [Tooltip("殴るのやりたさ(逃げるより低く、積むより高く)")]
@@ -110,6 +114,12 @@ namespace Nakahira
         [Range(0.0f, 1.0f)] public float ApproachScore = 0.45f;
         [Tooltip("待つ(積み木の供給を待つ)のやりたさ。積み木がないときの積む(0.05 + StateStickiness)より高く、攻めに行くより低く")]
         [Range(0.0f, 1.0f)] public float WaitScore = 0.3f;
+        [Tooltip("近くの相手と戦いに行く:道の距離がこれ(m)以内の相手には、積み木があっても、有利でなくても攻めに行く")]
+        [Min(0.0f)] public float NearFightDistance = 6.0f;
+        [Tooltip("近くの相手と戦いに行く:相手の方がこの段数まで多くても行く(逃げる FleeStackGap より小さく)")]
+        [Min(0)] public int NearFightStackGap = 2;
+        [Tooltip("近くの相手と戦いに行くのやりたさ。積む(CollectScore)より高く、殴る・撃つより低く")]
+        [Range(0.0f, 1.0f)] public float NearFightScore = 0.55f;
         [Tooltip("待つ場所を選ぶとき、この距離(m)以内の相手を数える(近いほど重い)")]
         [Min(0.1f)] public float WaitDangerRadius = 10.0f;
         [Tooltip("待つ場所を選ぶときの相手の重み:幽霊")]
