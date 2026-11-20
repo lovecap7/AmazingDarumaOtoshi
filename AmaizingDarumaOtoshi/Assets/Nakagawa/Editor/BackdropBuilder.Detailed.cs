@@ -61,7 +61,9 @@ namespace Nakagawa.EditorTools
 
             // ステージの床(半紙)・壁(文鎮)・床の下の支え(半紙の束)
             // 太陽の光が強く当たると白く飛ぶので、色を少し落とす
-            c.FloorMaterial = d.TexMat("StageFloor", hanshiTex, new Vector2(3, 2), 0.15f, new Color(0.88f, 0.87f, 0.84f));
+            // 床は1枚の大きな半紙(繰り返さない)。漉きむら・長い繊維・ゆるいしわを入れる
+            var sheetTex = d.Tex("HanshiSheet", 1024, HanshiSheet);
+            c.FloorMaterial = d.TexMat("StageFloor", sheetTex, Vector2.one, 0.12f, new Color(0.9f, 0.89f, 0.86f));
             c.WallMaterial = c.SeeThroughMat("StageWall", new Color(0.2f, 0.19f, 0.18f), 0.75f);
             SetSupports(c, StageBackdrop.SupportStyle.SlabStack, 0.5f, 0.9f, null,
                 d.TexMat("PaperBundleA", hanshiTex, new Vector2(2, 2), 0.1f, new Color(0.98f, 0.97f, 0.94f)),
@@ -232,7 +234,9 @@ namespace Nakagawa.EditorTools
             });
 
             // ステージの床(縁側の板)・壁(柱)・床の下の支え(木の箱)
-            c.FloorMaterial = d.TexMat("StageFloor", plankTex, new Vector2(2, 3), 0.3f, new Color(0.95f, 0.9f, 0.84f));
+            // 床は焦げ茶の板(木の積み木と見分けやすいよう暗く)。継ぎ目は太く暗く
+            var stagePlankTex = d.Tex("StagePlanks", 512, (u, v) => DarkPlanks(u, v, 5, 141));
+            c.FloorMaterial = d.TexMat("StageFloor", stagePlankTex, new Vector2(2, 3), 0.3f, Color.white);
             c.WallMaterial = c.SeeThroughMat("StageWall", new Color(0.3f, 0.22f, 0.15f), 0.45f);
             SetSupports(c, StageBackdrop.SupportStyle.SlabStack, 1.2f, 2.0f, null,
                 d.TexMat("BoxA", boxTex, new Vector2(3, 2), 0.25f, new Color(0.62f, 0.5f, 0.38f)),
@@ -456,6 +460,8 @@ namespace Nakagawa.EditorTools
                 mat.SetColor("_EmissionColor", color * intensity);
                 mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
                 EditorUtility.SetDirty(mat);
+                // すぐ保存しないと _EMISSION のキーワードが残らないことがある
+                AssetDatabase.SaveAssetIfDirty(mat);
                 return mat;
             }
 
@@ -500,6 +506,9 @@ namespace Nakagawa.EditorTools
                 }
                 return BuildExtrude(poly, height);
             });
+
+            // 凸多角形(XZ。上から見て反時計回り)を上へ押し出す
+            public Mesh Extrude(string name, List<Vector2> poly, float height) => Keep(name, () => BuildExtrude(poly, height));
 
             // 点の列に沿った管
             public Mesh Tube(string name, List<Vector3> path, float radius, int sides) => Keep(name, () => BuildTube(path, radius, sides));
@@ -755,6 +764,41 @@ namespace Nakagawa.EditorTools
             Color baseC = WoodGrain(Frac(u + Hash01(plank, 1, seed)), within / count + plank * 0.37f, seed + plank, new Color(0.64f, 0.51f, 0.37f), new Color(0.57f, 0.45f, 0.32f));
             float seam = within < 0.025f || within > 0.975f ? 0.7f : 1.0f;
             return baseC * shade * seam;
+        }
+
+        // 大きな1枚の半紙(繰り返さない)。漉きむら・長い繊維・ゆるいしわ(折れ線の片側が明るく、反対側が暗い)
+        static Color HanshiSheet(float u, float v)
+        {
+            // 漉きむら(雲のような濃淡)と細かい紙の目
+            float cloud = Fbm(u * 6, v * 6, 6, 151) * 0.6f + Fbm(u * 24, v * 24, 24, 152) * 0.4f;
+            float grain = Fbm(u * 160, v * 160, 160, 153);
+            // 長い繊維(縦横に寝た細い筋。少し明るい)
+            // 向きのそろわない短い繊維にするため、斜めに回した座標で2種類を重ね、まばらにする
+            float ru = u * 0.8f + v * 0.6f, rv = -u * 0.6f + v * 0.8f;
+            float fiberA = Mathf.Pow(Fbm(ru * 24, rv * 180, 24, 154), 6.0f) * Fbm(u * 12, v * 12, 12, 157);
+            float fiberB = Mathf.Pow(Fbm(rv * 24, ru * 180, 24, 155), 6.0f) * Fbm(u * 12, v * 12, 12, 158);
+            float fiber = Mathf.Clamp01((fiberA + fiberB) * 6.0f);
+            // しわ: 乱数で決めた線分のまわりを、法線方向の距離で明暗にする(片側が明るく、片側が暗い)
+            float crease = 0;
+            for (int i = 0; i < 14; i++)
+            {
+                Vector2 a = new Vector2(Hash01(i, 1, 156), Hash01(i, 2, 156));
+                float ang = Hash01(i, 3, 156) * Mathf.PI;
+                Vector2 dir = new Vector2(Mathf.Cos(ang), Mathf.Sin(ang));
+                float len = 0.15f + Hash01(i, 4, 156) * 0.35f;
+                Vector2 p = new Vector2(u, v) - a;
+                float along = Vector2.Dot(p, dir);
+                // 線の両端で消えるように
+                float fade = Mathf.Clamp01(1.0f - Mathf.Abs(along) / len);
+                if (fade <= 0) continue;
+                // 少し波打たせる
+                float side = p.x * -dir.y + p.y * dir.x + Mathf.Sin(along * 40 + i) * 0.004f;
+                float w = 0.006f + Hash01(i, 5, 156) * 0.01f;
+                float s = side / w;
+                crease += -s * Mathf.Exp(-s * s) * fade * fade * (0.5f + Hash01(i, 6, 156) * 0.5f);
+            }
+            float k = 0.86f + (cloud - 0.5f) * 0.05f + (grain - 0.5f) * 0.025f + fiber * 0.035f + crease * 0.06f;
+            return new Color(k, k * 0.988f, k * 0.955f);
         }
 
         // 畳(い草の目と、ところどころの色むら)
