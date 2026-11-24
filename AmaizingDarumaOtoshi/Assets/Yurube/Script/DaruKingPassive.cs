@@ -20,7 +20,8 @@ namespace Yurube
         bool m_reportedPassive;
 
         // 積める段数の上限(CPU が上限を越えて拾わないための読み取り用。CPU 用(中平))
-        public int MaxStack => m_maxStack;
+        // 2026-11-24 パッシブはレベル(DarumaLevel)に変わり、2段の上限はなくなった(上限なし)
+        public int MaxStack => DarumaLevel.LegacyPassives ? m_maxStack : int.MaxValue;
 
         private void Awake()
         {
@@ -30,6 +31,7 @@ namespace Yurube
         private void OnEnable()
         {
             if (m_character == null || m_character.Stack == null) return;
+            if (!DarumaLevel.LegacyPassives) return;   // 2026-11-24 2段の上限はなくなった
             m_character.Stack.SetMaxCount(m_maxStack);
             Trim();
             m_character.Stack.Changed += OnStackChanged;

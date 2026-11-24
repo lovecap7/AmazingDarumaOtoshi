@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f5928dbd30fda4d4bb2d068721a6aba4, type: 3}
+  m_Name: LevelParams
+  m_EditorClassIdentifier: Assembly-CSharp::Yurube.LevelParams
+  stackedToLevel: 03000000060000000a0000000f000000i
+  attackSpeedPerLevel: 0.05
+  moveSpeedPerLevel: 0.05
+  shotSpeedPerLevel: 0.05
+  perkShotSpeed: 0.1
+  perkAttackSpeed: 0.1
+  perkSlow: 0.1
+  perkSlowSeconds: 2
+  perkStamina: 0.25
+  perkShotDurability: 1
+  perkZigzagBase: 120
+  perkZigzagPerLevel: 40
+  perkZigzagInterval: 0.18
+  perkReach: 0.1
+  showLevel: 1

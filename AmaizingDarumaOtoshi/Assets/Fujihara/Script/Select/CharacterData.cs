@@ -1,5 +1,18 @@
 using UnityEngine;
 
+// レベルで上がる、キャラごとの能力（パッシブ。2026-11-24 メンバー全員で決めた仕様）
+public enum LevelPerk
+{
+    None,
+    ShotSpeed,       // あかだる：弾速
+    AttackSpeed,     // あおだる：攻撃速度
+    SlowOnHit,       // みだる：当てた相手の移動速度ダウン
+    Stamina,         // きだる：スタミナ（減りにくく、回復が速い）
+    ShotDurability,  // いわだる：撃った弾の耐久値
+    Zigzag,          // へびだる：撃った弾の蛇行の振れ幅
+    Reach,           // だるきんぐ：リーチ
+}
+
 // キャラクター1体分のデータ。Project ウィンドウで右クリック → Create → Daruma → Character で作り、
 // SelectRoster の characters に追加するとキャラクターセレクトに並ぶ。
 // パッシブ・必殺技はメニューの「ずかん」（CharacterBook）で表示する（ハンマー性能は今は性能差を作らないので、ずかんには出さない）。
@@ -34,6 +47,10 @@ public class CharacterData : ScriptableObject
 
     [Tooltip("使いやすさ（★の数）。キャラクターセレクトの枠に出る")]
     [Range(1, 5)] public int ease = 3;
+
+    [Header("レベル（試合中に積んだ数で上がる。Lv2 から、このキャラだけ下の能力も上がる）")]
+    [Tooltip("レベルで上がる、このキャラだけの能力（値は Yurube/Level/Resources/LevelParams）")]
+    public LevelPerk levelPerk = LevelPerk.None;
 
     [Header("パッシブ")]
     [Tooltip("（今は使っていない）条件になる積み木の色。積み木の色の性能は撤廃した（TumikiColorUtil.IgnoreColors）")]

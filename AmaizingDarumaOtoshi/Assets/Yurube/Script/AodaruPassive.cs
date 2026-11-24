@@ -39,6 +39,9 @@ namespace Yurube
             if (GetComponent<SpecialGauge>() == null) gameObject.AddComponent<SpecialGauge>();
             if (GetComponent<AodaruSpecial>() == null) gameObject.AddComponent<AodaruSpecial>();
 
+            // 2026-11-24 パッシブはレベル(DarumaLevel)に変わった。前の「青で移動速度UP」とその見た目は止める
+            if (!DarumaLevel.LegacyPassives) return;
+
             // 移動速度UPを見た目で出す(青い風・残像)
             var effect = GetComponent<AodaruSpeedEffect>();
             if (effect == null) effect = gameObject.AddComponent<AodaruSpeedEffect>();
@@ -48,7 +51,7 @@ namespace Yurube
         // 表示用。青の数か移動速度が変わったときだけ出す(毎フレームのログで埋もれないように)
         private void Update()
         {
-            if (m_character == null || !m_logMoveSpeed) return;
+            if (m_character == null || !m_logMoveSpeed || !DarumaLevel.LegacyPassives) return;
             if (SpecialNet.IsClient) return;   // ネット対戦用(suehara): 速さはホストが決める
 
             int blue = CountBlue();
@@ -65,7 +68,7 @@ namespace Yurube
         {
             // 停止中(ワープ・カウントダウン等)は DarumaCharacter 側が倍率を消費しないので、
             // ここで掛けると復帰時に溜まって爆発する。動ける状態のときだけ掛ける。
-            if (m_character == null || !m_character.CanBeAffected) return;
+            if (m_character == null || !m_character.CanBeAffected || !DarumaLevel.LegacyPassives) return;
             // ネット対戦用(suehara): クライアントのキャラクターは止めてあるので、倍率を積まない(ホストで速くなった動きが届く)
             if (SpecialNet.IsClient) return;
 

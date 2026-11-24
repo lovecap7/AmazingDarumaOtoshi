@@ -62,6 +62,7 @@ namespace Yurube
             if (!m_pendingShot) return;
             m_pendingShot = false;
             if (m_character == null) return;
+            if (!DarumaLevel.LegacyPassives) return;   // 2026-11-24 パッシブはレベル(DarumaLevel)に変わった。蛇行は Lv2 から DarumaLevel が付ける
             if (SpecialNet.IsClient) return;   // ネット対戦用(suehara): 蛇行はホストで動かす(動きはそのまま届く)
 
             var block = FindShotBlock();

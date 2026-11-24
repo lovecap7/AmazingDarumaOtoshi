@@ -148,9 +148,10 @@ public class GameModelSwapper : MonoBehaviour
         var hammer = body.GetComponentInChildren<DarumaHammer>(true);
         if (hammer == null) return;
 
-        // 武器の届く距離（だるきんぐの剣は倍）。性能はこのキャラのハンマーだけの複製にして、当たる距離を伸ばす
+        // 武器の届く距離（だるきんぐの剣は倍）。当たる距離はレベル（Yurube.DarumaLevel）がレベルの分と一緒に伸ばす。
+        // 前のパッシブに戻しているとき（レベルが止まっているとき）だけ、ここで性能の複製を作って伸ばす
         float reach = Mathf.Max(0.5f, data.weaponReach);
-        if (!Mathf.Approximately(reach, 1f) && hammer.Params != null)
+        if (Yurube.DarumaLevel.LegacyPassives && !Mathf.Approximately(reach, 1f) && hammer.Params != null)
         {
             var p = Instantiate(hammer.Params);
             p.HitReachScale *= reach;

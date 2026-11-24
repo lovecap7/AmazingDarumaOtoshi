@@ -41,6 +41,8 @@ namespace Yurube
                 ? m_character.Hammer
                 : GetComponentInChildren<DarumaHammer>();
             if (m_hammer == null || m_hammer.Params == null) return;
+            // 2026-11-24 パッシブはレベル(DarumaLevel)に変わった。前の「赤で弾速UP」は止める(撃ったときの見た目は残す)
+            if (!DarumaLevel.LegacyPassives) return;
 
             // 元のアセットを書き換えないよう、このキャラクター用に複製する
             m_params = Instantiate(m_hammer.Params);

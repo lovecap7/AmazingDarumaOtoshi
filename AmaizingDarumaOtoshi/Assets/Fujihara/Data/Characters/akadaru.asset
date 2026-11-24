@@ -18,12 +18,16 @@ MonoBehaviour:
   portrait: {fileID: 8484103885634726504, guid: 014688e61fe3f3f4f978b06ae3d65f1e, type: 3}
   model: {fileID: 919132149155446097, guid: a54aff5306b0dbe41aae15b383011655, type: 3}
   hammerModel: {fileID: 919132149155446097, guid: 0c938ca9e2ea039479fdb8caa53f4edb, type: 3}
+  extraModels: []
+  weaponReach: 1
+  showInMenu: 1
   prefab: {fileID: 9069936943766670842, guid: 1b40e3ce94eb73de3295fe933d28580b, type: 3}
   ease: 3
+  levelPerk: 1
   passiveColor: 0
   passiveCount: 0
-  passiveName: "\uFF5E\uFF5E\uFF5E"
-  passiveText: "\uFF5E\uFF5E\uFF5E"
+  passiveName: "\u5F3E\u901F\u30A2\u30C3\u30D7"
+  passiveText: "\u30EC\u30D9\u30EB2\u304B\u3089\u3001\u5F3E\u901F\u304C\u3055\u3089\u306B\u4E0A\u304C\u308B"
   hammerPower: 4
   hammerSpeed: 2
   hammerReach: 3

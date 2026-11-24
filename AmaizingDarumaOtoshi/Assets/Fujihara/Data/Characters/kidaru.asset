@@ -23,10 +23,11 @@ MonoBehaviour:
   showInMenu: 1
   prefab: {fileID: 9069936943766670842, guid: eee8c0cfb1cf6e24cc8ec6956b6554bf, type: 3}
   ease: 3
+  levelPerk: 4
   passiveColor: 3
-  passiveCount: 1
-  passiveName: "\u7A4D\u307F\u6728\u5897\u6B96"
-  passiveText: "\u7A4D\u307F\u6728\u3092\u7A4D\u3080\u3068\u3001\u3082\u30461\u500B\u5897\u3048\u308B"
+  passiveCount: 0
+  passiveName: "\u30B9\u30BF\u30DF\u30CA\u30A2\u30C3\u30D7"
+  passiveText: "\u30EC\u30D9\u30EB2\u304B\u3089\u3001\u30B9\u30BF\u30DF\u30CA\u304C\u6E1B\u308A\u306B\u304F\u304F\u3001\u56DE\u5FA9\u304C\u901F\u304F\u306A\u308B"
   hammerPower: 3
   hammerSpeed: 3
   hammerReach: 3

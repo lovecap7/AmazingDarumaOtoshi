@@ -53,6 +53,7 @@ namespace Yurube
         void OnStackChanged()
         {
             if (m_character == null) return;
+            if (!DarumaLevel.LegacyPassives) return;   // 2026-11-24 パッシブはレベル(DarumaLevel)に変わった。前の「増殖」は止める
             if (SpecialNet.IsClient) return;   // ネット対戦用(suehara): 積み木を増やすのはホストだけ
             int yellow = CountYellow();
             bool gained = yellow > m_lastYellow;

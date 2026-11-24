@@ -36,6 +36,7 @@ namespace Yurube
         private void FixedUpdate()
         {
             if (m_character == null || !m_character.CanBeAffected) return;
+            if (!DarumaLevel.LegacyPassives) return;   // 2026-11-24 パッシブはレベル(DarumaLevel)に変わった。前の「ホーミング」は止める
             if (SpecialNet.IsClient) return;   // ネット対戦用(suehara): ホーミングはホストで動かす(動きはそのまま届く)
 
             Vector3 center = m_character.transform.position + Vector3.up * 0.5f;
