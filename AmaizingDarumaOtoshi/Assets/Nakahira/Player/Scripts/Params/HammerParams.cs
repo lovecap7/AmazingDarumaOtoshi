@@ -20,6 +20,14 @@ namespace Nakahira
         [Min(0.01f)] public float SweepDuration = 0.25f;
         [Tooltip("股抜きショットにかかる時間(秒)")]
         [Min(0.01f)] public float ShotDuration = 0.3f;
+        [Tooltip("薙ぎ払いの振り方。1 で等速。大きいほど出だしがゆっくり(タメ)で、振り抜くときに速くなる(全体の時間は SweepDuration のまま)")]
+        [Min(1.0f)] public float SweepEasePower = 2.0f;
+
+        [Header("切り返し(薙ぎ払いの連打)")]
+        [Tooltip("振り始めてからこの時間(秒)の間に横振りを押すと、振り終わったあと逆向きに切り返す(右→左→右→…と何回でも続く)。\n振っている途中に押した分は、振り終わってから切り返す")]
+        [Min(0.0f)] public float SweepComboWindow = 0.45f;
+        [Tooltip("切り返しの受付が終わってから、ハンマーが待機の位置へ戻るまでの時間(秒。見た目だけ)")]
+        [Min(0.0f)] public float SweepReturnTime = 0.15f;
 
         [Header("当たり判定")]
         [Tooltip("ハンマーが届く距離の倍率(1で見た目のハンマーの長さ)")]

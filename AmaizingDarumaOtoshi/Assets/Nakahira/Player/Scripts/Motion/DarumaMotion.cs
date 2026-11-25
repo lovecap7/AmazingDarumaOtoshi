@@ -66,7 +66,7 @@ namespace Nakahira
         System.Random m_random;
 
         // ハンマー
-        bool m_wasSweeping;
+        int m_lastSweepCount;
         bool m_wasShooting;
 
         // 調査用(DarumaMotionWatcher など):積み木が動いているか
@@ -366,12 +366,16 @@ namespace Nakahira
         private void UpdateHammerKick()
         {
             if (m_hammer == null) return;
-            bool sweeping = m_hammer.IsSweeping;
+            int sweeps = m_hammer.SweepCount;
             bool shooting = m_hammer.IsShooting;
-            // 薙ぎ払いは右から左へ振るので、反動で体の上は右へ。ショットは後ろから前へ振り下ろすので後ろへ
-            if (sweeping && !m_wasSweeping) m_swayVelocity += transform.right * m_params.SweepKick;
+            // 薙ぎ払いは右から左へ振るので、反動で体の上は右へ(切り返しは左へ)。ショットは後ろから前へ振り下ろすので後ろへ
+            if (sweeps != m_lastSweepCount)
+            {
+                float side = m_hammer.IsReverseSweep ? -1.0f : 1.0f;
+                m_swayVelocity += transform.right * (m_params.SweepKick * side);
+            }
             if (shooting && !m_wasShooting) m_swayVelocity -= transform.forward * m_params.ShotKick;
-            m_wasSweeping = sweeping;
+            m_lastSweepCount = sweeps;
             m_wasShooting = shooting;
         }
 
