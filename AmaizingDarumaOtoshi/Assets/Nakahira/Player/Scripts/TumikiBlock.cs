@@ -708,6 +708,9 @@ namespace Nakahira
                 }
 
                 if (requireApproach && !IsApproaching(hitPos)) return;
+                // 相手がハンマーを振っている最中で、このまま振れば打ち返せていたなら、体には当てずに打ち返される
+                // (打ち返しが成功しているのに、相手の段が1つ抜けないように)
+                if (character.Hammer != null && character.Hammer.TryReturnBeforeBodyHit(this)) return;
                 RaiseHit(character, ContactPoint(collision), Speed);
 
                 // キャラクターは動かない相手として、ぶつかった方向の成分を失った残りの速度で割れる

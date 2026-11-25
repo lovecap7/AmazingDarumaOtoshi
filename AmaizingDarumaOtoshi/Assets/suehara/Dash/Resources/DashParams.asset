@@ -13,11 +13,12 @@ MonoBehaviour:
   m_Name: DashParams
   m_EditorClassIdentifier: Assembly-CSharp::DashParams
   SpeedMultiplier: 1.6
-  StaminaSeconds: 2.5
+  StaminaSeconds: 3
   RecoverSeconds: 3
   RecoverDelay: 0.5
   RestartRatio: 0.3
-  JumpCostRatio: 0.2
+  JumpCostRatio: 0.125
+  PickupRecoverRatio: 0.25
   BlinkDistance: 6
   BlinkCostRatio: 0.5
   BlinkCooldown: 0.5

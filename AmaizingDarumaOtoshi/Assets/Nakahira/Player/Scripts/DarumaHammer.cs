@@ -103,7 +103,10 @@ namespace Nakahira
         public static event System.Action<HammerSweepInfo> SweepFinished;
         // 股抜きショットで積み木を打ち出した(演出用。Target は打ち出した積み木、Point は打ち出した位置)
         public static event System.Action<HammerHitInfo> ShotFired;
-
+        // ハンマー以外の技(あかだるの必殺技の回るハンマーなど)が当たったことを、薙ぎ払いと同じ知らせで出す(演出・音・レベル用。suehara)
+        public static void RaiseHit(HammerHitInfo info) => Hit?.Invoke(info);
+        // 支点からハンマーの頭までの長さ(見た目。suehara)
+        public float ArmLength => m_armLength;
         public bool IsBusy => m_action != Action.None;
         // このハンマーの性能。キャラクターのパッシブが、実行時に複製へ差し替えるために使う
         public HammerParams Params { get => m_params; set => m_params = value; }
@@ -345,6 +348,31 @@ namespace Nakahira
             // ハンマーの太さの分だけ角度に余裕を持たせる
             float pad = Mathf.Atan2(m_hammerHalfWidth, Mathf.Max(dist, 0.01f)) * Mathf.Rad2Deg;
             return bearing >= yaw - pad && bearing <= prevYaw + pad;
+        }
+
+        // 薙ぎ払いの最中に、攻撃判定のある積み木が持ち主の体に当たりそうになった(TumikiBlock から呼ぶ)
+        // ハンマーがまだ通過していない側にあって、このまま振れば打ち返せていた積み木なら、体に当たる前に打ち返したことにする
+        // (ハンマーが届く前に体へ当たって段が抜け、抜けた段を打ち返す「一段壊れながら打ち返す」をなくす)。打ち返したら true
+        public bool TryReturnBeforeBodyHit(TumikiBlock block)
+        {
+            if (ViewOnly || m_action != Action.Sweep || block == null || !block.IsHarmful) return false;
+            if (m_hitThisSwing.Contains(block)) return false;
+
+            Vector3 local = m_root.InverseTransformPoint(block.transform.position);
+            float bearing = Mathf.Atan2(local.x, local.z) * Mathf.Rad2Deg;
+            float dist = new Vector2(local.x, local.z).magnitude;
+            float heightDiff = local.y - m_sweepHeight;
+            if (heightDiff > m_hitHeightRange || heightDiff < -m_hitHeightRange - AirHitDepth) return false;
+            if (dist > HitReach + TumikiBlock.kRadius) return false;
+
+            // これから通過する角度の範囲 [振り終わり, 今の角度] に入っているか(右から左へ振るので角度は減っていく)
+            float pad = Mathf.Atan2(m_hammerHalfWidth, Mathf.Max(dist, 0.01f)) * Mathf.Rad2Deg;
+            float yaw = CurrentSweepYaw();
+            if (bearing < m_sweepEndYaw - pad || bearing > yaw + pad) return false;
+
+            m_hitThisSwing.Add(block);
+            HitBlock(block, bearing, dist);
+            return true;
         }
 
         private void HitBlock(TumikiBlock block, float bearing, float dist)

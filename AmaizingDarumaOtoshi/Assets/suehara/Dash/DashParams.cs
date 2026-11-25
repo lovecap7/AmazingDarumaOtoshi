@@ -8,15 +8,17 @@ public class DashParams : ScriptableObject
     [Tooltip("ダッシュ中の移動速度の倍率")]
     [Min(1.0f)] public float SpeedMultiplier = 1.6f;
     [Tooltip("スタミナ満タンから走り続けられる時間(秒)")]
-    [Min(0.1f)] public float StaminaSeconds = 2.5f;
+    [Min(0.1f)] public float StaminaSeconds = 3.0f;
     [Tooltip("スタミナが空から満タンまで回復する時間(秒)")]
     [Min(0.1f)] public float RecoverSeconds = 3.0f;
     [Tooltip("走るのをやめてから回復が始まるまでの時間(秒)")]
     [Min(0.0f)] public float RecoverDelay = 0.5f;
     [Tooltip("スタミナ切れのあと、再び走れるようになるスタミナの割合(0〜1)")]
     [Range(0.0f, 1.0f)] public float RestartRatio = 0.3f;
-    [Tooltip("ジャンプ1回で消費するスタミナの割合(0〜1)。残りがこれより少ないとジャンプできない。積み木に乗ると同じ量だけ回復する")]
-    [Range(0.0f, 1.0f)] public float JumpCostRatio = 0.2f;
+    [Tooltip("ジャンプ1回で消費するスタミナの割合(0〜1)。残りがこれより少ないとジャンプできない")]
+    [Range(0.0f, 1.0f)] public float JumpCostRatio = 0.125f;
+    [Tooltip("積み木に上から乗って拾ったときに回復するスタミナの割合(0〜1)")]
+    [Range(0.0f, 1.0f)] public float PickupRecoverRatio = 0.25f;
 
     [Header("ブリンク(ダッシュボタンを素早く2回押す)")]
     [Tooltip("瞬間移動する距離(m)。壁もすり抜けるが、壁の中・ステージの範囲の外に出る場合は手前で止まる")]

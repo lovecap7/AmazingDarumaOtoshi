@@ -493,8 +493,8 @@ namespace Nakahira
             float speed = block.HorizontalVelocity.magnitude;
             int countBefore = m_stack.Count;
             Pickup(block);
-            // ダッシュ(suehara): 積み木に乗ると、ジャンプ1回分のスタミナが回復する
-            m_dashStamina.Recover(DashParams.Instance.JumpCostRatio);
+            // ダッシュ(suehara): 積み木に乗ると、スタミナが回復する
+            m_dashStamina.Recover(DashParams.Instance.PickupRecoverRatio);
             // パッシブ(だるきんぐの上限など)が段の変化に反応して外した分も含めて、段が増えたかを見る
             AnyPickedUp?.Invoke(new TumikiPickupInfo(this, block, wasHarmful, speed, m_stack.Count > countBefore));
             // 同じステップで複数の積み木に触れても1つだけ拾う

@@ -20,10 +20,12 @@ MonoBehaviour:
   ReturnImmunityTime: 0.5
   ReturnHitStopGrowth: 1.6
   ReturnHitStopMax: 2
+  ReturnHomingTurnSpeed: 270
+  ReturnHomingDuration: 1.5
   ShotSpeed: 30
   SweepLaunchSpeed: 30
-  ReturnSpeedRate: 1.25
-  MaxProjectileSpeed: 30
+  ReturnSpeedRate: 1.5
+  MaxProjectileSpeed: 90
   HitStopDuration: 0.1
   HitStopTimeScale: 0.1
   SelfShake: 0.04

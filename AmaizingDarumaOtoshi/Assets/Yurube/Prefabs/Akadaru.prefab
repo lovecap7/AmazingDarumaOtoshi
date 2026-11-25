@@ -697,8 +697,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Nakahira.DarumaPlayer
   m_baseMoveSpeed: 6
-  m_speedLossPerBlock: 0.3
-  m_minMoveSpeed: 2.5
   m_turnSpeed: 15
   m_jumpParams: {fileID: 11400000, guid: 2ece5d83d9bb2e84290afd00e96b4e55, type: 2}
   m_groundMask:
@@ -753,6 +751,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Yurube.SpecialGauge
   m_params: {fileID: 11400000, guid: b9a441f725ab50f489b3a9378147dab5, type: 2}
+  m_prologueGainScale: 1
 --- !u!114 &5182239471364050813
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -774,3 +773,10 @@ MonoBehaviour:
   m_logSpecial: 1
   m_cutInSpecialName: "\u7D42\u7109\u306E\u8ECC\u8DE1"
   m_cutInColor: {r: 0.91, g: 0.29, b: 0.25, a: 1}
+  m_useHammerStorm: 1
+  m_stormName: "\u7D05\u84EE\u4E71\u821E"
+  m_stormDuration: 5
+  m_stormHitInterval: 0.5
+  m_stormKnockSpeed: 24
+  m_stormHammerScale: 2
+  m_stormOrbitSpeed: 468

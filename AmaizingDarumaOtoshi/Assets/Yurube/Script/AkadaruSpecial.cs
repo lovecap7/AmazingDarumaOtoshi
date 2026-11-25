@@ -31,16 +31,36 @@ namespace Yurube
         [SerializeField] string m_cutInSpecialName = "終焉の軌跡";
         [SerializeField] Color m_cutInColor = new Color(0.91f, 0.29f, 0.25f);
 
+        [Header("ハンマーの嵐(suehara)。オンなら上の「終焉の軌跡」の代わりにこちらを出す")]
+        [Tooltip("オン: 大きなハンマーを体の周りで回す必殺技 / オフ: 前の「終焉の軌跡」")]
+        [SerializeField] bool m_useHammerStorm = true;
+        [Tooltip("技名(カットインに出す)")]
+        [SerializeField] string m_stormName = "紅蓮乱舞";
+        [Tooltip("効果時間(秒)")]
+        [SerializeField] float m_stormDuration = 5.0f;
+        [Tooltip("同じ敵を殴れる間隔(秒)")]
+        [SerializeField] float m_stormHitInterval = 0.5f;
+        [Tooltip("飛んでくる弾をはじき返す速さ(m/s)")]
+        [SerializeField] float m_stormKnockSpeed = 24.0f;
+        [Tooltip("回るハンマーの大きさ(手持ちのハンマーに対する倍率)")]
+        [SerializeField] float m_stormHammerScale = 2.0f;
+        [Tooltip("回る速さ(度/秒)。全部のハンマーが等間隔のまま同じ向きに回る(衛星)。マイナスで反時計回り")]
+        [SerializeField] float m_stormOrbitSpeed = 468.0f;
+
         DarumaCharacter m_character;
         SpecialGauge m_gauge;
         Material m_effectMaterial;
+        AkadaruHammerStorm m_storm;
 
         // CPU 用(中平): 必殺技の積み木の速さ(m/s。狙いの先読みに使う)
         public float Speed => m_speed;
+        // CPU 用(suehara): ハンマーの嵐を使うか / 回るハンマーが届く距離
+        public bool UsesHammerStorm => m_useHammerStorm;
+        public float StormReach => AkadaruHammerStorm.ReachFor(m_character, m_stormHammerScale);
 
         // 必殺技ゲージ用(中平): 発動してから残像ビームが残っている間(この間はゲージが溜まらない)
         float m_activeUntil = -1.0f;
-        public bool IsActive => Time.time < m_activeUntil;
+        public bool IsActive => Time.time < m_activeUntil || m_storm != null;
 
         private void Awake()
         {
@@ -78,6 +98,7 @@ namespace Yurube
         // ラボのボタンからも呼べる。発動できたら true
         public bool TryActivate()
         {
+            if (m_useHammerStorm) return TryActivateStorm();
             if (m_gauge == null || !m_gauge.IsFull) return false;
             if (m_character == null || m_character.Stack == null || m_character.Stack.Count == 0) return false;
             if (!m_character.CanBeAffected) return false;
@@ -129,13 +150,52 @@ namespace Yurube
         }
 
         //========================================
+        // ハンマーの嵐(suehara)
+        //========================================
+
+        bool TryActivateStorm()
+        {
+            if (m_gauge == null || !m_gauge.IsFull) return false;
+            if (m_character == null || !m_character.CanBeAffected) return false;
+            if (m_storm != null) return false;   // 発動中は重ねられない
+            if (m_character.Hammer != null && m_character.Hammer.IsBusy) return false;
+
+            m_gauge.Consume();
+            // ネット対戦用(suehara): クライアントでも同じ見た目を出す(当たり判定はホストだけ)
+            SpecialNet.Send(m_character, this, kNetStorm, new[] { 0.0f });
+            PlayStorm();
+
+            if (m_logSpecial) Debug.Log($"[あかだる] 必殺技『{m_stormName}』発動", this);
+            return true;
+        }
+
+        void PlayStorm()
+        {
+            var root = new GameObject("AkadaruHammerStorm");
+            m_storm = root.AddComponent<AkadaruHammerStorm>();
+            m_storm.Initialize(m_character, m_stormDuration, m_stormHitInterval, m_stormKnockSpeed, m_stormHammerScale, m_stormOrbitSpeed);
+            SpecialCutIn.Show(m_stormName, m_cutInColor, m_effectMaterial, m_character, null, m_character.Stack != null ? m_character.Stack.Count : 0);
+        }
+
+        private void OnDestroy()
+        {
+            if (m_storm != null) Destroy(m_storm.gameObject);
+        }
+
+        //========================================
         // ネット対戦用(suehara): クライアントで、ホストの発動と同じ見た目を出す
         //========================================
 
         const int kNetActivate = 0;
+        const int kNetStorm = 1;
 
         public void NetReceive(int ev, float[] v, TumikiBlock[] blocks)
         {
+            if (ev == kNetStorm)
+            {
+                if (m_storm == null) PlayStorm();
+                return;
+            }
             if (ev != kNetActivate || v.Length < 6 || blocks.Length < 1 || blocks[0] == null) return;
             var block = blocks[0];
             var position = new Vector3(v[0], v[1], v[2]);

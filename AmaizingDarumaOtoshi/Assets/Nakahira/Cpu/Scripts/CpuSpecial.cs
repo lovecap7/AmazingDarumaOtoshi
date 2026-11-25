@@ -117,7 +117,9 @@ namespace Nakahira
             if (m_ability == null || m_gauge == null) return false;
 
             // 暗転返しは時間が止まっている間に撃つので、下の「時間が止まっている間は撃たない」より先に見る
-            if (m_ability is AodaruSpecial && UpdateBlackoutCounter(c, engaged)) return Activated();
+            // (疾風連撃のあおだるは暗転返し・とっさの六腕をしない。suehara)
+            bool reflexAodaru = m_ability is AodaruSpecial aodaruSpecial && !aodaruSpecial.UsesGaleCombo;
+            if (reflexAodaru && UpdateBlackoutCounter(c, engaged)) return Activated();
 
             // だるきんぐ:ため中(ゲージは空)は、線に敵が入る向きへ向きを変え続け、中心部分に入ったら確定する
             if (m_ability is DaruKingSpecial king && king.IsCharging)
@@ -137,7 +139,7 @@ namespace Nakahira
             // 時間が止まっている・遅くなっている間(ほかの必殺技のカットイン・ヒットストップ・やられ演出)は撃たない
             if (Time.timeScale < DarumaMatch.PlaySpeed) return false;
 
-            if (m_ability is AodaruSpecial) return UpdateReflexArms(c) && Activated();
+            if (reflexAodaru) return UpdateReflexArms(c) && Activated();
 
             // 満タンになった瞬間に、撃ちどころを待たずにすぐ撃ってしまうかを決める(よわいほど多い)
             if (!m_wasFull)
@@ -149,7 +151,8 @@ namespace Nakahira
             }
             if (!m_rash && !Notice(c, ShouldActivate(c, current))) return false;
             // あかだる:狙う向きへ向き直ってから撃つ(トロンは押した瞬間の向きへ飛ぶ。すぐ撃ってしまうときは今の向きのまま)
-            if (!m_rash && m_ability is AkadaruSpecial akadaru && !FacingTronAim(c, akadaru)) return false;
+            // (ハンマーの嵐は向きに関係ないので向き直らない。suehara)
+            if (!m_rash && m_ability is AkadaruSpecial akadaru && !akadaru.UsesHammerStorm && !FacingTronAim(c, akadaru)) return false;
             // みだる:一番近い敵の方へ向き直ってから撃つ(弾が曲がって追うので、あかだるより甘くてよい)
             if (!m_rash && m_ability is MidaruSpecial && !FacingFunnelTarget(c)) return false;
             // 撃てない間(ハンマーを振っているなど)は、撃ちどころが続く間 毎フレーム試す
@@ -236,7 +239,8 @@ namespace Nakahira
             {
                 case IwadaruSpecial iwa: return MeteorChance(c, iwa);   // 隕石
                 case HebidaruSpecial hebi: return SwampChance(c, hebi);   // 毒沼
-                case AkadaruSpecial _:  return TronChance(c);   // トロン(ビーム)
+                case AkadaruSpecial aka: return aka.UsesHammerStorm ? StormChance(c, aka) : TronChance(c);   // ハンマーの嵐(suehara) / トロン(ビーム)
+                case AodaruSpecial aoda: return GaleChance(c, aoda);   // 疾風連撃(suehara)
                 case DaruKingSpecial king: return ExcaliburChance(c, king, KingSoloReady(c));   // エクスカリバー
                 case MidaruSpecial _:   return FunnelChance(c);   // ファンネル
                 case KidaruSpecial _:   return KidaruChance(c, current);   // 黄金化
@@ -406,6 +410,30 @@ namespace Nakahira
         // あかだる(トロン):どの状態の最中でも、TronRange 以内に間に壁のない敵がいるとき(積み木が 1 個以上あるとき)
         // 狙う相手は、攻めの点数が一番高い敵(今狙っている相手を少し優先)
         // 自分の通り道をふさぐ向きでも気にしない(自分のビームに当たって自滅しても、それはそれで面白い。中平が決めた)
+        // あおだる(疾風連撃。suehara):幽霊でも無敵でもない敵が、斬撃が届く距離の半分以内にいるとき(殴りながら斬撃を当てやすい距離)
+        private bool GaleChance(CpuContext c, AodaruSpecial aoda)
+        {
+            float range = aoda.SlashRange * 0.5f;
+            foreach (var o in c.Perception.Opponents)
+            {
+                if (o.IsGhost || o.IsInvincible || o.Character == null) continue;
+                if (o.FlatDistance <= range) return true;
+            }
+            return false;
+        }
+
+        // あかだる(ハンマーの嵐。suehara):幽霊でも無敵でもない敵が、回るハンマーの届く距離にいるとき
+        private bool StormChance(CpuContext c, AkadaruSpecial aka)
+        {
+            float reach = aka.StormReach;
+            foreach (var o in c.Perception.Opponents)
+            {
+                if (o.IsGhost || o.IsInvincible || o.Character == null) continue;
+                if (o.FlatDistance <= reach) return true;
+            }
+            return false;
+        }
+
         private bool TronChance(CpuContext c)
         {
             if (c.StackCount <= 0) return false;

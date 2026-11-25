@@ -26,11 +26,36 @@ namespace Yurube
         [Tooltip("画面下部に表示する必殺技名")]
         [SerializeField] string m_cutInName = "六腕";
 
+        [Header("疾風連撃(suehara)。オンなら上の「六腕」の代わりにこちらを出す")]
+        [Tooltip("オン: 薙ぎ払うたびに前へ斬撃が飛ぶ / オフ: 前の「六腕」")]
+        [SerializeField] bool m_useGaleCombo = true;
+        [Tooltip("技名(カットインに出す)")]
+        [SerializeField] string m_galeName = "疾風連撃";
+        [Tooltip("効果時間(秒)")]
+        [SerializeField] float m_galeDuration = 5.0f;
+        [Tooltip("斬撃の進む速さ(m/s)。遅いほどジャンプでよけやすい")]
+        [SerializeField] float m_slashSpeed = 11.0f;
+        [Tooltip("斬撃が届く距離(m)")]
+        [SerializeField] float m_slashRange = 12.0f;
+        [Tooltip("斬撃の横幅(m)")]
+        [SerializeField] float m_slashWidth = 2.4f;
+        [Tooltip("斬撃の高さ(足元から。m)。ジャンプで足元がこれより上にあれば当たらない")]
+        [SerializeField] float m_slashHeight = 0.6f;
+        [Tooltip("斬撃の厚み(進む向き。m)。厚いほどジャンプでよけにくい")]
+        [SerializeField] float m_slashDepth = 0.4f;
+        [SerializeField] Color m_galeCutInColor = new Color(0.35f, 0.75f, 1.0f);
+
         DarumaCharacter m_character;
         SpecialGauge m_gauge;
         AodaruSixArms m_arms;
+        // 疾風連撃が終わる時刻(使っていなければ負)・この振りで斬撃を出したか
+        float m_galeUntil = -1.0f;
+        bool m_slashedThisSwing;
 
-        public bool IsActive => m_arms != null;
+        public bool IsActive => m_arms != null || m_galeUntil >= 0.0f;
+        // CPU 用(suehara): 疾風連撃を使うか / 斬撃が届く距離
+        public bool UsesGaleCombo => m_useGaleCombo;
+        public float SlashRange => m_slashRange;
 
         private void Awake()
         {
@@ -40,6 +65,7 @@ namespace Yurube
 
         private void Update()
         {
+            UpdateGale();
             if (m_gauge == null || !IsLocalHuman()) return;
 
             if (SpecialInput.WasPressed(m_character)) TryActivate();
@@ -60,6 +86,7 @@ namespace Yurube
         // ラボのボタンからも呼べる。発動できたら true
         public bool TryActivate()
         {
+            if (m_useGaleCombo) return TryActivateGale();
             if (m_gauge == null || !m_gauge.IsFull) return false;
             if (m_character == null || !m_character.CanBeAffected) return false;
             if (m_arms != null) return false;   // 発動中は重ねられない
@@ -99,13 +126,76 @@ namespace Yurube
         }
 
         //========================================
+        // 疾風連撃(suehara)
+        //  効果時間の間、薙ぎ払いのたびに(振りの半分まで来たところで)前へ斬撃が飛ぶ
+        //========================================
+
+        bool TryActivateGale()
+        {
+            if (m_gauge == null || !m_gauge.IsFull) return false;
+            if (m_character == null || !m_character.CanBeAffected) return false;
+            if (m_galeUntil >= 0.0f) return false;   // 発動中は重ねられない
+
+            m_gauge.Consume();
+            // ネット対戦用(suehara): クライアントにも発動を知らせる(斬撃の当たり判定はホストだけ)
+            SpecialNet.Send(m_character, this, kNetGale, new[] { 0.0f });
+            PlayGale();
+
+            if (m_logSpecial) Debug.Log($"[あおだる] 必殺技『{m_galeName}』発動", this);
+            return true;
+        }
+
+        void PlayGale()
+        {
+            m_galeUntil = Time.time + m_galeDuration;
+            m_slashedThisSwing = false;
+            SpecialCutIn.Show(m_galeName, m_galeCutInColor, null, m_character, null, m_character.Stack != null ? m_character.Stack.Count : 0);
+        }
+
+        void UpdateGale()
+        {
+            if (m_galeUntil < 0.0f || m_character == null) return;
+            DarumaHammer hammer = m_character.Hammer;
+            if (hammer == null) return;
+
+            // 時間はゲームの時間で数える(カットインで止まっている間は減らない)
+            if (Time.time >= m_galeUntil)
+            {
+                m_galeUntil = -1.0f;
+                return;
+            }
+
+            if (!hammer.IsSweeping)
+            {
+                m_slashedThisSwing = false;
+                return;
+            }
+            if (m_slashedThisSwing || hammer.ActionTime < hammer.SweepDuration * 0.5f) return;
+            m_slashedThisSwing = true;
+            if (SpecialNet.IsClient) return;   // ネット対戦用(suehara): 斬撃はホストだけ
+
+            Vector3 dir = m_character.transform.forward;
+            dir.y = 0.0f;
+            if (dir.sqrMagnitude < 0.0001f) return;
+            dir.Normalize();
+            Vector3 from = m_character.transform.position + dir * (DarumaCharacter.kBodyRadius + 0.3f);
+            AodaruGaleSlash.Spawn(m_character, from, dir, m_slashSpeed, m_slashRange, m_slashWidth, m_slashHeight, m_slashDepth);
+        }
+
+        //========================================
         // ネット対戦用(suehara): クライアントで、ホストの発動と同じ見た目を出す
         //========================================
 
         const int kNetActivate = 0;
+        const int kNetGale = 1;
 
         public void NetReceive(int ev, float[] v, TumikiBlock[] blocks)
         {
+            if (ev == kNetGale)
+            {
+                if (m_galeUntil < 0.0f) PlayGale();
+                return;
+            }
             if (ev != kNetActivate || v.Length < 1 || m_arms != null) return;
             PlayActivate(v[0]);
         }
