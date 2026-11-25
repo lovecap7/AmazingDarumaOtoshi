@@ -518,7 +518,8 @@ namespace Nakahira
             float end = hammer.SweepEndYaw;
             // ハンマーが届かない角度(背中側)なら、跳ぶ必要がない
             if (bearing > start || bearing < end) return false;
-            float hitTime = hammer.SweepDuration * (start - bearing) / (start - end);
+            // 出だしがゆっくりの振り方・切り返し(左から右)も含めて、ハンマーがそこを通る時間
+            float hitTime = hammer.CurrentSweepTimeAtYaw(bearing);
             float left = (hitTime - hammer.ActionTime) / o.Character.LocalTimeScale;
             return left > kJumpClearTime;
         }

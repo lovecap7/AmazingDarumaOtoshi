@@ -13,3 +13,5 @@ MonoBehaviour:
   m_Name: Ghost_Default
   m_EditorClassIdentifier: Assembly-CSharp::Nakahira.GhostParams
   MoveSpeed: 3
+  FloatAmplitude: 0.08
+  FloatPeriod: 3

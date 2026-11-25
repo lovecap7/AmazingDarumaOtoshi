@@ -336,9 +336,8 @@ namespace Nakahira
         private static float SwingStartIn(CpuContext c, Threat t, float bearing)
         {
             DarumaHammer hammer = c.Self.Hammer;
-            float start = hammer.SweepStartYaw;
-            float end = hammer.SweepEndYaw;
-            float cross = Mathf.Clamp01((start - bearing) / (start - end)) * hammer.SweepDuration;
+            // 今押すと切り返しになるときは、左から右へ振る
+            float cross = hammer.SweepTimeAtYaw(bearing, hammer.NextSweepIsReverse);
             // 届く距離に入ってから体に触れるまでの間の真ん中で当てる
             float hitTime = (t.TReach + t.TIn) * 0.5f;
             return hitTime - cross - InputLatency;

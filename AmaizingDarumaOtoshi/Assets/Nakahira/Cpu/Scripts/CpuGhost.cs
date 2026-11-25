@@ -368,7 +368,7 @@ namespace Nakahira
                 local = t.InverseTransformPoint(sp + v * time);
                 float bearing = Mathf.Atan2(local.x, local.z) * Mathf.Rad2Deg;
                 if (bearing > start || bearing < end) return false;
-                time = kSwingDelay + duration * (start - bearing) / (start - end);
+                time = kSwingDelay + hammer.SweepTimeAtYaw(bearing, hammer.NextSweepIsReverse) / ghost.LocalTimeScale;
             }
             // 時間がたつほど相手の動きは変わりやすいので、遠い角度ほど届く距離を控えめにする
             float margin = Mathf.Lerp(1.0f, 0.85f, time / Mathf.Max(0.01f, duration));
