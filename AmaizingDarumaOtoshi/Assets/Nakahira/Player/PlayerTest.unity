@@ -1274,9 +1274,16 @@ MonoBehaviour:
   m_directStocks: 3
   m_directTimeLimit: 0
   m_maxPlayers: 4
+  m_directTeams: 0
+  m_directKnockPoints: 1
+  m_directKnockedPoints: -1
+  m_directHeadPoints: 1
+  m_directSelfOutPoints: -1
+  m_useDirectSlots: 0
+  m_directSlots: []
   m_dummyCount: 1
   m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
-  m_dummyStartBlocks: 80
+  m_dummyStartBlocks: 10
   m_cpuCount: 0
   m_cpuParams: {fileID: 0}
   m_addDebugView: 1

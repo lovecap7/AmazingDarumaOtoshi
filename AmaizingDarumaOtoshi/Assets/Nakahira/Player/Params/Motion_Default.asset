@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Motion_Default
   m_EditorClassIdentifier: Assembly-CSharp::Nakahira.DarumaMotionParams
   MaxHorizontalOffset: 1
-  StepLength: 2.5
+  StepLength: 1.5
   HopHeight: 0.1
   HopGap: 0.01
   WaddleAngle: 0.71
@@ -27,14 +27,16 @@ MonoBehaviour:
   SwayInertia: 0.05
   IdleSway: 0.03
   IdleSwayPeriod: 2.6
-  JumpGap: 0.5
-  MaxJumpSpread: 0.5
-  GapOpenTime: 0.16
-  GapCloseTime: 0.3
-  LandBounce: 0.1
-  LandInterval: 0.03
-  LandDuration: 0.08
-  LandMinAirTime: 0.15
+  BodyInertia: 0.2
+  BlockPull: 25
+  ContactFrequency: 30
+  ContactDamping: 0.5
+  MaxGap: 0.3
+  TiltKick: 15
+  TiltKickMinSpeed: 0.3
+  MaxTilt: 15
+  TiltFrequency: 6
+  TiltDamping: 0.5
   PickupGap: 0.03
   SweepKick: 2
   ShotKick: 0.8

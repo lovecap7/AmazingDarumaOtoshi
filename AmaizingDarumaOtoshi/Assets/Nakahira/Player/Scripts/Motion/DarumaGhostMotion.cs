@@ -92,5 +92,8 @@ namespace Nakahira
         {
             return new Vector3(0.0f, m_offset, 0.0f);
         }
+
+        // 幽霊は傾けない
+        public Quaternion GetTilt(float height) => Quaternion.identity;
     }
 }

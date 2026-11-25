@@ -3,8 +3,9 @@ using UnityEngine;
 namespace Nakahira
 {
     // 生存キャラクターの体の動き(見た目だけ。当たり判定・移動は変えない)の調整値(全キャラ共通。JumpParams.Motion に入れる)
-    // 積み上げているのは硬い積み木なので、伸び縮み(大きさの変化)も傾きも使わず、段ごとの平行なずれだけで動かす
+    // 積み上げているのは硬い積み木なので、伸び縮み(大きさの変化)は使わず、ふだんは段ごとの平行なずれだけで動かす
     // (横のずれは上の段ほど大きく、だるま落としのような階段の形になる。「角度」の値は、足元と一番上を結んだ線の傾き)
+    // ジャンプ・着地では、段ごとの上下の動きと傾きを簡単な物理で計算する(傾きの向きはランダム)
     // 値は使うたびに直接読むので、再生中に変更しても即座に反映される
     [CreateAssetMenu(fileName = "DarumaMotionParams", menuName = "Nakahira/Daruma Motion Params")]
     public class DarumaMotionParams : ScriptableObject
@@ -45,25 +46,29 @@ namespace Nakahira
         [Tooltip("止まっているときの揺れの周期(秒)")]
         [Min(0.1f)] public float IdleSwayPeriod = 2.6f;
 
-        [Header("ジャンプ(上の段ほど浮いて隙間が開く)")]
-        [Tooltip("跳んだ瞬間に、段と段の間に空く隙間(m。1 段ごと)")]
-        [Min(0.0f)] public float JumpGap = 0.05f;
-        [Tooltip("隙間を全部足した量の上限(m)。段が多いときに頭が浮きすぎないように")]
-        [Min(0.0f)] public float MaxJumpSpread = 0.35f;
-        [Tooltip("跳んでから隙間が開ききるまでの時間(秒)")]
-        [Min(0.01f)] public float GapOpenTime = 0.06f;
-        [Tooltip("落ち始めてから隙間が詰まるまでの時間(秒)")]
-        [Min(0.01f)] public float GapCloseTime = 0.3f;
+        [Header("ジャンプ・着地(段ごとに物理で計算する。跳んだ・落ちた・押し上げられたも同じ仕組み)")]
+        [Tooltip("体の上下の勢いの変化を、積み木がどれだけ受けるか。1 で本物どおり(キャラの跳び方が速すぎるので小さくする)")]
+        [Range(0.0f, 1.0f)] public float BodyInertia = 0.12f;
+        [Tooltip("宙に浮いた積み木を下へ引き戻す強さ(m/秒²)。大きいほど早く戻る。0 で体といっしょに落ちる")]
+        [Min(0.0f)] public float BlockPull = 25.0f;
+        [Tooltip("積み木どうしがぶつかったときの硬さ(Hz)。大きいほど硬く、小さいほどぐにゃっと弾む")]
+        [Range(5.0f, 80.0f)] public float ContactFrequency = 30.0f;
+        [Tooltip("ぶつかったときの跳ね返りにくさ(0 でよく跳ね返る〜1 で跳ね返らない)")]
+        [Range(0.0f, 1.0f)] public float ContactDamping = 0.5f;
+        [Tooltip("段と段の間の隙間の上限(m)。これより離れない")]
+        [Min(0.0f)] public float MaxGap = 0.3f;
 
-        [Header("着地(上の段から順にトトトッと詰まる)")]
-        [Tooltip("着地で 1 段ずつ跳ねる高さ(m)")]
-        [Min(0.0f)] public float LandBounce = 0.03f;
-        [Tooltip("上の段から次の段へ移るまでの間(秒)")]
-        [Min(0.0f)] public float LandInterval = 0.03f;
-        [Tooltip("1 段が跳ねている時間(秒)")]
-        [Min(0.01f)] public float LandDuration = 0.08f;
-        [Tooltip("これより短い空中(秒)からの着地では詰まる動きを出さない")]
-        [Min(0.0f)] public float LandMinAirTime = 0.15f;
+        [Header("ジャンプ・着地の傾き(向きはランダム)")]
+        [Tooltip("下の段から離れたとき・ぶつかったときに傾く勢い(度/秒。ぶつかる速さ 1m/秒あたり)")]
+        [Min(0.0f)] public float TiltKick = 15.0f;
+        [Tooltip("この速さ(m/秒)より弱く離れた・ぶつかったときは傾かない")]
+        [Min(0.0f)] public float TiltKickMinSpeed = 0.3f;
+        [Tooltip("どの段も、これ以上は傾かない(度)")]
+        [Range(0.0f, 60.0f)] public float MaxTilt = 15.0f;
+        [Tooltip("下の段に乗っているとき、下の段と同じ傾きに戻る速さ(Hz)")]
+        [Min(0.1f)] public float TiltFrequency = 6.0f;
+        [Tooltip("傾きが戻るときの揺れ返しにくさ(0 で揺れ続ける〜1 で揺れ返さない)")]
+        [Range(0.0f, 1.0f)] public float TiltDamping = 0.5f;
 
         [Header("拾う")]
         [Tooltip("積み木を拾った瞬間、段と段の間に空く隙間(m。1 段ごと。すぐ詰まる)")]

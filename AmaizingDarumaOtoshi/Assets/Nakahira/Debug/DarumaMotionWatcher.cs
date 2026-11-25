@@ -22,6 +22,22 @@ namespace Nakahira.DebugTools
         public float MaxGhostShift { get; private set; }
         readonly Dictionary<DarumaCharacter, bool> m_grounded = new Dictionary<DarumaCharacter, bool>();
 
+        // ジャンプののけぞり(2026-11-25)
+        // 頭・一番上の段の傾きの最大(度)、隣り合う段の中心の距離から積み木の高さを引いた最小(m。負なら重なっている)
+        public float MaxHeadTilt { get; private set; }
+        public float MaxTopBlockTilt { get; private set; }
+        public float MinLevelSpacing { get; private set; } = float.MaxValue;
+        // ジャンプの段階が変わった時刻(最初のキャラクターだけ)
+        readonly System.Text.StringBuilder m_phaseLog = new System.Text.StringBuilder();
+        string m_lastPhase;
+        public string PhaseLog => m_phaseLog.ToString();
+        // 段の隙間・傾きの時間ごとの記録(最初のキャラクターだけ。TraceInterval 秒ごと)
+        // 1 行 = 時刻 地上/空中 | 下から順の隙間(cm) | 下から順の傾き(度)
+        public float TraceInterval = 0.0333f;
+        readonly System.Text.StringBuilder m_trace = new System.Text.StringBuilder();
+        float m_nextTrace;
+        public string Trace => m_trace.ToString();
+
         public static DarumaMotionWatcher Begin()
         {
             if (Instance != null) Destroy(Instance.gameObject);
@@ -42,8 +58,24 @@ namespace Nakahira.DebugTools
                 keys.Sort();
                 sb.Append(" / 段数ごとの頭の横ずれ最大:");
                 foreach (int k in keys) sb.Append($" {k}段={m_maxHeadSide[k]:F3}");
+                sb.Append($" / 頭の傾き最大 {MaxHeadTilt:F1}度 / 一番上の段の傾き最大 {MaxTopBlockTilt:F1}度")
+                  .Append($" / 隣り合う段の隙間の最小 {(MinLevelSpacing == float.MaxValue ? 0.0f : MinLevelSpacing):F3}m");
                 return sb.ToString();
             }
+        }
+
+        // 段階を記録するキャラクター(最初に見つけた 1 人)
+        DarumaCharacter m_first;
+        private DarumaCharacter FindFirstCharacter()
+        {
+            if (m_first == null || !m_first.isActiveAndEnabled)
+            {
+                foreach (var c in FindObjectsByType<DarumaCharacter>())
+                {
+                    if (c.isActiveAndEnabled) { m_first = c; break; }
+                }
+            }
+            return m_first;
         }
 
         private void LateUpdate()
@@ -73,6 +105,48 @@ namespace Nakahira.DebugTools
                     Vector3 o = motion.GetOffset(0.6f);
                     MaxHammerShift = Mathf.Max(MaxHammerShift, o.magnitude);
                 }
+                // のけぞり:実際に置かれた段・頭の傾きと、隣り合う段の間隔
+                for (int i = 0; i < s.Count; i++)
+                {
+                    Transform t = s.Get(i).transform;
+                    float tilt = Quaternion.Angle(Quaternion.identity, t.localRotation);
+                    if (i == s.Count - 1) MaxTopBlockTilt = Mathf.Max(MaxTopBlockTilt, tilt);
+                    if (i > 0)
+                    {
+                        float d = Vector3.Distance(t.position, s.Get(i - 1).transform.position) - TumikiBlock.kHeight;
+                        MinLevelSpacing = Mathf.Min(MinLevelSpacing, d);
+                    }
+                }
+                if (s.Head != null)
+                {
+                    float headTilt = Vector3.Angle(s.Head.up, c.transform.up);
+                    MaxHeadTilt = Mathf.Max(MaxHeadTilt, headTilt);
+                }
+                if (m_phaseLog.Length < 4000 && c == FindFirstCharacter())
+                {
+                    string phase = motion.JumpPhaseName;
+                    if (phase != m_lastPhase)
+                    {
+                        m_phaseLog.Append($"{Time.time:F2}:{phase}{(c.IsGrounded ? "(地上)" : "(空中)")} ");
+                        m_lastPhase = phase;
+                    }
+                }
+
+                if (c == FindFirstCharacter() && Time.time >= m_nextTrace && m_trace.Length < 20000)
+                {
+                    m_nextTrace = Time.time + TraceInterval;
+                    m_trace.Append($"{Time.time:F2} {(c.IsGrounded ? "地" : "空")} |");
+                    for (int i = 1; i < s.Count; i++)
+                    {
+                        float gap = Vector3.Dot(s.Get(i).transform.position - s.Get(i - 1).transform.position, c.transform.up) - TumikiBlock.kHeight;
+                        m_trace.Append($" {gap * 100.0f:F0}");
+                    }
+                    m_trace.Append(" |");
+                    for (int i = 0; i < s.Count; i++)
+                        m_trace.Append($" {Quaternion.Angle(Quaternion.identity, s.Get(i).transform.localRotation):F0}");
+                    m_trace.Append('\n');
+                }
+
                 bool g = c.IsGrounded;
                 if (m_grounded.TryGetValue(c, out bool was))
                 {
