@@ -157,6 +157,12 @@ namespace Nakahira
         public IDarumaAttacker Owner { get; private set; }
         // ハンマーで打ち返された回数(打ち返しの弾速に使う)。連鎖した先にも引き継がれる
         public int ReturnCount { get; private set; }
+        // 攻撃力。生存キャラクターに当たったとき、この数だけ段が飛ぶ(足りなければ脱落)。
+        // ハンマーで打ち返すたびに 1 上がる。止まる・積まれると 1 に戻る(連鎖で飛び出した積み木は 1 のまま)
+        public int AttackPower { get; private set; } = 1;
+        public void SetAttackPower(int power) => AttackPower = Mathf.Max(1, power);
+        // 積み木共通の性能
+        public TumikiParams Params => m_params;
         // 攻撃判定があるか(連鎖・ダメージが起きる速さで動いている)
         public bool IsHarmful => CurrentState == State.Flying && !m_isConsumed && Speed >= m_params.HarmlessSpeed;
 
@@ -378,6 +384,46 @@ namespace Nakahira
             }
             SetEmission(m_smokeTrail, moving);
             SetEmission(m_fireAura, IsHarmful);
+            UpdateFlameColor();
+        }
+
+        // 攻撃力が上がるほど、炎を赤から青へ変える(打ち返す前は元の炎のまま)
+        int m_flameReturns;
+        bool m_flameSaved;
+        ParticleSystem.MinMaxGradient m_flameStartColor;
+        ParticleSystem.MinMaxGradient m_flameLifetimeColor;
+        bool m_flameLifetimeEnabled;
+        Gradient m_flameBuffer;
+
+        private void UpdateFlameColor()
+        {
+            if (m_fireAura == null || m_params == null) return;
+            int returns = AttackPower - 1;
+            if (returns == m_flameReturns) return;
+            m_flameReturns = returns;
+
+            var main = m_fireAura.main;
+            var lifetime = m_fireAura.colorOverLifetime;
+            if (!m_flameSaved)
+            {
+                m_flameStartColor = main.startColor;
+                m_flameLifetimeColor = lifetime.color;
+                m_flameLifetimeEnabled = lifetime.enabled;
+                m_flameSaved = true;
+            }
+            if (m_flameBuffer == null) m_flameBuffer = new Gradient();
+            Gradient g = m_params.FlameFor(returns, m_flameBuffer);
+            if (g == null)
+            {
+                main.startColor = m_flameStartColor;
+                lifetime.color = m_flameLifetimeColor;
+                lifetime.enabled = m_flameLifetimeEnabled;
+                return;
+            }
+            // 元の炎は粒ごとに少し黄色みを付けているので、色を変えるときは白にして、消えるまでの色だけで決める
+            main.startColor = UnityEngine.Color.white;
+            lifetime.enabled = true;
+            lifetime.color = new ParticleSystem.MinMaxGradient(g);
         }
 
         private static void SetEmission(ParticleSystem ps, bool enabled)
@@ -427,12 +473,14 @@ namespace Nakahira
             m_collider.enabled = false;
             transform.SetParent(parent, true);
             transform.localRotation = Quaternion.identity;
+            AttackPower = 1;
         }
 
         // ステージに落ちている状態にする
         public void SetLoose()
         {
             CurrentState = State.Loose;
+            AttackPower = 1;
             EnablePhysics();
         }
 

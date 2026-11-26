@@ -1285,6 +1285,10 @@ MonoBehaviour:
     character: {fileID: 11400000, guid: 9fc5324d816f46cb80cbe99a1d9c3a1a, type: 2}
     cpuLevel: 0
     team: 0
+  - kind: 0
+    character: {fileID: 11400000, guid: 9fc5324d816f46cb80cbe99a1d9c3a1a, type: 2}
+    cpuLevel: 0
+    team: 1
   m_dummyCount: 0
   m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
   m_dummyStartBlocks: 10
