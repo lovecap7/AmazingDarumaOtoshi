@@ -38,6 +38,8 @@ public static class CharacterPortraitBaker
 
             Undo.RecordObject(c, "キャラの顔写真");
             c.portrait = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+
+            BakeColors(c, id);
             EditorUtility.SetDirty(c);
             count++;
         }
@@ -45,14 +47,71 @@ public static class CharacterPortraitBaker
         Debug.Log($"[CharacterPortraitBaker] {count} キャラの顔写真を撮りました（{OutFolder}）");
     }
 
+    // 色違いの顔写真だけ撮る（いつもの顔写真はそのまま）
+    [MenuItem("Fujihara/キャラの色違いの顔写真を撮る")]
+    public static void BakeColorsAll()
+    {
+        var roster = AssetDatabase.LoadAssetAtPath<SelectRoster>(RosterPath);
+        if (roster == null) { Debug.LogError("SelectRoster が見つかりません：" + RosterPath); return; }
+        int count = 0;
+        foreach (var c in roster.characters)
+        {
+            if (c == null || c.model == null) continue;
+            Undo.RecordObject(c, "キャラの色違いの顔写真");
+            count += BakeColors(c, string.IsNullOrEmpty(c.id) ? c.name : c.id);
+            EditorUtility.SetDirty(c);
+        }
+        AssetDatabase.SaveAssets();
+        Debug.Log($"[CharacterPortraitBaker] 色違いの顔写真を {count} 枚撮りました（{OutFolder}/Colors）");
+    }
+
+    // 色違い（キャラクターセレクトで、プレイヤーの色のモデルを見せる）：その色のモデル＋その色の鉢巻で撮る。撮った枚数を返す
+    static int BakeColors(CharacterData c, string id)
+    {
+        int n = 0;
+        if (c.colorPortraits == null || c.colorPortraits.Length < 6) System.Array.Resize(ref c.colorPortraits, 6);
+        foreach (DarumaColor col in System.Enum.GetValues(typeof(DarumaColor)))
+        {
+            int ci = (int)col;
+            if (col == DarumaColor.Wood) { c.colorPortraits[ci] = null; continue; }   // 木はいつもの portrait
+            var colored = c.colorModels != null && ci < c.colorModels.Length ? c.colorModels[ci] : null;
+            if (colored == null) { c.colorPortraits[ci] = null; continue; }
+            string folder = $"{OutFolder}/Colors/{col}";
+            EnsureFolder(folder);
+            string cpath = $"{folder}/{id}.png";
+            File.WriteAllBytes(cpath, Render(colored, ExtrasOf(c, col)));
+            AssetDatabase.ImportAsset(cpath);
+            var cimp = (TextureImporter)AssetImporter.GetAtPath(cpath);
+            cimp.textureType = TextureImporterType.Sprite;
+            cimp.alphaIsTransparency = true;
+            cimp.mipmapEnabled = false;
+            cimp.SaveAndReimport();
+            c.colorPortraits[ci] = AssetDatabase.LoadAssetAtPath<Sprite>(cpath);
+            n++;
+        }
+        return n;
+    }
+
     // 頭と一緒に写すもの：マントなど（extraModels）と、いつもの鉢巻
-    public static GameObject[] ExtrasOf(CharacterData c)
+    public static GameObject[] ExtrasOf(CharacterData c) => ExtrasOf(c, DarumaColor.Wood);
+
+    // bandColor：鉢巻の色（色違いの顔写真では、そのプレイヤーの色の鉢巻）
+    public static GameObject[] ExtrasOf(CharacterData c, DarumaColor bandColor)
     {
         var list = new System.Collections.Generic.List<GameObject>();
         if (c.extraModels != null) list.AddRange(c.extraModels);
-        var band = GameModelSettings.HachimakiFor(DarumaColor.Wood);
+        var band = GameModelSettings.HachimakiFor(bandColor);
         if (band != null) list.Add(band);
         return list.ToArray();
+    }
+
+    static void EnsureFolder(string path)
+    {
+        if (AssetDatabase.IsValidFolder(path)) return;
+        int slash = path.LastIndexOf('/');
+        string parent = path.Substring(0, slash);
+        EnsureFolder(parent);
+        AssetDatabase.CreateFolder(parent, path.Substring(slash + 1));
     }
 
     // extras：頭と一緒に写すモデル（マント・アクセサリー。頭と同じ原点で作ったもの）

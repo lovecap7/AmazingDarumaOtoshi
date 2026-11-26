@@ -1,0 +1,76 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 296aea70e85e0eb4597a02a8b9cb6662, type: 3}
+  m_Name: MatchVfxSettings
+  m_EditorClassIdentifier: Assembly-CSharp::MatchVfxSettings
+  dust: 1
+  dustColor: {r: 0.96, g: 0.94, b: 0.9, a: 0.7}
+  runSpacing: 0.7
+  dashSpacing: 0.3
+  runSize: 0.35
+  dashSize: 0.55
+  jumpPuffs: 10
+  landPuffs: 14
+  landSpeed: 4
+  rally: 1
+  shockwave: 1
+  shockwaveColor: {r: 1, g: 1, b: 1, a: 0.9}
+  shockwaveSize: 0.5
+  shockwaveSizePerReturn: 0.15
+  shockwaveTime: 0.35
+  shockwavePulse: 0.22
+  invert: 0
+  invertAt: 4
+  invertExpand: 0.35
+  invertShrink: 0.15
+  invertShader: {fileID: 4800000, guid: caa70afbe88d28c44ab3474a351960a4, type: 3}
+  contrast: 35
+  flash: 1.6
+  recover: 0.25
+  shake: 0.35
+  shakePerReturn: 0.15
+  shakeMax: 1.2
+  speedLines: 0
+  swingTrail: 1
+  trailLife: 0.14
+  trailInner: 0.45
+  trailAlpha: 0.75
+  killExplosion: 1
+  minAttackPower: 2
+  chargeTime: 1.1
+  gatherRadius: 16
+  gatherRateStart: 150
+  gatherRateEnd: 900
+  explosionTime: 0.9
+  explosionSize: 9
+  chargeScale: 1.6
+  glowIntensity: 3
+  chargeDarken: 0.7
+  coreColor: {r: 1, g: 0.85, b: 0.8, a: 1}
+  outerColor: {r: 1, g: 0.08, b: 0.05, a: 1}
+  additiveShader: {fileID: 4800000, guid: 1c08af441a30e814f811fa5795564741, type: 3}
+  excalibur: 1
+  excaliburGold: {r: 1, g: 0.78, b: 0.25, a: 1}
+  excaliburCore: {r: 1, g: 0.97, b: 0.82, a: 1}
+  excaliburMoteRadius: 14
+  excaliburMoteRateStart: 60
+  excaliburMoteRateEnd: 260
+  excaliburGatherRate: 320
+  excaliburPillarHeight: 26
+  excaliburWaveTime: 0.22
+  excaliburCurtainHeight: 9
+  excaliburFireTime: 1.3
+  excaliburBlastInset: 4.5
+  excaliburScarWidth: 1.3
+  excaliburScarTime: 8
+  excaliburRockSize: 0.3
+  excaliburRockDensity: 1
