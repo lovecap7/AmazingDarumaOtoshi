@@ -109,6 +109,34 @@ public class CapeSway : MonoBehaviour
     void Awake()
     {
         if (roots.Count == 0) FindRoots();
+        Build();
+    }
+
+    // 実行中に作った骨（鉢巻の余りなど）を揺らす。root：揺らす鎖の根元
+    public void Setup(IEnumerable<Transform> newRoots)
+    {
+        roots.Clear();
+        roots.AddRange(newRoots);
+        started = false;
+        Build();
+    }
+
+    // 鉢巻の余りのような、軽くて細い布の揺れ方にする（マントより柔らかく、よくはためく）
+    public void UseRibbonPreset()
+    {
+        stiffness = 0.05f; softerToTip = 0.6f; damping = 0.08f; gravity = 0.3f; inertia = 0.85f; maxAngle = 110f;
+        airDrag = 0.45f; jumpDrag = 0.4f; runLift = 0.15f; runFlutter = 0.25f;
+        windStrength = 0.35f; windSpeed = 2.4f; windWave = 0.9f;
+        edgeFlutter = 25f; edgeFlutterSpeed = 7f;
+        bodyCenter = new Vector3(0f, 0.47f, 0f); bodyRadius = 0.45f; bodyHeight = 1f;
+        for (int c = 0; c < chains.Count; c++)
+            for (int i = 0; i < chains[c].Count; i++)
+                chains[c][i].k = stiffness * Mathf.Lerp(1f, 1f - softerToTip, chains[c][i].depth01);
+    }
+
+    void Build()
+    {
+        chains.Clear();
         for (int c = 0; c < roots.Count; c++)
         {
             if (roots[c] == null) continue;
@@ -122,6 +150,12 @@ public class CapeSway : MonoBehaviour
                 var child = b.childCount > 0 ? b.GetChild(0) : null;
                 var j = new Joint { bone = b, restLocalRot = b.localRotation, side = side };
                 if (child != null) { j.tipLocal = child.localPosition; lastLen = child.localPosition.magnitude; }
+                else if (b.parent != null && list.Count > 0)
+                {
+                    // 鎖の最後の骨：ひとつ前の骨と同じ向きに、同じ長さだけ伸ばす
+                    Vector3 prevDir = b.position - b.parent.position;
+                    j.tipLocal = prevDir.sqrMagnitude > 1e-10f ? b.InverseTransformDirection(prevDir).normalized * lastLen : Vector3.up * lastLen;
+                }
                 else j.tipLocal = Vector3.up * lastLen;   // 骨は +Y が先の向き（Blender の骨）
                 j.length = Mathf.Max(lastLen, 1e-4f);
                 j.seed = c * 17.3f + depth * 3.1f;
@@ -200,15 +234,16 @@ public class CapeSway : MonoBehaviour
                 float k = j.k * Mathf.Lerp(1f, chargeSoftness, chargeNow);   // 溜めている間は柔らかく
                 Vector3 next = j.tip + vel * inertia + (rest - j.tip) * k + force * dt;
 
-                // 骨の長さを保つ
+                // 骨の長さを保つ（世界での長さ。頭が拡大・縮小されていても形が変わらないように）
                 Vector3 root = j.bone.position;
+                float len = Mathf.Max((rest - root).magnitude, 1e-4f);
                 Vector3 dir = next - root;
                 if (dir.sqrMagnitude < 1e-8f) dir = rest - root;
-                next = root + dir.normalized * j.length;
+                next = root + dir.normalized * len;
 
                 // 体の中にめり込んだら外へ押し出す
                 next = PushOutOfBody(next);
-                next = root + (next - root).normalized * j.length;
+                next = root + (next - root).normalized * len;
 
                 // 元の形から曲がりすぎないようにする
                 Vector3 restDir = (rest - root).normalized, nowDir = (next - root).normalized;
@@ -216,7 +251,7 @@ public class CapeSway : MonoBehaviour
                 if (ang > limit)
                 {
                     nowDir = Vector3.Slerp(restDir, nowDir, limit / ang);
-                    next = root + nowDir * j.length;
+                    next = root + nowDir * len;
                 }
 
                 j.prevTip = j.tip;

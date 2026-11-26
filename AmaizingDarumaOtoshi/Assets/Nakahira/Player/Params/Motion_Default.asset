@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 105485de4b6fd4d4aa11e89bb034cf75, type: 3}
+  m_Name: Motion_Default
+  m_EditorClassIdentifier: Assembly-CSharp::Nakahira.DarumaMotionParams
+  MaxHorizontalOffset: 1
+  StepLength: 1.5
+  HopHeight: 0.1
+  HopGap: 0.01
+  WaddleAngle: 0.71
+  LeanAngle: 3
+  LeanSmoothTime: 0.12
+  WalkBlendTime: 0.08
+  SwayReferenceHeight: 3
+  SwayHeightExponent: 2
+  SwayFrequency: 1.4
+  SwayDamping: 0.25
+  SwayInertia: 0.05
+  IdleSway: 0.03
+  IdleSwayPeriod: 2.6
+  BodyInertia: 0.2
+  BlockPull: 25
+  ContactFrequency: 30
+  ContactDamping: 0.5
+  MaxGap: 0.3
+  TiltKick: 15
+  TiltKickMinSpeed: 0.3
+  MaxTilt: 15
+  TiltFrequency: 6
+  TiltDamping: 0.5
+  PickupGap: 0.03
+  SweepKick: 2
+  ShotKick: 0.8

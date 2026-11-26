@@ -153,6 +153,8 @@ namespace Nakahira
         public float MaxTurnDegreesPerSecond { get; set; }
         // 方向入力での旋回は許可しつつ、並進移動だけを止める(だるきんぐの照準詠唱など)
         public bool MovementLocked { get; set; }
+        // 自分で跳んだ回数(体の見た目の動き DarumaMotion が、跳んだのか押し上げられたのかを見分ける)
+        public int JumpCount { get; private set; }
         // 毒などのデバフ: 移動入力の左右前後を反転する(攻撃・カメラ操作は反転しない)
         public bool MovementInverted { get; set; }
         // 毒などのデバフ: 水平移動速度の倍率(1で通常)
@@ -227,6 +229,8 @@ namespace Nakahira
             m_commandSource = GetComponent<IDarumaCommandSource>();
             m_stack.Changed += UpdateBodyCollider;
             UpdateBodyCollider();
+            // 体の見た目の動き(歩く・跳ぶ・着地など)。キャラのプレハブを変えずに全キャラへ付ける。調整値は JumpParams.Motion
+            if (GetComponent<DarumaMotion>() == null) gameObject.AddComponent<DarumaMotion>();
         }
 
         private void Update()
@@ -442,6 +446,7 @@ namespace Nakahira
             v.y = m_jumpParams.JumpSpeed;
             // 次の接地判定を待たずに空中扱いにする(直後のショットを防ぐ)
             m_isGrounded = false;
+            JumpCount++;
         }
 
         private bool CheckGrounded()
@@ -685,6 +690,10 @@ namespace Nakahira
         }
 
         public Vector3 HorizontalVelocity => m_baseHorizontal;
+        // 前のステップで、自分で歩いた水平の速度(ギミックで流された分・はじかれた分を除く。体の動き DarumaMotion 用)
+        public Vector3 WalkVelocity => new Vector3(m_lastVelocity.x, 0.0f, m_lastVelocity.z);
+        // 前のステップの、本来の上下の速度(ヒットストップの倍率を掛ける前。体の動き DarumaMotion 用)
+        public float VerticalVelocity => m_lastVelocity.y;
 
         public void RequestSpeedScale(float scale)
         {

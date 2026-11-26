@@ -199,7 +199,8 @@ public static class ToyKit
 
     // スマイルの頭（CreateHead の root）をモデル（Blender のだるまなど。足元が原点）に差し替える。
     // 球と目・口は隠し、モデルの足元を球の下端に合わせる。頭が拡大されていても、頭のローカル座標で height の高さになる
-    public static void AttachHeadModel(Transform headRoot, GameObject model, float height, float yaw)
+    // band：着ける鉢巻（null なら、だるまのキャラのときはいつもの鉢巻）
+    public static void AttachHeadModel(Transform headRoot, GameObject model, float height, float yaw, GameObject band = null)
     {
         if (model == null || headRoot == null) return;
         foreach (Transform c in headRoot) c.gameObject.SetActive(false);
@@ -217,6 +218,15 @@ public static class ToyKit
         m.transform.localScale = Vector3.one * s;
         float bottom = (b.min.y - headRoot.position.y) / parentScale * s;
         m.transform.localPosition = new Vector3(0f, -HeadR - bottom, 0f);
+
+        // だるまのキャラなら鉢巻を着ける（鉢巻はだるまと同じ原点・大きさで作ってあるので、モデルの子にそのまま置く）
+        if (band == null && GameModelSettings.IsDarumaModel(model)) band = GameModelSettings.HachimakiFor(DarumaColor.Wood);
+        if (band != null)
+        {
+            var h = Object.Instantiate(band, m.transform, false);
+            h.name = "Hachimaki";
+            HachimakiRig.Make(h);   // 結び目のあとの余りを揺らす
+        }
     }
 
     // CreateBlock で作った積み木の本体を、モデル（mesh）に差し替える。size の大きさにそろえ、マテリアルは複製する（光らせるため）。

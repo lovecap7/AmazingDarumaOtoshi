@@ -20,6 +20,71 @@ public class GameModelSettings : ScriptableObject
     [Tooltip("幽霊の頭もモデルの形にする（色は幽霊の半透明のまま）")]
     public bool ghostUsesModelShape = true;
 
+    [Header("だるまの色・鉢巻")]
+    [Tooltip("試合のだるまを、プレイヤーの色のモデルにする（1P 赤・2P 青・3P 黄・4P 緑）。オフならいつもの木のモデル")]
+    public bool usePlayerColors = true;
+    [Tooltip("CPU は白のモデル・白の鉢巻にする（オフなら CPU も入っている枠の色）")]
+    public bool cpuUsesWhite = true;
+    [Tooltip("だるまに鉢巻を着ける")]
+    public bool useHachimaki = true;
+    [Tooltip("鉢巻のモデル（Model/Hachimaki/）。並びは DarumaColor（木＝いつもの鉢巻・赤・青・黄・緑・白）")]
+    public GameObject[] hachimakiModels = new GameObject[6];
+
+    // 試合でのキャラの色：プレイヤーの枠の色（チーム戦でもプレイヤーの色のまま）。CPU は白
+    public static DarumaColor CharacterColorOf(MatchSetup.Entry e)
+    {
+        var s = Current;
+        if (e == null || s == null || !s.usePlayerColors) return DarumaColor.Wood;
+        if (e.isCpu && s.cpuUsesWhite) return DarumaColor.White;
+        switch (e.playerIndex % 4)
+        {
+            case 0: return DarumaColor.Red;
+            case 1: return DarumaColor.Blue;
+            case 2: return DarumaColor.Yellow;
+            default: return DarumaColor.Green;
+        }
+    }
+
+    // 試合での鉢巻の色：チーム戦ならチームの色（赤・青・緑・黄）、そうでなければキャラと同じ色
+    public static DarumaColor BandColorOf(MatchSetup.Entry e)
+    {
+        if (e != null && MatchSetup.IsTeamBattle && e.team >= 0)
+        {
+            switch (e.team % MatchSetup.TeamCount)
+            {
+                case 0: return DarumaColor.Red;
+                case 1: return DarumaColor.Blue;
+                case 2: return DarumaColor.Green;
+                default: return DarumaColor.Yellow;
+            }
+        }
+        return CharacterColorOf(e);
+    }
+
+    // その色の鉢巻（着けない設定・モデルが無ければ null。その色が無ければいつもの鉢巻）
+    public static GameObject HachimakiFor(DarumaColor c)
+    {
+        var s = Current;
+        if (s == null || !s.useHachimaki || s.hachimakiModels == null || s.hachimakiModels.Length == 0) return null;
+        int i = (int)c;
+        var m = i >= 0 && i < s.hachimakiModels.Length ? s.hachimakiModels[i] : null;
+        return m != null ? m : s.hachimakiModels[0];
+    }
+
+    // model がだるまのキャラのモデル（どれかの色）か（タイトル・メニューの頭に鉢巻を着けるかを決める）
+    public static bool IsDarumaModel(GameObject model)
+    {
+        var s = Current;
+        if (model == null || s == null || s.roster == null) return false;
+        foreach (var c in s.roster.characters)
+        {
+            if (c == null) continue;
+            if (c.model == model) return true;
+            if (c.colorModels != null) foreach (var m in c.colorModels) if (m == model) return true;
+        }
+        return false;
+    }
+
     [Header("積み木")]
     [Tooltip("積み木の形（Model/Tsumiki/Goldline/tsumiki_goldline.fbx）")]
     public Mesh tsumikiMesh;

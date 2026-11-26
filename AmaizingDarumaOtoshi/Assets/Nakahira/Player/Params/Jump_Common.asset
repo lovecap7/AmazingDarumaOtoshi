@@ -15,3 +15,4 @@ MonoBehaviour:
   Height: 1.8
   TimeToApex: 0.15
   FallGravityMultiplier: 1
+  Motion: {fileID: 11400000, guid: 0f03d44004abcb74da57164832d5bdfb, type: 2}
