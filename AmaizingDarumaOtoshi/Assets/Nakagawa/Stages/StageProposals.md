@@ -10,7 +10,7 @@
 
 ## 実装済み（2026-11-12）
 
-下の4案は `StageBuilder.cs` の定義から Stage21〜24 として作った（メニュー `Nakagawa/Stages/Build Stages 21-24 Into AllStages`）。
+下の4案は `StageBuilder.cs` の定義から Stage21〜24 として作った（メニュー `Nakagawa/Stages/AllStages に Stage21〜24 を作る`）。
 説明は `StageList.md`。数値は案の初期値のままで、遊んで調整していない。
 
 | id | 名前 | ギミック(スクリプト) |

@@ -18,7 +18,7 @@ namespace Nakagawa.EditorTools
         public const float kVisibleHeight = 1.0f;
         const float kEps = 0.01f;
 
-        [MenuItem("Nakagawa/Stages/Split Walls Into Visible And Invisible (Open Scenes)")]
+        [MenuItem("Nakagawa/Stages/壁を見える壁と見えない壁に分ける(開いているシーン)")]
         public static void SplitOpenScenes()
         {
             int total = 0;

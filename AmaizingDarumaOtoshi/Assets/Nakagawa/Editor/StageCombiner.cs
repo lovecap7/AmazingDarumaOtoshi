@@ -39,7 +39,7 @@ namespace Nakagawa.EditorTools
 
         // 保存したカメラの設定を、開いているまとめたシーンの各ステージの CameraPoint に写し、写したステージの写真を撮り直す
         // (StageSwitcher は再生中に設定を直接使うので、写さなくても再生中の見た目は変わらない。エディタ上の見た目と写真のため)
-        [MenuItem("Nakagawa/Stages/Apply Camera Presets To AllStages")]
+        [MenuItem("Nakagawa/Stages/保存したカメラの設定を AllStages に写す")]
         public static void ApplyCameraPresets()
         {
             if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
@@ -97,7 +97,7 @@ namespace Nakagawa.EditorTools
             return preset != null && preset.Fov > 0.0f ? preset.Fov : fallback;
         }
 
-        [MenuItem("Nakagawa/Stages/Build Combined Scene (AllStages)")]
+        [MenuItem("Nakagawa/Stages/ステージのシーンから AllStages を作り直す")]
         public static void Build()
         {
             var stagePaths = Directory.GetFiles(kStageDir, "Stage*.unity")
@@ -115,7 +115,7 @@ namespace Nakagawa.EditorTools
             var missing = StagesWithoutScene(stagePaths);
             if (missing.Count > 0 && !EditorUtility.DisplayDialog("AllStages を作り直す",
                     $"次のステージは {kStageDir} にシーンがないため、作り直すと AllStages から消えます。\n{string.Join(", ", missing)}\n\n" +
-                    "ステージを足すだけなら「Add Stage Scenes To AllStages (Keep Others)」を使ってください。続けますか?", "作り直す", "やめる"))
+                    "ステージを足すだけなら「ステージのシーンを AllStages に足す(ほかはそのまま)」を使ってください。続けますか?", "作り直す", "やめる"))
             {
                 return;
             }
@@ -198,7 +198,7 @@ namespace Nakagawa.EditorTools
 
         // ステージのフォルダにあるステージのシーンを、今のまとめたシーンに足す(同じ名前のステージは入れ替える)
         // まとめたシーンにしかないステージ・手で直した共有の物(試合・カメラ・ライトなど)はそのまま残す
-        [MenuItem("Nakagawa/Stages/Add Stage Scenes To AllStages (Keep Others)")]
+        [MenuItem("Nakagawa/Stages/ステージのシーンを AllStages に足す(ほかはそのまま)")]
         public static void AddAllStageScenes()
         {
             if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
@@ -462,7 +462,7 @@ namespace Nakagawa.EditorTools
 
                 if (info == null) info = go.GetComponentInChildren<StageInfo>(true);
                 spawners.AddRange(go.GetComponentsInChildren<TumikiSpawner>(true));
-                // 背景はステージと一緒に表示が切り替わる。紐づけはプレハブで覚えておく(Apply Backdrops で置き直せる)
+                // 背景はステージと一緒に表示が切り替わる。紐づけはプレハブで覚えておく(「開いているシーンに背景を置き直す」で置き直せる)
                 if (backdrop == null && go.TryGetComponent<StageBackdrop>(out var b)) backdrop = b;
                 var srcArea = go.GetComponent<StageArea>();
                 if (srcArea != null && area == null)

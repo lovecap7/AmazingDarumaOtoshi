@@ -55,42 +55,42 @@ namespace Nakagawa.EditorTools
         // ステージは1つずつのシーンを作らず、すべてまとめたシーン(AllStages)の中に組み立てる
         // (同じ id のステージは入れ替え、他のステージ・共有の物はそのまま残す)
 
-        [MenuItem("Nakagawa/Stages/Build All Stages Into AllStages")]
+        [MenuItem("Nakagawa/Stages/AllStages にすべてのステージを作る")]
         public static void BuildAll()
         {
             BuildIntoCombined(def => true);
         }
 
         // 本編のステージ(Stage01〜。背景のあるステージ)だけを作り直す。デバッグステージはそのまま
-        [MenuItem("Nakagawa/Stages/Build Main Stages Into AllStages")]
+        [MenuItem("Nakagawa/Stages/AllStages に本編のステージを作る")]
         public static void BuildMainStages()
         {
             BuildIntoCombined(def => !IsDebugStage(def.Id));
         }
 
         // 追加ギミックを試すステージ(GimmickDebugStage01〜)だけを作り直す。他のステージはそのまま
-        [MenuItem("Nakagawa/Stages/Build Gimmick Debug Stages Into AllStages")]
+        [MenuItem("Nakagawa/Stages/AllStages に追加ギミックのデバッグステージを作る")]
         public static void BuildGimmickDebugStages()
         {
             BuildIntoCombined(def => def.Id.StartsWith(kGimmickDebugPrefix));
         }
 
         // 追加ギミックと元からあるギミックを組み合わせたデバッグステージ(DebugStage21〜30)だけを作り直す。他のステージはそのまま
-        [MenuItem("Nakagawa/Stages/Build Debug Stages 21-30 Into AllStages")]
+        [MenuItem("Nakagawa/Stages/AllStages にデバッグステージ21〜30を作る")]
         public static void BuildDebugStages21To30()
         {
             BuildIntoCombined(def => InNumberRange(def.Id, kDebugPrefix, 21, 30));
         }
 
         // 背景のテーマごとに5つずつ作ったデバッグステージ(DebugStage31〜70)だけを作り直す。他のステージはそのまま
-        [MenuItem("Nakagawa/Stages/Build Debug Stages 31-70 Into AllStages")]
+        [MenuItem("Nakagawa/Stages/AllStages にデバッグステージ31〜70を作る")]
         public static void BuildDebugStages31To70()
         {
             BuildIntoCombined(def => InNumberRange(def.Id, kDebugPrefix, 31, 70));
         }
 
         // 新しいギミックの本編ステージ(Stage21〜24: 氷・麻雀卓・大会・部室)だけを作り直す。他のステージはそのまま
-        [MenuItem("Nakagawa/Stages/Build Stages 21-24 Into AllStages")]
+        [MenuItem("Nakagawa/Stages/AllStages に Stage21〜24 を作る")]
         public static void BuildStages21To24()
         {
             BuildIntoCombined(def => InNumberRange(def.Id, kStagePrefix, 21, 24));
@@ -98,7 +98,7 @@ namespace Nakagawa.EditorTools
 
         // ミニゲーム由来のギミックの本編ステージ(Stage25〜26: 墨の筆跡・ねずみ花火)だけを作り直す。他のステージはそのまま
         // 計画は MinigameStagePlans.md。背景(Kakizome・HanabiEngawa)も作り直してから組み立てる
-        [MenuItem("Nakagawa/Stages/Build Stages 25-26 Into AllStages")]
+        [MenuItem("Nakagawa/Stages/AllStages に Stage25〜26 を作る")]
         public static void BuildStages25To26()
         {
             BackdropBuilder.Rebuild("Kakizome");
@@ -2236,17 +2236,19 @@ namespace Nakagawa.EditorTools
             // 新しいギミックの本編ステージ(Stage21〜24)
 
             Add("氷割りゲーム", 22,
-                "ちゃぶ台の上のクラッシュアイスゲーム。六角形の氷のタイルを大きな六角形に並べた盤で、出現地点だけは割れない床(タイル3枚分)。盤の外は崖で、壁はない。",
+                "ちゃぶ台の上のクラッシュアイスゲーム。六角形の氷のタイルを大きな六角形に並べた盤で、出現地点だけは割れない床(タイル4枚分の黒い石)。出現地点は正方形の四隅。盤の外は崖で、壁はない。",
                 "序盤は氷の上の積み木を取り合う。ジャンプして氷に着地すると、着地したタイルと隣のタイルにひびが入り、3回で崩れ落ちる(上の積み木も人も一緒に落ちる)。崩れた氷は10秒で元に戻る。" +
                 "積み木の少ない軽い人ほど跳べるので、積んで重くなった人の足元を割って落とせる。割れた所が多いほど穴だらけになり、割れない出現地点の小さな床が逃げ場になる。",
                 c =>
                 {
-                    // 半径5(タイル5枚分)の大きな六角形。出現地点は、互いに接する3枚(三角形)をまとめた割れない床を4か所(左右・上下に対称)
+                    // 半径5(タイル5枚分)の大きな六角形。出現地点は、ひし形に並んだ4枚をまとめた割れない床を4か所(左右・上下に対称)
+                    // 床の中心(4枚の真ん中の辺の中点)は (±5.4, ±5.2)。六角形の格子では正方形ぴったりにはできないので、いちばん近い形(縦横の差 4%)
+                    // 出現位置の順: 1 北東 / 2 北西 / 3 南東 / 4 南西(どの2か所も、一辺 約10.4m 以上離れる)
                     var spawnFloors = c.IceBoardGroups(Vector2.zero, 5, 2.4f,
-                        new[] { new Vector2Int(1, 2), new Vector2Int(2, 2), new Vector2Int(2, 1) },
-                        new[] { new Vector2Int(-3, 2), new Vector2Int(-4, 2), new Vector2Int(-3, 1) },
-                        new[] { new Vector2Int(3, -2), new Vector2Int(4, -2), new Vector2Int(3, -1) },
-                        new[] { new Vector2Int(-1, -2), new Vector2Int(-2, -2), new Vector2Int(-2, -1) });
+                        new[] { new Vector2Int(1, 2), new Vector2Int(1, 3), new Vector2Int(2, 2), new Vector2Int(0, 3) },
+                        new[] { new Vector2Int(-3, 2), new Vector2Int(-4, 3), new Vector2Int(-4, 2), new Vector2Int(-3, 3) },
+                        new[] { new Vector2Int(3, -2), new Vector2Int(4, -3), new Vector2Int(4, -2), new Vector2Int(3, -3) },
+                        new[] { new Vector2Int(-1, -2), new Vector2Int(-1, -3), new Vector2Int(-2, -2), new Vector2Int(0, -3) });
                     c.AreaCircle(0, 0, 2.5f);
                     // 出現地点の床の間(東西・南北) / 盤の縁の4か所
                     c.AreaCircle(9.6f, 0, 2);
@@ -2257,9 +2259,9 @@ namespace Nakagawa.EditorTools
                     c.AreaCircle(-7.2f, 8.3f, 1.5f);
                     c.AreaCircle(7.2f, -8.3f, 1.5f);
                     c.AreaCircle(-7.2f, -8.3f, 1.5f);
-                    // 出現位置は、3枚の床の真ん中(3枚が接する頂点)
+                    // 出現位置は、割れない床の中心(4枚のタイルの中心の平均)
                     c.Spawns(spawnFloors.ToArray());
-                    // 冷たい海に浮かぶ氷の盤(支えなし)。割れない床は岩(背景 IceSea の床のマテリアル)
+                    // 冷たい海に浮かぶ氷の盤(支えなし)。割れない床は黒い石灰岩(背景 IceSea の床のマテリアル)
                 }).Backdrop = kIceSeaBackdrop;
 
             var mahjongStage = Add("こたつの全自動卓", 24,
@@ -2291,24 +2293,32 @@ namespace Nakagawa.EditorTools
             var finalStage = Add("決勝の特設ステージ", 24,
                 "スタジアムの特設ステージ。南北だけ壁があり、東西は崖。左右の広い床(せり上がり塀)が、交互に高台へせり上がっては下がる。",
                 "上がっている側は高台と盾になり、下がっている側は見通しが開く。上がった床の側面で弾が跳ね返るので、中央の通路は跳弾が多い。" +
-                "床が上がる前に乗っていれば一緒に持ち上がり、高台から撃ち下ろせる(高さ1.5mなので、積み木の少ない人は下から跳び乗れる)。東西の崖が落下の場所。",
+                "床が上がる前に乗っていれば一緒に持ち上がり、高台から撃ち下ろせる(高さ2.5mなので、上がったあとは跳んでも登れない)。東西の崖が落下の場所。",
                 c =>
                 {
-                    // 床はパネルの継ぎ目が見える特設ステージの床(遠近感が分かる程度の控えめな模様)
-                    c.FloorMaterial = StadiumStageFloorMaterial(28, 22);
-                    c.Arena(0, 0, 28, 20, true, true, false, false);
-                    // 左右の床が半周期ずれて交互に上下する(1周 8.3秒 = 床3 + 予兆1 + 上昇0.5 + 壁3 + 下降0.8)
-                    // 大きさは 6×7.5m(案の 8×10m の 3/4。中心の位置と高さ 1.5m は同じ)
-                    c.RisingWall(-6.5f, 0, new Vector2(6, 7.5f), 0.0f, 1.5f);
-                    c.RisingWall(6.5f, 0, new Vector2(6, 7.5f), 4.15f, 1.5f);
+                    // 床はパネルの継ぎ目が見える特設ステージの床(遠近感が分かる程度の控えめな模様。引数は壁の下まで含めた床の広さ)
+                    c.FloorMaterial = StadiumStageFloorMaterial(20, 18);
+                    c.Arena(0, 0, 20, 16, true, true, false, false);
+                    // 左右の床が交互に上下する(1周 38秒 = 床20 + 予兆3 + 上昇2 + 壁10 + 下降3。開始のずれは西 11秒・東 32秒)
+                    // 高さは既定の 2.5m(跳んでも登れない。上がる前に乗っていれば一緒に持ち上がる)
+                    c.RisingWall(-5.7f, 0, new Vector2(5.7f, 8.2f), 11);
+                    c.Tune("m_floorTime", 20);
+                    c.Tune("m_warningTime", 3);
+                    c.Tune("m_riseTime", 2);
+                    c.Tune("m_wallTime", 10);
+                    c.Tune("m_lowerTime", 3);
+                    c.RisingWall(5.7f, 0, new Vector2(5.7f, 8.2f), 32);
+                    c.Tune("m_floorTime", 20);
+                    c.Tune("m_warningTime", 3);
+                    c.Tune("m_riseTime", 2);
+                    c.Tune("m_wallTime", 10);
+                    c.Tune("m_lowerTime", 3);
                     c.AreaRect(0, 0, 4, 8);
-                    c.AreaRect(0, 7.5f, 10, 3);
-                    c.AreaRect(0, -7.5f, 10, 3);
-                    c.AreaCircle(-6.5f, 0, 2.5f);
-                    c.AreaCircle(6.5f, 0, 2.5f);
-                    c.AreaRect(12.25f, 0, 3, 8);
-                    c.AreaRect(-12.25f, 0, 3, 8);
-                    c.Spawns(new Vector2(-9, 7.5f), new Vector2(9, -7.5f), new Vector2(-9, -7.5f), new Vector2(9, 7.5f));
+                    c.AreaRect(0, 5.5f, 16, 3);
+                    c.AreaRect(0, -5.5f, 16, 3);
+                    c.AreaCircle(-6, 0, 2.5f);
+                    c.AreaCircle(6, 0, 2.5f);
+                    c.Spawns(new Vector2(-9, 6), new Vector2(9, -6), new Vector2(-9, -6), new Vector2(9, 6));
                 });
             finalStage.Backdrop = kStadiumBackdrop;
             // 床の縁の LED の帯と、四隅の照明トラス
@@ -3182,7 +3192,7 @@ namespace Nakagawa.EditorTools
 
             class IceMaterials
             {
-                public readonly Material Ice = LitMaterial("IceTile", new Color(0.80f, 0.88f, 0.92f), 0.8f);
+                public readonly Material Ice = IceTileMaterial();
                 public readonly Material Edge = LitMaterial("IceTileEdge", new Color(0.9f, 0.95f, 0.98f), 0.5f);
                 public readonly Material Crack = LitMaterial("IceTileCrack", new Color(0.16f, 0.18f, 0.24f), 0.1f);
             }
@@ -3193,6 +3203,8 @@ namespace Nakagawa.EditorTools
                 var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab, Scene);
                 go.transform.SetParent(parent != null ? parent : Gimmicks, false);
                 go.transform.position = pos;
+                // 直後の Tune で値を変える対象(StageBuilder.DefinitionWriter.cs)
+                LastPlaced = go;
                 return go;
             }
 
@@ -3252,7 +3264,7 @@ namespace Nakagawa.EditorTools
 
         // 定義の積み木の生成エリアを、まとめたシーン(AllStages)と、フォルダにあるステージのシーンへ写す
         // ステージ(床・ギミック・背景など)は作り直さないので、まとめたシーンで手を加えた所はそのまま残る
-        [MenuItem("Nakagawa/Stages/Sync Spawn Areas From Definitions (AllStages + Stage Scenes)")]
+        [MenuItem("Nakagawa/Stages/定義の生成エリアだけを写す(AllStages とステージのシーン)")]
         public static void SyncSpawnAreas()
         {
             if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
@@ -3693,7 +3705,7 @@ namespace Nakagawa.EditorTools
         }
 
         // 積み木のプレハブに耐久度(ヒビの見た目つき)を付ける。付いていれば何もしない
-        [MenuItem("Nakagawa/Tumiki/Setup Tumiki Prefab")]
+        [MenuItem("Nakagawa/Tumiki/積み木のプレハブに耐久度を付ける")]
         public static void SetupTumikiPrefab()
         {
             var root = PrefabUtility.LoadPrefabContents(kTumikiPrefab);
@@ -3771,7 +3783,7 @@ namespace Nakagawa.EditorTools
         }
 
         // 既存のステージのシーンに、カメラの演出・壁の透過・デバッグ用の切り替えを付ける(ステージは作り直さない)
-        [MenuItem("Nakagawa/Stages/Update Existing Stages (Camera, Walls, Debug)")]
+        [MenuItem("Nakagawa/Stages/今あるステージのシーンを更新する(カメラ・壁・デバッグ)")]
         public static void UpdateExistingStages()
         {
             if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
@@ -3935,7 +3947,7 @@ namespace Nakagawa.EditorTools
             var sb = new StringBuilder();
             sb.AppendLine("# ステージ一覧");
             sb.AppendLine();
-            sb.AppendLine("`Nakagawa > Stages > Build All Stages` で生成したステージの一覧です。定義は `Assets/Nakagawa/Editor/StageBuilder.cs` にあります。");
+            sb.AppendLine("`Nakagawa > Stages > AllStages にすべてのステージを作る` で生成したステージの一覧です。定義は `Assets/Nakagawa/Editor/StageBuilder.cs` にあります。");
             sb.AppendLine("各シーンの `StageInfo` オブジェクトにも同じ内容が入っています。");
             sb.AppendLine();
             sb.AppendLine("| No. | 名前 | ギミック | 生成エリア | 背景 |");
@@ -4050,6 +4062,34 @@ namespace Nakagawa.EditorTools
             mat.SetColor("_BaseColor", color);
             mat.SetFloat("_Smoothness", smoothness);
             mat.SetFloat("_Metallic", 0.0f);
+            EditorUtility.SetDirty(mat);
+            return mat;
+        }
+
+        // 割れる氷のタイル(Assets/Nakagawa/Materials/IceTile.mat)。透明感のある氷のシェーダー(Nakagawa/IceTile)
+        // 海面(波で上下する)より下は水の中として描く
+        static Material IceTileMaterial()
+        {
+            string path = $"{kMaterialDir}/IceTile.mat";
+            var shader = Shader.Find("Nakagawa/IceTile");
+            var mat = Load<Material>(path);
+            if (mat == null)
+            {
+                EnsureFolder(kMaterialDir);
+                mat = new Material(shader);
+                AssetDatabase.CreateAsset(mat, path);
+            }
+            else if (shader != null && mat.shader != shader) mat.shader = shader;
+
+            // 中の模様は、浮いている氷(背景 IceSea)と同じテクスチャ。海面の高さ・うねりも海と同じにする
+            mat.SetTexture("_BaseMap", BackdropBuilder.IceInnerTexture());
+            mat.SetColor("_BaseColor", new Color(0.80f, 0.88f, 0.92f));
+            mat.SetFloat("_Bob", 0.0f);
+            BackdropBuilder.ApplySeaToIce(mat);
+            // 透け具合(霜の所は白く曇らせて、床として見えるようにする)
+            mat.SetFloat("_Opacity", 0.36f);
+            mat.SetFloat("_FrostOpacity", 0.38f);
+            mat.SetFloat("_Smoothness", 0.92f);
             EditorUtility.SetDirty(mat);
             return mat;
         }

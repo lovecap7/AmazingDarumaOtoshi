@@ -57,11 +57,11 @@ namespace Nakagawa.EditorTools
         };
 
         //  閃光 → 光の柱 → 地面を走る衝撃波 → 尾を引いて弾ける火花 → 舞い上がるきらめき、点光源、「NICE CATCH!」の文字
-        [MenuItem("Nakagawa/Effects/Build Catch Effect Prefab")]
+        [MenuItem("Nakagawa/Effects/キャッチ成功のエフェクトのプレハブを作る")]
         public static GameObject BuildCatchEffect() => Build(kCatch, kCatchEffectPath);
 
         //  閃光 → 地面を走る衝撃波 → 尾を引いて弾ける火花 → 舞い上がる火の粉、点光源、「K.O.!」の文字
-        [MenuItem("Nakagawa/Effects/Build Elimination Effect Prefab")]
+        [MenuItem("Nakagawa/Effects/脱落のエフェクトのプレハブを作る")]
         public static GameObject BuildEliminationEffect() => Build(kElimination, kEliminationEffectPath);
 
         static GameObject Build(Style style, string path)

@@ -15,7 +15,7 @@ namespace Nakagawa.EditorTools
     {
         const float kEps = 0.005f;
 
-        [MenuItem("Nakagawa/Stages/Fix Overlapping Floors And Walls (Open Scenes)")]
+        [MenuItem("Nakagawa/Stages/重なった床・壁を直す(開いているシーン)")]
         public static void FixOpenScenes()
         {
             int total = 0;

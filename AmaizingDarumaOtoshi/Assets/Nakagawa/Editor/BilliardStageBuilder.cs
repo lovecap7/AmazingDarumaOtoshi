@@ -60,7 +60,7 @@ namespace Nakagawa.EditorTools
         static readonly Vector3 kHeadSpot = new Vector3(-8.5f, 0, 0);
         static readonly Vector3 kRackApex = new Vector3(7.5f, 0, 0);
 
-        [MenuItem("Nakagawa/Stages/Build Stage19 (Billiard) Into Open AllStages")]
+        [MenuItem("Nakagawa/Stages/開いている AllStages に Stage19(ビリヤード)を作る")]
         public static void BuildMenu()
         {
             string report = Build();

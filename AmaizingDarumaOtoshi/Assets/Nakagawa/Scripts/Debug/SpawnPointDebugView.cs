@@ -8,7 +8,7 @@ namespace Nakagawa
     // プレイヤーの出現・復活ポイント(DarumaMatch の出現ポイント)のデバッグ表示
     //  ・再生中: 床の上に点線の輪と柱、画面に番号(S1, S2, ...)を出す。キーで表示を切り替える
     //    出現ポイントが動いても(ステージの切り替えなど)ついていく。当たり判定は持たない
-    //  ・エディタ: Gizmos で同じ位置に輪と番号を出す(再生していなくても見える)
+    //  ・エディタ: Gizmos で輪と番号を出す(再生していなくても見える)。AllStages では、表示しているステージの SpawnPoints の位置に出す
     //  ・積み木の生成エリアの床の目印(TumikiSpawnArea.MarkersVisible)も、同じ切り替えで表示する
     //    (このデバッグ表示がオフ・無い場合は、生成エリアの目印は見えない)
     // 試合のシーンのデバッグ用の物(DebugTools など)に付ける
@@ -177,9 +177,25 @@ namespace Nakagawa
         private void OnDrawGizmos()
         {
             if (Application.isPlaying) return;
+            // まとめたシーン(AllStages)では、表示しているステージ(StageEntry)ごとに、そのステージの SpawnPoints の位置に出す
+            // (試合の出現ポイントは、再生中にステージを切り替えたときに動かすので、エディタでは最初のステージの位置のまま)
+            var entries = FindObjectsByType<StageEntry>(FindObjectsInactive.Exclude);
+            if (entries.Length > 0)
+            {
+                foreach (var entry in entries)
+                {
+                    if (entry.SpawnPoints != null) DrawPointGizmos(entry.SpawnPoints);
+                }
+                return;
+            }
+            // ステージ1つ分のシーン: 試合の出現ポイント
             var match = m_match != null ? m_match : FindAnyObjectByType<DarumaMatch>();
-            if (match == null) return;
-            var points = match.SpawnPoints;
+            if (match != null) DrawPointGizmos(match.SpawnPoints);
+        }
+
+        // 輪・柱・番号
+        private void DrawPointGizmos(IReadOnlyList<Transform> points)
+        {
             for (int i = 0; i < points.Count; i++)
             {
                 if (points[i] == null) continue;

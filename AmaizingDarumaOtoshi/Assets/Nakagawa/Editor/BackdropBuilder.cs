@@ -18,7 +18,7 @@ namespace Nakagawa.EditorTools
         public const string kBackdropDir = "Assets/Nakagawa/Backdrops";
         const string kMaterialDir = kBackdropDir + "/Materials";
 
-        [MenuItem("Nakagawa/Backdrops/Build All Backdrops")]
+        [MenuItem("Nakagawa/Backdrops/すべての背景を作る")]
         public static void BuildAll()
         {
             var names = new List<string>();
@@ -30,7 +30,7 @@ namespace Nakagawa.EditorTools
             AssetDatabase.SaveAssets();
             // 作り直したプレハブは中の物が入れ替わるので、置いてある背景はステージに合わせ直す必要がある
             Debug.Log($"[BackdropBuilder] 背景を {names.Count} 個作りました({kBackdropDir})。" +
-                      "AllStages を開いて「Nakagawa > Backdrops > Apply Backdrops To Open Scene」を実行し、置いてある背景を置き直してください\n" + string.Join("\n", names));
+                      "AllStages を開いて「Nakagawa > Backdrops > 開いているシーンに背景を置き直す」を実行し、置いてある背景を置き直してください\n" + string.Join("\n", names));
         }
 
         public static string PrefabPath(string id) => $"{kBackdropDir}/Backdrop_{id}.prefab";
@@ -66,7 +66,7 @@ namespace Nakagawa.EditorTools
 
         // まとめたシーンなど、開いているシーンの各ステージ(StageEntry)に、紐づけた背景を置き直す
         // 紐づけを外したステージからは背景を取り除く
-        [MenuItem("Nakagawa/Backdrops/Apply Backdrops To Open Scene")]
+        [MenuItem("Nakagawa/Backdrops/開いているシーンに背景を置き直す")]
         public static void ApplyToOpenScene()
         {
             int placed = 0, removed = 0;
