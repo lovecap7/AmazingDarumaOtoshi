@@ -50,7 +50,8 @@ namespace Yurube
         AodaruSixArms m_arms;
         // 疾風連撃が終わる時刻(使っていなければ負)・この振りで斬撃を出したか
         float m_galeUntil = -1.0f;
-        bool m_slashedThisSwing;
+        // 最後に斬撃を出した振りの番号(DarumaHammer.SweepCount。切り返しで続けて振っても1振りに1本)
+        int m_slashedSweep = -1;
 
         public bool IsActive => m_arms != null || m_galeUntil >= 0.0f;
         // CPU 用(suehara): 疾風連撃を使うか / 斬撃が届く距離
@@ -148,7 +149,8 @@ namespace Yurube
         void PlayGale()
         {
             m_galeUntil = Time.time + m_galeDuration;
-            m_slashedThisSwing = false;
+            // 発動する前から振っていた振りでは出さない
+            m_slashedSweep = m_character.Hammer != null ? m_character.Hammer.SweepCount : -1;
             SpecialCutIn.Show(m_galeName, m_galeCutInColor, null, m_character, null, m_character.Stack != null ? m_character.Stack.Count : 0);
         }
 
@@ -165,13 +167,9 @@ namespace Yurube
                 return;
             }
 
-            if (!hammer.IsSweeping)
-            {
-                m_slashedThisSwing = false;
-                return;
-            }
-            if (m_slashedThisSwing || hammer.ActionTime < hammer.SweepDuration * 0.5f) return;
-            m_slashedThisSwing = true;
+            if (!hammer.IsSweeping || hammer.SweepCount == m_slashedSweep) return;
+            if (hammer.ActionTime < hammer.SweepDuration * 0.5f) return;
+            m_slashedSweep = hammer.SweepCount;
             if (SpecialNet.IsClient) return;   // ネット対戦用(suehara): 斬撃はホストだけ
 
             Vector3 dir = m_character.transform.forward;

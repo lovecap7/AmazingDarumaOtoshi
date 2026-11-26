@@ -54,6 +54,8 @@ namespace Nakahira
         // あかだる(トロン):狙う相手・狙いのぶれ(度。向き直り始めに一度だけ決める)
         MatchPlayer m_tronTarget;
         bool m_aiming;
+        // きだる(震脚。suehara): このフレームは跳ぶ(OverrideAim で入れる)
+        bool m_quakeJump;
         Vector3 m_aimDir;
         float m_tronAimError;
         // 向き直るときにスティックを倒す強さ(歩かないよう小さく)
@@ -116,6 +118,10 @@ namespace Nakahira
             Bind(c.Self);
             if (m_ability == null || m_gauge == null) return false;
 
+            // きだる(震脚。suehara): 効き目の間、衝撃波の届く所に敵がいれば跳び続ける(着地のたびに衝撃波が出る)
+            m_quakeJump = m_ability is KidaruSpecial quake && quake.UsesQuake && quake.IsActive
+                && c.Self.IsGrounded && EnemyWithin(c, quake.QuakeRadius);
+
             // 暗転返しは時間が止まっている間に撃つので、下の「時間が止まっている間は撃たない」より先に見る
             // (疾風連撃のあおだるは暗転返し・とっさの六腕をしない。suehara)
             bool reflexAodaru = m_ability is AodaruSpecial aodaruSpecial && !aodaruSpecial.UsesGaleCombo;
@@ -154,7 +160,8 @@ namespace Nakahira
             // (ハンマーの嵐は向きに関係ないので向き直らない。suehara)
             if (!m_rash && m_ability is AkadaruSpecial akadaru && !akadaru.UsesHammerStorm && !FacingTronAim(c, akadaru)) return false;
             // みだる:一番近い敵の方へ向き直ってから撃つ(弾が曲がって追うので、あかだるより甘くてよい)
-            if (!m_rash && m_ability is MidaruSpecial && !FacingFunnelTarget(c)) return false;
+            // (マシンガンは砲台が勝手に敵を狙うので向き直らない。suehara)
+            if (!m_rash && m_ability is MidaruSpecial midaru && !midaru.UsesMachineGun && !FacingFunnelTarget(c)) return false;
             // 撃てない間(ハンマーを振っているなど)は、撃ちどころが続く間 毎フレーム試す
             if (!m_ability.TryActivate()) return false;
             m_wasFull = false;
@@ -199,6 +206,7 @@ namespace Nakahira
         // 狙う向きへスティックを少しだけ倒す(歩かずに向きだけ変える)。ハンマー・ジャンプは止める
         public void OverrideAim(ref DarumaCommand cmd)
         {
+            if (m_quakeJump) cmd.Jump = true;   // きだる(震脚。suehara)
             if (!m_aiming) return;
             cmd.Move = new Vector2(m_aimDir.x, m_aimDir.z) * kAimInput;
             cmd.Jump = false;
@@ -242,8 +250,8 @@ namespace Nakahira
                 case AkadaruSpecial aka: return aka.UsesHammerStorm ? StormChance(c, aka) : TronChance(c);   // ハンマーの嵐(suehara) / トロン(ビーム)
                 case AodaruSpecial aoda: return GaleChance(c, aoda);   // 疾風連撃(suehara)
                 case DaruKingSpecial king: return ExcaliburChance(c, king, KingSoloReady(c));   // エクスカリバー
-                case MidaruSpecial _:   return FunnelChance(c);   // ファンネル
-                case KidaruSpecial _:   return KidaruChance(c, current);   // 黄金化
+                case MidaruSpecial mid: return mid.UsesMachineGun ? MachineGunChance(c, mid) : FunnelChance(c);   // マシンガン(suehara) / ファンネル
+                case KidaruSpecial kid: return kid.UsesQuake ? EnemyWithin(c, kid.QuakeRadius) : KidaruChance(c, current);   // 震脚(suehara) / 黄金化
                 default:                return true;
             }
         }
@@ -414,6 +422,17 @@ namespace Nakahira
         private bool GaleChance(CpuContext c, AodaruSpecial aoda)
         {
             float range = aoda.SlashRange * 0.5f;
+            foreach (var o in c.Perception.Opponents)
+            {
+                if (o.IsGhost || o.IsInvincible || o.Character == null) continue;
+                if (o.FlatDistance <= range) return true;
+            }
+            return false;
+        }
+
+        // 幽霊でも無敵でもない敵が、水平の距離 range 以内にいるか(suehara)
+        private static bool EnemyWithin(CpuContext c, float range)
+        {
             foreach (var o in c.Perception.Opponents)
             {
                 if (o.IsGhost || o.IsInvincible || o.Character == null) continue;
@@ -597,6 +616,24 @@ namespace Nakahira
             bool faster = c.Self.MoveSpeed > target.Character.MoveSpeed;
             float ratio = faster ? c.Params.MeteorFastFireRadiusRatio : c.Params.MeteorFireRadiusRatio;
             return target.FlatDistance <= iwa.PredictRadius(c.StackCount) * ratio;
+        }
+
+        // みだる(マシンガン。suehara):一番近い敵が、撃った弾が届く目安の距離以内で、間に壁がないとき(積み木 0 個でも撃てる)
+        // 砲台が勝手に一番近い敵を狙うので、向き直らずにその場で置く
+        private bool MachineGunChance(CpuContext c, MidaruSpecial mid)
+        {
+            m_funnelTarget = null;
+            CpuOpponent nearest = null;
+            foreach (var o in c.Perception.Opponents)
+            {
+                if (o.IsGhost || o.Character == null) continue;
+                if (nearest == null || o.FlatDistance < nearest.FlatDistance) nearest = o;
+            }
+            if (nearest == null || nearest.IsInvincible) return false;
+            if (nearest.FlatDistance > mid.MachineGunRange) return false;
+            if (CpuShotState.HasWall(c.Position, nearest.Position)) return false;
+            m_funnelTarget = nearest.Player;
+            return true;
         }
 
         // みだる(ファンネル):どの状態の最中でも、一番近い敵(1 発目が向かう敵)が FunnelRange 以内で、間に壁がないとき

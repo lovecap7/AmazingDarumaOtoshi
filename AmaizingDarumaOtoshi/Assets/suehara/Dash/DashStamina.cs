@@ -9,7 +9,8 @@ public sealed class DashStamina
 
     // 残りのスタミナ(0〜1)
     public float Ratio { get; private set; } = 1.0f;
-    // スタミナの効率(レベル用 2026-11-24)。2 なら減り方が半分・回復が倍。1 で今までどおり
+    // ジャンプのスタミナの効率(レベル用 2026-11-24。2026-11-26 からジャンプの消費だけに効く)
+    // 2 ならジャンプの消費が半分。ダッシュ・ブリンク・時間での回復には効かない。1 で今までどおり
     public float Efficiency { get; set; } = 1.0f;
     float Eff => Mathf.Max(0.01f, Efficiency);
     // スタミナ切れ。一定量まで回復し、ボタンを離すまで走れない
@@ -17,11 +18,12 @@ public sealed class DashStamina
     // このステップで走っているか
     public bool IsDashing { get; private set; }
 
-    // ジャンプなどで一度にスタミナを使う。足りなければ何もせず false
-    public bool TryConsume(float cost, DashParams param)
+    // ジャンプ・ブリンクなどで一度にスタミナを使う。足りなければ何もせず false
+    // useEfficiency: ジャンプのときだけ true(Efficiency で消費が減る)
+    public bool TryConsume(float cost, DashParams param, bool useEfficiency = false)
     {
+        if (useEfficiency) cost /= Eff;
         // 小数の誤差で最後の1回分が足りなくならないように、わずかな差は足りているとみなす
-        cost /= Eff;
         if (Ratio + kEpsilon < cost) return false;
         Ratio -= cost;
         if (Ratio <= kEpsilon) Ratio = 0.0f;
@@ -45,7 +47,7 @@ public sealed class DashStamina
         IsDashing = wantDash && !IsExhausted;
         if (IsDashing)
         {
-            Ratio = Mathf.Max(0.0f, Ratio - dt / (param.StaminaSeconds * Eff));
+            Ratio = Mathf.Max(0.0f, Ratio - dt / param.StaminaSeconds);
             m_recoverWait = param.RecoverDelay;
             if (Ratio <= 0.0f) IsExhausted = true;
             return true;
@@ -63,7 +65,7 @@ public sealed class DashStamina
             m_recoverWait -= dt;
             return false;
         }
-        Ratio = Mathf.Min(1.0f, Ratio + dt * Eff / param.RecoverSeconds);
+        Ratio = Mathf.Min(1.0f, Ratio + dt / param.RecoverSeconds);
         return false;
     }
 }

@@ -32,7 +32,7 @@ namespace Yurube
         [Range(0f, 0.25f)] public float perkSlow = 0.1f;
         [Tooltip("みだる：移動速度が下がっている時間（秒）")]
         [Min(0f)] public float perkSlowSeconds = 2f;
-        [Tooltip("きだる：スタミナの効率を上げる割合（0.25 なら Lv5 で減り方が半分・回復が倍）")]
+        [Tooltip("きだる：ジャンプのスタミナ消費を減らす割合（0.25 なら Lv5 でジャンプの消費が半分。ダッシュ・ブリンク・回復には効かない）")]
         [Min(0f)] public float perkStamina = 0.25f;
         [Tooltip("いわだる：撃った弾の耐久値を足す数（ほかの積み木に何回当たっても壊れずに進むか）")]
         [Min(0)] public int perkShotDurability = 1;

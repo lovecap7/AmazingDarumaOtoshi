@@ -130,6 +130,21 @@ namespace Yurube
             LevelUp?.Invoke(p, level);
         }
 
+        // デバッグ用(suehara): そのプレイヤーをすぐ最大レベルにする(LT のデバッグボタンから呼ぶ)。実績には数えない
+        public static bool DebugSetMaxLevel(MatchPlayer p)
+        {
+            if (s_instance == null || p == null) return false;
+            s_instance.WatchMatch();
+            if (!Active || s_instance.PlayerOf(p.Character) != p) return false;
+            var s = s_instance.StateOf(p);
+            if (s.level >= LevelParams.MaxLevel) return false;
+            int[] need = LevelParams.Instance.stackedToLevel;
+            if (need != null && need.Length > 0) s.stacked = Mathf.Max(s.stacked, need[need.Length - 1]);
+            s.level = LevelParams.MaxLevel;
+            LevelUp?.Invoke(p, s.level);
+            return true;
+        }
+
         static LevelPerk Perk(MatchPlayer p) => p != null && p.CharacterData != null ? p.CharacterData.levelPerk : LevelPerk.None;
 
         // Lv2 から数えた、キャラごとの能力の段階（Lv1 なら 0、Lv5 なら 4）
@@ -246,13 +261,23 @@ namespace Yurube
             if (info.IsHarmful && info.Block != null) TrySlow(info.Block.Owner as Component, info.Target as DarumaCharacter);
         }
 
-        void TrySlow(Component attacker, DarumaCharacter victim)
+        // みだるのマシンガンの弾など(suehara): レベルが足りなくても、パッシブの「当てた相手を遅くする」を
+        // Lv2 と同じ強さ以上でかける(Lv3 以上ならそのレベルの強さ)
+        public static void ApplySlowAtLeastOneStep(DarumaCharacter attacker, DarumaCharacter victim)
+        {
+            if (s_instance == null) return;
+            s_instance.WatchMatch();
+            s_instance.TrySlow(attacker, victim, 1);
+        }
+
+        // minSteps: レベルが足りなくても使う、能力の最低の段階(ふだんは 0。suehara)
+        void TrySlow(Component attacker, DarumaCharacter victim, int minSteps = 0)
         {
             if (!Active || attacker == null || victim == null) return;
             var a = PlayerOf(attacker);
             var v = PlayerOf(victim);
             if (a == null || v == null || a == v || Perk(a) != LevelPerk.SlowOnHit) return;
-            int n = PerkSteps(StateOf(a).level);
+            int n = Mathf.Max(minSteps, PerkSteps(StateOf(a).level));
             if (n <= 0) return;
             if (m_match != null && m_match.IsFriendly(attacker as IDarumaAttacker, victim)) return;
             var lp = LevelParams.Instance;
