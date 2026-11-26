@@ -1279,9 +1279,17 @@ MonoBehaviour:
   m_directKnockedPoints: -1
   m_directHeadPoints: 1
   m_directSelfOutPoints: -1
-  m_useDirectSlots: 0
-  m_directSlots: []
-  m_dummyCount: 1
+  m_useDirectSlots: 1
+  m_directSlots:
+  - kind: 0
+    character: {fileID: 11400000, guid: 9fc5324d816f46cb80cbe99a1d9c3a1a, type: 2}
+    cpuLevel: 0
+    team: 0
+  - kind: 0
+    character: {fileID: 11400000, guid: 9fc5324d816f46cb80cbe99a1d9c3a1a, type: 2}
+    cpuLevel: 0
+    team: 1
+  m_dummyCount: 0
   m_tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
   m_dummyStartBlocks: 10
   m_cpuCount: 0
@@ -1289,6 +1297,7 @@ MonoBehaviour:
   m_addDebugView: 1
   m_respawnAppearTime: 0.8
   m_reviveTravelTime: 0.7
+  m_respawnStartBlocks: 3
   m_startCountdown: 3
   m_countdownInDirectPlay: 0
   m_friendlyFire: 0

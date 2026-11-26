@@ -42,6 +42,17 @@ public class ResultTowerScreen : MonoBehaviour
     [Tooltip("引き分けのとき、タワーどうしの間隔")]
     [SerializeField] float towerSpacing = 3f;
 
+    [Header("表彰台（オンなら、順位の高さの積み木の台に全員が乗る）")]
+    [Tooltip("オン：表彰台。左から 2位・1位・3位・4位 の順に並び、台の高さは順位で決まる。積み木はプレイヤーの色（チーム戦はチームの色）\n" +
+             "オフ：前の「1位が持っていた積み木でタワーを積む」演出")]
+    [SerializeField] bool podium = true;
+    [Tooltip("順位ごとの台の高さ（積み木の数。1位・2位・3位・4位）")]
+    [SerializeField] int[] podiumHeights = { 4, 3, 2, 1 };
+    [Tooltip("台どうしの間隔")]
+    [SerializeField] float podiumSpacing = 2.4f;
+    [Tooltip("表彰台のときの、上の文字")]
+    [SerializeField] string podiumTitle = "けっかはっぴょう！";
+
     [Header("文字")]
     [SerializeField] string winText = "のかち！";
     [SerializeField] string drawText = "ひきわけ！";
@@ -80,6 +91,7 @@ public class ResultTowerScreen : MonoBehaviour
         public float wobble;                                // 積んだときの揺れ
         public bool onTop;                                  // 顔がてっぺんに乗ったか
         public bool ghost;                                  // 幽霊の姿（ゴーストで負けた人）
+        public bool crownOnHead;                            // 王冠が頭のモデルの子（王冠のモデル）。位置は頭のモデルの中で 0 が、かぶった位置
         public float Top => stacked * BlockH;               // 積み木のてっぺんの高さ
         public float HeadTop => Top + HeadR * 2f;           // 顔を乗せたときの頭のてっぺん
     }
@@ -230,8 +242,75 @@ public class ResultTowerScreen : MonoBehaviour
         }
     }
 
+    // ---- 表彰台 ----
+    //   2
+    //     1        ← 左から 2位・1位・3位・4位。台の高さは順位（podiumHeights）。1位がいちばん高い
+    //       3
+    //         4
+    // 全員が、自分の台の横で待ち、台が積み上がったらてっぺんへ跳び乗る。1位（チーム戦は勝ったチーム全員）に王冠
+    void BuildPodiums()
+    {
+        int n = entries.Count;
+        for (int i = 0; i < n; i++)
+        {
+            var e = entries[i];
+            // 並ぶ場所（左から何番目か）：1位は2番目、2位は左端、3位以降はその右へ順に
+            int slot = i == 0 ? Mathf.Min(1, n - 1) : i == 1 ? 0 : i;
+            // 1位の台が画面の真ん中（x = 0）に来るように並べる
+            float x = (slot - Mathf.Min(1, n - 1)) * podiumSpacing;
+            var t = MakeTower(e, new Vector3(x, 0f, 0f));
+            // 台の横（外側）で待つ。左端の人は左、それ以外は右
+            float side = slot == 0 ? -1f : 1f;
+            t.face.root.localPosition = new Vector3(side * 1.2f, HeadR, 0f);
+
+            int height = podiumHeights != null && podiumHeights.Length > 0 ? podiumHeights[Mathf.Clamp(e.rank - 1, 0, podiumHeights.Length - 1)] : 1;
+            AddPodiumBlocks(t, Mathf.Max(1, height), e.playerColor, e.rank);
+
+            if (e.rank == 1)
+            {
+                if (!isDraw) MakeHeadCrown(t);
+                towers.Add(t);
+            }
+            else
+            {
+                t.tag.gameObject.SetActive(false);
+                others.Add(t);
+            }
+        }
+    }
+
+    // 台の積み木（プレイヤーの色／チームの色に染めた木の積み木）。一番下の積み木に順位の数字
+    void AddPodiumBlocks(Tower t, int count, Color color, int rank)
+    {
+        for (int b = 0; b < count; b++)
+        {
+            var blk = ToyKit.CreateBlock(b == 0 ? rank.ToString() : "", color, blockMesh, new Vector2(1.05f, 0.68f), BlockD, font, letterMat, out _);
+            if (!GameModelSettings.ApplyWoodBlock(blk, color)) GameModelSettings.ApplyBlock(blk, color);
+            blk.SetParent(t.root, false);
+            blk.localPosition = new Vector3(0f, (b + 0.5f) * BlockH, 0f);
+            blk.gameObject.SetActive(false);
+            t.blocks.Add(blk);
+        }
+    }
+
+    // 王冠のモデルを頭のモデルにかぶせておく（最初は隠す。DropCrown で上から落ちてくる）。モデルが無ければ前の王冠
+    void MakeHeadCrown(Tower t)
+    {
+        var s = GameModelSettings.Current;
+        var headModel = t.face.root.Find("HeadModel");
+        if (s != null && s.crownModel != null && headModel != null)
+        {
+            t.crown = Instantiate(s.crownModel, headModel, false).transform;
+            t.crown.name = "Crown";
+            t.crownOnHead = true;
+        }
+        else t.crown = MakeCrown(t.root);
+        t.crown.gameObject.SetActive(false);
+    }
+
     void BuildTowers()
     {
+        if (podium) { BuildPodiums(); return; }
         var tops = entries.FindAll(e => e.rank == 1);
         // 個人戦で勝者が決まっているときだけ、先頭の1人に絞る(チーム戦は勝ったチームの全員を並べる)
         // if (!isDraw && tops.Count > 1) tops.RemoveRange(1, tops.Count - 1);
@@ -334,7 +413,7 @@ public class ResultTowerScreen : MonoBehaviour
         t.face.root.SetParent(t.root, false);
         t.face.root.localPosition = new Vector3(0f, HeadR, 0f);
         if (e.character != null && e.character.color != Color.white) t.face.body.SetColor("_BaseColor", e.character.color);
-        GameModelSettings.ApplyHead(t.face, e.character);   // 選んだキャラのモデルに
+        GameModelSettings.ApplyHead(t.face, e.character, e.setup);   // 選んだキャラのモデルに（試合と同じ色・鉢巻）
         t.tag =ToyKit.Text3D(font, letterMat, e.label, t.root, new Vector2(2f, 0.5f), 3f);
         t.tag.color = e.playerColor;
         // 名札は顔の前の床に立てる
@@ -401,7 +480,7 @@ public class ResultTowerScreen : MonoBehaviour
         // チーム戦のときは、勝ったチームの名前で出す
         string teamName = isTeam && winnerTeam >= 0 ? MatchSetup.TeamNames[winnerTeam % MatchSetup.TeamCount] + "チーム" : null;
         string who = isDraw ? "" : teamName != null ? teamName + " の" : towers.Count > 0 ? towers[0].entry.label + " の" : "";
-        titleText = ToyKit.UIText("Title", uiRoot, font, isDraw ? "タワーくらべ！" : who + "タワー！", 80f, Color.white);
+        titleText = ToyKit.UIText("Title", uiRoot, font, podium ? podiumTitle : isDraw ? "タワーくらべ！" : who + "タワー！", 80f, Color.white);
         titleText.fontSharedMaterial = popMat;
         ToyKit.Anchor(titleText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -110f), new Vector2(1400f, 140f));
         titleGroup = titleText.gameObject.AddComponent<CanvasGroup>();
@@ -447,7 +526,13 @@ public class ResultTowerScreen : MonoBehaviour
     // ================= 演出の流れ =================
     IEnumerator Ceremony()
     {
+        // 表彰台では、1位（たち）の真ん中を見る
         float centerX = 0f;
+        if (podium && towers.Count > 0)
+        {
+            foreach (var t in towers) centerX += t.root.position.x;
+            centerX /= towers.Count;
+        }
         float spread = (towers.Count - 1) * towerSpacing;
         // 積む人：1位（引き分けなら1位の人たち）と、時間切れなら積み木を持っていた2位以下
         var builders = new List<Tower>(towers);
@@ -462,7 +547,7 @@ public class ResultTowerScreen : MonoBehaviour
         StartCoroutine(PunchUI(titleText.rectTransform));
         Play(SoundSynth.Pickup, 0.6f, 0.8f);
         yield return Wait(0.7f);
-        if (!isDraw) countGroup.alpha = 1f;   // 引き分けはタワーの高さがちがうことがあるので出さない
+        if (!isDraw && !podium) countGroup.alpha = 1f;   // 引き分けはタワーの高さがちがうことがあるので出さない。表彰台の高さは順位なので出さない
 
         // ---- 2. 積み木が1個ずつ床から積み上がる（カメラは下から上へ） ----
         int max = 0;
@@ -501,7 +586,7 @@ public class ResultTowerScreen : MonoBehaviour
         // ---- 4. 頭に王冠が「ポンッ」とかぶさる ----
         var w = towers[0];
         float crownY = w.HeadTop - 0.06f + BlockH * 0.35f * CrownScale;
-        SetCam(new Vector3(-1.1f, crownY + 0.2f, -4.2f), new Vector3(0f, crownY - 0.1f, 0f), 42f, false);
+        SetCam(new Vector3(centerX - 1.1f, crownY + 0.2f, -4.2f - spread * 0.6f), new Vector3(centerX, crownY - 0.1f, 0f), 42f, false);
         yield return Wait(0.45f);   // ため
 
         // 勝った人全員に王冠をかぶせる(個人戦は1人だけ)。最後の1人を待つ
@@ -649,6 +734,7 @@ public class ResultTowerScreen : MonoBehaviour
     // 王冠が回りながら落ちてきて「ポンッ」
     IEnumerator DropCrown(Tower t, float y)
     {
+        if (t.crownOnHead) { yield return DropHeadCrown(t); yield break; }
         var c = t.crown;
         Vector3 local = new Vector3(0f, y, 0f);
         c.gameObject.SetActive(true);
@@ -680,6 +766,43 @@ public class ResultTowerScreen : MonoBehaviour
             yield return null;
         }
         c.localScale = Vector3.one * CrownScale;
+        head.localScale = Vector3.one;
+    }
+
+    // 王冠のモデル（頭のモデルの子）が、回りながら上から落ちてきて「ポンッ」とかぶさる。位置は頭のモデルの中（0 がかぶった位置）
+    IEnumerator DropHeadCrown(Tower t)
+    {
+        var c = t.crown;
+        c.gameObject.SetActive(true);
+        // 頭のモデルの大きさで割って、世界で 4.5 の高さから落とす
+        float scale = Mathf.Max(c.parent != null ? c.parent.lossyScale.y : 1f, 1e-3f);
+        float height = 4.5f / scale;
+        const float time = 0.38f;
+        for (float u = 0f; u < 1f; u += Dt / time)
+        {
+            c.localPosition = Vector3.up * height * (1f - u * u);
+            c.localRotation = Quaternion.Euler(0f, (1f - u) * 540f, 0f);
+            yield return null;
+        }
+        c.localPosition = Vector3.zero;
+        c.localRotation = Quaternion.identity;
+        t.wobble = 1.4f;
+
+        Vector3 at = c.position + Vector3.up * 1.0f * scale;
+        ToyKit.Emit(sparkle, at, Quaternion.Euler(-90f, 0f, 0f), 50);
+        ToyKit.Emit(confetti, at + Vector3.up * 0.1f, Quaternion.Euler(-90f, 0f, 0f), 80);
+        shake = 0.4f;
+        Play(SoundSynth.Pickup, 1f, 1.9f);
+        Play(SoundSynth.Respawn, 0.9f, 1f);
+
+        var head = t.face.root;
+        for (float u = 0f; u < 1f; u += Dt / 0.35f)
+        {
+            c.localScale = ToyKit.SquashVec(ToyKit.Squash(u, 0.25f));
+            head.localScale = ToyKit.SquashVec(ToyKit.Squash(u, 0.15f));
+            yield return null;
+        }
+        c.localScale = Vector3.one;
         head.localScale = Vector3.one;
     }
 
@@ -778,7 +901,7 @@ public class ResultTowerScreen : MonoBehaviour
             // てっぺんに乗った顔と、かぶった王冠も一緒に揺れる
             float topX = Mathf.Sin(sway * Mathf.Deg2Rad) * 0.6f;
             if (t.onTop) t.face.root.localPosition = new Vector3(topX, t.face.root.localPosition.y, 0f);
-            if (t.crown != null && t.crown.gameObject.activeSelf && t.crown.localScale == Vector3.one * CrownScale)
+            if (t.crown != null && !t.crownOnHead && t.crown.gameObject.activeSelf && t.crown.localScale == Vector3.one * CrownScale)
                 t.crown.localPosition = new Vector3(topX, t.crown.localPosition.y, 0f);
 
             // 1位の顔：最後はうれしそうに揺れる

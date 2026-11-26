@@ -32,6 +32,8 @@ namespace Nakahira
         [Header("当たり判定")]
         [Tooltip("ハンマーが届く距離の倍率(1で見た目のハンマーの長さ)")]
         [Min(0.1f)] public float HitReachScale = 1.5f;
+        [Tooltip("はじき返しアシスト。薙ぎ払いを振っている間、攻撃判定のある積み木が振る軌道(振り始め〜振り終わりの扇形)のどこかに入ったら、すぐにはじき返す。\nハンマーはその角度へ移り、そこから振り抜く。オフなら、ハンマーがその位置を通ったときだけ当たる")]
+        public bool DeflectAssist = true;
 
         [Header("打ち返し")]
         [Tooltip("飛んできた積み木を打ち返す向き。Facing: 向いている向き / HammerAngle: ハンマーが当たった角度")]

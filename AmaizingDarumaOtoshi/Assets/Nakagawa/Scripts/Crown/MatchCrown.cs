@@ -482,6 +482,10 @@ namespace Nakagawa
         // 金の輪に5本のとがりと宝石を付けた王冠(大きさ1で幅およそ1。底が原点)
         public static Transform BuildCrown(float size, Color gold, Color gem)
         {
+            // 王冠のモデル(Fujihara 2026-11-26: GameModelSettings の王冠のモデル)があれば、それを使う。無ければ今までの王冠を組み立てる
+            var model = BuildModelCrown(size);
+            if (model != null) return model;
+
             if (s_goldMat == null)
             {
                 s_goldMat = ToyKit.Lit(gold, 0.85f);
@@ -526,6 +530,26 @@ namespace Nakagawa
                 stone.localRotation = Quaternion.LookRotation(dir);
                 SetMat(stone, s_gemMat);
             }
+            root.localScale = Vector3.one * size;
+            return root;
+        }
+
+        // 王冠のモデル(Fujihara 2026-11-26)。モデルはだるまの頭と同じ原点・大きさで作ってあり、輪の底が y = 0.85(頭のてっぺん 0.94 の少し下)。
+        // 王冠の底(輪の下)を原点に合わせ、size 0.7 のときに試合の頭(幅およそ 0.9)にぴったりかぶる大きさにする
+        const float kModelBottom = 0.85f;
+        const float kModelScalePerSize = 0.9f / 0.7f;
+        private static Transform BuildModelCrown(float size)
+        {
+            var settings = GameModelSettings.Current;
+            if (settings == null || settings.crownModel == null) return null;
+            var root = new GameObject("Crown").transform;
+            root.gameObject.AddComponent<OutlineExclude>();   // かぶっている人の輪郭(PlayerOutlines)を王冠には付けない
+            var m = Instantiate(settings.crownModel, root, false).transform;
+            m.name = "Model";
+            m.localScale = Vector3.one * kModelScalePerSize;
+            m.localPosition = Vector3.down * (kModelBottom * kModelScalePerSize);
+            foreach (var c in m.GetComponentsInChildren<Collider>(true)) DestroyImmediate(c);
+            foreach (var r in m.GetComponentsInChildren<Renderer>(true)) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
             root.localScale = Vector3.one * size;
             return root;
         }

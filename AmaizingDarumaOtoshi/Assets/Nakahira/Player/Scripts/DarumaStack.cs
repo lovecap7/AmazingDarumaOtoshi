@@ -66,6 +66,8 @@ namespace Nakahira
         }
 
         public TumikiBlock Get(int index) => m_blocks[index];
+        // 積まれている段の番号(なければ -1)
+        public int IndexOf(TumikiBlock block) => m_blocks.IndexOf(block);
 
         // プレイヤーがrootDeltaだけ移動したとき、頭と積まれた段のワールド位置を移動前のまま保つ
         public void KeepVisualsInPlace(Vector3 rootDelta)

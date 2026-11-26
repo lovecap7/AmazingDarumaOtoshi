@@ -630,13 +630,63 @@ namespace Nakahira
             StartHitStop(duration, timeScale, shake);
 
             // 当たった段が抜けて、当たった角度に応じた速さで飛ぶ(連鎖)。ヒットストップが明けてから飛び出す
-            TumikiBlock block = m_stack.RemoveAt(index);
-            block.StartHitStop(duration, timeScale, shake);
-            projectile.ComputeImpact(block.transform.position, out Vector3 dir, out float speed);
-            block.Push(dir, speed, projectile.Owner, projectile.ReturnCount, this);
+            // 攻撃力が 2 以上なら、当たった段から上・下・上…と交互にその数だけ飛ぶ。段が足りなければ脱落する
+            int power = Mathf.Max(1, projectile.AttackPower);
+            s_knocked.Clear();
+            for (int step = 0; s_knocked.Count < power && step <= 2 * m_stack.Count; step++)
+            {
+                // 0, +1, -1, +2, -2, …
+                int offset = (step + 1) / 2 * (step % 2 == 1 ? 1 : -1);
+                int i = index + offset;
+                if (i >= 0 && i < m_stack.Count) s_knocked.Add(m_stack.Get(i));
+            }
+            bool overkill = s_knocked.Count < power;
+
+            // 2 段以上のときは、当たった向きから左右へ散らす(どの段がどこへ飛ぶかはばらばら)
+            int n = s_knocked.Count;
+            float spread = n > 1 && projectile.Params != null ? projectile.Params.MultiKnockSpread : 0.0f;
+            s_spreadAngles.Clear();
+            for (int k = 0; k < n; k++)
+            {
+                float a = 0.0f;
+                if (n > 1) a = Mathf.Lerp(-spread, spread, k / (float)(n - 1)) + UnityEngine.Random.Range(-0.3f, 0.3f) * spread / (n - 1);
+                s_spreadAngles.Add(a);
+            }
+            for (int k = n - 1; k > 0; k--)
+            {
+                int j = UnityEngine.Random.Range(0, k + 1);
+                float tmp = s_spreadAngles[k];
+                s_spreadAngles[k] = s_spreadAngles[j];
+                s_spreadAngles[j] = tmp;
+            }
+
+            for (int k = 0; k < n; k++)
+            {
+                TumikiBlock block = s_knocked[k];
+                m_stack.RemoveAt(m_stack.IndexOf(block));
+                block.StartHitStop(duration, timeScale, shake);
+                projectile.ComputeImpact(block.transform.position, out Vector3 dir, out float speed);
+                if (s_spreadAngles[k] != 0.0f) dir = Quaternion.Euler(0.0f, s_spreadAngles[k], 0.0f) * dir;
+                block.Push(dir, speed, projectile.Owner, projectile.ReturnCount, this);
+            }
+            // いっしょに飛び出した段どうしは、離れるまでぶつからない(すぐに当たって崩れないように)
+            for (int a = 0; a < n; a++)
+            {
+                for (int b = a + 1; b < n; b++)
+                {
+                    s_knocked[a].IgnoreFor(s_knocked[b].GetComponent<Collider>(), kKnockIgnoreTime);
+                }
+            }
             RaiseDamaged();
+            // 攻撃力が段の数より多かった: 残った首も吹き飛ぶ
+            if (overkill) Eliminate(EliminationCause.Projectile, projectile.Direction, transform.position);
             return true;
         }
+
+        static readonly System.Collections.Generic.List<TumikiBlock> s_knocked = new System.Collections.Generic.List<TumikiBlock>();
+        static readonly System.Collections.Generic.List<float> s_spreadAngles = new System.Collections.Generic.List<float>();
+        // いっしょに飛び出した段どうしがぶつからない時間(秒)
+        const float kKnockIgnoreTime = 0.4f;
 
         // 脱落。とりあえずキャラクターを消すだけ(演出は今後)
         public void Eliminate() => Eliminate(EliminationCause.Other);
