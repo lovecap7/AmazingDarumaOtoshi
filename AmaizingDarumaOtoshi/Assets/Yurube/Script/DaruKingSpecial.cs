@@ -113,6 +113,34 @@ namespace Yurube
         public float ChargeRemaining => m_state == State.Charging
             ? Mathf.Max(0.0f, m_chargeDuration - m_stateTime)
             : 0.0f;
+        // ラボ表示用: 現在の状態名とフェーズ残り時間
+        public string PhaseLabel
+        {
+            get
+            {
+                switch (m_state)
+                {
+                    case State.Charging: return "詠唱中";
+                    case State.CutIn: return "カットイン中";
+                    case State.Windup: return "斬撃準備";
+                    case State.Recover: return "攻撃演出中";
+                    default: return "待機";
+                }
+            }
+        }
+        public float PhaseRemaining
+        {
+            get
+            {
+                switch (m_state)
+                {
+                    case State.Charging: return ChargeRemaining;
+                    case State.Windup: return Mathf.Max(0.0f, m_strikeDelay - m_stateTime);
+                    case State.Recover: return Mathf.Max(0.0f, m_effectDuration - m_stateTime);
+                    default: return 0.0f;
+                }
+            }
+        }
 
         // ---- CPU がエクスカリバーを避けるための読み取り用(中平追加。動きには関係しない) ----
         // 発動したキャラクター(この人には当たらない)

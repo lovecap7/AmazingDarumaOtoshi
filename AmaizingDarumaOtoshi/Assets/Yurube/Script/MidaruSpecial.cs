@@ -34,12 +34,40 @@ namespace Yurube
         [Tooltip("画面下部に表示する必殺技名")]
         [SerializeField] string m_cutInName = "ファンネル";
 
+        [Header("マシンガン(suehara)。オンなら上の「ファンネル」の代わりにこちらを出す")]
+        [Tooltip("オン: 目の前に固定砲台を置き、砲台が一番近い敵へ自動で向いて弾を連射する(みだるは自由に動ける) / オフ: 前の「ファンネル」")]
+        [SerializeField] bool m_useMachineGun = true;
+        [Tooltip("技名(カットインに出す)")]
+        [SerializeField] string m_machineGunName = "マシンガン";
+        [Tooltip("撃ち続ける時間(秒)")]
+        [SerializeField] float m_machineGunDuration = 6.0f;
+        [Tooltip("1秒に撃つ数")]
+        [SerializeField] float m_machineGunRate = 8.0f;
+        [Tooltip("弾の速さ(m/s)")]
+        [SerializeField] float m_machineGunSpeed = 24.0f;
+        [Tooltip("弾が届く距離(m)。0 なら無限(壁などに当たるまで飛ぶ)")]
+        [SerializeField] float m_machineGunRange = 0.0f;
+        [Tooltip("砲台が回る速さの上限(度/秒)。ダッシュ(9.6m/s)で横に走る相手は、距離5mで毎秒約110°、4mで約140°回り込む。140なら4mより近くでダッシュされると追いつけない")]
+        [SerializeField] float m_machineGunTurnSpeed = 140.0f;
+        [SerializeField] Color m_machineGunCutInColor = new Color(0.3f, 0.85f, 0.4f);
+
         DarumaCharacter m_character;
         SpecialGauge m_gauge;
+        MidaruMachineGun m_gun;
+        float m_gunActiveUntil = -1.0f;
 
         // 必殺技ゲージ用(中平): 発動してから分裂弾が追いかけ終わるまで(この間はゲージが溜まらない)
         float m_activeUntil = -1.0f;
-        public bool IsActive => Time.time < m_activeUntil;
+        public bool IsActive => Time.time < m_activeUntil || (m_gun != null && m_gun.IsFiring);
+        // CPU 用(suehara): マシンガンを使うか / 撃った弾が届く目安の距離
+        public bool UsesMachineGun => m_useMachineGun;
+        public float MachineGunRange => 10.0f;
+        // ラボ表示用
+        public float RemainingSeconds => (m_gun != null && m_gun.IsFiring)
+            ? Mathf.Max(0.0f, m_gunActiveUntil - Time.time)
+            : (Time.time < m_activeUntil ? Mathf.Max(0.0f, m_activeUntil - Time.time) : 0.0f);
+        public float MachineGunDuration => m_machineGunDuration;
+        public MidaruMachineGun ActiveGun => m_gun;
 
         private void Awake()
         {
@@ -69,6 +97,7 @@ namespace Yurube
         // ラボのボタンからも呼べる。発動できたら true
         public bool TryActivate()
         {
+            if (m_useMachineGun) return TryActivateMachineGun();
             if (m_gauge == null || !m_gauge.IsFull) return false;
             if (m_character == null || m_character.Stack == null || m_character.Stack.Count == 0) return false;
             if (!m_character.CanBeAffected) return false;
@@ -108,13 +137,50 @@ namespace Yurube
         }
 
         //========================================
+        // マシンガン(suehara)
+        //========================================
+
+        bool TryActivateMachineGun()
+        {
+            if (m_gauge == null || !m_gauge.IsFull) return false;
+            if (m_character == null || !m_character.CanBeAffected) return false;
+            if (IsActive) return false;   // 砲台が撃っている間は重ねられない
+
+            m_gauge.Consume();
+            // 砲台はみだるの目の前に置く(置いたあと、みだるは自由に動ける)
+            Vector3 direction = m_character.transform.forward;
+            direction.y = 0.0f;
+            direction = direction.sqrMagnitude > 0.0001f ? direction.normalized : Vector3.forward;
+            Vector3 position = m_character.transform.position + direction * MidaruMachineGun.HoldDistance;
+            // ネット対戦用(suehara): クライアントでも砲台の見た目を出す(撃つのはホストだけ)
+            SpecialNet.Send(m_character, this, kNetMachineGun, new[] { position.x, position.y, position.z, direction.x, direction.z });
+            PlayMachineGun(position, direction);
+
+            if (m_logSpecial) Debug.Log($"[みだる] 必殺技『{m_machineGunName}』発動", this);
+            return true;
+        }
+
+        void PlayMachineGun(Vector3 position, Vector3 direction)
+        {
+            m_gun = MidaruMachineGun.Place(m_character, position, direction, m_machineGunDuration, m_machineGunRate, m_machineGunSpeed, m_machineGunRange, m_machineGunTurnSpeed);
+            m_gunActiveUntil = Time.time + 0.25f + Mathf.Max(0.1f, m_machineGunDuration);
+            SpecialCutIn.Show(m_machineGunName, m_machineGunCutInColor, null, m_character, null, m_character.Stack != null ? m_character.Stack.Count : 0);
+        }
+
+        //========================================
         // ネット対戦用(suehara): クライアントで、ホストの発動と同じカットインを出す
         //========================================
 
         const int kNetActivate = 0;
+        const int kNetMachineGun = 1;
 
         public void NetReceive(int ev, float[] v, TumikiBlock[] blocks)
         {
+            if (ev == kNetMachineGun)
+            {
+                if (v.Length >= 5 && m_gun == null) PlayMachineGun(new Vector3(v[0], v[1], v[2]), new Vector3(v[3], 0.0f, v[4]));
+                return;
+            }
             if (ev != kNetActivate) return;
             var list = new List<TumikiBlock>();
             foreach (var b in blocks) if (b != null) list.Add(b);

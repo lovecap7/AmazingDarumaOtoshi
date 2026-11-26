@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 namespace Yurube.Story
@@ -16,6 +17,11 @@ namespace Yurube.Story
     public class DialogueRunner : MonoBehaviour
     {
         const string HintText = StoryText.Hint;
+        const string ChoiceHintText = "↑↓：えらぶ　A：けってい";
+
+        static readonly Color ChoiceSelectedBg = new Color(1f, 0.95f, 0.78f, 1f);
+        static readonly Color ChoiceNormalBg = new Color(0.95f, 0.92f, 0.87f, 0.94f);
+        static readonly Color ChoiceSelectedOutline = new Color(1.0f, 0.84f, 0.24f, 1f);
 
         // 文字送りの速さ（1秒あたりの文字数）。インスペクターで変えられる
         [SerializeField, Min(1f)] float m_charsPerSecond = 34f;
@@ -41,23 +47,41 @@ namespace Yurube.Story
         RectTransform m_newsSubBg;
         TextMeshProUGUI m_newsSubHeader, m_newsSubBody;
         CanvasGroup m_bigGroup, m_smallGroup, m_newsGroup, m_objectiveGroup, m_koGroup, m_hintGroup;
+        class ChoiceButton
+        {
+            public RectTransform Rect;
+            public Image Bg;
+            public Outline Outline;
+            public TextMeshProUGUI Arrow;
+            public TextMeshProUGUI Label;
+        }
+
+        RectTransform m_choiceRoot;
+        CanvasGroup m_choiceGroup;
+        readonly List<ChoiceButton> m_choiceButtons = new List<ChoiceButton>();
         bool m_skipped;
         bool m_smallShowing;
         bool m_bigShowing;
+        bool m_choiceShowing;
         bool m_compactLayout;
         // いま出している小窓のコルーチン。新しい小窓が来たら止めて、すぐ切り替える
         Coroutine m_smallRoutine;
 
-        // 大きいウィンドウ・小さいウィンドウ・新聞のどれかが出ているか
-        public bool IsShowing => m_bigShowing || m_smallShowing;
+        // 大きいウィンドウ・小さいウィンドウ・選択肢・新聞のどれかが出ているか
+        public bool IsShowing => m_bigShowing || m_smallShowing || m_choiceShowing;
 
         // 直前の会話で B（スキップ）が押されたか。エピローグのように「Bで残りを飛ばす」場面で使う
         public bool WasSkipped => m_skipped;
+
+        // 直前の2択で選ばれた結果（未選択なら null）。セーブには書かず、呼び出し元の分岐判定に使う
+        public StoryChoiceResult? LastChoiceResult { get; private set; }
 
         // 1行を表示し始めた（話者ID。ト書きは空）。会話中にカメラを話者へ寄せる演出用
         public event Action<string> LineStarted;
         // 1行を表示し始めた（行データ全体。ショットIDなどを使ったカメラ切り替え用）
         public event Action<StoryLine> StoryLineStarted;
+        // 2択の選択肢を決定した（最終章のエンディング分岐などで使用）
+        public event Action<StoryChoiceResult> ChoiceSelected;
 
         // 操作バナーを目立たせる（連鎖の詰まり防止）
         bool m_objectiveEmphasis;
@@ -124,6 +148,7 @@ namespace Yurube.Story
             m_dim = dim.GetComponent<Image>();
 
             BuildBig();
+            BuildChoice();
             BuildSmall();
             BuildNews();
             BuildObjective();
@@ -268,6 +293,104 @@ namespace Yurube.Story
 
             m_bigGroup.alpha = 0f;
             panel.gameObject.SetActive(false);
+        }
+
+        void BuildChoice()
+        {
+            var root = new GameObject("Choice", typeof(RectTransform)).GetComponent<RectTransform>();
+            root.SetParent(m_root, false);
+            root.anchorMin = root.anchorMax = new Vector2(0.5f, 0f);
+            root.pivot = new Vector2(0.5f, 0f);
+            root.anchoredPosition = new Vector2(220f, 642f);
+            root.sizeDelta = new Vector2(940f, 170f);
+            m_choiceRoot = root;
+            m_choiceGroup = root.gameObject.AddComponent<CanvasGroup>();
+            m_choiceGroup.alpha = 0f;
+            root.gameObject.SetActive(false);
+        }
+
+        void EnsureChoiceButtons(int count)
+        {
+            const float itemWidth = 940f;
+            const float itemHeight = 78f;
+            const float gap = 14f;
+            float totalHeight = count > 0 ? count * itemHeight + (count - 1) * gap : itemHeight;
+            m_choiceRoot.sizeDelta = new Vector2(itemWidth, totalHeight);
+
+            while (m_choiceButtons.Count < count)
+            {
+                int i = m_choiceButtons.Count;
+                var rect = ToyKit.UIRounded("Option" + i, m_choiceRoot, ChoiceNormalBg, 20f);
+                rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 1f);
+                rect.pivot = new Vector2(0.5f, 1f);
+                rect.GetComponent<Image>().pixelsPerUnitMultiplier = 0.55f;
+
+                var outline = rect.gameObject.AddComponent<Outline>();
+                outline.effectColor = Ink;
+                outline.effectDistance = new Vector2(2f, -2f);
+
+                var arrow = ToyKit.UIText("Arrow", rect, m_font, "▶", 28f, new Color(0.84f, 0.25f, 0.20f, 1f));
+                arrow.fontStyle = FontStyles.Bold;
+                arrow.rectTransform.anchorMin = arrow.rectTransform.anchorMax = new Vector2(0f, 0.5f);
+                arrow.rectTransform.pivot = new Vector2(0f, 0.5f);
+                arrow.rectTransform.anchoredPosition = new Vector2(24f, 0f);
+                arrow.rectTransform.sizeDelta = new Vector2(36f, 44f);
+
+                var label = ToyKit.UIText("Label", rect, m_font, "", 32f, Ink);
+                label.alignment = TextAlignmentOptions.Left;
+                label.fontStyle = FontStyles.Bold;
+                label.textWrappingMode = TextWrappingModes.Normal;
+                label.enableAutoSizing = true;
+                label.fontSizeMin = 20f;
+                label.fontSizeMax = 32f;
+                var labelRect = label.rectTransform;
+                labelRect.anchorMin = labelRect.anchorMax = new Vector2(0f, 0.5f);
+                labelRect.pivot = new Vector2(0f, 0.5f);
+                labelRect.anchoredPosition = new Vector2(72f, 0f);
+                labelRect.sizeDelta = new Vector2(itemWidth - 98f, itemHeight - 14f);
+
+                m_choiceButtons.Add(new ChoiceButton
+                {
+                    Rect = rect,
+                    Bg = rect.GetComponent<Image>(),
+                    Outline = outline,
+                    Arrow = arrow,
+                    Label = label,
+                });
+            }
+
+            for (int i = 0; i < m_choiceButtons.Count; i++)
+            {
+                bool active = i < count;
+                m_choiceButtons[i].Rect.gameObject.SetActive(active);
+                if (active)
+                {
+                    m_choiceButtons[i].Rect.anchoredPosition = new Vector2(0f, -i * (itemHeight + gap));
+                    m_choiceButtons[i].Rect.sizeDelta = new Vector2(itemWidth, itemHeight);
+                }
+            }
+        }
+
+        void UpdateChoiceVisuals(int selectedIndex, int count)
+        {
+            for (int i = 0; i < count && i < m_choiceButtons.Count; i++)
+            {
+                bool selected = i == selectedIndex;
+                var btn = m_choiceButtons[i];
+                btn.Bg.color = selected ? ChoiceSelectedBg : ChoiceNormalBg;
+                btn.Outline.effectColor = selected ? ChoiceSelectedOutline : Ink;
+                btn.Outline.effectDistance = selected ? new Vector2(4f, -4f) : new Vector2(2f, -2f);
+                btn.Rect.localScale = selected ? Vector3.one * 1.03f : Vector3.one;
+                btn.Arrow.gameObject.SetActive(selected);
+            }
+        }
+
+        void UpdateHint(string text)
+        {
+            if (m_hint == null || m_hintPlate == null) return;
+            m_hint.text = text;
+            m_hint.ForceMeshUpdate();
+            m_hintPlate.sizeDelta = new Vector2(Mathf.Clamp(m_hint.preferredWidth + 30f, 280f, 560f), 56f);
         }
 
         void BuildSmall()
@@ -418,7 +541,10 @@ namespace Yurube.Story
         //========================================
 
         // onLine: 行を出し始めたときに呼ぶ（章ごとの演出を台詞に合わせるため。省略可）
-        public IEnumerator PlayBig(StoryChapter chapter, IList<StoryLine> lines, Action<int, StoryLine> onLine = null)
+        // onChoice: 2択の選択肢を選んだときに呼ぶ（最終章の分岐など。省略可）
+        public IEnumerator PlayBig(StoryChapter chapter, IList<StoryLine> lines,
+                                   Action<int, StoryLine> onLine = null,
+                                   Action<StoryChoiceResult> onChoice = null)
         {
             if (lines == null || lines.Count == 0) yield break;
             Build();
@@ -433,6 +559,7 @@ namespace Yurube.Story
 
             m_bigPanel.gameObject.SetActive(true);
             m_smallPanel.gameObject.SetActive(false);
+            UpdateHint(HintText);
             m_hintGroup.gameObject.SetActive(true);
             m_hintGroup.alpha = 1f;
             // フェードインの前に最初の行を入れておく（空のウィンドウが一瞬出ないように）
@@ -443,15 +570,45 @@ namespace Yurube.Story
 
             int index = 0;
             bool firstPrepared = first != null;
+            StoryLine lastDialogueLine = first;
             foreach (var line in lines)
             {
                 if (line == null) { index++; continue; }
+                if (line.HasChoice)
+                {
+                    if (m_skipped)
+                    {
+                        // Bスキップは選択肢の手前で止める。スキップされた直前の台詞が画面に出た状態にする
+                        m_skipped = false;
+                        if (lastDialogueLine != null)
+                        {
+                            PrepareLine(chapter, lastDialogueLine, true);
+                            m_bigText.maxVisibleCharacters = m_bigText.textInfo.characterCount;
+                        }
+                    }
+                    yield return RunChoice(chapter, line.choice, onChoice);
+                    firstPrepared = false;
+                    lastDialogueLine = null;
+                    index++;
+                    if (m_skipped) break;
+                    continue;
+                }
+
+                lastDialogueLine = line;
+                if (m_skipped) { index++; continue; }
+
                 yield return ShowLine(chapter, line, big: true, index, onLine, firstPrepared);
                 firstPrepared = false;
                 index++;
-                if (m_skipped) break;
             }
 
+            if (m_choiceRoot != null)
+            {
+                m_choiceGroup.alpha = 0f;
+                m_choiceRoot.gameObject.SetActive(false);
+            }
+            m_choiceShowing = false;
+            UpdateHint(HintText);
             m_hintGroup.alpha = 0f;
             m_hintGroup.gameObject.SetActive(false);
             yield return FadeGroup(m_bigGroup, 1f, 0f, 0.15f);
@@ -459,6 +616,111 @@ namespace Yurube.Story
             m_bigPanel.gameObject.SetActive(false);
             m_bigShowing = false;
             SpecialGaugeHUD.Suppressed = gaugeWasSuppressed;
+        }
+
+        IEnumerator RunChoice(StoryChapter chapter, StoryChoice choice, Action<StoryChoiceResult> onChoice)
+        {
+            if (choice == null || choice.options == null || choice.options.Count == 0) yield break;
+
+            int count = choice.options.Count;
+            EnsureChoiceButtons(count);
+            for (int i = 0; i < count; i++)
+            {
+                var opt = choice.options[i];
+                m_choiceButtons[i].Label.text = opt != null && !string.IsNullOrEmpty(opt.text) ? opt.text : "";
+            }
+
+            int selected = 0;
+            UpdateChoiceVisuals(selected, count);
+            UpdateHint(ChoiceHintText);
+
+            m_choiceShowing = true;
+            m_choiceRoot.gameObject.SetActive(true);
+            yield return FadeGroup(m_choiceGroup, 0f, 1f, 0.12f);
+
+            while (true)
+            {
+                // B（スキップ）を押しても選択肢は閉じない・飛ばさない
+                if (MenuInput.Up())
+                {
+                    selected = (selected - 1 + count) % count;
+                    UpdateChoiceVisuals(selected, count);
+                    MenuSounds.Cursor();
+                }
+                else if (MenuInput.Down())
+                {
+                    selected = (selected + 1) % count;
+                    UpdateChoiceVisuals(selected, count);
+                    MenuSounds.Cursor();
+                }
+
+                var mouse = Mouse.current;
+                bool mouseMoved = mouse != null && mouse.delta.ReadValue().sqrMagnitude > 0f;
+                bool click = InputFree && MenuInput.AnyClick();
+                int hover = -1;
+                if (mouse != null && (mouseMoved || click))
+                {
+                    Vector2 mp = mouse.position.ReadValue();
+                    for (int i = 0; i < count; i++)
+                    {
+                        if (RectTransformUtility.RectangleContainsScreenPoint(m_choiceButtons[i].Rect, mp, null))
+                        {
+                            hover = i;
+                            break;
+                        }
+                    }
+                    if (hover >= 0 && hover != selected)
+                    {
+                        selected = hover;
+                        UpdateChoiceVisuals(selected, count);
+                        MenuSounds.Cursor();
+                    }
+                }
+
+                bool submitKey = InputFree && MenuInput.Submit();
+                bool clickOption = click && hover >= 0;
+                if (submitKey || clickOption)
+                {
+                    ConsumeInput();
+                    MenuSounds.Decide();
+                    break;
+                }
+                yield return null;
+            }
+
+            yield return FadeGroup(m_choiceGroup, 1f, 0f, 0.1f);
+            m_choiceRoot.gameObject.SetActive(false);
+            m_choiceShowing = false;
+            UpdateHint(HintText);
+
+            var chosen = choice.options[selected];
+            string chosenText = chosen != null ? chosen.text : "";
+            string branchId = chosen != null ? chosen.branchId : "";
+            var result = new StoryChoiceResult(choice.id, selected, branchId, chosenText);
+            LastChoiceResult = result;
+            onChoice?.Invoke(result);
+            ChoiceSelected?.Invoke(result);
+
+            // 選んだ選択肢を操作キャラ（または指定話者）の台詞として表示してから、反応を再生する
+            string speakerId = !string.IsNullOrEmpty(choice.speaker)
+                ? choice.speaker
+                : (chapter != null && !string.IsNullOrEmpty(chapter.playerCharacter) ? chapter.playerCharacter : "akadaru");
+            if (!string.IsNullOrEmpty(chosenText))
+            {
+                var selfLine = new StoryLine { speaker = speakerId, text = chosenText };
+                yield return ShowLine(chapter, selfLine, big: true);
+                if (m_skipped) yield break;
+            }
+
+            if (chosen != null && chosen.reaction != null)
+            {
+                foreach (var r in chosen.reaction)
+                {
+                    if (r == null) continue;
+                    yield return ShowLine(chapter, r.ToStoryLine(), big: true);
+                    if (m_skipped) yield break;
+                }
+            }
         }
 
         // 右下の操作ヒントを消す（GO!やメニュー移行時に残らないように）
@@ -504,6 +766,8 @@ namespace Yurube.Story
                     textRect.anchoredPosition = new Vector2(left, -72f);
                     textRect.sizeDelta = new Vector2(1500f - left - 44f, 114f);
                 }
+                if (m_choiceRoot != null)
+                    ToyKit.Anchor(m_choiceRoot, new Vector2(0.5f, 0f), new Vector2(220f, 316f), m_choiceRoot.sizeDelta);
             }
             else
             {
@@ -521,6 +785,8 @@ namespace Yurube.Story
                     textRect.anchoredPosition = new Vector2(300f, -100f);
                     textRect.sizeDelta = new Vector2(1120f, 190f);
                 }
+                if (m_choiceRoot != null)
+                    ToyKit.Anchor(m_choiceRoot, new Vector2(0.5f, 0f), new Vector2(220f, 642f), m_choiceRoot.sizeDelta);
             }
         }
 
@@ -703,13 +969,13 @@ namespace Yurube.Story
             m_newsCaption.gameObject.SetActive(hasCaption);
             m_newsCaptionBg.SetActive(hasCaption);
 
-            // 紙面の隅の小さな囲み記事（最終章）
-            bool hasSub = !string.IsNullOrEmpty(paper.subBody);
+            // 紙面の隅の小さな囲み記事（最終章など）。subHeader か subBody があれば出す
+            bool hasSub = !string.IsNullOrEmpty(paper.subHeader) || !string.IsNullOrEmpty(paper.subBody);
             m_newsSubBg.gameObject.SetActive(hasSub);
             if (hasSub)
             {
                 m_newsSubHeader.text = string.IsNullOrEmpty(paper.subHeader) ? "囲み記事" : paper.subHeader;
-                m_newsSubBody.text = paper.subBody;
+                m_newsSubBody.text = string.IsNullOrEmpty(paper.subBody) ? "" : paper.subBody;
             }
 
             m_newsPanel.gameObject.SetActive(true);
@@ -754,7 +1020,7 @@ namespace Yurube.Story
             if (lines == null) return null;
             foreach (var line in lines)
             {
-                if (line != null) return line;
+                if (line != null && !line.HasChoice) return line;
             }
             return null;
         }

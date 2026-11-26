@@ -17,11 +17,12 @@ namespace Yurube.Story
             return PlayerPrefs.GetInt(KeyPrefix + chapterId, 0) == 1;
         }
 
-        // 章が遊べるか（解放済みとして保存されているか、または解放条件の章をクリア済みか）
+        // 章が遊べるか（解放済みまたはクリア済みとして保存されているか、または解放条件の章をクリア済みか）
         public static bool IsUnlocked(StoryChapter chapter)
         {
             if (chapter == null) return false;
             if (PlayerPrefs.GetInt(UnlockKeyPrefix + chapter.id, 0) == 1) return true;
+            if (IsCleared(chapter.id)) return true;
             return string.IsNullOrEmpty(chapter.requiredChapter) || IsCleared(chapter.requiredChapter);
         }
 

@@ -32,14 +32,14 @@ namespace Nakagawa.EditorTools
         const string kStageMaterial = kNakahira + "/Materials/Stage.mat";
         const string kWallMaterial = kNakahira + "/Materials/Wall.mat";
 
-        [MenuItem("Nakagawa/Gimmick/Build Prefabs And Test Field")]
+        [MenuItem("Nakagawa/Gimmick/プレハブとテスト場を作る")]
         public static void BuildAll()
         {
             BuildPrefabs();
             BuildTestField();
         }
 
-        [MenuItem("Nakagawa/Gimmick/Build Prefabs")]
+        [MenuItem("Nakagawa/Gimmick/プレハブを作る")]
         public static void BuildPrefabs()
         {
             EnsureFolder(kMaterialDir);
@@ -187,7 +187,7 @@ namespace Nakagawa.EditorTools
         }
 
         // 積み木の生成に使うもの(エリアのプレハブ・マテリアル・生成パターン)だけを作る。ギミックのプレハブには触れない
-        [MenuItem("Nakagawa/Gimmick/Build Tumiki Spawn Assets")]
+        [MenuItem("Nakagawa/Gimmick/積み木の生成のアセットを作る")]
         public static void BuildSpawnAssets()
         {
             EnsureFolder(kMaterialDir);
@@ -239,7 +239,7 @@ namespace Nakagawa.EditorTools
 
         // 開いているシーンに積み木の生成(司令塔 + 矩形・円形のエリア)を置く。既にあれば置き直す
         // シーンの保存はしない(手で編集中の内容を勝手に保存しないため)
-        [MenuItem("Nakagawa/Gimmick/Add Tumiki Spawner To Open Scene")]
+        [MenuItem("Nakagawa/Gimmick/開いているシーンに積み木の生成を足す")]
         public static void AddSpawnerToOpenScene()
         {
             var areaPrefab = LoadPrefab("TumikiSpawnArea");
@@ -300,7 +300,7 @@ namespace Nakagawa.EditorTools
         // テストフィールド
         //========================================
 
-        [MenuItem("Nakagawa/Gimmick/Build Test Field")]
+        [MenuItem("Nakagawa/Gimmick/テスト場を作る")]
         public static void BuildTestField()
         {
             var fanPrefab = LoadPrefab("Fan");

@@ -1390,14 +1390,16 @@ public class MatchSelect : MonoBehaviour
             if (cpu) ui.level.text = SelectTexts.F(texts.cpuLevel, p.cpuLevel);
 
             CharacterData shown = null;   // 使いやすさを出すキャラ（選んだキャラ、まだならカーソルが乗っているキャラ）
+            // 顔写真は、試合と同じプレイヤーの色のモデル（1P 赤・2P 青・3P 黄・4P 緑・CPU 白）
+            var slotColor = GameModelSettings.CharacterColorOf(new MatchSetup.Entry { playerIndex = i, isCpu = cpu });
             if (p.heldBy != null) SetPortrait(ui, null, texts.chooseCharacter, new Color(0.92f, 0.9f, 0.88f), "");
             else if (p.randomCharacter) SetPortrait(ui, null, texts.randomCharacter, RandomColor, texts.randomLetter);
-            else if (p.character != null) { shown = p.character; SetPortrait(ui, p.character.portrait, p.character.displayName, p.character.IconColor, Initial(p.character.displayName)); }
+            else if (p.character != null) { shown = p.character; SetPortrait(ui, p.character.PortraitFor(slotColor), p.character.displayName, p.character.IconColor, Initial(p.character.displayName)); }
             else
             {
                 // まだ選んでいない：カーソルが乗っているキャラを薄く見せる
                 var hover = !cpu && phase == Phase.Character ? TileAt(charTiles, p.cursor) : null;
-                if (hover != null && !hover.random) { shown = hover.character; SetPortrait(ui, hover.character.portrait, hover.character.displayName, hover.character.IconColor * 0.75f, Initial(hover.character.displayName)); }
+                if (hover != null && !hover.random) { shown = hover.character; SetPortrait(ui, hover.character.PortraitFor(slotColor), hover.character.displayName, hover.character.IconColor * 0.75f, Initial(hover.character.displayName)); }
                 else SetPortrait(ui, null, texts.chooseCharacter, new Color(0.92f, 0.9f, 0.88f), "");
             }
 

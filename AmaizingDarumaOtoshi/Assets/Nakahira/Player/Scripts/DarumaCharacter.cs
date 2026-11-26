@@ -166,7 +166,7 @@ namespace Nakahira
         // ダッシュ(suehara): 走っているか / 残りのスタミナ(0〜1)
         public bool IsDashing => m_dashStamina.IsDashing;
         public float StaminaRatio => m_dashStamina.Ratio;
-        // スタミナの効率(レベル用 2026-11-24。きだるのレベルで上がる)。2 なら減り方が半分・回復が倍
+        // ジャンプのスタミナの効率(レベル用 2026-11-24。きだるのレベルで上がる)。2 ならジャンプの消費が半分(ダッシュ・ブリンク・回復には効かない)
         public float StaminaEfficiency { get => m_dashStamina.Efficiency; set => m_dashStamina.Efficiency = value; }
         // ダッシュ(suehara): ジャンプでスタミナを使うか(ローカルの人の操作だけ。CPU・ネット対戦・デモは使わない)
         private bool UsesJumpStamina => m_commandSource is DarumaInputHandler || m_commandSource is KeyboardDarumaInput;
@@ -440,7 +440,8 @@ namespace Nakahira
             if (UsesJumpStamina)
             {
                 DashParams param = DashParams.Instance;
-                if (!m_dashStamina.TryConsume(param.JumpCostRatio, param)) return;
+                // スタミナの効率(きだるのレベル)はジャンプの消費にだけ効く
+                if (!m_dashStamina.TryConsume(param.JumpCostRatio, param, true)) return;
             }
 
             v.y = m_jumpParams.JumpSpeed;

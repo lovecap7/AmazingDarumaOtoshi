@@ -16,6 +16,13 @@ MonoBehaviour:
   displayName: "\u3078\u3073\u3060\u308B"
   color: {r: 0.42, g: 0.75, b: 0.27, a: 1}
   portrait: {fileID: -6082668426197136557, guid: 52a6346556bdc7748881ba01cd3746df, type: 3}
+  colorPortraits:
+  - {fileID: 0}
+  - {fileID: -6082668426197136557, guid: 5b98d65e11b12164e9427db15219423a, type: 3}
+  - {fileID: -6082668426197136557, guid: 9cc8004381675554c860b2d8a3a60f09, type: 3}
+  - {fileID: -6082668426197136557, guid: a94f136148b52704ea80838d683d062e, type: 3}
+  - {fileID: -6082668426197136557, guid: b10e12cdc9f7fbb44b84a63410d29573, type: 3}
+  - {fileID: -6082668426197136557, guid: 8c0635d7296946841ba2944557d0d4db, type: 3}
   model: {fileID: 919132149155446097, guid: 54f29b052a859e64eb4c02e29aabd41e, type: 3}
   colorModels:
   - {fileID: 919132149155446097, guid: 54f29b052a859e64eb4c02e29aabd41e, type: 3}

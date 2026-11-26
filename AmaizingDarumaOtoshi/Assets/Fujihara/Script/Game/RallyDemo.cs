@@ -7,27 +7,33 @@ using UnityEngine;
 //  ・2人には RallyInput を付ける：その場で相手を向き、飛んできた積み木がハンマーの届くところに来たら薙ぎ払って打ち返す
 //  ・積み木が止まったり（打ち返しそこね）消えたりしたら、交互にサーブし直す
 //  ・打ち返しの音は MatchSounds の①〜④（回数で変わる）。試合ではないので MatchAudio の代わりにここで鳴らす
+// 2026-11-26：試合と同じものをそのまま使う（キャラクターのプレハブ・ハンマーの性能 Hammer_Default・積み木のプレハブ）。
+//   このシーンだけの速さ・打ち返す向きの書き替えはやめた。サーブの速さも、サーブする人のハンマーの性能（SweepLaunchSpeed）
+//   MissAfter 回打ち返したら、次に受ける人は打ち返さずに当たる（無敵も外す）→ 即死の大爆発（KillExplosionVfx）を見せる。
+//   やられた人は RespawnDelay 秒後に出直して、ラリーを始め直す
 public class RallyDemo : MonoBehaviour
 {
+    [Tooltip("2人のキャラクター（試合と同じ CharacterData のプレハブを使う）。空なら characterPrefab")]
+    [SerializeField] CharacterData[] characters = new CharacterData[2];
     [SerializeField] DarumaCharacter characterPrefab;
     [SerializeField] TumikiBlock tumikiPrefab;
     [Tooltip("2人の間の距離")]
     [SerializeField] float distance = 12f;
     [Tooltip("キャラクターに積んでおく積み木の数（見た目用）")]
     [SerializeField] int stackBlocks = 3;
-    [Header("打ち返しの速さ（このシーンだけ）")]
-    [Tooltip("積み木は速さ10未満になると攻撃判定が消え（＝打ち返せない）、毎秒5ずつ減速するので、相手に届くまで10以上を保てる速さにする")]
-    [SerializeField] float launchSpeed = 18f;
-    [Tooltip("打ち返すたびに速さに掛ける倍率")]
-    [SerializeField] float speedRate = 1.08f;
-    [SerializeField] float maxSpeed = 24f;
     [Tooltip("積み木が止まってからサーブし直すまでの秒数")]
     [SerializeField] float serveDelay = 1f;
+    [Header("わざと食らう")]
+    [Tooltip("この回数打ち返したら、次に受ける人は打ち返さずに当たる（0 でずっと打ち返す）")]
+    [SerializeField] int missAfter = 15;
+    [Tooltip("やられてから出直すまでの秒数")]
+    [SerializeField] float respawnDelay = 3.5f;
 
     readonly DarumaCharacter[] players = new DarumaCharacter[2];
     readonly Vector3[] homes = new Vector3[2];
+    readonly float[] respawnAt = new float[2];
+    bool missArmed;
     TumikiBlock ball;
-    HammerParams facingParams;
     AudioSource audioSource;
     int server;
     float idle;
@@ -46,12 +52,19 @@ public class RallyDemo : MonoBehaviour
         DarumaHammer.Hit -= OnHammerHit;
     }
 
+    DarumaCharacter PrefabFor(int i)
+    {
+        var data = characters != null && i < characters.Length ? characters[i] : null;
+        var p = data != null && data.prefab != null ? data.prefab.GetComponent<DarumaCharacter>() : null;
+        return p != null ? p : characterPrefab;
+    }
+
     void Spawn(int i)
     {
         homes[i] = new Vector3(i == 0 ? -distance * 0.5f : distance * 0.5f, 0f, 0f);
-        var ch = Instantiate(characterPrefab, homes[i], Quaternion.LookRotation(i == 0 ? Vector3.right : Vector3.left));
-        ch.name = i == 0 ? "Player1" : "Player2";
-        ch.SetInvincible(float.MaxValue);   // 打ち返しそこねても倒れない
+        // 名前はプレハブのまま（「Akadaru(Clone)」。GameModelSwapper が名前からキャラのモデルを探す）
+        var ch = Instantiate(PrefabFor(i), homes[i], Quaternion.LookRotation(i == 0 ? Vector3.right : Vector3.left));
+        ch.SetInvincible(float.MaxValue);   // 打ち返しそこねても倒れない（わざと食らうときだけ外す）
         var input = ch.gameObject.AddComponent<RallyInput>();
         ch.SetCommandSource(input);
         players[i] = ch;
@@ -62,13 +75,20 @@ public class RallyDemo : MonoBehaviour
         for (int i = 0; i < 2; i++)
         {
             var ch = players[i];
-            if (ch == null) continue;
+            if (ch == null)
+            {
+                // やられた：少し待ってから出直す
+                if (respawnAt[i] <= 0f) respawnAt[i] = Time.time + respawnDelay;
+                else if (Time.time >= respawnAt[i]) { respawnAt[i] = 0f; Spawn(i); idle = 0f; }
+                continue;
+            }
             var other = players[1 - i];
             if (other != null) ch.GetComponent<RallyInput>().Setup(ch, other);
-            Pin(ch, homes[i], other != null ? other.transform.position : Vector3.zero);
+            Pin(ch, homes[i], other != null ? other.transform.position : homes[1 - i]);
             Refill(ch);
-            FaceReturn(ch);
         }
+        // 片方がいない間はサーブしない
+        if (players[0] == null || players[1] == null) { idle = 0f; return; }
 
         // 積み木：積まれてしまったら新しく出す。止まっていたらしばらく待ってサーブ
         if (ball != null && ball.CurrentState == TumikiBlock.State.Stacked) ball = null;
@@ -103,6 +123,14 @@ public class RallyDemo : MonoBehaviour
         var from = players[server];
         var to = players[1 - server];
         if (from == null || to == null || tumikiPrefab == null) return;
+        // ラリーを始め直すので、2人とも「打ち返す・無敵」に戻す（わざと食らう状態を残さない）
+        missArmed = false;
+        foreach (var p in players)
+        {
+            if (p == null) continue;
+            p.GetComponent<RallyInput>().Miss = false;
+            p.SetInvincible(float.MaxValue);
+        }
         Vector3 dir = to.transform.position - from.transform.position;
         dir.y = 0f;
         dir.Normalize();
@@ -113,13 +141,30 @@ public class RallyDemo : MonoBehaviour
             ball.SetColor(TumikiColor.Red);
         }
         else ball.Teleport(pos, 0f);
-        ball.Launch(dir, launchSpeed, from, from);
+        // サーブの速さは、試合でハンマーが積み木を弾く速さ（サーブする人のハンマーの性能そのもの）
+        var hammer = from.GetComponentInChildren<DarumaHammer>();
+        float speed = hammer != null && hammer.Params != null ? hammer.Params.SweepLaunchSpeed : 30f;
+        ball.Launch(dir, speed, from, from);
         Play(MatchSounds.Instance.Swing);
         server = 1 - server;   // 次のサーブは相手
     }
 
     void OnHammerHit(HammerHitInfo h)
     {
+        // MissAfter 回打ち返したら、次に受ける人（打った人の相手）は打ち返さずに当たる。無敵も外して、即死するようにする
+        if (missAfter > 0 && h.ReturnCount >= missAfter && !missArmed)
+        {
+            missArmed = true;   // 1回のラリーで食らうのは1人だけ（サーブし直すまで）
+            for (int i = 0; i < 2; i++)
+            {
+                var ch = players[i];
+                if (ch == null || ReferenceEquals(ch, h.Owner)) continue;
+                var input = ch.GetComponent<RallyInput>();
+                if (!input.Miss) Debug.Log($"[RallyScene] {h.ReturnCount} 回打ち返した。{ch.name} は打ち返さずに食らう");
+                input.Miss = true;
+                ch.SetInvincible(0f);
+            }
+        }
         var s = MatchSounds.Instance;
         var clip = h.ReturnCount > 0 ? s.ReturnHit(h.ReturnCount) : null;
         if (clip != null) Play(clip, s.ReturnPitch(h.ReturnCount));
@@ -140,26 +185,6 @@ public class RallyDemo : MonoBehaviour
         src.PlayOneShot(clip, MatchSounds.Instance.SeVolume);
     }
 
-    // このシーンだけ、打ち返す向きの決め方を「向いている向き」にする（設定アセットは書き換えず、実行中の複製を使う）
-    void FaceReturn(DarumaCharacter ch)
-    {
-        var hammer = ch.GetComponentInChildren<DarumaHammer>();
-        if (hammer == null) return;
-        var f = typeof(DarumaHammer).GetField("m_params", BindingFlags.NonPublic | BindingFlags.Instance);
-        var current = f.GetValue(hammer) as HammerParams;
-        if (current == null || current == facingParams) return;
-        if (facingParams == null)
-        {
-            facingParams = Instantiate(current);
-            facingParams.ReturnAimMode = HammerParams.ReturnAim.Facing;
-            facingParams.ReturnAimOffset = 0f;
-            facingParams.SweepLaunchSpeed = launchSpeed;
-            facingParams.ReturnSpeedRate = speedRate;
-            facingParams.MaxProjectileSpeed = maxSpeed;
-        }
-        f.SetValue(hammer, facingParams);
-    }
-
     void Refill(DarumaCharacter ch)
     {
         if (tumikiPrefab == null || ch.Stack.Count >= stackBlocks) return;
@@ -178,6 +203,9 @@ public class RallyInput : MonoBehaviour, IDarumaCommandSource
     DarumaCharacter me, opponent;
     float sweepCooldown;
 
+    // true の間は振らない（わざと食らう）
+    public bool Miss { get; set; }
+
     public void Setup(DarumaCharacter self, DarumaCharacter other)
     {
         me = self;
@@ -187,7 +215,7 @@ public class RallyInput : MonoBehaviour, IDarumaCommandSource
     public DarumaCommand ReadCommand()
     {
         var cmd = new DarumaCommand();
-        if (me == null) return cmd;
+        if (me == null || Miss) return cmd;
         sweepCooldown -= Time.deltaTime;
         if (sweepCooldown > 0f) return cmd;
 

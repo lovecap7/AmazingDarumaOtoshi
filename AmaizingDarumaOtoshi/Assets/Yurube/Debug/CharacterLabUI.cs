@@ -1,12 +1,10 @@
-using System.Collections;
 using Nakahira;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
 namespace Yurube.Lab
 {
-    // ラボの操作パネル。キーボード中心なので、どのキーで何が起きるかを常に画面に出す。
-    // マウスでも同じことができるようにボタンも並べる(色の追加・プリセット・各種切替)。
+    // ラボの操作パネル。現行仕様の必殺技・レベル・ダッシュ・積み木・F3 当たり判定可視化を操作/表示する。
     public class CharacterLabUI : MonoBehaviour
     {
         CharacterLab m_lab;
@@ -15,7 +13,7 @@ namespace Yurube.Lab
         bool m_addToDummy;
         Vector2 m_scroll;
         int m_flying;
-        GUIStyle m_title, m_section, m_label, m_button;
+        GUIStyle m_title, m_section, m_label, m_button, m_guideStyle, m_warnStyle;
         bool m_stylesReady;
         Rect m_panelRect, m_helpRect;
 
@@ -23,7 +21,7 @@ namespace Yurube.Lab
         {
             m_lab = lab;
             // OnGUIが走る前の1フレームでも判定できるように、だいたいの位置を入れておく
-            m_panelRect = new Rect(10.0f, 10.0f, 400.0f, Mathf.Clamp(Screen.height - 220.0f, 240.0f, 680.0f));
+            m_panelRect = new Rect(10.0f, 10.0f, 430.0f, Mathf.Clamp(Screen.height - 150.0f, 260.0f, 760.0f));
             m_helpRect = new Rect(10.0f, Screen.height - 120.0f, Mathf.Max(200.0f, Screen.width - 40.0f) + 20.0f, 110.0f);
         }
 
@@ -40,14 +38,10 @@ namespace Yurube.Lab
         {
             var keyboard = Keyboard.current;
             if (keyboard != null && keyboard.hKey.wasPressedThisFrame) m_show = !m_show;
-            if (keyboard != null && keyboard.f3Key.wasPressedThisFrame && m_lab != null)
+            if (keyboard != null && keyboard.f3Key.wasPressedThisFrame && m_lab != null && m_lab.Character != null)
             {
-                var current = m_lab.Character;
-                if (current != null && (current.GetComponent<IwadaruSpecial>() != null
-                    || current.GetComponent<HebidaruSpecial>() != null))
-                {
-                    TronHitboxView.Visible = !TronHitboxView.Visible;
-                }
+                // SpecialHitboxDebug.Toggle は1フレーム1回だけ反転するため、AkadaruSpecial 等と競合しない
+                SpecialHitboxDebug.Toggle();
             }
             if (m_lab != null && m_lab.Blocks != null) m_flying = m_lab.Blocks.CountFlying();
         }
@@ -56,10 +50,7 @@ namespace Yurube.Lab
         {
             if (!m_show || m_lab == null) return;
             // カットイン中はラボUIも描かない（必殺技ゲージ等が前面に残らないようにする）
-            if (SpecialCutIn.IsPlaying || IwadaruCutIn.IsPlaying
-                || HebidaruCutIn.IsPlaying || DaruKingCutIn.IsPlaying
-                || AodaruCutIn.IsPlaying || MidaruCutIn.IsPlaying
-                || KidaruCutIn.IsPlaying) return;
+            if (IsCutInPlaying()) return;
             EnsureStyles();
             DrawMainPanel();
             DrawHelp();
@@ -78,18 +69,22 @@ namespace Yurube.Lab
             m_section = new GUIStyle(GUI.skin.label) { font = m_font, fontSize = 15, fontStyle = FontStyle.Bold };
             m_label = new GUIStyle(GUI.skin.label) { font = m_font, fontSize = 14 };
             m_button = new GUIStyle(GUI.skin.button) { font = m_font, fontSize = 14 };
+            m_guideStyle = new GUIStyle(GUI.skin.label) { font = m_font, fontSize = 14, fontStyle = FontStyle.Bold };
+            m_guideStyle.normal.textColor = new Color(0.45f, 0.95f, 1.0f);
+            m_warnStyle = new GUIStyle(GUI.skin.label) { font = m_font, fontSize = 14, fontStyle = FontStyle.Bold };
+            m_warnStyle.normal.textColor = new Color(1.0f, 0.78f, 0.25f);
             m_stylesReady = true;
         }
 
         void DrawMainPanel()
         {
-            float height = Mathf.Clamp(Screen.height - 220.0f, 240.0f, 680.0f);
-            m_panelRect = new Rect(10.0f, 10.0f, 400.0f, height);
+            float height = Mathf.Clamp(Screen.height - 150.0f, 260.0f, 760.0f);
+            m_panelRect = new Rect(10.0f, 10.0f, 430.0f, height);
             GUILayout.BeginArea(m_panelRect, GUI.skin.box);
             m_scroll = GUILayout.BeginScrollView(m_scroll, false, true);
 
             GUILayout.Label("キャラクターラボ", m_title);
-            GUILayout.Label("CPUなし。色付き積み木を自由に用意してパッシブを確認", m_label);
+            GUILayout.Label("CPUなし。積み木・レベル・ダッシュ・必殺技をその場で確認", m_label);
             GUILayout.Space(6.0f);
 
             // ---- キャラクター ----
@@ -98,64 +93,45 @@ namespace Yurube.Lab
                 var data = m_lab.Characters[i];
                 string name = data != null ? data.displayName : "?";
                 string label = (i == m_lab.CurrentIndex ? "● " : "　") + (i + 1) + ". " + name;
-                if (GUILayout.Button(label, m_button, GUILayout.Height(27.0f))) m_lab.SelectCharacter(i);
+                if (GUILayout.Button(label, m_button, GUILayout.Height(26.0f))) m_lab.SelectCharacter(i);
             }
 
             GUILayout.Space(6.0f);
             DrawStats();
+            DrawLevelPanel();
             DrawSpecialPanel();
 
             // ---- 積み木 ----
             GUILayout.Space(6.0f);
-            GUILayout.Label("積み木を追加", m_section);
+            GUILayout.Label("積み木操作", m_section);
             m_addToDummy = GUILayout.Toggle(m_addToDummy, "追加先をダミーにする");
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("赤+1", m_button)) Add(TumikiColor.Red, 1);
-            if (GUILayout.Button("青+1", m_button)) Add(TumikiColor.Blue, 1);
-            if (GUILayout.Button("緑+1", m_button)) Add(TumikiColor.Green, 1);
-            if (GUILayout.Button("黄+1", m_button)) Add(TumikiColor.Yellow, 1);
+            if (GUILayout.Button("+1", m_button)) Add(1);
+            if (GUILayout.Button("+5", m_button)) Add(5);
+            if (GUILayout.Button("+10", m_button)) Add(10);
+            if (GUILayout.Button("-1", m_button)) RemoveOne();
+            if (GUILayout.Button("全消し", m_button)) ClearSelected();
             GUILayout.EndHorizontal();
-            GUILayout.BeginHorizontal();
-            if (GUILayout.Button("赤10", m_button)) Add(TumikiColor.Red, 10);
-            if (GUILayout.Button("青10", m_button)) Add(TumikiColor.Blue, 10);
-            if (GUILayout.Button("緑10", m_button)) Add(TumikiColor.Green, 10);
-            if (GUILayout.Button("黄10", m_button)) Add(TumikiColor.Yellow, 10);
-            GUILayout.EndHorizontal();
-            GUILayout.BeginHorizontal();
-            if (GUILayout.Button("赤-1", m_button)) Remove(TumikiColor.Red);
-            if (GUILayout.Button("青-1", m_button)) Remove(TumikiColor.Blue);
-            if (GUILayout.Button("緑-1", m_button)) Remove(TumikiColor.Green);
-            if (GUILayout.Button("黄-1", m_button)) Remove(TumikiColor.Yellow);
-            GUILayout.EndHorizontal();
-            if (GUILayout.Button("選択先の積み木を全部消す", m_button)) ClearSelected();
-
-            GUILayout.Space(4.0f);
-            GUILayout.Label("選択色: " + ColorName(m_lab.SelectedColor), m_label);
-            GUILayout.BeginHorizontal();
-            if (GUILayout.Button("赤", m_button)) m_lab.SelectedColor = TumikiColor.Red;
-            if (GUILayout.Button("青", m_button)) m_lab.SelectedColor = TumikiColor.Blue;
-            if (GUILayout.Button("緑", m_button)) m_lab.SelectedColor = TumikiColor.Green;
-            if (GUILayout.Button("黄", m_button)) m_lab.SelectedColor = TumikiColor.Yellow;
-            GUILayout.EndHorizontal();
-            if (GUILayout.Button("選択色をダミーへ発射 (V)", m_button)) m_lab.Launch(m_lab.SelectedColor, 20.0f, 0.0f);
+            if (GUILayout.Button("積み木をダミーへ発射 (V)", m_button)) m_lab.Launch(TumikiColor.Red, 20.0f, 0.0f);
 
             // ---- プリセット ----
             GUILayout.Space(6.0f);
-            GUILayout.Label("プリセット", m_section);
-            if (GUILayout.Button("あかだる: 赤10個", m_button)) PresetAkadaru();
-            if (GUILayout.Button("あおだる: 青10個", m_button)) PresetAodaru();
-            if (GUILayout.Button("みだる: 緑1個＋わざと外して発射", m_button)) PresetMidaru();
-            if (GUILayout.Button("いわだる: ダミー5個＋発射", m_button)) PresetIwa();
-            if (GUILayout.Button("きだる: 黄色1個", m_button)) PresetKidaru();
-            if (GUILayout.Button("きだる: 必殺技", m_button)) PresetKidaruSpecial();
-            if (GUILayout.Button("へびだる: 積んでショット", m_button)) PresetHebi();
-            if (GUILayout.Button("だるきんぐ: 積み木3個", m_button)) PresetDaruKing();
-            if (GUILayout.Button("あかだる: 必殺技", m_button)) PresetAkadaruSpecial();
-            if (GUILayout.Button("あおだる: 必殺技", m_button)) PresetAodaruSpecial();
-            if (GUILayout.Button("みだる: 必殺技", m_button)) PresetMidaruSpecial();
-            if (GUILayout.Button("いわだる: 必殺技", m_button)) PresetIwadaruSpecial();
-            if (GUILayout.Button("へびだる: 必殺技", m_button)) PresetHebidaruSpecial();
-            if (GUILayout.Button("だるきんぐ: 必殺技", m_button)) PresetDaruKingSpecial();
+            GUILayout.Label("必殺技プリセット（ダミー積載＋無敵OFF）", m_section);
+            if (GUILayout.Button("あかだる: 紅蓮乱舞", m_button)) RunSpecialPreset("akadaru", 0, 5);
+            if (GUILayout.Button("あおだる: 疾風連撃", m_button)) RunSpecialPreset("aodaru", 0, 5);
+            if (GUILayout.Button("みだる: マシンガン", m_button)) RunSpecialPreset("midaru", 0, 5);
+            if (GUILayout.Button("きだる: 震脚", m_button)) RunSpecialPreset("kidaru", 0, 5);
+            if (GUILayout.Button("いわだる: いわだる崩し", m_button)) RunSpecialPreset("iwadaru", 5, 5);
+            if (GUILayout.Button("へびだる: 反転毒沼", m_button)) RunSpecialPreset("hebidaru", 5, 5);
+            if (GUILayout.Button("だるきんぐ: エクスカリバー", m_button)) RunSpecialPreset("daruking", 0, 5);
+
+            GUILayout.Space(4.0f);
+            GUILayout.Label("レベル・ダミー補助", m_section);
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("現在キャラを Lv5 に", m_button)) m_lab.SetPlayerLevel(LevelParams.MaxLevel);
+            if (GUILayout.Button("Lv1 に戻す", m_button)) m_lab.SetPlayerLevel(1);
+            GUILayout.EndHorizontal();
+            if (GUILayout.Button("ダミーに積み木5個＋無敵OFF", m_button)) PrepareDummy(5);
 
             // ---- 切替 ----
             GUILayout.Space(6.0f);
@@ -169,7 +145,7 @@ namespace Yurube.Lab
 
             GUILayout.Space(6.0f);
             if (GUILayout.Button("位置リセット (P)", m_button)) m_lab.ResetPositions();
-            if (GUILayout.Button("全部リセット(積み木も消す)", m_button)) m_lab.ResetAll();
+            if (GUILayout.Button("全部リセット（初期化）", m_button)) m_lab.ResetAll();
 
             GUILayout.EndScrollView();
             GUILayout.EndArea();
@@ -184,33 +160,75 @@ namespace Yurube.Lab
                 return;
             }
 
+            var data = m_lab.Current;
+            int level = m_lab.PlayerLevel;
+            LevelPerk perk = data != null ? data.levelPerk : LevelPerk.None;
+            float weaponReach = data != null ? data.weaponReach : 1.0f;
+            DarumaLevel.ComputeMultipliers(level, perk, weaponReach,
+                out float attackMul, out _, out float moveMul, out float reachMul, out _);
+
             var stack = character.Stack;
             int count = stack != null ? stack.Count : 0;
-            int red = stack != null ? stack.CountColor(TumikiColor.Red) : 0;
-            int blue = stack != null ? stack.CountColor(TumikiColor.Blue) : 0;
-            int green = stack != null ? stack.CountColor(TumikiColor.Green) : 0;
-            int yellow = stack != null ? stack.CountColor(TumikiColor.Yellow) : 0;
+            GUILayout.Label($"積み木: {count}段   接地: {(character.IsGrounded ? "はい" : "いいえ")}   ショット可: {(character.CanStartShot ? "はい" : "いいえ")}", m_label);
 
-            GUILayout.Label($"積み木: {count}段   赤{red} 青{blue} 緑{green} 黄{yellow}", m_label);
+            DashParams dp = DashParams.Instance;
+            float dashMul = character.IsDashing ? dp.SpeedMultiplier : 1.0f;
+            float actualMoveSpeed = character.MoveSpeed * moveMul * dashMul * Mathf.Max(0.0f, character.MoveSpeedMultiplier);
+            string dashTag = character.IsDashing ? $" [ダッシュ x{dp.SpeedMultiplier:0.0}]" : "";
+            GUILayout.Label($"移動速度: {actualMoveSpeed:0.0} m/s (基本{character.MoveSpeed:0.0} × Lv{moveMul:0.00}){dashTag}", m_label);
 
-            float displaySpeed = character.MoveSpeed;
-            var kidaru = character.GetComponent<KidaruSpecial>();
-            if (kidaru != null) displaySpeed = kidaru.EffectiveSpeed;
-            string speedSuffix = kidaru != null && kidaru.IsSpeedBoosted
-                ? $" (必殺技 x{kidaru.CurrentSpeedMultiplier:0.0})"
-                : "";
-            GUILayout.Label($"弾速: {m_lab.ShotSpeed:0.0} m/s   移動速度: {displaySpeed:0.0} m/s{speedSuffix}", m_label);
+            float staminaRatio = Mathf.Clamp01(character.StaminaRatio);
+            int staminaPct = Mathf.RoundToInt(staminaRatio * 100.0f);
+            string staminaNote = staminaRatio < dp.JumpCostRatio ? " [ジャンプ不可]" : "";
+            string effNote = character.StaminaEfficiency > 1.001f ? $"  ジャンプ消費 ÷{character.StaminaEfficiency:0.00}" : "";
+            GUILayout.Label($"スタミナ: {staminaPct}%{staminaNote}{effNote}", m_label);
+            DrawProgressBar(staminaRatio, staminaRatio < dp.JumpCostRatio
+                ? new Color(0.95f, 0.35f, 0.25f)
+                : new Color(0.35f, 0.90f, 0.45f));
 
-            var aodaru = character.GetComponent<AodaruPassive>();
-            if (aodaru != null)
-                GUILayout.Label($"あおだる実効速度: {aodaru.EffectiveSpeed:0.0} m/s (青{aodaru.BlueCount}個)", m_label);
+            GUILayout.Label($"弾速: {m_lab.ShotSpeed:0.0} m/s   攻撃速度: ×{attackMul:0.00}   リーチ: ×{reachMul:0.00}", m_label);
 
-            GUILayout.Label($"接地: {(character.IsGrounded ? "はい" : "いいえ")}   ショット可: {(character.CanStartShot ? "はい" : "いいえ")}", m_label);
             if (m_lab.Dummy != null && m_lab.Dummy.Character != null)
-                GUILayout.Label($"ダミー: {m_lab.Dummy.Character.Stack.Count}段 / 無敵 {(m_lab.DummyInvincible ? "ON" : "OFF")}", m_label);
+            {
+                var dc = m_lab.Dummy.Character;
+                string debuff = "";
+                if (DarumaLevel.IsLabSlowed(dc)) debuff += $" [スロウ×{DarumaLevel.GetLabSlowScale(dc):0.00}]";
+                if (dc.MovementInverted) debuff += " [操作反転]";
+                GUILayout.Label($"ダミー: {dc.Stack.Count}段 / 無敵 {(m_lab.DummyInvincible ? "ON" : "OFF")}{debuff}", m_label);
+            }
             else
+            {
                 GUILayout.Label("ダミー: 復活待ち...", m_label);
+            }
             GUILayout.Label($"飛んでいる積み木: {m_flying}", m_label);
+        }
+
+        void DrawLevelPanel()
+        {
+            var character = m_lab.Character;
+            if (character == null) return;
+
+            var data = m_lab.Current;
+            int level = m_lab.PlayerLevel;
+            int stacked = DarumaLevel.GetLabStacked(character);
+
+            GUILayout.Space(6.0f);
+            GUILayout.Label($"レベル（Lv{level} / {LevelParams.MaxLevel}   累計積載: {stacked}）", m_section);
+
+            GUILayout.BeginHorizontal();
+            for (int lv = 1; lv <= LevelParams.MaxLevel; lv++)
+            {
+                string label = lv == level ? $"[Lv{lv}]" : $"Lv{lv}";
+                if (GUILayout.Button(label, m_button)) m_lab.SetPlayerLevel(lv);
+            }
+            GUILayout.EndHorizontal();
+
+            if (data != null && !string.IsNullOrEmpty(data.passiveName))
+            {
+                string activeTag = level >= 2 ? "発動中" : "Lv2で解放";
+                GUILayout.Label($"固有能力: {data.passiveName} ({activeTag})", m_label);
+                if (!string.IsNullOrEmpty(data.passiveText)) GUILayout.Label($"  {data.passiveText}", m_label);
+            }
         }
 
         void DrawSpecialPanel()
@@ -223,37 +241,154 @@ namespace Yurube.Lab
             GUILayout.Space(6.0f);
             GUILayout.Label("必殺技", m_section);
             GUILayout.Label($"ゲージ: {gauge.Percent}%" + (gauge.IsFull ? "  READY" : ""), m_label);
+
+            GUILayout.BeginHorizontal();
             if (GUILayout.Button("ゲージ満タン", m_button)) gauge.Fill();
-
-            bool hasHitboxView = character.GetComponent<AkadaruSpecial>() != null
-                || character.GetComponent<IwadaruSpecial>() != null
-                || character.GetComponent<HebidaruSpecial>() != null;
-            if (hasHitboxView)
-            {
-                bool showHitbox = TronHitboxView.Visible;
-                bool newShowHitbox = GUILayout.Toggle(showHitbox, "当たり判定を表示 (F3)");
-                if (newShowHitbox != showHitbox) TronHitboxView.Visible = newShowHitbox;
-            }
-
             var special = character.GetComponent<ISpecialAbility>();
             if (special != null && GUILayout.Button("必殺技 (L/Y)", m_button)) special.TryActivate();
+            GUILayout.EndHorizontal();
 
-            var kidaru = character.GetComponent<KidaruSpecial>();
-            if (kidaru != null)
+            bool showHitbox = SpecialHitboxDebug.Visible;
+            bool newShowHitbox = GUILayout.Toggle(showHitbox, "当たり判定を表示 (F3)");
+            if (newShowHitbox != showHitbox) SpecialHitboxDebug.Visible = newShowHitbox;
+
+            DrawCharacterSpecialStatus(character);
+        }
+
+        void DrawCharacterSpecialStatus(DarumaCharacter character)
+        {
+            if (character.GetComponent<AkadaruSpecial>() is AkadaruSpecial aka)
             {
-                string state = kidaru.IsActive ? $"強化中 残り{kidaru.RemainingSeconds:F1}秒" : "強化待機";
-                GUILayout.Label($"{state}  前回: {kidaru.LastDuration:F1}秒 ({kidaru.LastBlocks}個)", m_label);
+                if (aka.IsActive)
+                {
+                    float rem = aka.RemainingSeconds;
+                    GUILayout.Label($"紅蓮乱舞 発動中: 残り {rem:0.0}s", m_guideStyle);
+                    DrawProgressBar(rem / Mathf.Max(0.1f, aka.StormDuration + 0.25f), new Color(0.95f, 0.35f, 0.25f));
+                }
+                else
+                {
+                    GUILayout.Label("紅蓮乱舞: 周囲に巨大ハンマー5本を回転（5.0秒・積み木不要）", m_label);
+                }
+                return;
             }
+
+            if (character.GetComponent<AodaruSpecial>() is AodaruSpecial ao)
+            {
+                if (ao.IsActive)
+                {
+                    float rem = ao.RemainingSeconds;
+                    GUILayout.Label($"疾風連撃 強化中: 残り {rem:0.0}s", m_guideStyle);
+                    DrawProgressBar(rem / Mathf.Max(0.1f, ao.GaleDuration), new Color(0.35f, 0.85f, 1.0f));
+                    GUILayout.Label("→ J キーで薙ぎ払いすると前方へ斬撃が飛びます！", m_warnStyle);
+                }
+                else
+                {
+                    GUILayout.Label("疾風連撃: 発動後5秒間、薙ぎ払い(J)で前方へ斬撃", m_label);
+                }
+                return;
+            }
+
+            if (character.GetComponent<MidaruSpecial>() is MidaruSpecial mi)
+            {
+                if (mi.IsActive)
+                {
+                    float rem = mi.RemainingSeconds;
+                    GUILayout.Label($"マシンガン 稼働中: 残り {rem:0.0}s", m_guideStyle);
+                    DrawProgressBar(rem / Mathf.Max(0.1f, mi.MachineGunDuration + 0.25f), new Color(0.35f, 0.88f, 0.45f));
+                }
+                else
+                {
+                    GUILayout.Label("マシンガン: 自動追尾の固定砲台を設置（6.0秒・積み木不要）", m_label);
+                }
+                return;
+            }
+
+            if (character.GetComponent<KidaruSpecial>() is KidaruSpecial ki)
+            {
+                if (ki.IsActive)
+                {
+                    float rem = ki.RemainingSeconds;
+                    float total = Mathf.Max(0.1f, ki.LastDuration);
+                    GUILayout.Label($"震脚 強化中: 残り {rem:0.0}s (衝撃波半径 {ki.QuakeRadius:0.0}m)", m_guideStyle);
+                    DrawProgressBar(rem / total, new Color(1.0f, 0.82f, 0.22f));
+                    GUILayout.Label("→ Space キーでジャンプ着地すると周囲に衝撃波が出ます！", m_warnStyle);
+                }
+                else
+                {
+                    GUILayout.Label($"震脚: 発動後5秒間、ジャンプ着地ごとに衝撃波(半径{ki.QuakeRadius:0.0}m)", m_label);
+                }
+                return;
+            }
+
+            if (character.GetComponent<IwadaruSpecial>() is IwadaruSpecial iwa)
+            {
+                if (iwa.IsActive)
+                {
+                    float rem = iwa.PhaseRemaining;
+                    string remText = rem > 0.0f ? $" 残り {rem:0.0}s" : "";
+                    GUILayout.Label($"いわだる崩し [{iwa.PhaseLabel}]{remText} (半径 {iwa.AttackRadius:0.0}m)", m_guideStyle);
+                }
+                else
+                {
+                    GUILayout.Label("いわだる崩し: 積み木1個以上で発動。段数で範囲拡大・着弾即死", m_label);
+                }
+                return;
+            }
+
+            if (character.GetComponent<HebidaruSpecial>() is HebidaruSpecial hebi)
+            {
+                if (hebi.IsActive)
+                {
+                    string text = hebi.IsInCutIn
+                        ? "反転毒沼: カットイン中..."
+                        : $"反転毒沼 展開中: 残り {hebi.RemainingSeconds:0.0}s (半径 {hebi.ActiveSwampRadius:0.0}m)";
+                    GUILayout.Label(text, m_guideStyle);
+                }
+                else
+                {
+                    GUILayout.Label("反転毒沼: 周囲に毒沼を展開（8.0秒・移動低下＋反転）", m_label);
+                }
+                return;
+            }
+
+            if (character.GetComponent<DaruKingSpecial>() is DaruKingSpecial king)
+            {
+                if (king.IsActive)
+                {
+                    float rem = king.PhaseRemaining;
+                    string remText = rem > 0.0f ? $" 残り {rem:0.0}s" : "";
+                    GUILayout.Label($"エクスカリバー [{king.PhaseLabel}]{remText}", m_guideStyle);
+                    if (king.IsCharging)
+                        GUILayout.Label("→ WASDで向き調整 / 行動ボタン(J/K/Space等)で即確定", m_warnStyle);
+                }
+                else
+                {
+                    GUILayout.Label("エクスカリバー: 2.0秒詠唱（移動で向き調整）→ 直線即死", m_label);
+                }
+            }
+        }
+
+        static void DrawProgressBar(float normalized, Color fillColor)
+        {
+            Rect rect = GUILayoutUtility.GetRect(10.0f, 10.0f, GUILayout.ExpandWidth(true));
+            Color prev = GUI.color;
+            GUI.color = new Color(0.0f, 0.0f, 0.0f, 0.65f);
+            GUI.DrawTexture(rect, Texture2D.whiteTexture);
+            GUI.color = fillColor;
+            GUI.DrawTexture(new Rect(rect.x + 1.0f, rect.y + 1.0f,
+                Mathf.Max(0.0f, (rect.width - 2.0f) * Mathf.Clamp01(normalized)), rect.height - 2.0f),
+                Texture2D.whiteTexture);
+            GUI.color = prev;
         }
 
         void DrawHelp()
         {
             string[] lines =
             {
-                "1-9: キャラ切替   R/G/B/Y: 積み木追加   Shift+R/G/B/Y: ダミーに追加   V: 選択色を発射",
-                "WASD: 移動   Space: ジャンプ   J: 薙ぎ払い   K: ショット   L/Y: 必殺技",
-                "右ドラッグ: 視点回転   ホイール/Z/X: ズーム   Q/E: 回転   F: 追従   T: スロー   P: 位置リセット   H: UI非表示   F3: 判定表示",
-                "積み木の−1／全消し／ダミー復活は左パネルのボタン",
+                "1-7: キャラ切替   R/G/B/Y: 積み木+1   右Shift+R/G/B/Y: ダミー+1   V: 積み木発射",
+                "WASD: 移動   左Shift(長押し): ダッシュ   左Shift(2回): ブリンク   Space: ジャンプ",
+                "J: 薙ぎ払い   K: ショット   L/Y: 必殺技   F3: 当たり判定表示",
+                "右ドラッグ: 回転   ホイール/Z/X: ズーム   Q/E: 回転   F: 追従   T: スロー   P: 位置リセット   H: UI非表示",
             };
             float width = Mathf.Max(200.0f, Screen.width - 40.0f);
             float height = 12.0f;
@@ -265,16 +400,17 @@ namespace Yurube.Lab
             GUILayout.EndArea();
         }
 
-        void Add(TumikiColor color, int count)
+        void Add(int count)
         {
-            m_lab.AddBlocks(Target(), color, count);
-            m_lab.SelectedColor = color;
+            m_lab.AddBlocks(Target(), TumikiColor.Red, count);
         }
 
-        void Remove(TumikiColor color)
+        void RemoveOne()
         {
-            m_lab.RemoveBlocks(Target(), color);
-            m_lab.SelectedColor = color;
+            var target = Target();
+            if (target == null || target.Stack == null || target.Stack.Count == 0) return;
+            var block = target.Stack.Get(target.Stack.Count - 1);
+            if (block != null) m_lab.RemoveBlocks(target, block.Color);
         }
 
         void ClearSelected()
@@ -288,230 +424,54 @@ namespace Yurube.Lab
             return m_lab.Character;
         }
 
-        void PresetAkadaru()
+        void PrepareDummy(int dummyBlocks)
         {
-            m_lab.SelectCharacter("akadaru");
-            var character = m_lab.Character;
-            m_lab.ClearStack(character);
-            m_lab.AddBlocks(character, TumikiColor.Red, 10);
-            m_lab.SelectedColor = TumikiColor.Red;
-        }
-
-        void PresetAodaru()
-        {
-            m_lab.SelectCharacter("aodaru");
-            var character = m_lab.Character;
-            m_lab.ClearStack(character);
-            m_lab.AddBlocks(character, TumikiColor.Blue, 10);
-            m_lab.SelectedColor = TumikiColor.Blue;
-        }
-
-        void PresetMidaru()
-        {
-            m_lab.SelectCharacter("midaru");
-            var character = m_lab.Character;
-            m_lab.ClearStack(character);
-            m_lab.AddBlocks(character, TumikiColor.Green, 1);
-            m_lab.SelectedColor = TumikiColor.Green;
-            // まっすぐ当てず、わざと25度外して曲がりを見る
-            m_lab.Launch(TumikiColor.Green, 20.0f, 25.0f);
-        }
-
-        void PresetIwa()
-        {
-            m_lab.SelectCharacter("iwadaru");
-            var character = m_lab.Character;
+            m_lab.EnsureDummyAlive();
             var dummy = m_lab.Dummy != null ? m_lab.Dummy.Character : null;
-            m_lab.ClearStack(character);
             m_lab.ClearStack(dummy);
-            m_lab.AddBlocks(dummy, TumikiColor.Red, 5);
-            m_lab.SelectedColor = TumikiColor.Red;
-            m_lab.Launch(TumikiColor.Red, 20.0f, 0.0f);
+            if (dummyBlocks > 0) m_lab.AddBlocks(dummy, TumikiColor.Red, dummyBlocks);
+            m_lab.SetDummyInvincible(false);
         }
 
-        void PresetKidaru()
-        {
-            m_lab.SelectCharacter("kidaru");
-            var character = m_lab.Character;
-            m_lab.ClearStack(character);
-            // 黄色を1個積むと、パッシブでもう1個増えて2段になる
-            m_lab.AddBlocks(character, TumikiColor.Yellow, 1);
-            m_lab.SelectedColor = TumikiColor.Yellow;
-        }
-
-        void PresetKidaruSpecial()
+        void RunSpecialPreset(string id, int playerBlocks, int dummyBlocks)
         {
             if (!CanStartSpecialPreset()) return;
-            m_lab.SelectCharacter("kidaru");
+
+            m_lab.CleanupSpecialObjects();
+            m_lab.SelectCharacter(id);
+            m_lab.EnsureDummyAlive();
+            if (m_lab.Blocks != null) m_lab.Blocks.DestroyLoose();
+            m_lab.ResetPositions();
+
             var character = m_lab.Character;
             m_lab.ClearStack(character);
-            // 5個積んでゲージを満タンにし、そのまま発動
-            m_lab.AddBlocks(character, TumikiColor.Yellow, 5);
-            m_lab.SelectedColor = TumikiColor.Yellow;
+            if (playerBlocks > 0) m_lab.AddBlocks(character, TumikiColor.Red, playerBlocks);
 
-            var special = character != null ? character.GetComponent<ISpecialAbility>() : null;
-            if (special != null) special.TryActivate();
-        }
+            PrepareDummy(dummyBlocks);
 
-        void PresetHebi()
-        {
-            m_lab.SelectCharacter("hebidaru");
-            var character = m_lab.Character;
-            m_lab.ClearStack(character);
-            m_lab.AddBlocks(character, TumikiColor.Green, 1);
-            m_lab.SelectedColor = TumikiColor.Green;
-            // 生成直後は接地判定がまだなので、動けるようになってからショットする
-            StartCoroutine(ShotWhenReady());
-        }
-
-        IEnumerator ShotWhenReady()
-        {
-            var character = m_lab.Character;
-            float timeout = 1.0f;
-            while (character != null && !character.CanStartShot && timeout > 0.0f)
-            {
-                timeout -= Time.unscaledDeltaTime;
-                yield return null;
-            }
-            if (character != null && character.Hammer != null) character.Hammer.TryShot();
-        }
-
-        void PresetDaruKing()
-        {
-            m_lab.SelectCharacter("daruking");
-            var character = m_lab.Character;
-            m_lab.ClearStack(character);
-            // 3個積もうとしても、パッシブで2段までに抑えられる
-            m_lab.AddBlocks(character, TumikiColor.Red, 3);
-            m_lab.SelectedColor = TumikiColor.Red;
-        }
-
-        void PresetAkadaruSpecial()
-        {
-            if (!CanStartSpecialPreset()) return;
-            m_lab.SelectCharacter("akadaru");
-            var character = m_lab.Character;
-            m_lab.ClearStack(character);
-            // 5個積むとゲージが満タンになる
-            m_lab.AddBlocks(character, TumikiColor.Red, 5);
-            m_lab.SelectedColor = TumikiColor.Red;
-
-            var special = character != null ? character.GetComponent<AkadaruSpecial>() : null;
-            if (special != null) special.TryActivate();
-        }
-
-        void PresetAodaruSpecial()
-        {
-            if (!CanStartSpecialPreset()) return;
-            m_lab.SelectCharacter("aodaru");
-            var character = m_lab.Character;
-            m_lab.ClearStack(character);
-            // 5個積むとゲージが満タンになる
-            m_lab.AddBlocks(character, TumikiColor.Blue, 5);
-            m_lab.SelectedColor = TumikiColor.Blue;
-
-            var special = character != null ? character.GetComponent<ISpecialAbility>() : null;
-            if (special != null) special.TryActivate();
-        }
-
-        void PresetIwadaruSpecial()
-        {
-            if (!CanStartSpecialPreset()) return;
-            m_lab.SelectCharacter("iwadaru");
-            var character = m_lab.Character;
-            m_lab.ClearStack(character);
-            // 5個積むとゲージが満タン。予告円の大きさも5個ぶんになる
-            m_lab.AddBlocks(character, TumikiColor.Red, 5);
-            m_lab.SelectedColor = TumikiColor.Red;
-            var special = character != null ? character.GetComponent<ISpecialAbility>() : null;
-            if (special != null) special.TryActivate();
-        }
-
-        void PresetHebidaruSpecial()
-        {
-            if (!CanStartSpecialPreset()) return;
-            m_lab.SelectCharacter("hebidaru");
-            var character = m_lab.Character;
-            m_lab.ClearStack(character);
-            // 5個積むとゲージが満タン。カットイン後に足元へ毒沼が出る
-            m_lab.AddBlocks(character, TumikiColor.Green, 5);
-            m_lab.SelectedColor = TumikiColor.Green;
-
-            var special = character != null ? character.GetComponent<ISpecialAbility>() : null;
-            if (special != null) special.TryActivate();
-        }
-
-        void PresetDaruKingSpecial()
-        {
-            if (!CanStartSpecialPreset()) return;
-            m_lab.SelectCharacter("daruking");
-            var character = m_lab.Character;
-            m_lab.ClearStack(character);
-            // だるきんぐは2段まで。ゲージを満タンにして詠唱を開始する
-            m_lab.AddBlocks(character, TumikiColor.Red, 2);
-            var gauge = character != null ? character.GetComponent<SpecialGauge>() : null;
+            if (character == null) return;
+            var gauge = character.GetComponent<SpecialGauge>();
             if (gauge != null) gauge.Fill();
-            m_lab.SelectedColor = TumikiColor.Red;
 
-            var special = character != null ? character.GetComponent<ISpecialAbility>() : null;
-            if (special != null) special.TryActivate();
-        }
-
-        void PresetMidaruSpecial()
-        {
-            if (!CanStartSpecialPreset()) return;
-            m_lab.SelectCharacter("midaru");
-            var character = m_lab.Character;
-            m_lab.ClearStack(character);
-            // 5個積むとゲージが満タン。押した瞬間に撃って5発に分裂する
-            m_lab.AddBlocks(character, TumikiColor.Red, 5);
-            m_lab.SelectedColor = TumikiColor.Red;
-
-            var special = character != null ? character.GetComponent<ISpecialAbility>() : null;
+            var special = character.GetComponent<ISpecialAbility>();
             if (special != null) special.TryActivate();
         }
 
         bool CanStartSpecialPreset()
         {
-            // カットイン中はゲームが止まっているが、ラボのボタンは押せる。
-            // ここで止めないと、別キャラに切り替わってその必殺技まで連続で出てしまう。
-            if (SpecialCutIn.IsPlaying || IwadaruCutIn.IsPlaying
-                || HebidaruCutIn.IsPlaying || DaruKingCutIn.IsPlaying
-                || AodaruCutIn.IsPlaying || MidaruCutIn.IsPlaying
-                || KidaruCutIn.IsPlaying)
-                return false;
-
+            if (IsCutInPlaying()) return false;
             var current = m_lab.Character;
             if (current == null) return true;
-
-            var iwa = current.GetComponent<IwadaruSpecial>();
-            if (iwa != null && iwa.IsActive) return false;
-
-            var kidaru = current.GetComponent<KidaruSpecial>();
-            if (kidaru != null && kidaru.IsActive) return false;
-
-            var aodaru = current.GetComponent<AodaruSpecial>();
-            if (aodaru != null && aodaru.IsActive) return false;
-
-            var hebi = current.GetComponent<HebidaruSpecial>();
-            if (hebi != null && hebi.IsActive) return false;
-
-            var daruking = current.GetComponent<DaruKingSpecial>();
-            if (daruking != null && daruking.IsActive) return false;
-
-            return true;
+            var special = current.GetComponent<ISpecialAbility>();
+            return special == null || !special.IsActive;
         }
 
-        static string ColorName(TumikiColor color)
+        static bool IsCutInPlaying()
         {
-            switch (color)
-            {
-                case TumikiColor.Red: return "赤";
-                case TumikiColor.Blue: return "青";
-                case TumikiColor.Green: return "緑";
-                case TumikiColor.Yellow: return "黄";
-                default: return "?";
-            }
+            return SpecialCutIn.IsPlaying || IwadaruCutIn.IsPlaying
+                || HebidaruCutIn.IsPlaying || DaruKingCutIn.IsPlaying
+                || AodaruCutIn.IsPlaying || MidaruCutIn.IsPlaying
+                || KidaruCutIn.IsPlaying;
         }
     }
 }

@@ -2,7 +2,8 @@
   "id": "chapter2",
   "order": 2,
   "requiredChapter": "chapter1",
-  "title": "第2章「まっすぐじゃない」",
+  "title": "第2章「曲がる悪意」",
+  "subtitle": "曲がる悪意",
   "stageId": "DebugStage46",
   "sceneName": "AllStages",
   "playerCharacter": "akadaru",
@@ -30,24 +31,48 @@
   ],
   "cutscene": {
     "type": "venue",
-    "caption": "全国大会 準決勝",
+    "caption": "全国大会 準々決勝",
     "shots": [
       { "view": "wide", "seconds": 3.4 },
       { "view": "group", "seconds": 4.8 }
     ]
   },
   "before": [
-    { "speaker": "", "direction": true, "text": "（鳥居の前。4人で「全国制覇！ だるま落とし部」の看板に誓う）" },
+    { "speaker": "", "direction": true, "text": "（鳥居の前。4人で「全国制覇！」の看板に誓う）" },
     { "speaker": "akadaru", "text": "全国制覇！ 一撃入魂！" },
     { "speaker": "hebidaru", "text": "相変わらずうるさいなあ、あかだる" },
-    { "speaker": "akadaru", "text": "その声は……へびだる！？ なぜここに！" },
+    { "speaker": "akadaru", "text": "その声は……へびだる！？ なぜここに" },
     { "speaker": "hebidaru", "text": "蛇ノ目学園のエースだよ。ボクも全国に来たってこと" },
-    { "speaker": "akadaru", "text": "中学のとき、一緒に全国へ行こうと言ったじゃないか！" },
-    { "speaker": "hebidaru", "text": "言ってないよ。キミが一人で叫んでただけ" },
-    { "speaker": "midaru", "text": "データによると、へびだるの弾は左右交互に曲がります" },
+    { "speaker": "midaru", "text": "データによると、へびだるは積み木を飛ばすと左右交互に曲がります。まっすぐ読まないでください" },
     { "speaker": "aodaru", "text": "……読みづらい" },
     { "speaker": "kidaru", "text": "へびせんぱい、おにぎり食べます？" },
-    { "speaker": "hebidaru", "text": "……いらない" }
+    { "speaker": "hebidaru", "text": "……いらない" },
+    { "speaker": "", "direction": true, "text": "（試合直前、あかだるとへびだるが視線を交わす）" },
+    { "speaker": "hebidaru", "text": "ねえ、あかだる。キミ、本当は大会優勝なんてどうでもいいんでしょ" },
+    { "speaker": "akadaru", "text": "……なんの話だ" },
+    { "speaker": "hebidaru", "text": "本当は、主催者の『王』を落としたいんだよね。顔に書いてあるよ" },
+    {
+      "choice": {
+        "id": "ch2_malice",
+        "speaker": "akadaru",
+        "options": [
+          {
+            "text": "……お前に、何が分かる",
+            "branchId": "what_do_you_know",
+            "reaction": [
+              { "speaker": "hebidaru", "text": "ふふ。怒った？ 図星って顔になってきたじゃない" }
+            ]
+          },
+          {
+            "text": "……だとしたら、どうする",
+            "branchId": "what_will_you_do",
+            "reaction": [
+              { "speaker": "hebidaru", "text": "へえ、隠す気もないんだ。ますます見届けたくなったよ" }
+            ]
+          }
+        ]
+      }
+    }
   ],
   "tutorial": [
     {
@@ -64,9 +89,9 @@
     }
   ],
   "matchStart": [],
-  "matchStartNotice": "全国大会 準決勝、開始！",
+  "matchStartNotice": "全国大会 準々決勝、開始！",
   "chainFirst": [
-    { "speaker": "akadaru", "text": "一撃入魂ぁ！" },
+    { "speaker": "akadaru", "text": "一撃入魂ぃ！" },
     { "speaker": "hebidaru", "text": "……っ！" }
   ],
   "chainHint": [
@@ -97,22 +122,18 @@
   },
   "after": [
     { "speaker": "hebidaru", "text": "……笑えないな" },
-    { "speaker": "akadaru", "text": "へび。あのとき、なぜ笑った" },
-    { "speaker": "hebidaru", "text": "……全国制覇なんて、本気で言うやつがいるとは思わなかったんだよ。羨ましかっただけさ" },
-    { "speaker": "akadaru", "text": "羨ましい？" },
-    { "speaker": "hebidaru", "text": "うるさいな。……まっすぐ飛ばすなんてつまらないけど、今日のキミのは、悪くなかったよ" },
-    { "speaker": "akadaru", "text": "へび……" },
-    { "speaker": "hebidaru", "text": "決勝で会おう。ボクにも事情があるんだ" },
-    { "speaker": "akadaru", "text": "事情？" },
-    { "speaker": "hebidaru", "text": "……そのうち話すよ。ただ、『落とし手』って言葉だけは、覚えといて" },
-    { "speaker": "akadaru", "text": "落とし手……？" },
-    { "speaker": "hebidaru", "text": "ボクは断ったけどね。……じゃあ、決勝で" }
+    { "speaker": "akadaru", "text": "へび。なんで、あんなことを言った" },
+    { "speaker": "hebidaru", "text": "……中学のとき、キミは笑って全国制覇を叫んでた。ボクは、それが羨ましかった。……今のキミは、笑ってない" },
+    { "speaker": "hebidaru", "text": "一つだけ忠告するよ。『落とす側』に行ったら、もう戻ってこられない。……そういう人を、ボクは知ってる" },
+    { "speaker": "akadaru", "text": "誰のことだ" },
+    { "speaker": "hebidaru", "text": "さあね。ボクも敗者復活から這い上がるよ。……決勝で会おう" }
   ],
   "newspaper": {
     "header": "だるま新聞",
-    "headline": "あかだる、元チームメイトを下し決勝へ",
-    "body": "全国大会準決勝。七転高校だるま落とし部のあかだるが、中学時代のチームメイト・へびだるを破り、決勝進出を決めた。へびだるの左右に曲がる弾に苦しみながらも、最後はまっすぐな一撃で押し切った。あかだるは「一撃入魂だ！」と声を弾ませた。",
+    "headline": "あかだる、元チームメイトを下し準決勝へ",
+    "body": "全国大会準々決勝。七転高校だるま落とし部のあかだるが、中学時代のチームメイト・へびだるを破り、準決勝進出を決めた。へびだるの左右に曲がる弾に苦しみながらも、最後はまっすぐな一撃で押し切った。あかだるは「一撃入魂だ！」と声を弾ませた。",
     "image": "",
-    "caption": "全国大会 準決勝 七転高校 あかだる"
+    "caption": "全国大会 準々決勝 七転高校 あかだる",
+    "subHeader": "王冠大会の裏に、もう一つの噂？"
   }
 }

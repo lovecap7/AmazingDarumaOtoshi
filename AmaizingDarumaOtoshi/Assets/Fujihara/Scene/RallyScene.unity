@@ -1837,14 +1837,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 05670406ff4ef0646abc81857b5c603c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RallyDemo
+  characters:
+  - {fileID: 11400000, guid: 7ffcf080adad0f64380e6846824a2978, type: 2}
+  - {fileID: 11400000, guid: 9fc5324d816f46cb80cbe99a1d9c3a1a, type: 2}
   characterPrefab: {fileID: 6242312641939630888, guid: 98dfe1d631da6fc429ba3618bb53aa46, type: 3}
   tumikiPrefab: {fileID: 3841633084211777074, guid: fe206d19834ed2e4f8fa6f2e5318eebf, type: 3}
   distance: 12
   stackBlocks: 3
-  launchSpeed: 18
-  speedRate: 1.08
-  maxSpeed: 24
   serveDelay: 1
+  missAfter: 15
+  respawnDelay: 3.5
 --- !u!4 &1009882541
 Transform:
   m_ObjectHideFlags: 0

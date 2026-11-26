@@ -74,6 +74,8 @@ namespace Yurube
         public float Radius => m_radius;
         // デバフを掛けている最中か(消えかけ・消えたあとは false)
         public bool IsEffective => !m_finished && !m_fading;
+        // ラボ表示用: 毒沼の残り時間(秒)
+        public float RemainingSeconds => (m_finished || m_fading) ? 0.0f : Mathf.Max(0.0f, m_timeLeft);
 
         public void Initialize(DarumaCharacter owner, float radius, float duration, float fadeDuration,
             float debuffDuration, float slowMultiplier, float tickInterval,

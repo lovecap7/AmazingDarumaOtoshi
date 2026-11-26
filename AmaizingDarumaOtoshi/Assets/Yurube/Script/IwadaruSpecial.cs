@@ -170,6 +170,36 @@ namespace Yurube
         public float CountdownRemaining => m_state == State.Countdown
             ? Mathf.Max(0.0f, m_countdown - m_stateTime)
             : 0.0f;
+        // ラボ表示用: 現在の状態名とフェーズ残り時間
+        public string PhaseLabel
+        {
+            get
+            {
+                switch (m_state)
+                {
+                    case State.Countdown: return "予告カウントダウン";
+                    case State.Rising: return "上昇中";
+                    case State.CutIn: return "カットイン中";
+                    case State.Falling: return "落下中";
+                    case State.Impact: return "着弾硬直";
+                    default: return "待機";
+                }
+            }
+        }
+        public float PhaseRemaining
+        {
+            get
+            {
+                switch (m_state)
+                {
+                    case State.Countdown: return Mathf.Max(0.0f, m_countdown - m_stateTime);
+                    case State.Rising: return Mathf.Max(0.0f, m_riseTime - m_stateTime);
+                    case State.Falling: return Mathf.Max(0.0f, m_fallTime - m_stateTime);
+                    case State.Impact: return Mathf.Max(0.0f, m_impactRecovery - m_stateTime);
+                    default: return 0.0f;
+                }
+            }
+        }
 
         // ---- CPU が予告円を避けるための読み取り用(中平追加。動きには関係しない) ----
         // 発動したキャラクター(隕石はこのキャラクターには当たらない)

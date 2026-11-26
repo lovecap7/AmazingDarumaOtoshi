@@ -51,11 +51,11 @@ namespace Nakagawa.EditorTools
         }
 
         // ないプレハブだけを作り、あるプレハブは参照の修復だけを行う(インスペクターで調整した値はそのまま残る)
-        [MenuItem("Nakagawa/Gimmick/Build Additional Gimmick Prefabs")]
+        [MenuItem("Nakagawa/Gimmick/追加ギミックのプレハブを作る")]
         public static void BuildAll() => Build(false);
 
         // すべてのプレハブを作り直す(調整した値も既定に戻る。シーンに置いたギミックの上書きが外れることがあるので、ステージも作り直す)
-        [MenuItem("Nakagawa/Gimmick/Rebuild Additional Gimmick Prefabs (Reset Values)")]
+        [MenuItem("Nakagawa/Gimmick/追加ギミックのプレハブを作り直す(値を既定に戻す)")]
         public static void RebuildAll() => Build(true);
 
         static void Build(bool rebuild)
@@ -99,7 +99,7 @@ namespace Nakagawa.EditorTools
 
         // 見た目の部品への参照が外れていたら、部品の名前からつなぎ直す(値はそのまま)
         // プレハブを編集中に作り直すと、古い内容のまま保存されて参照が外れることがあるため
-        [MenuItem("Nakagawa/Gimmick/Repair Additional Gimmick Prefabs")]
+        [MenuItem("Nakagawa/Gimmick/追加ギミックのプレハブを修復する")]
         public static void RepairAll()
         {
             var repaired = new System.Collections.Generic.List<string>();

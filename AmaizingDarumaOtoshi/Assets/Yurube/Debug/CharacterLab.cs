@@ -7,7 +7,7 @@ using UnityEngine.InputSystem;
 namespace Yurube.Lab
 {
     // キャラクター確認用のラボ。セレクト画面・CPU・試合ルールを通さず、
-    // 積み木の色と数をその場で用意して、パッシブと演出だけを確認する。
+    // 積み木・レベル・ダッシュ・必殺技をその場で用意して挙動と当たり判定を確認する。
     // 舞台・カメラ・ライトは実行時に組み立てるので、シーンにはこのコンポーネントを1つ置くだけでよい。
     [DefaultExecutionOrder(-500)]
     public class CharacterLab : MonoBehaviour
@@ -40,10 +40,12 @@ namespace Yurube.Lab
 
         readonly List<CharacterData> m_characters = new List<CharacterData>();
         int m_index;
+        int m_playerLevel = 1;
         DarumaCharacter m_character;
         CharacterLabDummy m_dummy;
         CharacterLabBlocks m_blocks;
         CharacterLabUI m_ui;
+        CharacterLabHitboxView m_hitboxView;
         Camera m_camera;
         GameObject m_arenaRoot;
         float m_yaw, m_pitch, m_distance;
@@ -65,6 +67,7 @@ namespace Yurube.Lab
         public bool DummyInvincible => m_dummyInvincible;
         public bool Follow { get => m_follow; set => m_follow = value; }
         public TumikiColor SelectedColor { get => m_selectedColor; set => m_selectedColor = value; }
+        public int PlayerLevel => m_character != null ? DarumaLevel.GetLabLevel(m_character) : m_playerLevel;
         public float ShotSpeed => m_character != null && m_character.Hammer != null && m_character.Hammer.Params != null
             ? m_character.Hammer.Params.ShotSpeed : 0.0f;
 
@@ -82,8 +85,9 @@ namespace Yurube.Lab
 
         private void OnDestroy()
         {
-            // ラボを閉じたあとにスローが残らないようにする
+            // ラボを閉じたあとにスローやラボ登録が残らないようにする
             Time.timeScale = 1.0f;
+            DarumaLevel.ClearLab();
         }
 
         //========================================
@@ -96,7 +100,7 @@ namespace Yurube.Lab
             if (m_roster == null) return;
             foreach (var data in m_roster.characters)
             {
-                // まだプレハブが無いキャラ(hebi など)は並べない
+                // まだプレハブが無いキャラ(darumaotoshi など)は並べない
                 if (data != null && data.prefab != null) m_characters.Add(data);
             }
         }
@@ -106,6 +110,10 @@ namespace Yurube.Lab
             var blocksGo = new GameObject("CharacterLabBlocks");
             m_blocks = blocksGo.AddComponent<CharacterLabBlocks>();
             m_blocks.Initialize(m_blockPrefab);
+
+            var hitboxGo = new GameObject("CharacterLabHitboxView");
+            m_hitboxView = hitboxGo.AddComponent<CharacterLabHitboxView>();
+            m_hitboxView.Initialize(this);
 
             var uiGo = new GameObject("CharacterLabUI");
             var ui = uiGo.AddComponent<CharacterLabUI>();
@@ -198,12 +206,14 @@ namespace Yurube.Lab
             character.Eliminated += OnDummyEliminated;
             m_dummy = go.AddComponent<CharacterLabDummy>();
             m_dummy.Initialize(character, m_dummyInvincible);
+            DarumaLevel.RegisterLab(character, null, 1);
         }
 
         // ダミーが倒れたら、少し待って同じ場所に出す
         void OnDummyEliminated(DarumaCharacter character)
         {
             if (!ReferenceEquals(character, m_dummyCharacter)) return;
+            DarumaLevel.UnregisterLab(character);
             m_dummyCharacter = null;
             m_dummy = null;
             if (m_dummyRespawnRoutine == null)
@@ -227,6 +237,7 @@ namespace Yurube.Lab
             }
             if (m_dummyCharacter != null)
             {
+                DarumaLevel.UnregisterLab(m_dummyCharacter);
                 m_dummyCharacter.gameObject.SetActive(false);
                 Destroy(m_dummyCharacter.gameObject);
             }
@@ -235,10 +246,21 @@ namespace Yurube.Lab
             SpawnDummy();
         }
 
+        public void EnsureDummyAlive()
+        {
+            if (m_dummy == null || m_dummyCharacter == null) RespawnDummyNow();
+        }
+
         public void SetDummyInvincible(bool invincible)
         {
             m_dummyInvincible = invincible;
             if (m_dummy != null) m_dummy.SetInvincible(invincible);
+        }
+
+        public void SetPlayerLevel(int level)
+        {
+            m_playerLevel = Mathf.Clamp(level, 1, LevelParams.MaxLevel);
+            if (m_character != null) DarumaLevel.SetLabLevel(m_character, m_playerLevel);
         }
 
         //========================================
@@ -263,8 +285,10 @@ namespace Yurube.Lab
 
         void RespawnCharacter()
         {
+            CleanupSpecialObjects();
             if (m_character != null)
             {
+                DarumaLevel.UnregisterLab(m_character);
                 if (m_blocks != null) m_blocks.ClearStack(m_character);
                 // 同じ位置に出すので、消えるまでの1フレームだけ古い体を止める
                 m_character.gameObject.SetActive(false);
@@ -286,12 +310,14 @@ namespace Yurube.Lab
             character.SetCommandSource(input);
             character.Eliminated += OnPlayerEliminated;
             m_character = character;
+            DarumaLevel.RegisterLab(character, data, m_playerLevel);
         }
 
         // 必殺技の自爆などで倒れたら、少し待って同じキャラを出し直す
         void OnPlayerEliminated(DarumaCharacter character)
         {
             if (!ReferenceEquals(character, m_character)) return;
+            DarumaLevel.UnregisterLab(character);
             m_character = null;
             if (m_playerRespawnRoutine == null)
                 m_playerRespawnRoutine = StartCoroutine(RespawnPlayerLater());
@@ -354,7 +380,8 @@ namespace Yurube.Lab
                 if (keyboard[kCharacterKeys[i]].wasPressedThisFrame) SelectCharacter(i);
             }
 
-            bool toDummy = keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed;
+            // 左Shift はダッシュ(KeyboardDarumaInput)と競合するため、ダミー追加は右Shiftを使う
+            bool toDummy = keyboard.rightShiftKey.isPressed;
             if (keyboard.rKey.wasPressedThisFrame) AddColor(TumikiColor.Red, toDummy);
             if (keyboard.gKey.wasPressedThisFrame) AddColor(TumikiColor.Green, toDummy);
             if (keyboard.bKey.wasPressedThisFrame) AddColor(TumikiColor.Blue, toDummy);
@@ -447,13 +474,45 @@ namespace Yurube.Lab
 
         public void ResetAll()
         {
+            CleanupSpecialObjects();
             if (m_blocks != null)
             {
                 m_blocks.ClearStack(m_character);
                 if (m_dummy != null) m_blocks.ClearStack(m_dummy.Character);
                 m_blocks.DestroyLoose();
             }
-            ResetPositions();
+            StopPlayerRespawn();
+            RespawnCharacter();
+            RespawnDummyNow();
+        }
+
+        // キャラ切替・リセット・プリセット前に、前の必殺技が場に残した生成物を片付ける
+        public void CleanupSpecialObjects()
+        {
+            DestroyAllOf<AkadaruHammerStorm>();
+            DestroyAllOf<AodaruGaleSlash>();
+            DestroyAllOf<MidaruMachineGun>();
+            DestroyAllOf<MidaruBullet>();
+            DestroyAllOf<KidaruQuake>();
+            DestroyAllOf<HebiPoisonSwamp>();
+            DestroyAllOf<TronProjectile>();
+            DestroyAllOf<TronScorchTrail>();
+            DestroyAllOf<GroundScorch>();
+            DestroyAllOf<IwaCraterEffect>();
+            DestroyAllOf<IwaGroundCracks>();
+            DestroyAllOf<IwaDustEffect>();
+            DestroyAllOf<IwaShockwaveRing>();
+            if (m_dummyCharacter != null) HebiPoisonDebuff.Clear(m_dummyCharacter);
+            if (m_character != null) HebiPoisonDebuff.Clear(m_character);
+            if (m_hitboxView != null) m_hitboxView.ClearEchoes();
+        }
+
+        static void DestroyAllOf<T>() where T : Component
+        {
+            foreach (var obj in FindObjectsByType<T>(FindObjectsInactive.Exclude))
+            {
+                if (obj != null) Destroy(obj.gameObject);
+            }
         }
     }
 }

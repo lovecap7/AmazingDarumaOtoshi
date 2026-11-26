@@ -16,6 +16,13 @@ MonoBehaviour:
   displayName: "\u3042\u304B\u3060\u308B"
   color: {r: 0.91, g: 0.29, b: 0.25, a: 1}
   portrait: {fileID: 8484103885634726504, guid: 014688e61fe3f3f4f978b06ae3d65f1e, type: 3}
+  colorPortraits:
+  - {fileID: 0}
+  - {fileID: 8484103885634726504, guid: 51d9f5b05fd00b344b30b5f36b727e4d, type: 3}
+  - {fileID: 8484103885634726504, guid: 1a0328271d8629e499a1df7d9af433fd, type: 3}
+  - {fileID: 8484103885634726504, guid: eafd465c0330e8346b6911162f2aa345, type: 3}
+  - {fileID: 8484103885634726504, guid: c53d51dc449a7a54ba961d48a69229ce, type: 3}
+  - {fileID: 8484103885634726504, guid: 08ca4b38c12b76d4d865ef23cb147cea, type: 3}
   model: {fileID: 919132149155446097, guid: 00564cfedf86ebf448f97bd3b314d042, type: 3}
   colorModels:
   - {fileID: 919132149155446097, guid: 00564cfedf86ebf448f97bd3b314d042, type: 3}

@@ -285,8 +285,8 @@ namespace Yurube.Achievements
                     AchievementCategory.Story, "序章をクリアする（だるま新聞まで見る）", AchievementMetric.StoryChapterCleared, 1,
                     AchievementRarity.Bronze, mode: AchievementMode.Story, storyChapter: "prologue"),
 
-                new AchievementDefinition("story_chapter1", "窓ガラスと走り込み",
-                    "第1章をクリア。走り込みの先に、地区大会優勝があった。",
+                new AchievementDefinition("story_chapter1", "壁は砕ける",
+                    "第1章をクリア。立ちはだかる壁を砕き、地区予選を制した。",
                     AchievementCategory.Story, "第1章をクリアする（だるま新聞まで見る）", AchievementMetric.StoryChapterCleared, 1,
                     AchievementRarity.Silver, mode: AchievementMode.Story, storyChapter: "chapter1"),
 

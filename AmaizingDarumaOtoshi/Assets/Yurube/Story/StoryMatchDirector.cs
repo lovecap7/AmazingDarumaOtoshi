@@ -58,6 +58,9 @@ namespace Yurube.Story
         bool m_gaugeFullTriggered;
         float m_gaugeStackHintAt = -1f;
 
+        readonly HashSet<DarumaCharacter> m_hookedTauntBodies = new HashSet<DarumaCharacter>();
+        DarumaCharacter m_hookedPlayerBody;
+
         bool IsPrologueGaugeTutorial => m_chapter != null && m_chapter.rules != null && m_chapter.rules.awakening;
         float GaugeTimeHintSeconds
         {
@@ -68,6 +71,9 @@ namespace Yurube.Story
             }
         }
 
+        // ストーリーの選択肢が選ばれたときに受け取る（最終章のエンディング分岐などで使用。第1章では保存せず保持のみ）
+        public StoryChoiceResult? LastChoiceResult { get; private set; }
+        public event System.Action<StoryChoiceResult> ChoiceSelected;
         // チュートリアルから使う
         public MatchPlayer Player => m_player;
         public DarumaMatch Match => m_match;
@@ -145,6 +151,7 @@ namespace Yurube.Story
 
             m_dialogue = DialogueRunner.Create();
             m_dialogue.StoryLineStarted += OnStoryLineStarted;
+            m_dialogue.ChoiceSelected += OnDialogueChoiceSelected;
             m_movie = StoryMovie.Create(m_chapter);
             // シーンが明けた瞬間にチュートリアルステージが見えないよう、黒いムービー画面で覆っておく
             m_movie.SetBlack();
@@ -170,6 +177,9 @@ namespace Yurube.Story
                 m_match.PlayerOut -= OnPlayerOut;
             }
             KidaruPassive.ExtraAdded -= OnYellowExtra;
+            DarumaCharacter.AnyPickedUp -= OnStoryBlockPickedUp;
+            UnhookPlayerFirstAttack();
+            m_hookedTauntBodies.Clear();
             DarumaHammer.Hit -= OnHammerHit;
             DarumaHammer.ShotFired -= OnCpuShot;
             IwaBlock.WallBroken -= OnIwaWallBroken;
@@ -177,7 +187,11 @@ namespace Yurube.Story
             AchievementEvents.Chain -= OnChainForStory;
             UnhookPrologueGauge();
             SpecialGauge.StoryGainScale = -1.0f;
-            if (m_dialogue != null) m_dialogue.StoryLineStarted -= OnStoryLineStarted;
+            if (m_dialogue != null)
+            {
+                m_dialogue.StoryLineStarted -= OnStoryLineStarted;
+                m_dialogue.ChoiceSelected -= OnDialogueChoiceSelected;
+            }
             if (m_movie != null) Destroy(m_movie.gameObject);
 
             // ポーズメニューからタイトルへ戻った等：ストーリーを中断し、次の試合に影響を残さない
@@ -257,7 +271,10 @@ namespace Yurube.Story
 
             // ここからは動かして、必殺技を実際に1回使ってもらう
             SetStoryPaused(false);
-            m_dialogue.ShowObjective(m_chapter, "kidaru", "[Y]で必殺技！");
+            string speaker = m_chapter != null && !string.IsNullOrEmpty(m_chapter.playerCharacter)
+                ? m_chapter.playerCharacter
+                : "akadaru";
+            m_dialogue.ShowObjective(m_chapter, speaker, "[Y]で必殺技！");
 
             bool used = false;
             System.Action<SpecialGauge> onConsumed = g =>
@@ -398,19 +415,57 @@ namespace Yurube.Story
             Debug.Log("[Story] " + reason + "：積み木を1個渡しました");
         }
 
-        // 「あっ、増えた！」：黄色の追加分が積まれたとき（チュートリアル後・初回だけ）
+        // 「あっ、ぼくの積み木、増えました！」：黄色の追加分が積まれたとき（チュートリアル後・初回だけ）
         void HookYellowExtra()
         {
             if (m_chapter == null || m_chapter.yellowExtra == null || m_chapter.yellowExtra.Count == 0) return;
             KidaruPassive.ExtraAdded += OnYellowExtra;
+            DarumaCharacter.AnyPickedUp += OnStoryBlockPickedUp;
+        }
+
+        bool IsCharacterId(DarumaCharacter character, string characterId)
+        {
+            if (character == null || m_match == null || string.IsNullOrEmpty(characterId)) return false;
+            foreach (var p in m_match.Players)
+            {
+                if (p != null && p.Character == character && p.CharacterData != null && p.CharacterData.id == characterId)
+                    return true;
+            }
+            return false;
         }
 
         void OnYellowExtra(DarumaCharacter character)
         {
             if (m_finishedHandled || StorySession.YellowExtraPlayed) return;
             if (!m_matchRunning || m_awakeningRunning || m_dialogue == null || m_dialogue.IsShowing) return;
-            if (m_player == null || character != m_player.Character) return;
+            if (!IsCharacterId(character, "kidaru")) return;
             if (m_match != null && m_match.IsPaused) return;
+
+            StorySession.YellowExtraPlayed = true;
+            StartCoroutine(PlayLines(m_chapter.yellowExtra));
+        }
+
+        // DarumaLevel 移行後は KidaruPassive が止まっているため、序章の演出用に初回だけ黄色い積み木を1個増やして掛け合いを出す
+        void OnStoryBlockPickedUp(TumikiPickupInfo info)
+        {
+            if (DarumaLevel.LegacyPassives) return;
+            if (m_finishedHandled || StorySession.YellowExtraPlayed) return;
+            if (!m_matchRunning || m_awakeningRunning || m_dialogue == null || m_dialogue.IsShowing) return;
+            if (m_match != null && m_match.IsPaused) return;
+            if (!info.StackGrew || info.Block == null || info.Block.Color != TumikiColor.Yellow) return;
+            if (!IsCharacterId(info.Character, "kidaru")) return;
+
+            var stack = info.Character.Stack;
+            if (stack != null && stack.Count < stack.MaxCount)
+            {
+                var extra = CreateAssistBlock(info.Character.transform.position);
+                if (extra != null)
+                {
+                    extra.SetColor(TumikiColor.Yellow);
+                    var overflow = stack.AddBottom(extra);
+                    if (overflow != null) Destroy(overflow.gameObject);
+                }
+            }
 
             StorySession.YellowExtraPlayed = true;
             StartCoroutine(PlayLines(m_chapter.yellowExtra));
@@ -499,6 +554,7 @@ namespace Yurube.Story
             yield return null;
 
             HookTaunts();
+            HookPlayerFirstAttack();
             ApplyCpuBlockLimit(CpuBlockLimit);
 
             // 会話（前）：フェーダーが明けて、止められるようになってから
@@ -588,17 +644,7 @@ namespace Yurube.Story
         IEnumerator StartPrologueGaugeTutorial()
         {
             HookPrologueGauge();
-
-            // 手順0：「練習試合、開始！」の小窓が消えたあと、あかだるの一言を出す
-            yield return new WaitForSecondsRealtime(2.2f);
-            float waitUntil = Time.unscaledTime + 2.0f;
-            while (m_dialogue != null && m_dialogue.IsShowing && Time.unscaledTime < waitUntil) yield return null;
-
-            if (m_finishedHandled || m_gaugeFullTriggered || m_awakeningRunning) yield break;
-            if (!m_gaugeStackHintDone && !m_gaugeHitHintDone && m_dialogue != null)
-            {
-                yield return m_dialogue.PlaySmall("akadaru", "新入り相手に必殺技は使わん！", m_chapter, 2.8f);
-            }
+            yield break;
         }
 
         void OnPrologueGaugeGained(SpecialGauge gauge, float added, SpecialGauge.GainReason reason)
@@ -654,7 +700,7 @@ namespace Yurube.Story
             }
         }
 
-        // 手順4：満タンになった瞬間にゲームを止め、[Y]で必殺技を発動させる（そのまま黄金化演出へ）
+        // 手順4：満タンになった瞬間にゲームを止め、[Y]で必殺技を発動させる
         IEnumerator PrologueFullSpecialPrompt(SpecialGauge gauge)
         {
             m_awakeningRunning = true;
@@ -664,7 +710,7 @@ namespace Yurube.Story
             if (m_dialogue != null)
             {
                 m_dialogue.CloseSmallWindow();
-                m_dialogue.ShowObjective(m_chapter, "kidaru", "[Y]で必殺技！");
+                m_dialogue.ShowObjective(m_chapter, "midaru", "[Y]で必殺技！");
             }
             SpecialInput.StoryLocked = false;
 
@@ -677,11 +723,33 @@ namespace Yurube.Story
                 if (SpecialInput.WasPressedIgnoringPause(m_player.Character))
                 {
                     SetStoryPaused(false);
-                    var special = m_player.Character.GetComponent<KidaruSpecial>();
-                    if (special != null && special.TryActivate())
+                    var ch = m_player.Character;
+                    var special = ch.GetComponent<ISpecialAbility>();
+                    if (special is AkadaruSpecial ak && !ak.UsesHammerStorm && ch.Stack != null && ch.Stack.Count == 0)
+                    {
+                        EnsurePlayerHasBlock("序章必殺技チュートリアルの補助");
+                    }
+
+                    bool activated = special != null && special.TryActivate();
+                    // ハンマー振り中に満タン→停止した場合、解除直後の数フレームは IsBusy が残るため完了まで待って発動する
+                    float retryUntil = Time.unscaledTime + 0.6f;
+                    while (!activated && !m_finishedHandled && Time.unscaledTime < retryUntil)
+                    {
+                        yield return null;
+                        if (m_player == null || m_player.Character == null) break;
+                        ch = m_player.Character;
+                        special = ch.GetComponent<ISpecialAbility>();
+                        if (special is AkadaruSpecial akRetry && !akRetry.UsesHammerStorm && ch.Stack != null && ch.Stack.Count == 0)
+                        {
+                            EnsurePlayerHasBlock("序章必殺技チュートリアルの補助");
+                        }
+                        activated = special != null && special.TryActivate();
+                    }
+
+                    if (activated)
                     {
                         StorySession.AwakeningDone = true;
-                        Debug.Log("[Story] 序章ゲージチュートリアル完了（黄金化発動）");
+                        Debug.Log("[Story] 序章ゲージチュートリアル完了（必殺技発動）");
                     }
                     break;
                 }
@@ -707,11 +775,54 @@ namespace Yurube.Story
             }
         }
 
-        // 復活で体が作り直されたら、CPUの上限をかけ直す
+        // 復活で体が作り直されたら、CPUの上限・掛け合いフック・プレイヤー攻撃フックをかけ直す
         void OnPlayerRespawned(MatchPlayer p)
         {
-            if (p == null || !p.IsCpu) return;
+            if (p == null) return;
+            if (!p.IsCpu)
+            {
+                HookPlayerFirstAttack();
+                return;
+            }
             ApplyCpuBlockLimit(CpuBlockLimit);
+            HookCpuTaunt(p);
+        }
+
+        void HookPlayerFirstAttack()
+        {
+            if (m_chapter == null || m_chapter.playerAttackFirst == null || m_chapter.playerAttackFirst.Count == 0) return;
+            var body = m_player != null ? m_player.Character : null;
+            if (body == null || body == m_hookedPlayerBody) return;
+            UnhookPlayerFirstAttack();
+            m_hookedPlayerBody = body;
+            m_hookedPlayerBody.CommandReceived += OnPlayerCommandForFirstAttack;
+        }
+
+        void UnhookPlayerFirstAttack()
+        {
+            if (m_hookedPlayerBody != null)
+            {
+                m_hookedPlayerBody.CommandReceived -= OnPlayerCommandForFirstAttack;
+                m_hookedPlayerBody = null;
+            }
+        }
+
+        void OnPlayerCommandForFirstAttack(DarumaCommand command)
+        {
+            if (m_finishedHandled || !m_matchRunning || m_awakeningRunning || m_koRunning) return;
+            if (m_chapter == null || m_chapter.playerAttackFirst == null || m_chapter.playerAttackFirst.Count == 0) return;
+            if (m_dialogue == null || m_dialogue.IsShowing) return;
+            if (m_match != null && m_match.IsPaused) return;
+            if (m_player == null || m_player.Character == null || m_player.Character.MovementOnly) return;
+
+            bool attacked = command.Sweep
+                || (command.Shot && m_player.Character.Stack != null && m_player.Character.Stack.Count > 0 && m_player.Character.CanStartShot);
+            if (!attacked) return;
+
+            string key = m_chapter.id + ".playerAttackFirst";
+            if (StorySession.HasEvent(key)) return;
+            StorySession.MarkEvent(key);
+            StartCoroutine(PlayLines(m_chapter.playerAttackFirst));
         }
 
         void HookTaunts()
@@ -719,12 +830,19 @@ namespace Yurube.Story
             if (m_match == null || m_chapter.cpuTaunts == null) return;
             foreach (var p in m_match.Players)
             {
-                if (p == null || !p.IsCpu || p.Character == null) continue;
-                var character = p.Character;
-                character.DealtDamage += attacker => OnCpuAttack(character, attacker);
+                HookCpuTaunt(p);
             }
             // 第2章のへびだるのように「攻撃したとき」で出したい章は、ショットでも拾う
             if (m_chapter.cpuTauntOnShot) DarumaHammer.ShotFired += OnCpuShot;
+        }
+
+        void HookCpuTaunt(MatchPlayer p)
+        {
+            if (m_chapter == null || m_chapter.cpuTaunts == null) return;
+            if (p == null || !p.IsCpu || p.Character == null) return;
+            var character = p.Character;
+            if (!m_hookedTauntBodies.Add(character)) return;
+            character.DealtDamage += attacker => OnCpuAttack(character, attacker);
         }
 
         // CPU が攻撃したときの掛け合い（同じ台詞は一度だけ・数秒で自動的に閉じる）
@@ -836,6 +954,12 @@ namespace Yurube.Story
         {
             // 会話の1行ごとにショットIDの切り替えや話者へのカメラ寄せを行う
             if (m_movie != null) m_movie.OnDialogueLine(line);
+        }
+
+        void OnDialogueChoiceSelected(StoryChoiceResult result)
+        {
+            LastChoiceResult = result;
+            ChoiceSelected?.Invoke(result);
         }
 
         // プレイヤーの弾が相手（CPU）に当たった。このあと抜けた積み木が連鎖すれば「相手の積み木を崩した」

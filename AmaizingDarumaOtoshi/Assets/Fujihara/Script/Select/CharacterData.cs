@@ -11,7 +11,7 @@ public enum LevelPerk
     ShotSpeed,       // あかだる：弾速
     AttackSpeed,     // あおだる：攻撃速度
     SlowOnHit,       // みだる：当てた相手の移動速度ダウン
-    Stamina,         // きだる：スタミナ（減りにくく、回復が速い）
+    Stamina,         // きだる：ジャンプのスタミナ消費が減る（2026-11-26 からジャンプだけ）
     ShotDurability,  // いわだる：撃った弾の耐久値
     Zigzag,          // へびだる：撃った弾の蛇行の振れ幅
     Reach,           // だるきんぐ：リーチ
@@ -31,6 +31,16 @@ public class CharacterData : ScriptableObject
     public Color color = Color.white;
     [Tooltip("セレクト画面のアイコン。画像の Texture Type を「Sprite (2D and UI)」にしてここへドラッグ（未設定なら色と頭文字で仮表示）")]
     public Sprite portrait;
+    [Tooltip("色違いの顔写真（キャラクターセレクトで、プレイヤーの色のモデルを見せる）。並びは DarumaColor（木・赤・青・黄・緑・白）。" +
+             "メニュー「Fujihara > キャラの顔写真を撮る」で colorModels から撮る。空の色は portrait を使う")]
+    public Sprite[] colorPortraits = new Sprite[6];
+
+    // その色の顔写真（無ければいつもの portrait）
+    public Sprite PortraitFor(DarumaColor c)
+    {
+        int i = (int)c;
+        return colorPortraits != null && i >= 0 && i < colorPortraits.Length && colorPortraits[i] != null ? colorPortraits[i] : portrait;
+    }
     [Tooltip("キャラの3Dモデル（Blender で作っただるま。足元が原点）。メニュー「Fujihara > キャラの顔写真を撮る」で、このモデルを撮って portrait に入れる")]
     public GameObject model;
     [Tooltip("色違いのモデル（Model/Daruma/Colors/<色>/<id>/）。並びは DarumaColor（木・赤・青・黄・緑・白）。空の色は model を使う")]

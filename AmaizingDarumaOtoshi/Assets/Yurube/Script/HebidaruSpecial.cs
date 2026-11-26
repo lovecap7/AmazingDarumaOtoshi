@@ -50,6 +50,10 @@ namespace Yurube
         float m_activeSwampRadius;
 
         public bool IsActive => m_state != State.Idle || m_swamp != null;
+        // ラボ表示用
+        public float RemainingSeconds => m_swamp != null ? m_swamp.RemainingSeconds : 0.0f;
+        public float ActiveSwampRadius => m_swamp != null ? m_swamp.Radius : m_activeSwampRadius;
+        public bool IsInCutIn => m_state == State.CutIn;
 
         // CPU 用(中平): 積み木 blocks 個で撃ったときの毒沼の半径(m。TryActivate と同じ計算)
         public float PredictRadius(int blocks)

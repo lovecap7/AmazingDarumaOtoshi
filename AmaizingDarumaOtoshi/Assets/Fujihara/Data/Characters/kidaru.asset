@@ -16,6 +16,13 @@ MonoBehaviour:
   displayName: "\u304D\u3060\u308B"
   color: {r: 0.95, g: 0.85, b: 0.2, a: 1}
   portrait: {fileID: -1180001305099005471, guid: b89e2af523fb11f4f93470427241b32c, type: 3}
+  colorPortraits:
+  - {fileID: 0}
+  - {fileID: -1180001305099005471, guid: 7f61ac176b6ac55439d8dd88873aadc2, type: 3}
+  - {fileID: -1180001305099005471, guid: a0f3fa1613966d543be46078ea8d96ca, type: 3}
+  - {fileID: -1180001305099005471, guid: 4d7134fdc6b06cb4d84c9dd29d836e73, type: 3}
+  - {fileID: -1180001305099005471, guid: 83f4a45d6813b0d4cafb307b45f78d6c, type: 3}
+  - {fileID: -1180001305099005471, guid: bc8c01f77ac6d6143999a4bdb504c3b6, type: 3}
   model: {fileID: 919132149155446097, guid: 731032ade55cb9d41acd13da0ed902d7, type: 3}
   colorModels:
   - {fileID: 919132149155446097, guid: 731032ade55cb9d41acd13da0ed902d7, type: 3}
@@ -40,8 +47,8 @@ MonoBehaviour:
   levelPerk: 4
   passiveColor: 3
   passiveCount: 0
-  passiveName: "\u30B9\u30BF\u30DF\u30CA\u30A2\u30C3\u30D7"
-  passiveText: "\u30EC\u30D9\u30EB2\u304B\u3089\u3001\u30B9\u30BF\u30DF\u30CA\u304C\u6E1B\u308A\u306B\u304F\u304F\u3001\u56DE\u5FA9\u304C\u901F\u304F\u306A\u308B"
+  passiveName: "\u30B8\u30E3\u30F3\u30D7\u4E0A\u624B"
+  passiveText: "\u30EC\u30D9\u30EB2\u304B\u3089\u3001\u30B8\u30E3\u30F3\u30D7\u306E\u30B9\u30BF\u30DF\u30CA\u6D88\u8CBB\u304C\u6E1B\u308B"
   hammerPower: 3
   hammerSpeed: 3
   hammerReach: 3
