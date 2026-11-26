@@ -31,10 +31,27 @@ namespace Yurube
         [Tooltip("画面下部に表示する必殺技名")]
         [SerializeField] string m_cutInName = "黄金化";
 
+        [Header("震脚(suehara)。オンなら上の「黄金化」の代わりにこちらを出す")]
+        [Tooltip("オン: 効果時間の間、ジャンプして着地するたびに周りへ衝撃波を出す / オフ: 前の「黄金化」")]
+        [SerializeField] bool m_useQuake = true;
+        [Tooltip("技名(カットインに出す)")]
+        [SerializeField] string m_quakeName = "震脚";
+        [Tooltip("効果時間(秒)")]
+        [SerializeField] float m_quakeDuration = 5.0f;
+        [Tooltip("衝撃波の半径(m)。この中の敵は空中にいても1段削られる")]
+        [SerializeField] float m_quakeRadius = 5.0f;
+        [SerializeField] Color m_quakeCutInColor = new Color(1.0f, 0.8f, 0.2f);
+
         DarumaCharacter m_character;
         SpecialGauge m_gauge;
         KidaruWheelVisual m_wheel;
         float m_activeUntil;
+        // 震脚: ジャンプして空中にいる(次に着地したら衝撃波)
+        bool m_quakeJumping;
+
+        // CPU 用(suehara): 震脚を使うか / 衝撃波の半径
+        public bool UsesQuake => m_useQuake;
+        public float QuakeRadius => m_quakeRadius;
 
         Renderer[] m_renderers;
         Material[][] m_originalMaterials;
@@ -47,7 +64,7 @@ namespace Yurube
         public float LastDuration { get; private set; }
 
         // ラボ表示用。実際に速度倍率が掛かっている状態かを返す
-        public bool IsSpeedBoosted => IsActive && m_character != null && m_character.CanBeAffected;
+        public bool IsSpeedBoosted => IsActive && !m_useQuake && m_character != null && m_character.CanBeAffected;
         public float CurrentSpeedMultiplier => IsSpeedBoosted ? Mathf.Max(1.0f, m_speedMultiplier) : 1.0f;
         public float EffectiveSpeed => m_character != null ? m_character.MoveSpeed * CurrentSpeedMultiplier : 0.0f;
 
@@ -68,7 +85,8 @@ namespace Yurube
 
         private void Update()
         {
-            bool active = IsActive && m_character != null;
+            // 震脚は無敵・虹色・車輪を使わない
+            bool active = IsActive && m_character != null && !m_useQuake;
             if (m_wheel != null)
             {
                 if (active) m_wheel.Begin();
@@ -92,6 +110,7 @@ namespace Yurube
         // この必殺技中は点滅させず、虹色の発光で無敵を示す。
         private void LateUpdate()
         {
+            if (m_useQuake) return;
             if (!IsActive || m_character == null || !m_character.IsInvincible) return;
 
             foreach (var renderer in m_character.GetComponentsInChildren<Renderer>(true))
@@ -107,8 +126,29 @@ namespace Yurube
         private void FixedUpdate()
         {
             if (!IsActive || m_character == null || !m_character.CanBeAffected) return;
+            if (m_useQuake)
+            {
+                UpdateQuake();
+                return;
+            }
 
             m_character.RequestSpeedScale(Mathf.Max(1.0f, m_speedMultiplier));
+        }
+
+        // 震脚: 跳び上がったのを覚えておき、着地した瞬間に衝撃波を出す
+        // (DarumaCharacter より先に動くので、IsGrounded は前の物理ステップの結果)
+        void UpdateQuake()
+        {
+            bool grounded = m_character.IsGrounded;
+            if (!grounded && m_character.Rigidbody != null && m_character.Rigidbody.linearVelocity.y > 1.0f)
+            {
+                m_quakeJumping = true;
+                return;
+            }
+            if (!m_quakeJumping || !grounded) return;
+            m_quakeJumping = false;
+            int hits = KidaruQuake.Emit(m_character, m_quakeRadius);
+            if (m_logSpecial) Debug.Log($"[きだる] 震脚の衝撃波 ({hits}人に命中)", this);
         }
 
         // CPUのきだるが、人間のキー入力で必殺技を出さないようにする
@@ -129,6 +169,7 @@ namespace Yurube
             if (m_gauge == null || !m_gauge.IsFull) return false;
             if (m_character == null || !m_character.CanBeAffected) return false;
             if (IsActive) return false;   // 強化中は重ねがけしない
+            if (m_useQuake) return ActivateQuake();
 
             int blocks = m_character.Stack != null ? m_character.Stack.Count : 0;
             float duration = m_baseDuration + m_durationPerBlock * blocks;
@@ -166,13 +207,43 @@ namespace Yurube
         }
 
         //========================================
+        // 震脚(suehara)
+        //========================================
+
+        bool ActivateQuake()
+        {
+            m_gauge.Consume();
+            // ネット対戦用(suehara): クライアントにも発動を知らせる(衝撃波の当たり判定はホストだけ)
+            SpecialNet.Send(m_character, this, kNetQuake, new[] { m_quakeDuration });
+            PlayQuake(m_quakeDuration);
+            if (m_logSpecial) Debug.Log($"[きだる] 必殺技『{m_quakeName}』発動: {m_quakeDuration:F1}秒", this);
+            return true;
+        }
+
+        void PlayQuake(float duration)
+        {
+            m_activeUntil = Time.time + duration;
+            LastDuration = duration;
+            LastBlocks = m_character.Stack != null ? m_character.Stack.Count : 0;
+            // 発動する前から跳んでいた分では出さない(発動のあと跳んで着地したら出る)
+            m_quakeJumping = false;
+            SpecialCutIn.Show(m_quakeName, m_quakeCutInColor, null, m_character, null, LastBlocks);
+        }
+
+        //========================================
         // ネット対戦用(suehara): クライアントで、ホストの発動と同じ見た目を出す
         //========================================
 
         const int kNetActivate = 0;
+        const int kNetQuake = 1;
 
         public void NetReceive(int ev, float[] v, TumikiBlock[] blocks)
         {
+            if (ev == kNetQuake)
+            {
+                if (!IsActive && v.Length >= 1) PlayQuake(v[0]);
+                return;
+            }
             if (ev != kNetActivate || v.Length < 1 || IsActive) return;
             var list = new List<TumikiBlock>();
             foreach (var b in blocks) if (b != null) list.Add(b);
@@ -277,7 +348,7 @@ namespace Yurube
         private void OnGUI()
         {
             SpecialGaugeHUD.Draw(m_gauge, m_character,
-                IsActive ? $"POWER UP {RemainingSeconds:F1}s" : null);
+                IsActive ? (m_useQuake ? $"QUAKE {RemainingSeconds:F1}s" : $"POWER UP {RemainingSeconds:F1}s") : null);
         }
 
         private void OnDisable()

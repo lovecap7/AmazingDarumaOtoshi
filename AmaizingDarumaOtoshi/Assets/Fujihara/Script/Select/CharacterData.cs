@@ -11,7 +11,7 @@ public enum LevelPerk
     ShotSpeed,       // あかだる：弾速
     AttackSpeed,     // あおだる：攻撃速度
     SlowOnHit,       // みだる：当てた相手の移動速度ダウン
-    Stamina,         // きだる：スタミナ（減りにくく、回復が速い）
+    Stamina,         // きだる：ジャンプのスタミナ消費が減る（2026-11-26 からジャンプだけ）
     ShotDurability,  // いわだる：撃った弾の耐久値
     Zigzag,          // へびだる：撃った弾の蛇行の振れ幅
     Reach,           // だるきんぐ：リーチ
