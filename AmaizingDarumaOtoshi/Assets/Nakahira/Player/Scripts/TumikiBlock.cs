@@ -846,6 +846,13 @@ namespace Nakahira
         private void EnablePhysics()
         {
             transform.SetParent(null, true);
+            // 積まれている間にジャンプの見た目で傾いていた分を戻す(向き(水平の回転)はそのまま)
+            // 回転は固定するので、傾いたまま外れると傾いた積み木がずっと残ってしまう
+            Vector3 forward = Vector3.ProjectOnPlane(transform.forward, Vector3.up);
+            if (forward.sqrMagnitude < 1e-6f) forward = Vector3.ProjectOnPlane(transform.up, Vector3.up);
+            Quaternion upright = forward.sqrMagnitude > 1e-6f ? Quaternion.LookRotation(forward, Vector3.up) : Quaternion.identity;
+            transform.rotation = upright;
+            m_rb.rotation = upright;
             m_collider.enabled = true;
             m_rb.isKinematic = false;
             m_rb.useGravity = true;
