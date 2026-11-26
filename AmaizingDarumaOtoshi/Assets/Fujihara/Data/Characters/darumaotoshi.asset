@@ -15,8 +15,29 @@ MonoBehaviour:
   id: darumaotoshi
   displayName: "\u3060\u308B\u307E\u304A\u3068\u3057"
   color: {r: 0.97, g: 0.82, b: 0.24, a: 1}
-  portrait: {fileID: 0}
+  portrait: {fileID: -8262992467028346042, guid: 8b4c39a68aa867348b1f4befb5a93177, type: 3}
+  model: {fileID: 919132149155446097, guid: 5152b0ac3a480cf439abd01947637cca, type: 3}
+  colorModels:
+  - {fileID: 919132149155446097, guid: 5152b0ac3a480cf439abd01947637cca, type: 3}
+  - {fileID: 919132149155446097, guid: 4e909cc2b70e1f94c9ba839d6cf633ec, type: 3}
+  - {fileID: 919132149155446097, guid: 54d98a3048ece954cbd88f30e4c0b98a, type: 3}
+  - {fileID: 919132149155446097, guid: 50ff957249891084e81eb5f19f89791b, type: 3}
+  - {fileID: 919132149155446097, guid: b44cef274e950aa469c7dba0738d26fc, type: 3}
+  - {fileID: 919132149155446097, guid: 67a6801287d6a3a40a65626caf351a8c, type: 3}
+  hammerModel: {fileID: 919132149155446097, guid: 667dd722da071e842afc54d68893cedb, type: 3}
+  hammerColorModels:
+  - {fileID: 919132149155446097, guid: 667dd722da071e842afc54d68893cedb, type: 3}
+  - {fileID: 919132149155446097, guid: f8dd762af39efa34bb4574475b243fac, type: 3}
+  - {fileID: 919132149155446097, guid: aaf4b84a0729a3e42b5ab95ecebb6839, type: 3}
+  - {fileID: 919132149155446097, guid: 55cfad1eecd55d24596cb6c059560e83, type: 3}
+  - {fileID: 919132149155446097, guid: 446f0bdbc2045ba4c8c1b9f02682d886, type: 3}
+  - {fileID: 0}
+  extraModels: []
+  weaponReach: 1
+  showInMenu: 1
   prefab: {fileID: 0}
+  ease: 3
+  levelPerk: 0
   passiveColor: 3
   passiveCount: 1
   passiveName: "\uFF5E\uFF5E\uFF5E"

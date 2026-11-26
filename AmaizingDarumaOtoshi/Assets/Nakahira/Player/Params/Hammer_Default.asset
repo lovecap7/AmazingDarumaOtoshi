@@ -14,6 +14,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Nakahira.HammerParams
   SweepDuration: 0.25
   ShotDuration: 0.3
+  SweepEasePower: 1
+  SweepComboWindow: 0.45
+  SweepReturnTime: 0.15
   HitReachScale: 1.5
   ReturnAimMode: 0
   ReturnAimOffset: 0

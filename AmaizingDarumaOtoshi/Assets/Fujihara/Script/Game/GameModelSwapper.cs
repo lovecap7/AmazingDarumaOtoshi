@@ -63,8 +63,8 @@ public class GameModelSwapper : MonoBehaviour
             foreach (var p in match.Players)
             {
                 if (p == null) continue;
-                if (p.Character != null) SwapHead(p.Character.transform, p.CharacterData, false);
-                if (p.Ghost != null && settings.ghostUsesModelShape) SwapHead(p.Ghost.transform, p.CharacterData, true);
+                if (p.Character != null) SwapHead(p.Character.transform, p.CharacterData, false, p.Entry);
+                if (p.Ghost != null && settings.ghostUsesModelShape) SwapHead(p.Ghost.transform, p.CharacterData, true, p.Entry);
             }
 
         // 試合の管理が無い場面（ネット対戦のクライアント・テスト用のシーン）は、プレハブの名前からキャラを探す
@@ -77,13 +77,17 @@ public class GameModelSwapper : MonoBehaviour
     }
 
     // ---------------- 頭 ----------------
-    void SwapHead(Transform body, CharacterData data, bool ghost)
+    // entry：そのだるまのプレイヤー（分からなければ null ＝ いつもの木の色）。モデルはプレイヤーの色、鉢巻はチーム戦ならチームの色
+    void SwapHead(Transform body, CharacterData data, bool ghost, MatchSetup.Entry entry = null)
     {
         var id = body;
         if (doneHeads.Contains(id)) return;
         doneHeads.Add(id);
         if (data == null || data.model == null) data = FindByName(body.name);
-        if (data == null || !GameModelSettings.MeshOf(data.model, out var mesh, out var mat)) return;
+        if (data == null) return;
+        var color = entry != null ? GameModelSettings.CharacterColorOf(entry) : DarumaColor.Wood;
+        var band = GameModelSettings.HachimakiFor(entry != null ? GameModelSettings.BandColorOf(entry) : DarumaColor.Wood);
+        if (!GameModelSettings.MeshOf(data.ModelFor(color), out var mesh, out var mat)) return;
 
         Transform head = null;
         foreach (var t in body.GetComponentsInChildren<Transform>(true))
@@ -98,11 +102,11 @@ public class GameModelSwapper : MonoBehaviour
         if (fitted == null) return;
         mf.sharedMesh = fitted;
 
-        if (!ghost) SwapHammer(body, data);
+        if (!ghost) SwapHammer(body, data, data.HammerFor(color));
 
         if (!ghost)
         {
-            AttachExtras(body, head, mesh, target, data);
+            AttachExtras(body, head, mesh, target, data, band);
             if (mat != null) SetFirstMaterial(mr, mat);
             // ゲームは頭の色を _BaseColor で付けるが、モデルは画像に色があるので、この材質だけ白にしておく
             mr.SetPropertyBlock(white, 0);
@@ -114,11 +118,15 @@ public class GameModelSwapper : MonoBehaviour
     // ---------------- マント・アクセサリー ----------------
     // CharacterData.extraModels を、頭（Fit した頭のメッシュ）にぴったり重ねて付ける。
     // マント（Cape_ の骨があるもの）には CapeSway を付けて揺らし、必殺技の溜め中は大きくなびかせる
-    void AttachExtras(Transform body, Transform head, Mesh headMesh, Bounds target, CharacterData data)
+    // band：着ける鉢巻（null なら着けない）。マントと同じく、頭のモデルと同じ原点で作ってあるので同じように重ねる
+    void AttachExtras(Transform body, Transform head, Mesh headMesh, Bounds target, CharacterData data, GameObject band)
     {
-        if (data.extraModels == null || data.extraModels.Length == 0) return;
+        var list = new List<GameObject>();
+        if (data.extraModels != null) list.AddRange(data.extraModels);
+        if (band != null) list.Add(band);
+        if (list.Count == 0) return;
         if (!GameModelSettings.FitTransform(headMesh, target, settings.headYaw, out var rot, out float k, out var offset)) return;
-        foreach (var extra in data.extraModels)
+        foreach (var extra in list)
         {
             if (extra == null) continue;
             var go = Instantiate(extra, head, false);
@@ -127,6 +135,14 @@ public class GameModelSwapper : MonoBehaviour
             go.transform.localScale = Vector3.one * k;
             go.transform.localPosition = offset;
             foreach (var smr in go.GetComponentsInChildren<SkinnedMeshRenderer>(true)) smr.updateWhenOffscreen = true;
+
+            // 鉢巻：結び目のあとの余りを揺らす（必殺技の溜め中は、マントと同じく大きくなびく）
+            if (extra == band)
+            {
+                var ribbon = HachimakiRig.Make(go);
+                if (ribbon != null) go.AddComponent<CapeChargeFromSpecial>().Init(ribbon, body);
+                continue;
+            }
 
             bool hasCape = false;
             foreach (var t in go.GetComponentsInChildren<Transform>(true))
@@ -142,9 +158,10 @@ public class GameModelSwapper : MonoBehaviour
     // 元のハンマー：柄が +Z に 0〜1、頭の中心が z = 1.2、頭は縦（Y）向きで長さ 0.6
     const float GameHammerHeadZ = 1.2f;
 
-    void SwapHammer(Transform body, CharacterData data)
+    // hammerModel：持たせるハンマー（プレイヤーの色のもの）
+    void SwapHammer(Transform body, CharacterData data, GameObject hammerModel)
     {
-        if (data == null || data.hammerModel == null) return;
+        if (data == null || hammerModel == null) return;
         var hammer = body.GetComponentInChildren<DarumaHammer>(true);
         if (hammer == null) return;
 
@@ -158,7 +175,7 @@ public class GameModelSwapper : MonoBehaviour
             hammer.Params = p;
         }
         var pivot = hammer.transform;
-        var model = ToyKit.CreateHammerModel("HammerModelHead", data.hammerModel);
+        var model = ToyKit.CreateHammerModel("HammerModelHead", hammerModel);
         if (model == null) return;
 
         // 元の柄と頭は、メッシュを外して見えなくする（点滅で Renderer がまた有効になっても出ないように）
@@ -173,7 +190,7 @@ public class GameModelSwapper : MonoBehaviour
         model.localRotation = Quaternion.Euler(0f, 0f, 90f);   // 頭を X 向きから Y 向きへ
         float scale = GameHammerHeadZ / ToyKit.HammerLength;
         // 届く距離を変えた武器は、先の長さが「ふつうのハンマーの先 × 倍率」になるように大きさを合わせる
-        if (!Mathf.Approximately(reach, 1f) && GameModelSettings.MeshOf(data.hammerModel, out var wMesh, out _))
+        if (!Mathf.Approximately(reach, 1f) && GameModelSettings.MeshOf(hammerModel, out var wMesh, out _))
         {
             float normalTop = GameModelSettings.MeshOf(GameModelSettings.HammerModel, out var hMesh, out _) ? hMesh.bounds.max.y : ToyKit.HammerLength + 0.3f;
             scale *= reach * normalTop / Mathf.Max(wMesh.bounds.max.y, 0.01f);

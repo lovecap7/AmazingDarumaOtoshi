@@ -1,5 +1,9 @@
 using UnityEngine;
 
+// だるまの色（キャラのモデル・鉢巻の色違い）。Wood は色のついていない木（セレクト・ずかん・メニューなどのいつもの色）
+// 試合では 1P 赤・2P 青・3P 黄・4P 緑・CPU 白（GameModelSettings.CharacterColorOf）
+public enum DarumaColor { Wood, Red, Blue, Yellow, Green, White }
+
 // レベルで上がる、キャラごとの能力（パッシブ。2026-11-24 メンバー全員で決めた仕様）
 public enum LevelPerk
 {
@@ -29,8 +33,32 @@ public class CharacterData : ScriptableObject
     public Sprite portrait;
     [Tooltip("キャラの3Dモデル（Blender で作っただるま。足元が原点）。メニュー「Fujihara > キャラの顔写真を撮る」で、このモデルを撮って portrait に入れる")]
     public GameObject model;
+    [Tooltip("色違いのモデル（Model/Daruma/Colors/<色>/<id>/）。並びは DarumaColor（木・赤・青・黄・緑・白）。空の色は model を使う")]
+    public GameObject[] colorModels = new GameObject[6];
+
+    // その色のモデル（無ければいつもの model）
+    public GameObject ModelFor(DarumaColor c)
+    {
+        int i = (int)c;
+        return colorModels != null && i >= 0 && i < colorModels.Length && colorModels[i] != null ? colorModels[i] : model;
+    }
     [Tooltip("キャラのハンマーのモデル（Model/Hammer/hammer_<id>.fbx）。試合・タイトル・ムービーで、このキャラが持つハンマーになる（空なら共通のハンマー）")]
     public GameObject hammerModel;
+    [Tooltip("色違いのハンマー（Model/Hammer/Colors/<色>/）。並びは DarumaColor（木・赤・青・黄・緑・白）。試合ではプレイヤーの色のハンマーを持つ。" +
+             "その色が無ければ木、木も無ければ hammerModel")]
+    public GameObject[] hammerColorModels = new GameObject[6];
+
+    // その色のハンマー（無ければ木の色、それも無ければいつもの hammerModel）
+    public GameObject HammerFor(DarumaColor c)
+    {
+        int i = (int)c;
+        if (hammerColorModels != null)
+        {
+            if (i >= 0 && i < hammerColorModels.Length && hammerColorModels[i] != null) return hammerColorModels[i];
+            if (hammerColorModels.Length > 0 && hammerColorModels[0] != null) return hammerColorModels[0];
+        }
+        return hammerModel;
+    }
     [Tooltip("頭と一緒に付けるモデル（マント・アクセサリーなど。頭のモデルと同じ原点・大きさで書き出したもの）。試合の頭と顔写真に付く。" +
              "骨の名前が Cape_ で始まるモデル（マント）は、試合で CapeSway で揺れる")]
     public GameObject[] extraModels;

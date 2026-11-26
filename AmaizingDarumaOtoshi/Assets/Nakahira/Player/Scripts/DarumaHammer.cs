@@ -47,6 +47,9 @@ namespace Nakahira
     // ハンマー。このコンポーネントが付いたTransformを回転の支点として振る
     // 子に「前方(+Z)へ伸びる」ハンマーの見た目を置く
     //  ・薙ぎ払い     : 前方を右から左へ水平に振る。ハンマーが対象の位置を通過した瞬間に当たり、その角度へ飛ばす
+    //                   出だしはゆっくり(タメ)で、振り抜くほど速くなる(HammerParams.SweepEasePower)
+    //                   振り始めから SweepComboWindow 秒の間に押し直すと、振り終わったあと左から右へ切り返す(何回でも往復する)
+    //                   押さなければ振り終わりの位置で待ち、受付が終わると待機の位置へ戻る(待っている間は動ける)
     //                   飛んできた積み木は、既定では向いている向きへ打ち返す(HammerParams.ReturnAimMode で
     //                   「先端で捉える(早振り)と左へ、根元で捉える(振り遅れ)と右へずれる」従来の打ち方に切り替えられる)
     //  ・股抜きショット: 後ろから振り下ろし、自分の最下段を向いている方向へ打ち出す(生存キャラクターのみ)
@@ -83,7 +86,8 @@ namespace Nakahira
         [SerializeField] float m_shotEndPitch = 30.0f;    // 前下
         [SerializeField] float m_shotHitPitch = 90.0f;    // 真下(最下段に当たる角度)
 
-        enum Action { None, Sweep, Shot }
+        // SweepHold: 振り終わりの位置で切り返しを待つ / SweepReturn: 待機の位置へ戻る(どちらも動作中ではない)
+        enum Action { None, Sweep, Shot, SweepHold, SweepReturn }
 
         IDarumaAttacker m_owner;
         Transform m_root;              // 持ち主のTransform
@@ -93,6 +97,10 @@ namespace Nakahira
         float m_time;
         float m_prevSweepYaw;          // 前のステップでのハンマーの角度
         bool m_shotFired;
+        bool m_reverse;                // 今の(最後の)薙ぎ払いが左から右への切り返しか
+        bool m_comboQueued;            // 振っている間に次の横振りが押された
+        float m_returnTime;            // 待機の位置へ戻り始めてからの時間
+        int m_sweepCount;
         readonly HashSet<Object> m_hitThisSwing = new HashSet<Object>();
         // 空中で振ると調べる範囲が縦に伸びるので、床・壁で埋まらないように多めに持つ
         readonly Collider[] m_overlaps = new Collider[64];
@@ -104,7 +112,7 @@ namespace Nakahira
         // 股抜きショットで積み木を打ち出した(演出用。Target は打ち出した積み木、Point は打ち出した位置)
         public static event System.Action<HammerHitInfo> ShotFired;
 
-        public bool IsBusy => m_action != Action.None;
+        public bool IsBusy => m_action == Action.Sweep || m_action == Action.Shot;
         // このハンマーの性能。キャラクターのパッシブが、実行時に複製へ差し替えるために使う
         public HammerParams Params { get => m_params; set => m_params = value; }
         // 当たり判定が届く距離(見た目のハンマーの長さ × 倍率)
@@ -134,6 +142,24 @@ namespace Nakahira
         // 薙ぎ払いで振り始める角度・振り終わる角度(度。持ち主の正面から、右が +)
         public float SweepStartYaw => m_sweepStartYaw;
         public float SweepEndYaw => m_sweepEndYaw;
+        // 今の(最後の)薙ぎ払いが、左から右への切り返しか
+        public bool IsReverseSweep => m_reverse;
+        // 今、横振りを押したら切り返し(左から右)になるか(振り終わりの位置で待っているとき)
+        public bool NextSweepIsReverse => m_action == Action.SweepHold && !m_reverse;
+        // 薙ぎ払いを始めた回数(切り返しも 1 回と数える。新しい振りを見分ける用)
+        public int SweepCount => m_sweepCount;
+        // 今のハンマーの角度(度。持ち主の正面から、右が +。薙ぎ払い中・切り返しを待っている間)
+        public float SweepYaw => m_action == Action.SweepHold || m_action == Action.SweepReturn ? SweepToYaw : CurrentSweepYaw();
+        // 薙ぎ払いを振り始めてから、ハンマーがこの角度を通るまでの時間(秒)。reverse は切り返し(左から右)
+        public float SweepTimeAtYaw(float yaw, bool reverse = false)
+        {
+            float from = reverse ? m_sweepEndYaw : m_sweepStartYaw;
+            float to = reverse ? m_sweepStartYaw : m_sweepEndYaw;
+            float f = Mathf.Clamp01((yaw - from) / (to - from));
+            return m_params.SweepDuration * Mathf.Pow(f, 1.0f / Mathf.Max(1.0f, m_params.SweepEasePower));
+        }
+        // 今振っている薙ぎ払いが、この角度を通るとき(振り始めからの秒数。ActionTime と比べる)
+        public float CurrentSweepTimeAtYaw(float yaw) => SweepTimeAtYaw(yaw, m_reverse);
         // 股抜きショットを振り始めてから弾が出るまでの間(持ち主は向きを変えて狙いを調整できる)
         public bool IsAimingShot => m_action == Action.Shot && !m_shotFired;
 
@@ -149,23 +175,50 @@ namespace Nakahira
         public bool ViewOnly { get; set; }
 
         // ネット対戦のクライアント用: ホストで始まった動作の見た目を最初から再生する
-        public void PlayVisual(bool shot)
+        // reverse: 左から右への切り返し(IsReverseSweep)
+        public void PlayVisual(bool shot, bool reverse = false)
         {
-            m_action = shot ? Action.Shot : Action.Sweep;
+            if (!shot)
+            {
+                StartSweep(reverse);
+                return;
+            }
+            m_action = Action.Shot;
             m_time = 0.0f;
-            m_prevSweepYaw = m_sweepStartYaw;
             m_shotFired = false;
             m_hitThisSwing.Clear();
         }
 
+        // 振っている途中なら、振り終わってから切り返す(振り始めから SweepComboWindow 秒まで受け付ける)
+        // 振り終わりの位置で待っているなら、すぐに切り返す
         public bool TrySweep()
         {
-            if (IsBusy) return false;
+            switch (m_action)
+            {
+                case Action.Shot:
+                    return false;
+                case Action.Sweep:
+                    if (m_time > m_params.SweepComboWindow) return false;
+                    m_comboQueued = true;
+                    return true;
+                case Action.SweepHold:
+                    StartSweep(!m_reverse);
+                    return true;
+                default:
+                    StartSweep(false);
+                    return true;
+            }
+        }
+
+        private void StartSweep(bool reverse)
+        {
             m_action = Action.Sweep;
             m_time = 0.0f;
-            m_prevSweepYaw = m_sweepStartYaw;
+            m_reverse = reverse;
+            m_comboQueued = false;
+            m_prevSweepYaw = SweepFromYaw;
             m_hitThisSwing.Clear();
-            return true;
+            m_sweepCount++;
         }
 
         public bool TryShot()
@@ -184,7 +237,8 @@ namespace Nakahira
             if (m_action == Action.None) return;
 
             // 持ち主がヒットストップ中ならハンマーもスローになる
-            m_time += Time.fixedDeltaTime * m_owner.LocalTimeScale;
+            float dt = Time.fixedDeltaTime * m_owner.LocalTimeScale;
+            m_time += dt;
 
             if (m_action == Action.Sweep)
             {
@@ -193,8 +247,24 @@ namespace Nakahira
                 {
                     // 当たった対象が0なら空振り。見た目だけの再生(ネットのクライアント)では数えない
                     if (!ViewOnly) SweepFinished?.Invoke(new HammerSweepInfo(this, m_owner, m_hitThisSwing.Count));
-                    m_action = Action.None;
+                    // 振り終わりの位置で切り返しを待つ(押してあった分は次のステップで切り返す。
+                    // 1 ステップだけ動作中でなくなるので、振り始めを見ている効果音などが 2 回目以降も気づける)
+                    m_action = Action.SweepHold;
                 }
+            }
+            else if (m_action == Action.SweepHold)
+            {
+                if (m_comboQueued) StartSweep(!m_reverse);
+                else if (m_time > m_params.SweepComboWindow)
+                {
+                    m_action = Action.SweepReturn;
+                    m_returnTime = 0.0f;
+                }
+            }
+            else if (m_action == Action.SweepReturn)
+            {
+                m_returnTime += dt;
+                if (m_returnTime >= m_params.SweepReturnTime) m_action = Action.None;
             }
             else if (m_action == Action.Shot)
             {
@@ -207,9 +277,14 @@ namespace Nakahira
             }
         }
 
+        // 持ち主の体の見た目の動き(DarumaMotion・DarumaGhostMotion)。支点の位置に体の揺れを足す(傾けない)
+        // 見た目だけ(当たり判定は持ち主の位置から計算しているので変わらない)。null なら揺らさない
+        public IDarumaBodyMotion BodyMotion { get; set; }
+
         private void Update()
         {
             GetPose(out Vector3 pos, out Quaternion rot);
+            if (BodyMotion != null) pos += BodyMotion.GetOffset(pos.y);
             transform.localPosition = pos;
             transform.localRotation = rot;
             UpdateTrail();
@@ -249,9 +324,20 @@ namespace Nakahira
             switch (m_action)
             {
                 case Action.Sweep:
-                    pos = new Vector3(0.0f, m_sweepHeight, 0.0f);
-                    rot = Quaternion.Euler(0.0f, CurrentSweepYaw(), 0.0f) * Quaternion.Euler(0.0f, 0.0f, m_sweepRoll);
+                    SweepPose(CurrentSweepYaw(), out pos, out rot);
                     break;
+                case Action.SweepHold:
+                    SweepPose(SweepToYaw, out pos, out rot);
+                    break;
+                case Action.SweepReturn:
+                {
+                    // 振り終わりの位置から待機の位置へ、なめらかに戻す
+                    SweepPose(SweepToYaw, out Vector3 from, out Quaternion fromRot);
+                    float t = m_params.SweepReturnTime > 0.0f ? Mathf.SmoothStep(0.0f, 1.0f, m_returnTime / m_params.SweepReturnTime) : 1.0f;
+                    pos = Vector3.Lerp(from, m_idlePosition, t);
+                    rot = Quaternion.Slerp(fromRot, Quaternion.Euler(m_idleEuler), t);
+                    break;
+                }
                 case Action.Shot:
                     // 頭が真下に来たときに最下段の高さになるよう支点を上げる
                     pos = new Vector3(0.0f, m_sweepHeight + m_armLength, 0.0f);
@@ -264,9 +350,22 @@ namespace Nakahira
             }
         }
 
+        private void SweepPose(float yaw, out Vector3 pos, out Quaternion rot)
+        {
+            pos = new Vector3(0.0f, m_sweepHeight, 0.0f);
+            // 頭の長い向きを振る面にそろえる(切り返しでも同じひねりのまま。逆にすると切り返しの瞬間に頭がくるっと回る)
+            rot = Quaternion.Euler(0.0f, yaw, 0.0f) * Quaternion.Euler(0.0f, 0.0f, m_sweepRoll);
+        }
+
+        // 今の薙ぎ払いの振り始め・振り終わりの角度(切り返しは左から右)
+        private float SweepFromYaw => m_reverse ? m_sweepEndYaw : m_sweepStartYaw;
+        private float SweepToYaw => m_reverse ? m_sweepStartYaw : m_sweepEndYaw;
+
+        // 出だしはゆっくり、振り抜くほど速い(進み具合 = 時間の割合 ^ SweepEasePower)
         private float CurrentSweepYaw()
         {
-            return Mathf.Lerp(m_sweepStartYaw, m_sweepEndYaw, Mathf.Clamp01(m_time / m_params.SweepDuration));
+            float p = Mathf.Clamp01(m_time / m_params.SweepDuration);
+            return Mathf.Lerp(SweepFromYaw, SweepToYaw, Mathf.Pow(p, Mathf.Max(1.0f, m_params.SweepEasePower)));
         }
 
         private float CurrentShotPitch()
@@ -342,9 +441,11 @@ namespace Nakahira
             if (heightDiff > m_hitHeightRange || heightDiff < -m_hitHeightRange - AirHitDepth) return false;
             if (dist > HitReach + targetRadius) return false;
 
-            // ハンマーの太さの分だけ角度に余裕を持たせる
+            // ハンマーの太さの分だけ角度に余裕を持たせる(切り返しは角度が増える向きに通る)
             float pad = Mathf.Atan2(m_hammerHalfWidth, Mathf.Max(dist, 0.01f)) * Mathf.Rad2Deg;
-            return bearing >= yaw - pad && bearing <= prevYaw + pad;
+            float lo = Mathf.Min(yaw, prevYaw);
+            float hi = Mathf.Max(yaw, prevYaw);
+            return bearing >= lo - pad && bearing <= hi + pad;
         }
 
         private void HitBlock(TumikiBlock block, float bearing, float dist)
@@ -396,11 +497,12 @@ namespace Nakahira
             {
                 case HammerParams.ReturnAim.HammerAngle:
                 {
-                    // ハンマーの先端で捉える(早振り)ほど左へ引っ張り、根元(振り遅れ)ほど右へ流す
+                    // ハンマーの先端で捉える(早振り)ほど振る向きへ引っ張り、根元(振り遅れ)ほど逆へ流す
                     float near = DarumaCharacter.kBodyRadius + TumikiBlock.kRadius;
                     float far = HitReach + TumikiBlock.kRadius;
                     float t = Mathf.InverseLerp(near, far, dist);
-                    return bearing + Mathf.Lerp(m_returnSpreadAngle, -m_returnSpreadAngle, t);
+                    float spread = m_reverse ? -m_returnSpreadAngle : m_returnSpreadAngle;
+                    return bearing + Mathf.Lerp(spread, -spread, t);
                 }
                 default:
                     // ハンマーのどこで捉えても、向いている向きへ

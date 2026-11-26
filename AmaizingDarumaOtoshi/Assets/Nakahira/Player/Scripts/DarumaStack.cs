@@ -98,22 +98,89 @@ namespace Nakahira
             return n;
         }
 
+        // 体の見た目の動き(DarumaMotion)。段・頭の本来の位置に、この揺れを足して置く(見た目だけ)。null なら揺らさない
+        public IDarumaBodyMotion Motion { get; set; }
+
+        // 段・頭ごとの「本来の位置・回転」(揺れを足す前)と、最後に足した揺れ・傾き、最後に置いた位置・回転
+        struct Slot
+        {
+            public Vector3 Rest;
+            public Vector3 Written;
+            public Vector3 Offset;
+            public Quaternion RestRotation;
+            public Quaternion WrittenRotation;
+            public Quaternion Tilt;
+        }
+        readonly Dictionary<Transform, Slot> m_slots = new Dictionary<Transform, Slot>();
+        readonly List<Transform> m_slotRemoved = new List<Transform>();
+        readonly HashSet<Transform> m_slotUsed = new HashSet<Transform>();
+
         private void LateUpdate()
         {
             float step = m_fallSpeed * Time.deltaTime;
+            m_slotUsed.Clear();
             for (int i = 0; i < m_blocks.Count; i++)
             {
                 Transform t = m_blocks[i].transform;
                 Vector3 target = new Vector3(0.0f, TumikiBlock.kHeight * (i + 0.5f), 0.0f);
-                t.localPosition = Vector3.MoveTowards(t.localPosition, target, step);
-                t.localRotation = Quaternion.identity;
+                Place(t, target, step);
             }
 
             if (m_head != null)
             {
                 Vector3 headTarget = new Vector3(0.0f, m_blocks.Count * TumikiBlock.kHeight + m_headRadius, 0.0f);
-                m_head.localPosition = Vector3.MoveTowards(m_head.localPosition, headTarget, step);
+                Place(m_head, headTarget, step, true);
             }
+
+            // 段から外れた積み木の記録を消す
+            if (m_slots.Count > m_slotUsed.Count)
+            {
+                m_slotRemoved.Clear();
+                foreach (var key in m_slots.Keys) if (!m_slotUsed.Contains(key)) m_slotRemoved.Add(key);
+                foreach (var key in m_slotRemoved) m_slots.Remove(key);
+            }
+        }
+
+        // 本来の位置を target へ寄せ、揺れを足して置く
+        // 外から位置を変えられていたら(拾ったときの KeepVisualsInPlace など)、そこを本来の位置として続ける
+        // 揺れがないとき(Motion が null)は前と同じ置き方になる
+        private void Place(Transform t, Vector3 target, float step, bool isHead = false)
+        {
+            m_slotUsed.Add(t);
+            Vector3 current = t.localPosition;
+            bool known = m_slots.TryGetValue(t, out Slot slot);
+            if (!known || slot.Written != current)
+            {
+                // 外から動かされた分はそのまま本来の位置へ移す(前に足した揺れだけを引く)
+                slot.Rest = current - (known ? slot.Offset : Vector3.zero);
+            }
+            slot.Rest = Vector3.MoveTowards(slot.Rest, target, step);
+
+            // 揺れ(平行なずれ)と、ジャンプでのけぞる傾き
+            Vector3 offset = Motion != null ? Motion.GetOffset(slot.Rest.y) : Vector3.zero;
+            Quaternion tilt = Motion != null ? Motion.GetTilt(slot.Rest.y) : Quaternion.identity;
+
+            t.localPosition = slot.Rest + offset;
+            if (isHead)
+            {
+                // 頭の回転はほかの仕組みが変えることがあるので、外から変えられていたらそれを本来の回転にして、傾きを外側に掛ける
+                Quaternion currentRotation = t.localRotation;
+                if (!known || slot.WrittenRotation != currentRotation)
+                {
+                    slot.RestRotation = Quaternion.Inverse(known ? slot.Tilt : Quaternion.identity) * currentRotation;
+                }
+                t.localRotation = tilt * slot.RestRotation;
+                slot.WrittenRotation = t.localRotation;
+            }
+            else
+            {
+                // 段は前と同じく、まっすぐに直す(のけぞっている間だけ傾ける)
+                t.localRotation = tilt;
+            }
+            slot.Written = t.localPosition;
+            slot.Offset = offset;
+            slot.Tilt = tilt;
+            m_slots[t] = slot;
         }
     }
 }

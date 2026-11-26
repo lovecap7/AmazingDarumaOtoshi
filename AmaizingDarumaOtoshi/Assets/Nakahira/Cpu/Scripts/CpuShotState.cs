@@ -389,7 +389,7 @@ namespace Nakahira
 
                 // 弾いた積み木が飛ぶ線(積み木から、自分から見た積み木の方向へ)の上を、相手が通るか
                 Vector3 dir = rel / dist;
-                float cross = Mathf.Clamp01((hammer.SweepStartYaw - bearing) / (hammer.SweepStartYaw - hammer.SweepEndYaw)) * hammer.SweepDuration;
+                float cross = hammer.SweepTimeAtYaw(bearing, hammer.NextSweepIsReverse);
                 Vector3 target = o.Position;
                 for (int i = 0; i < 2; i++)
                 {

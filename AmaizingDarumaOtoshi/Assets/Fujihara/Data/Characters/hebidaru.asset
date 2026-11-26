@@ -16,8 +16,22 @@ MonoBehaviour:
   displayName: "\u3078\u3073\u3060\u308B"
   color: {r: 0.42, g: 0.75, b: 0.27, a: 1}
   portrait: {fileID: -6082668426197136557, guid: 52a6346556bdc7748881ba01cd3746df, type: 3}
-  model: {fileID: 919132149155446097, guid: 05f4fe4b9a40e2b48a7a1213093190b8, type: 3}
-  hammerModel: {fileID: 919132149155446097, guid: 192594f6dff27ab4698f1ef2aaa36616, type: 3}
+  model: {fileID: 919132149155446097, guid: 54f29b052a859e64eb4c02e29aabd41e, type: 3}
+  colorModels:
+  - {fileID: 919132149155446097, guid: 54f29b052a859e64eb4c02e29aabd41e, type: 3}
+  - {fileID: 919132149155446097, guid: f9f0750a339809b4e8e32c47ba95b01b, type: 3}
+  - {fileID: 919132149155446097, guid: 443ed080bee9a2b4e9de9e067172a9ae, type: 3}
+  - {fileID: 919132149155446097, guid: 2a71032768789884585767ca0f8d5d2c, type: 3}
+  - {fileID: 919132149155446097, guid: 3d371b320de192d45bd5176d6cbf2d2d, type: 3}
+  - {fileID: 919132149155446097, guid: b5fa683263b9b4c41a9f9eb6fbe916d5, type: 3}
+  hammerModel: {fileID: 919132149155446097, guid: 39cdfe2578df930498150ad8970cbcac, type: 3}
+  hammerColorModels:
+  - {fileID: 919132149155446097, guid: 39cdfe2578df930498150ad8970cbcac, type: 3}
+  - {fileID: 919132149155446097, guid: d3e7dd996c8101940830d28fac6becf9, type: 3}
+  - {fileID: 919132149155446097, guid: ba984049fd75da649892f8704be8dd5b, type: 3}
+  - {fileID: 919132149155446097, guid: e183e1399c149824aaa3c96e8fec15e8, type: 3}
+  - {fileID: 919132149155446097, guid: b58be2ef7a714f64581b2e24f9bff8e2, type: 3}
+  - {fileID: 0}
   extraModels: []
   weaponReach: 1
   showInMenu: 1

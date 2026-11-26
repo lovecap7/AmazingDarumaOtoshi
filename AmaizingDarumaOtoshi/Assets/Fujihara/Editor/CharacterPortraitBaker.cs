@@ -28,7 +28,7 @@ public static class CharacterPortraitBaker
             if (c == null || c.model == null) continue;
             string id = string.IsNullOrEmpty(c.id) ? c.name : c.id;
             string path = $"{OutFolder}/{id}.png";
-            File.WriteAllBytes(path, Render(c.model, c.extraModels));
+            File.WriteAllBytes(path, Render(c.model, ExtrasOf(c)));
             AssetDatabase.ImportAsset(path);
             var imp = (TextureImporter)AssetImporter.GetAtPath(path);
             imp.textureType = TextureImporterType.Sprite;
@@ -43,6 +43,16 @@ public static class CharacterPortraitBaker
         }
         AssetDatabase.SaveAssets();
         Debug.Log($"[CharacterPortraitBaker] {count} キャラの顔写真を撮りました（{OutFolder}）");
+    }
+
+    // 頭と一緒に写すもの：マントなど（extraModels）と、いつもの鉢巻
+    public static GameObject[] ExtrasOf(CharacterData c)
+    {
+        var list = new System.Collections.Generic.List<GameObject>();
+        if (c.extraModels != null) list.AddRange(c.extraModels);
+        var band = GameModelSettings.HachimakiFor(DarumaColor.Wood);
+        if (band != null) list.Add(band);
+        return list.ToArray();
     }
 
     // extras：頭と一緒に写すモデル（マント・アクセサリー。頭と同じ原点で作ったもの）
