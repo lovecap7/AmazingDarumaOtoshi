@@ -452,6 +452,18 @@ namespace Nakahira
         {
             m_hitStop.Begin(duration, timeScale, shake);
         }
+        // ヒットストップ中か
+        public bool IsInHitStop => m_hitStop != null && m_hitStop.IsActive;
+
+        // 飛んでいる速度を、今のヒットストップの倍率にすぐ合わせる(高さ方向はそのまま)
+        // Launch は全速の速度を入れるので、そのままだと弾いたステップだけ全速で進んでしまう(ハンマーから離れて止まって見える)
+        public void SyncFlyingVelocity()
+        {
+            if (CurrentState != State.Flying || m_rb.isKinematic) return;
+            Vector3 v = Direction * (Speed * m_hitStop.TimeScale);
+            v.y = m_rb.linearVelocity.y;
+            m_rb.linearVelocity = v;
+        }
 
         public void SetColor(TumikiColor color)
         {

@@ -107,6 +107,9 @@ namespace Nakahira
         bool m_snapped;
         float m_snapYaw;
         float m_snapProgress;
+        // はじき返した積み木。ヒットストップの間は、ハンマーがこの積み木を押していくように追いかける
+        TumikiBlock m_snapBlock;
+        float m_snapTouch;
         readonly HashSet<Object> m_hitThisSwing = new HashSet<Object>();
         // 空中で振ると調べる範囲が縦に伸びるので、床・壁で埋まらないように多めに持つ
         readonly Collider[] m_overlaps = new Collider[64];
@@ -228,6 +231,7 @@ namespace Nakahira
             m_comboQueued = false;
             m_prevSweepYaw = SweepFromYaw;
             m_snapped = false;
+            m_snapBlock = null;
             m_hitThisSwing.Clear();
             m_sweepCount++;
         }
@@ -253,6 +257,7 @@ namespace Nakahira
 
             if (m_action == Action.Sweep)
             {
+                FollowSnapBlock();
                 if (!ViewOnly) DetectSweepHits();
                 if (m_time >= m_params.SweepDuration)
                 {
@@ -374,9 +379,12 @@ namespace Nakahira
 
         // 出だしはゆっくり、振り抜くほど速い(進み具合 = 時間の割合 ^ SweepEasePower)
         // はじき返しアシストでハンマーを移したあとは、移した角度から振り終わりへ、残りの時間で同じ速さの変わり方で振る
-        private float CurrentSweepYaw()
+        private float CurrentSweepYaw() => SweepYawAt(m_time);
+
+        // 振り始めから time 秒のハンマーの角度(今の振りのまま進んだとき)
+        private float SweepYawAt(float time)
         {
-            float progress = SweepProgress();
+            float progress = SweepProgress(time);
             if (!m_snapped) return Mathf.Lerp(SweepFromYaw, SweepToYaw, progress);
             float rest = 1.0f - m_snapProgress;
             float q = rest > 1e-4f ? Mathf.Clamp01((progress - m_snapProgress) / rest) : 1.0f;
@@ -384,9 +392,11 @@ namespace Nakahira
         }
 
         // 振り始めからの進み具合(0〜1。出だしがゆっくり)
-        private float SweepProgress()
+        private float SweepProgress() => SweepProgress(m_time);
+
+        private float SweepProgress(float time)
         {
-            float p = Mathf.Clamp01(m_time / m_params.SweepDuration);
+            float p = Mathf.Clamp01(time / m_params.SweepDuration);
             return Mathf.Pow(p, Mathf.Max(1.0f, m_params.SweepEasePower));
         }
 
@@ -493,12 +503,14 @@ namespace Nakahira
             if (heightDiff > m_hitHeightRange || heightDiff < -m_hitHeightRange - AirHitDepth) return false;
             if (dist > HitReach + TumikiBlock.kRadius) return false;
 
-            // これから通過する角度の範囲(今の角度から振り終わりまで)に入っているか
+            // もうすぐ通過する角度の範囲(今の角度から BodyHitReturnGrace 秒後の角度まで)に入っているか
             // (ふだんは右から左で角度が減っていく。切り返しは左から右で角度が増えていく)
+            // 振り終わりまで全部にすると、出だしがゆっくりな振りでは連打でほぼ必ず打ち返せてしまうので、直前だけにする
             float pad = Mathf.Atan2(m_hammerHalfWidth, Mathf.Max(dist, 0.01f)) * Mathf.Rad2Deg;
             float yaw = CurrentSweepYaw();
-            float lo = Mathf.Min(yaw, SweepToYaw);
-            float hi = Mathf.Max(yaw, SweepToYaw);
+            float soon = SweepYawAt(m_time + m_params.BodyHitReturnGrace);
+            float lo = Mathf.Min(yaw, soon);
+            float hi = Mathf.Max(yaw, soon);
             if (bearing < lo - pad || bearing > hi + pad) return false;
 
             m_hitThisSwing.Add(block);
@@ -507,7 +519,8 @@ namespace Nakahira
         }
 
         // はじき返しアシストを使うか(幽霊のハンマーは HammerParams でオフにしてある)
-        private bool UseDeflectAssist => m_params.DeflectAssist;
+        // 効くのは振り始めから DeflectAssistTime 秒まで(連打で受付が途切れないことがないように)
+        private bool UseDeflectAssist => m_params.DeflectAssist && m_time <= m_params.DeflectAssistTime;
 
         // 攻撃判定のある積み木が、振る軌道の扇形(振り始め〜振り終わり。届く距離・高さは今と同じ)に入っていれば、
         // ハンマーをその角度へ移してはじき返す。はじき返したら true
@@ -525,15 +538,59 @@ namespace Nakahira
             float hi = Mathf.Max(m_sweepStartYaw, m_sweepEndYaw);
             if (bearing < lo - pad || bearing > hi + pad) return false;
 
-            // ハンマーをはじき返した角度へ移し、そこから振り抜く(ヒットストップ中はほぼこの角度で止まって見える)
-            m_snapYaw = Mathf.Clamp(bearing, lo, hi);
+            // 当たり判定は見た目のハンマーより遠くまで届くので、積み木をハンマーの頭の届く距離まで寄せる
+            // (速い積み木ほど判定の外側で止まり、ハンマーから離れた所でヒットストップして見えるため)
+            float minDist = DarumaCharacter.kBodyRadius + TumikiBlock.kRadius;
+            float contactDist = Mathf.Clamp(dist, minDist, Mathf.Max(minDist, m_armLength));
+            if (!Mathf.Approximately(contactDist, dist)) MoveBlockTo(block, bearing, contactDist, local.y);
+
+            // ハンマーを、頭の面が積み木に触れる角度(振ってきた側へ、頭の半分の太さ + 積み木の半径だけずらす)へ移し、
+            // そこから振り抜く(ヒットストップ中はほぼこの角度で止まって見える)
+            float side = Mathf.Sign(SweepToYaw - SweepFromYaw);
+            float touch = Mathf.Atan2(m_hammerHalfWidth + TumikiBlock.kRadius, contactDist) * Mathf.Rad2Deg;
+            m_snapYaw = Mathf.Clamp(bearing - side * touch, lo, hi);
             m_snapProgress = SweepProgress();
             m_snapped = true;
             m_prevSweepYaw = m_snapYaw;
+            m_snapBlock = block;
+            m_snapTouch = touch;
 
             m_hitThisSwing.Add(block);
-            HitBlock(block, bearing, dist);
+            HitBlock(block, bearing, contactDist);
             return true;
+        }
+
+        // はじき返した積み木がヒットストップ中なら、頭の面が触れたまま押していく角度へハンマーを進める
+        // (積み木はスローで打ち返す向きへ進むので、止まったままだとハンマーにめり込んで見える)
+        // 動かしたら、その角度・今の進み具合から振り抜き直す
+        private void FollowSnapBlock()
+        {
+            if (m_snapBlock == null) return;
+            if (!m_snapBlock.IsInHitStop || m_snapBlock.CurrentState != TumikiBlock.State.Flying)
+            {
+                m_snapBlock = null;
+                return;
+            }
+            Vector3 local = m_root.InverseTransformPoint(m_snapBlock.transform.position);
+            float bearing = Mathf.Atan2(local.x, local.z) * Mathf.Rad2Deg;
+            float side = Mathf.Sign(SweepToYaw - SweepFromYaw);
+            float target = bearing - side * m_snapTouch;
+            // 打ち返す向きによっては、積み木はハンマーが来た側へ進むので、どちら向きにも付いていく(軌道の外へは出さない)
+            float lo = Mathf.Min(m_sweepStartYaw, m_sweepEndYaw);
+            float hi = Mathf.Max(m_sweepStartYaw, m_sweepEndYaw);
+            m_snapYaw = Mathf.Clamp(target, lo, hi);
+            m_snapProgress = SweepProgress();
+        }
+
+        // 積み木を、持ち主から見て bearing の向き・水平の距離 dist の所へ移す(高さ localY はそのまま)。壁の中には入れない
+        private void MoveBlockTo(TumikiBlock block, float bearing, float dist, float localY)
+        {
+            Vector3 origin = m_root.TransformPoint(new Vector3(0.0f, localY, 0.0f));
+            float rad = bearing * Mathf.Deg2Rad;
+            Vector3 pos = m_root.TransformPoint(new Vector3(Mathf.Sin(rad) * dist, localY, Mathf.Cos(rad) * dist));
+            Nakagawa.TumikiPlacement.ResolveEmbed(origin, ref pos);
+            block.transform.position = pos;
+            if (block.Rigidbody != null) block.Rigidbody.position = pos;
         }
 
         private void HitBlock(TumikiBlock block, float bearing, float dist)
@@ -562,6 +619,8 @@ namespace Nakahira
             if (returnCount > 0) block.ExtendIgnore(m_params.ReturnImmunityTime);
             if (returnCount > 0) BeginReturnHoming(block, shooter);
             BeginHitStop(block, null, returnCount);
+            // 弾いたステップから、すぐにスローの速さにする(ハンマーに触れた位置で止まって見えるように)
+            block.SyncFlyingVelocity();
             Hit?.Invoke(new HammerHitInfo(this, m_owner, block, block.transform.position, false, returnCount));
         }
 

@@ -19,6 +19,8 @@ MonoBehaviour:
   SweepReturnTime: 0.15
   HitReachScale: 1.5
   DeflectAssist: 0
+  DeflectAssistTime: 0.08
+  BodyHitReturnGrace: 0.04
   ReturnAimMode: 0
   ReturnAimOffset: 0
   ReturnImmunityTime: 0.5
