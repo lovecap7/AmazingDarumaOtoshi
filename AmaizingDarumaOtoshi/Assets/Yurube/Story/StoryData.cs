@@ -30,6 +30,78 @@ namespace Yurube.Story
         public string se;
         // 演出キュー（例：tower_collapse / blackout / keep_blackout / lights_on_hammer）。空なら何もしない
         public string cue;
+        // 2択の選択肢（会話の途中に差し込む汎用ブロック）。null または options が空なら通常の行として扱う
+        public StoryChoice choice;
+
+        public bool HasChoice => choice != null && choice.options != null && choice.options.Count > 0;
+    }
+
+    // 選択肢の反応として流す1行（JsonUtility の自己参照制限を避けるため StoryLine と別型にする）
+    [Serializable]
+    public class StoryChoiceLine
+    {
+        public string speaker;
+        public string text;
+        public bool direction;
+        public string eventId;
+        public string portrait;
+        public string scene;
+        public string expression;
+        public string shot;
+        public string se;
+        public string cue;
+
+        public StoryLine ToStoryLine()
+        {
+            return new StoryLine
+            {
+                speaker = speaker,
+                text = text,
+                direction = direction,
+                eventId = eventId,
+                portrait = portrait,
+                scene = scene,
+                expression = expression,
+                shot = shot,
+                se = se,
+                cue = cue,
+            };
+        }
+    }
+
+    // 2択の選択肢1つ分
+    [Serializable]
+    public class StoryChoiceOption
+    {
+        public string text;         // 選択肢に表示する台詞
+        public string branchId;     // 分岐識別子（任意。最終章の分岐などで使う）
+        public List<StoryChoiceLine> reaction = new List<StoryChoiceLine>();
+    }
+
+    // 会話中に差し込む2択データ
+    [Serializable]
+    public class StoryChoice
+    {
+        public string id;           // 選択の識別子（例：ch1_taunt）
+        public string speaker;      // 選択後に表示する話者ID（空なら章の playerCharacter）
+        public List<StoryChoiceOption> options = new List<StoryChoiceOption>();
+    }
+
+    // 選択結果（呼び出し元へコールバック等で渡す用。セーブはしない）
+    public readonly struct StoryChoiceResult
+    {
+        public readonly string ChoiceId;
+        public readonly int OptionIndex;
+        public readonly string BranchId;
+        public readonly string Text;
+
+        public StoryChoiceResult(string choiceId, int optionIndex, string branchId, string text)
+        {
+            ChoiceId = choiceId;
+            OptionIndex = optionIndex;
+            BranchId = branchId;
+            Text = text;
+        }
     }
 
     [Serializable]
@@ -219,6 +291,8 @@ namespace Yurube.Story
         public bool cpuTauntOnShot;
         // 初回だけ出す掛け合い（黄色い積み木を積んで増えたとき）
         public List<StoryLine> yellowExtra = new List<StoryLine>();
+        // 初回だけ出す掛け合い（プレイヤーが初めて攻撃したとき）
+        public List<StoryLine> playerAttackFirst = new List<StoryLine>();
         // 対戦開始（GO!の直後）に小窓で出す掛け合い（最終章。初回だけ）
         public List<StoryLine> startLines = new List<StoryLine>();
         // そのキャラが脱落したときの台詞（最終章。初回だけ・キャラごとに1回）

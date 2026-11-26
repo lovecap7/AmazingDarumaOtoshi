@@ -2,76 +2,82 @@
   "id": "prologue",
   "order": 0,
   "requiredChapter": "",
-  "title": "序章「はじまりは、おにぎり」",
+  "title": "序章「招待状」",
+  "subtitle": "招待状",
   "stageId": "DebugStage31",
   "sceneName": "AllStages",
-  "playerCharacter": "kidaru",
+  "playerCharacter": "akadaru",
   "clearKey": "Story.Clear.prologue",
   "rules": { "mode": "Stock", "stocks": 3, "timeLimit": 0, "cpuSpecial": false, "awakening": true, "gaugeFromStart": true, "cpuBlockLimit": 6 },
   "cpu": [
-    { "character": "midaru", "level": 1, "stocks": 2 }
+    { "character": "aodaru", "level": 1, "stocks": 2 },
+    { "character": "midaru", "level": 1, "stocks": 2 },
+    { "character": "kidaru", "level": 1, "stocks": 2 }
   ],
   "speakers": [
     { "id": "akadaru", "name": "あかだる", "color": "#E8544B" },
     { "id": "aodaru", "name": "あおだる", "color": "#4B8BE8" },
     { "id": "midaru", "name": "みだる", "color": "#4BA85A" },
-    { "id": "kidaru", "name": "きだる", "color": "#E8C64B" }
+    { "id": "kidaru", "name": "きだる", "color": "#E8C64B" },
+    { "id": "messenger", "name": "使者", "color": "#111827" }
   ],
   "before": [
-    { "speaker": "", "direction": true, "shot": "S_WHITEBOARD", "text": "（部室。ホワイトボードには「練習メニュー：素振り1000回／積み上げ100段／走り込み！」とある）" },
+    { "speaker": "", "direction": true, "shot": "S_WALL_PAPER", "text": "春。七転高校の部室。壁には「全国制覇！」と殴り書きされた紙、机の上には年季の入った古い槌が一本置かれている。" },
     { "speaker": "kidaru", "shot": "S_KIDARU", "text": "あの、ここがだるま落とし部ですか？ おにぎりが出るって聞いて来ました！" },
-    { "speaker": "akadaru", "shot": "S_AKA", "text": "おにぎり……？ まあいい！ ようこそ、七転高校だるま落とし部へ！ オレは主将のあかだるだ！" },
+    { "speaker": "akadaru", "shot": "S_AKA", "text": "おう！ 来たな！ オレは主将のあかだるだ！ ようこそ、七転高校だるま落とし部へ！" },
     { "speaker": "aodaru", "shot": "S_AO", "text": "……副主将。あおだる" },
     { "speaker": "midaru", "shot": "S_MI", "text": "分析担当のみだるです（眼鏡をクイッ）。おにぎりなら、部費の0.8%で用意してあります" },
-    { "speaker": "akadaru", "shot": "S_AKA", "text": "部訓は『一撃入魂』！ 目標は全国制覇だ！ さっそく練習試合といくぞ！" },
-    { "speaker": "kidaru", "shot": "S_KIDARU", "text": "ええっ、いきなりですか！？ ぼく、やり方がわかりませんっ" },
-    { "speaker": "midaru", "shot": "S_MI", "text": "問題ありません。私が説明します" },
-    { "speaker": "", "direction": true, "shot": "S_DOLL_FAR", "text": "（ふと、窓際のだるま人形に目が止まる）" },
-    { "speaker": "kidaru", "shot": "S_DOLL_EYE", "text": "あれ？ あのだるまさん、目が片方しか入ってないですね" },
-    { "speaker": "akadaru", "shot": "", "text": "先代から続く願掛けだるまだ。全国制覇したら、もう片方の目を入れる決まりなんだ" },
-    { "speaker": "midaru", "shot": "S_MI", "text": "……いつからそこにあるのか、記録がありません。データの欠損です（眼鏡をクイッ）" },
-    { "speaker": "kidaru", "shot": "S_ROOM_WIDE", "text": "ふしぎです！" }
+    { "speaker": "akadaru", "shot": "S_AKA", "text": "部訓は『一撃入魂』！ 目標は全国制覇だ！" },
+    { "speaker": "midaru", "shot": "S_MI", "text": "あかだる先輩は、半年前に廃部寸前だった部を、一人で立て直したそうですね。データ上、驚異的です" },
+    { "speaker": "akadaru", "shot": "S_AKA", "text": "当然だ！ 大会に出たいからな！" },
+    { "speaker": "kidaru", "shot": "S_KIDARU", "text": "あかせんぱい、だるま落とし、大好きなんですね！" },
+    { "speaker": "akadaru", "shot": "S_AKA", "text": "……ああ。そうだな" },
+    { "speaker": "", "direction": true, "shot": "S_OLD_HAMMER", "text": "あかだるの視線が、一瞬だけ暗くなる。机の上の古い槌に手を添える。" },
+    { "speaker": "aodaru", "shot": "S_AO", "text": "……" },
+    { "speaker": "akadaru", "shot": "S_AKA", "text": "さあ、練習試合だ！ きだる、オレの動きを見て覚えろ！" }
   ],
   "tutorial": [
-    { "speaker": "midaru", "text": "まずは基本から。左スティックで歩いて、Aボタンでジャンプです", "condition": "MoveAndJump", "count": 1 },
-    { "speaker": "midaru", "text": "そこに落ちている積み木。近づいて拾うと、頭に積めます。積み木は、攻撃を受け止める『鎧』です", "condition": "Stack", "count": 1 },
-    { "speaker": "midaru", "text": "Xボタンでハンマー、Bボタンで積み木を飛ばせます。どちらか一度、やってみましょう", "condition": "Attack", "count": 1 },
-    { "speaker": "midaru", "text": "積み木が0のときに攻撃されると、そのまま落ちてしまいます。積み木は10個まで積めます", "condition": "DialogueDone" },
-    { "speaker": "midaru", "text": "落ちても、ストックが残っていれば復活できます。ストックは3つ。相手のストックを0にしたら勝ちです", "condition": "DialogueDone" }
+    { "speaker": "midaru", "text": "まずは歩いて、ジャンプしてみましょう。あかだる先輩、お手本をお願いします", "condition": "MoveAndJump", "count": 1 },
+    { "speaker": "midaru", "text": "落ちている積み木に乗ると、積めますよ。積んだ分が体力と武器になります", "condition": "Stack", "count": 1 },
+    { "speaker": "midaru", "text": "積み木は飛ばして攻撃にも使えます。ハンマーで直接殴ることもできますよ", "condition": "Attack", "count": 1 },
+    { "speaker": "midaru", "text": "気をつけて。積み木がない状態で攻撃を受けると、落ちてしまいます", "condition": "DialogueDone" },
+    { "speaker": "midaru", "text": "積み木は10個まで積めます。落ちても、ストックが残っていれば復活できます。ストックは3つ。相手のストックを0にしたら勝ちです", "condition": "DialogueDone" }
   ],
-  "matchStart": [
-    { "speaker": "midaru", "text": "では……私と一試合、やりましょう。手加減はしませんよ" }
-  ],
-  "awakening": [
-    { "speaker": "midaru", "text": "……発動条件を満たしています。入部1日目で？（眼鏡をクイッ）" },
-    { "speaker": "kidaru", "text": "えっ、ぼく、いま何を……？ 力がわいてきます！" },
-    { "speaker": "akadaru", "text": "それが、部の奥義だ！ 追い詰められた者の気合が呼ぶんだ！" }
+  "matchStart": [],
+  "playerAttackFirst": [
+    { "speaker": "akadaru", "text": "行くぞ、一撃入魂ぃ！" }
   ],
   "yellowExtra": [
-    { "speaker": "kidaru", "text": "あっ、増えた！" },
-    { "speaker": "midaru", "text": "……確率的にあり得ません。ノートに記録しておきます" }
+    { "speaker": "kidaru", "text": "あっ、ぼくの積み木、増えました！" },
+    { "speaker": "midaru", "text": "……確率的にあり得ません。ノートに記録します" }
   ],
   "cpuTaunts": [
+    { "speaker": "aodaru", "text": "……悪くない" },
     { "speaker": "midaru", "text": "……データ通りです" },
     { "speaker": "midaru", "text": "そこ、甘いですよ" }
   ],
   "defeat": [
-    { "speaker": "akadaru", "shot": "S_AKA", "text": "まだまだだが、その根性は買うぞ！" }
+    { "speaker": "akadaru", "shot": "S_AKA", "text": "チッ、主将のオレが鈍ってどうする！ もう一本！" }
   ],
   "after": [
-    { "speaker": "akadaru", "shot": "S_AKA", "text": "うむ、いい動きだ！ 新入りにしては根性がある！" },
-    { "speaker": "aodaru", "shot": "S_AO", "text": "……明日から、走る" },
-    { "speaker": "kidaru", "shot": "S_KIDARU", "text": "ええっ！ 走るんですか！？" },
-    { "speaker": "midaru", "shot": "S_MI", "text": "うちの練習メニューの実施率は100%です" },
-    { "speaker": "kidaru", "shot": "S_KIDARU", "text": "ぼく、がんばります！ おにぎりのために！" },
-    { "speaker": "akadaru", "shot": "S_AKA", "text": "おう！ 全国制覇のためにな！" },
-    { "speaker": "", "direction": true, "shot": "S_EMPTY_ROOM", "text": "（誰もいなくなった部室。窓際のだるま人形が、カタ、と小さく揺れた）", "eventId": "doll_shake" }
+    { "speaker": "akadaru", "shot": "S_AKA", "text": "うむ、いい動きだ！ きだる、才能あるぞ！" },
+    { "speaker": "kidaru", "shot": "S_KIDARU", "text": "えへへ、おにぎりのおかげです！" },
+    { "speaker": "", "direction": true, "shot": "S_MESSENGER", "text": "そのとき、部室のドアが開く。黒い封筒を持った使者が立っている。" },
+    { "speaker": "messenger", "shot": "S_MESSENGER", "text": "七転高校だるま落とし部殿。協会主催・王冠大会の招待状でございます" },
+    { "speaker": "akadaru", "shot": "S_AKA", "text": "……来たか" },
+    { "speaker": "midaru", "shot": "S_MI", "text": "王冠大会……絶対王者だるきんぐが主催する、あの大会ですね。優勝者は『何でも望むものを与えられる』とか" },
+    { "speaker": "kidaru", "shot": "S_KIDARU", "text": "すごいです！ おにぎり、いっぱい頼めますね！" },
+    { "speaker": "akadaru", "shot": "S_AKA", "text": "……大丈夫だ。……オレは、必ず勝つ" },
+    { "speaker": "", "direction": true, "shot": "S_EMPTY_ROOM", "text": "誰もいなくなった夕暮れの部室。机の上に残された古い槌と、床に伸びるあかだるの長い影が静かに揺れる。" }
   ],
   "newspaper": {
     "header": "だるま新聞",
-    "headline": "新入部員きだる、入部の決め手は『おにぎり』",
-    "body": "七転高校だるま落とし部に、新しい部員が入った。入部の決め手は部費の0.8%で用意されるおにぎりだという。主将のあかだるは「根性がある」と太鼓判を押した。",
+    "headline": "新入部員きだる、入部の決め手は「おにぎり」",
+    "body": "七転高校だるま落とし部に、新しい部員が入った。入部の決め手は部費の0.8%で用意されるおにぎりだという。主将のあかだるは「才能あるぞ」と太鼓判を押した。",
     "image": "",
-    "caption": "新入部員 きだる（1年）"
+    "art": "prologue",
+    "caption": "新入部員 きだる（1年）",
+    "subHeader": "王冠大会、今年も開催へ",
+    "subBody": "協会主催・王冠大会の開催が発表され、各校へ招待状が送られ始めた。"
   }
 }

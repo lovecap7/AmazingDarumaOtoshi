@@ -53,6 +53,8 @@ namespace Yurube
         {
             public int stacked;
             public int level = 1;
+            // ラボ用: 試合外で使うキャラデータ
+            public CharacterData labData;
             // 今の体と、その体のハンマーの性能（このプレイヤー用の複製と、複製したときの元の値）
             public DarumaCharacter body;
             public DarumaHammer hammer;
@@ -64,7 +66,88 @@ namespace Yurube
         }
 
         readonly Dictionary<MatchPlayer, State> m_states = new Dictionary<MatchPlayer, State>();
+        readonly Dictionary<DarumaCharacter, State> m_labStates = new Dictionary<DarumaCharacter, State>();
+        readonly List<DarumaCharacter> m_labDeadKeys = new List<DarumaCharacter>();
         DarumaMatch m_match;
+
+        static DarumaLevel EnsureInstance()
+        {
+            if (s_instance == null) Boot();
+            return s_instance;
+        }
+
+        // ---- ラボ用(試合外 DarumaMatch.Current == null のときだけ動く) ----
+        public static void RegisterLab(DarumaCharacter body, CharacterData data, int level = 1)
+        {
+            if (body == null || DarumaMatch.Current != null) return;
+            var inst = EnsureInstance();
+            if (inst == null) return;
+            if (!inst.m_labStates.TryGetValue(body, out var s))
+            {
+                s = new State();
+                inst.m_labStates[body] = s;
+            }
+            s.labData = data;
+            ApplyLevelToState(s, level);
+            if (Active) inst.UpdateSingleState(body, s, data);
+        }
+
+        public static void UnregisterLab(DarumaCharacter body)
+        {
+            if (s_instance == null || body == null) return;
+            s_instance.m_labStates.Remove(body);
+        }
+
+        public static void ClearLab()
+        {
+            if (s_instance == null) return;
+            s_instance.m_labStates.Clear();
+        }
+
+        public static void SetLabLevel(DarumaCharacter body, int level)
+        {
+            if (body == null || DarumaMatch.Current != null) return;
+            var inst = EnsureInstance();
+            if (inst == null || !inst.m_labStates.TryGetValue(body, out var s)) return;
+            ApplyLevelToState(s, level);
+            if (Active) inst.UpdateSingleState(body, s, s.labData);
+        }
+
+        public static int GetLabLevel(DarumaCharacter body) =>
+            s_instance != null && body != null && s_instance.m_labStates.TryGetValue(body, out var s) ? s.level : 1;
+
+        public static int GetLabStacked(DarumaCharacter body) =>
+            s_instance != null && body != null && s_instance.m_labStates.TryGetValue(body, out var s) ? s.stacked : 0;
+
+        public static bool IsLabSlowed(DarumaCharacter body) =>
+            s_instance != null && body != null && s_instance.m_labStates.TryGetValue(body, out var s) && Time.time < s.slowUntil;
+
+        public static float GetLabSlowScale(DarumaCharacter body) =>
+            s_instance != null && body != null && s_instance.m_labStates.TryGetValue(body, out var s) && Time.time < s.slowUntil ? s.slowScale : 1f;
+
+        public static void ComputeMultipliers(int level, LevelPerk perk, float weaponReach,
+            out float attackMul, out float shotMul, out float moveMul, out float reachMul, out float staminaEff)
+        {
+            var lp = LevelParams.Instance;
+            int n = PerkSteps(level);
+            attackMul = 1f + lp.attackSpeedPerLevel * n;
+            shotMul = 1f + lp.shotSpeedPerLevel * n;
+            moveMul = 1f + lp.moveSpeedPerLevel * n;
+            float reach = 1f;
+            if (perk == LevelPerk.AttackSpeed) attackMul *= 1f + lp.perkAttackSpeed * n;
+            if (perk == LevelPerk.ShotSpeed) shotMul *= 1f + lp.perkShotSpeed * n;
+            if (perk == LevelPerk.Reach) reach *= 1f + lp.perkReach * n;
+            reachMul = Mathf.Max(0.5f, weaponReach) * reach;
+            staminaEff = perk == LevelPerk.Stamina ? 1f + lp.perkStamina * n : 1f;
+        }
+
+        static void ApplyLevelToState(State s, int level)
+        {
+            level = Mathf.Clamp(level, 1, LevelParams.MaxLevel);
+            s.level = level;
+            int[] need = LevelParams.Instance.stackedToLevel;
+            s.stacked = (level >= 2 && need != null && level - 2 < need.Length) ? need[level - 2] : 0;
+        }
 
         void OnEnable()
         {
@@ -93,7 +176,11 @@ namespace Yurube
             if (m_match != null) m_match.Started -= OnMatchStarted;
             m_match = match;
             m_states.Clear();
-            if (m_match != null) m_match.Started += OnMatchStarted;
+            if (m_match != null)
+            {
+                m_labStates.Clear();
+                m_match.Started += OnMatchStarted;
+            }
         }
 
         void OnMatchStarted() => m_states.Clear();
@@ -117,6 +204,20 @@ namespace Yurube
         {
             WatchMatch();
             if (!Active || !info.StackGrew) return;
+            if (m_match == null)
+            {
+                if (info.Character != null && m_labStates.TryGetValue(info.Character, out var ls))
+                {
+                    ls.stacked++;
+                    int next = LevelParams.Instance.LevelFor(ls.stacked);
+                    if (next > ls.level)
+                    {
+                        ls.level = next;
+                        Debug.Log($"[ラボ・レベル] {(ls.labData != null ? ls.labData.displayName : info.Character.name)} Lv{next}（積んだ数 {ls.stacked}）");
+                    }
+                }
+                return;
+            }
             var p = PlayerOf(info.Character);
             if (p == null) return;
             var s = StateOf(p);
@@ -146,6 +247,7 @@ namespace Yurube
         }
 
         static LevelPerk Perk(MatchPlayer p) => p != null && p.CharacterData != null ? p.CharacterData.levelPerk : LevelPerk.None;
+        static LevelPerk PerkOf(CharacterData data) => data != null ? data.levelPerk : LevelPerk.None;
 
         // Lv2 から数えた、キャラごとの能力の段階（Lv1 なら 0、Lv5 なら 4）
         static int PerkSteps(int level) => Mathf.Max(0, level - 1);
@@ -154,40 +256,46 @@ namespace Yurube
         void Update()
         {
             WatchMatch();
-            if (!Active || m_match == null) return;
-            var lp = LevelParams.Instance;
-            foreach (var p in m_match.Players)
+            if (!Active) return;
+            if (m_match != null)
             {
-                if (p == null || p.Character == null) continue;
-                var s = StateOf(p);
-                AdoptBody(p, s);
-                if (s.clone == null) continue;
-
-                int n = PerkSteps(s.level);
-                var perk = Perk(p);
-                float attack = 1f + lp.attackSpeedPerLevel * n;
-                float shot = 1f + lp.shotSpeedPerLevel * n;
-                float reach = 1f;
-                if (perk == LevelPerk.AttackSpeed) attack *= 1f + lp.perkAttackSpeed * n;
-                if (perk == LevelPerk.ShotSpeed) shot *= 1f + lp.perkShotSpeed * n;
-                if (perk == LevelPerk.Reach) reach *= 1f + lp.perkReach * n;
-                float weapon = p.CharacterData != null ? Mathf.Max(0.5f, p.CharacterData.weaponReach) : 1f;
-
-                s.clone.SweepDuration = s.baseSweep / attack;
-                s.clone.ShotDuration = s.baseShot / attack;
-                s.clone.ShotSpeed = s.baseShotSpeed * shot;
-                s.clone.SweepLaunchSpeed = s.baseLaunch * shot;
-                s.clone.MaxProjectileSpeed = s.baseMaxSpeed * shot;
-                s.clone.HitReachScale = s.baseReach * weapon * reach;
-
-                p.Character.StaminaEfficiency = perk == LevelPerk.Stamina ? 1f + lp.perkStamina * n : 1f;
+                foreach (var p in m_match.Players)
+                {
+                    if (p == null || p.Character == null) continue;
+                    UpdateSingleState(p.Character, StateOf(p), p.CharacterData);
+                }
+                return;
             }
+
+            if (m_labStates.Count == 0) return;
+            CleanupDeadLabStates();
+            foreach (var pair in m_labStates)
+                UpdateSingleState(pair.Key, pair.Value, pair.Value.labData);
+        }
+
+        void UpdateSingleState(DarumaCharacter body, State s, CharacterData data)
+        {
+            if (body == null) return;
+            AdoptBody(body, s);
+            if (s.clone == null) return;
+
+            var perk = PerkOf(data);
+            float weapon = data != null ? data.weaponReach : 1f;
+            ComputeMultipliers(s.level, perk, weapon, out float attack, out float shot, out _, out float reachMul, out float staminaEff);
+
+            s.clone.SweepDuration = s.baseSweep / attack;
+            s.clone.ShotDuration = s.baseShot / attack;
+            s.clone.ShotSpeed = s.baseShotSpeed * shot;
+            s.clone.SweepLaunchSpeed = s.baseLaunch * shot;
+            s.clone.MaxProjectileSpeed = s.baseMaxSpeed * shot;
+            s.clone.HitReachScale = s.baseReach * reachMul;
+
+            body.StaminaEfficiency = staminaEff;
         }
 
         // 体が新しくなった（復活）・ハンマーの性能をほかの人に差し替えられたら、今の性能を元にして複製し直す
-        void AdoptBody(MatchPlayer p, State s)
+        void AdoptBody(DarumaCharacter body, State s)
         {
-            var body = p.Character;
             var hammer = body.Hammer != null ? body.Hammer : body.GetComponentInChildren<DarumaHammer>(true);
             if (hammer == null || hammer.Params == null) { s.clone = null; return; }
             if (body == s.body && hammer == s.hammer && hammer.Params == s.clone) return;
@@ -208,16 +316,40 @@ namespace Yurube
         // ---------------- 物理のステップ：移動速度 ----------------
         void FixedUpdate()
         {
-            if (!Active || m_match == null) return;
+            if (!Active) return;
             var lp = LevelParams.Instance;
-            foreach (var p in m_match.Players)
+            if (m_match != null)
             {
-                if (p == null || p.Character == null || !p.Character.CanBeAffected) continue;
-                var s = StateOf(p);
-                float scale = 1f + lp.moveSpeedPerLevel * PerkSteps(s.level);
-                if (Time.time < s.slowUntil) scale *= s.slowScale;
-                if (Mathf.Abs(scale - 1f) > 0.0001f) p.Character.RequestSpeedScale(scale);
+                foreach (var p in m_match.Players)
+                {
+                    if (p == null || p.Character == null || !p.Character.CanBeAffected) continue;
+                    ApplySpeedScale(p.Character, StateOf(p), lp);
+                }
+                return;
             }
+
+            if (m_labStates.Count == 0) return;
+            CleanupDeadLabStates();
+            foreach (var pair in m_labStates)
+            {
+                if (pair.Key != null && pair.Key.CanBeAffected) ApplySpeedScale(pair.Key, pair.Value, lp);
+            }
+        }
+
+        static void ApplySpeedScale(DarumaCharacter body, State s, LevelParams lp)
+        {
+            float scale = 1f + lp.moveSpeedPerLevel * PerkSteps(s.level);
+            if (Time.time < s.slowUntil) scale *= s.slowScale;
+            if (Mathf.Abs(scale - 1f) > 0.0001f) body.RequestSpeedScale(scale);
+        }
+
+        void CleanupDeadLabStates()
+        {
+            m_labDeadKeys.Clear();
+            foreach (var pair in m_labStates)
+                if (pair.Key == null) m_labDeadKeys.Add(pair.Key);
+            for (int i = 0; i < m_labDeadKeys.Count; i++)
+                m_labStates.Remove(m_labDeadKeys[i]);
         }
 
         // ---------------- 撃った弾：いわだるの耐久値・へびだるの蛇行 ----------------
@@ -227,25 +359,43 @@ namespace Yurube
             var block = info.Target as TumikiBlock;
             var shooter = info.Owner as DarumaCharacter;
             if (block == null || shooter == null) return;
-            var p = PlayerOf(shooter);
-            if (p == null) return;
-            int n = PerkSteps(StateOf(p).level);
+
+            int level;
+            LevelPerk perk;
+            string label;
+            if (m_match != null)
+            {
+                var p = PlayerOf(shooter);
+                if (p == null) return;
+                level = StateOf(p).level;
+                perk = Perk(p);
+                label = p.Label;
+            }
+            else
+            {
+                if (!m_labStates.TryGetValue(shooter, out var ls)) return;
+                level = ls.level;
+                perk = PerkOf(ls.labData);
+                label = ls.labData != null ? ls.labData.displayName : shooter.name;
+            }
+
+            int n = PerkSteps(level);
             if (n <= 0) return;
             var lp = LevelParams.Instance;
-            switch (Perk(p))
+            switch (perk)
             {
                 case LevelPerk.ShotDurability:
                     var keep = block.GetComponent<LevelShotDurability>();
                     if (keep == null) keep = block.gameObject.AddComponent<LevelShotDurability>();
                     keep.Begin(lp.perkShotDurability * n);
-                    Debug.Log($"[レベル] {p.Label}（いわだる）Lv{n + 1} の弾：耐久値 +{lp.perkShotDurability * n}");
+                    Debug.Log($"[レベル] {label}（いわだる）Lv{n + 1} の弾：耐久値 +{lp.perkShotDurability * n}");
                     break;
                 case LevelPerk.Zigzag:
                     var zig = block.GetComponent<TumikiZigzag>();
                     if (zig == null) zig = block.gameObject.AddComponent<TumikiZigzag>();
                     float angle = lp.perkZigzagAngleBase + lp.perkZigzagAnglePerLevel * (n - 1);
                     zig.BeginSharp(shooter, lp.perkZigzagInterval, angle);
-                    Debug.Log($"[レベル] {p.Label}（へびだる）Lv{n + 1} の弾：ジグザグ ±{angle:0}度");
+                    Debug.Log($"[レベル] {label}（へびだる）Lv{n + 1} の弾：ジグザグ ±{angle:0}度");
                     break;
             }
         }
@@ -274,17 +424,43 @@ namespace Yurube
         void TrySlow(Component attacker, DarumaCharacter victim, int minSteps = 0)
         {
             if (!Active || attacker == null || victim == null) return;
-            var a = PlayerOf(attacker);
-            var v = PlayerOf(victim);
-            if (a == null || v == null || a == v || Perk(a) != LevelPerk.SlowOnHit) return;
-            int n = Mathf.Max(minSteps, PerkSteps(StateOf(a).level));
+
+            State vs;
+            int attackerLevel;
+            LevelPerk attackerPerk;
+            string attackerLabel;
+            string victimLabel;
+
+            if (m_match != null)
+            {
+                var a = PlayerOf(attacker);
+                var v = PlayerOf(victim);
+                if (a == null || v == null || a == v) return;
+                if (m_match.IsFriendly(attacker as IDarumaAttacker, victim)) return;
+                vs = StateOf(v);
+                attackerLevel = StateOf(a).level;
+                attackerPerk = Perk(a);
+                attackerLabel = a.Label;
+                victimLabel = v.Label;
+            }
+            else
+            {
+                var attackerChar = attacker as DarumaCharacter ?? attacker.GetComponentInParent<DarumaCharacter>();
+                if (attackerChar == null || attackerChar == victim) return;
+                if (!m_labStates.TryGetValue(attackerChar, out var la) || !m_labStates.TryGetValue(victim, out vs)) return;
+                attackerLevel = la.level;
+                attackerPerk = PerkOf(la.labData);
+                attackerLabel = la.labData != null ? la.labData.displayName : attackerChar.name;
+                victimLabel = victim.name;
+            }
+
+            if (attackerPerk != LevelPerk.SlowOnHit) return;
+            int n = Mathf.Max(minSteps, PerkSteps(attackerLevel));
             if (n <= 0) return;
-            if (m_match != null && m_match.IsFriendly(attacker as IDarumaAttacker, victim)) return;
             var lp = LevelParams.Instance;
-            var vs = StateOf(v);
             vs.slowScale = Mathf.Clamp(1f - lp.perkSlow * n, 0.1f, 1f);
             vs.slowUntil = Time.time + lp.perkSlowSeconds;
-            Debug.Log($"[レベル] {a.Label}（みだる）Lv{n + 1} が {v.Label} に当てた：移動速度 ×{vs.slowScale:0.00}（{lp.perkSlowSeconds:0.0}秒）");
+            Debug.Log($"[レベル] {attackerLabel}（みだる）Lv{n + 1} が {victimLabel} に当てた：移動速度 ×{vs.slowScale:0.00}（{lp.perkSlowSeconds:0.0}秒）");
         }
 
         // みだるに当てられて遅くなっているか（見た目用）

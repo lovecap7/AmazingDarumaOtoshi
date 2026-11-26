@@ -51,12 +51,20 @@ namespace Yurube
         SpecialGauge m_gauge;
         Material m_effectMaterial;
         AkadaruHammerStorm m_storm;
+        float m_stormActiveUntil = -1.0f;
 
         // CPU 用(中平): 必殺技の積み木の速さ(m/s。狙いの先読みに使う)
         public float Speed => m_speed;
         // CPU 用(suehara): ハンマーの嵐を使うか / 回るハンマーが届く距離
         public bool UsesHammerStorm => m_useHammerStorm;
         public float StormReach => AkadaruHammerStorm.ReachFor(m_character, m_stormHammerScale);
+        // ラボ表示用: 紅蓮乱舞の残り時間・ハンマー倍率・インスタンス
+        public float StormHammerScale => m_stormHammerScale;
+        public float StormDuration => m_stormDuration;
+        public AkadaruHammerStorm ActiveStorm => m_storm;
+        public float RemainingSeconds => m_storm != null && m_stormActiveUntil > 0.0f
+            ? Mathf.Max(0.0f, m_stormActiveUntil - Time.time)
+            : (Time.time < m_activeUntil ? Mathf.Max(0.0f, m_activeUntil - Time.time) : 0.0f);
 
         // 必殺技ゲージ用(中平): 発動してから残像ビームが残っている間(この間はゲージが溜まらない)
         float m_activeUntil = -1.0f;
@@ -78,7 +86,7 @@ namespace Yurube
             var keyboard = Keyboard.current;
             // F3で当たり判定のデバッグ表示を切り替える
             if (keyboard != null && keyboard.f3Key.wasPressedThisFrame)
-                TronHitboxView.Visible = !TronHitboxView.Visible;
+                SpecialHitboxDebug.Toggle();
 
             bool pressed = SpecialInput.WasPressed(m_character);
             if (pressed) TryActivate();
@@ -174,6 +182,7 @@ namespace Yurube
             var root = new GameObject("AkadaruHammerStorm");
             m_storm = root.AddComponent<AkadaruHammerStorm>();
             m_storm.Initialize(m_character, m_stormDuration, m_stormHitInterval, m_stormKnockSpeed, m_stormHammerScale, m_stormOrbitSpeed);
+            m_stormActiveUntil = Time.time + 0.25f + Mathf.Max(0.1f, m_stormDuration);
             SpecialCutIn.Show(m_stormName, m_cutInColor, m_effectMaterial, m_character, null, m_character.Stack != null ? m_character.Stack.Count : 0);
         }
 

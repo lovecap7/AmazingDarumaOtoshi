@@ -54,6 +54,7 @@ namespace Yurube
         DarumaCharacter m_character;
         SpecialGauge m_gauge;
         MidaruMachineGun m_gun;
+        float m_gunActiveUntil = -1.0f;
 
         // 必殺技ゲージ用(中平): 発動してから分裂弾が追いかけ終わるまで(この間はゲージが溜まらない)
         float m_activeUntil = -1.0f;
@@ -61,6 +62,12 @@ namespace Yurube
         // CPU 用(suehara): マシンガンを使うか / 撃った弾が届く目安の距離
         public bool UsesMachineGun => m_useMachineGun;
         public float MachineGunRange => 10.0f;
+        // ラボ表示用
+        public float RemainingSeconds => (m_gun != null && m_gun.IsFiring)
+            ? Mathf.Max(0.0f, m_gunActiveUntil - Time.time)
+            : (Time.time < m_activeUntil ? Mathf.Max(0.0f, m_activeUntil - Time.time) : 0.0f);
+        public float MachineGunDuration => m_machineGunDuration;
+        public MidaruMachineGun ActiveGun => m_gun;
 
         private void Awake()
         {
@@ -156,6 +163,7 @@ namespace Yurube
         void PlayMachineGun(Vector3 position, Vector3 direction)
         {
             m_gun = MidaruMachineGun.Place(m_character, position, direction, m_machineGunDuration, m_machineGunRate, m_machineGunSpeed, m_machineGunRange, m_machineGunTurnSpeed);
+            m_gunActiveUntil = Time.time + 0.25f + Mathf.Max(0.1f, m_machineGunDuration);
             SpecialCutIn.Show(m_machineGunName, m_machineGunCutInColor, null, m_character, null, m_character.Stack != null ? m_character.Stack.Count : 0);
         }
 

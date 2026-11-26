@@ -89,6 +89,13 @@ namespace Yurube.Story
         Light m_sun, m_fill;
         Transform m_doll;
         Transform m_whiteboard;
+        Transform m_wallPaper;
+        Transform m_oldHammer;
+        Transform m_messenger;
+        Transform m_longShadow;
+        bool m_darkMood;
+
+        bool IsPrologueChapter => m_chapter != null && m_chapter.id == StoryLauncher.PrologueId;
 
         class Member
         {
@@ -113,6 +120,11 @@ namespace Yurube.Story
         Quaternion m_runnerHomeRot;
         float m_runnerStart, m_runnerDuration;
         bool m_runnerActive;
+        bool m_swingerActive;
+        Nakahira.DarumaHammer m_swingerHammer;
+        Vector3 m_swingerHammerBasePos;
+        Quaternion m_swingerHammerBaseRot;
+        bool m_swingerHammerWasEnabled;
 
         // 第2章以降：全国大会会場（鳥居の前）のセットを撮るカットシーン
         bool m_venueMode;
@@ -542,6 +554,114 @@ namespace Yurube.Story
                 leaf.localScale = Vector3.one * 0.42f;
                 leaf.GetComponent<Renderer>().sharedMaterial = leafMat;
             }
+
+            BuildPrologueProps();
+        }
+
+        void BuildPrologueProps()
+        {
+            // 壁の「全国制覇！」の殴り書きの紙（奥の壁、少し傾けて手書き感を出す）
+            var paperRoot = new GameObject("WallPaper").transform;
+            paperRoot.SetParent(m_root, false);
+            paperRoot.localPosition = new Vector3(-3.3f, 2.7f, 4.82f);
+            paperRoot.localRotation = Quaternion.Euler(0f, 0f, -2.5f);
+            var paperSheet = ToyKit.Primitive(PrimitiveType.Cube, "Sheet", paperRoot);
+            paperSheet.localScale = new Vector3(1.55f, 2.0f, 0.03f);
+            paperSheet.GetComponent<Renderer>().sharedMaterial = Unlit(new Color(0.97f, 0.94f, 0.85f));
+            var tapeMat = Unlit(new Color(0.82f, 0.72f, 0.48f));
+            var tapeL = ToyKit.Primitive(PrimitiveType.Cube, "TapeL", paperRoot);
+            tapeL.localPosition = new Vector3(-0.62f, 0.92f, -0.02f);
+            tapeL.localScale = new Vector3(0.28f, 0.12f, 0.02f);
+            tapeL.localRotation = Quaternion.Euler(0f, 0f, 22f);
+            tapeL.GetComponent<Renderer>().sharedMaterial = tapeMat;
+            var tapeR = ToyKit.Primitive(PrimitiveType.Cube, "TapeR", paperRoot);
+            tapeR.localPosition = new Vector3(0.62f, 0.92f, -0.02f);
+            tapeR.localScale = new Vector3(0.28f, 0.12f, 0.02f);
+            tapeR.localRotation = Quaternion.Euler(0f, 0f, -18f);
+            tapeR.GetComponent<Renderer>().sharedMaterial = tapeMat;
+            var paperText = TitleDressingKit.Text(paperRoot, PresentationSettings.DefaultFont,
+                "全国\n制覇！", Vector3.zero, new Vector2(1.3f, 1.7f), 5.0f,
+                new Color(0.11f, 0.09f, 0.08f), new Color(0.11f, 0.09f, 0.08f), 0.04f, 0f);
+            paperText.transform.localPosition = new Vector3(0f, -0.04f, -0.03f);
+            paperText.transform.localRotation = Quaternion.identity;
+            paperText.fontStyle = FontStyles.Bold;
+            paperText.alignment = TextAlignmentOptions.Center;
+            paperText.lineSpacing = -8f;
+            m_wallPaper = paperRoot;
+
+            // 机の上の年季の入った古い槌（長机の上 y=0.83 付近）
+            var hammerRoot = new GameObject("OldHammer").transform;
+            hammerRoot.SetParent(m_root, false);
+            hammerRoot.localPosition = new Vector3(0.15f, 0.90f, 1.35f);
+            hammerRoot.localRotation = Quaternion.Euler(0f, -24f, 0f);
+            var oldHandleMat = ToyKit.Lit(new Color(0.38f, 0.24f, 0.14f), 0.18f);
+            var oldHeadMat = ToyKit.Lit(new Color(0.24f, 0.18f, 0.14f), 0.35f);
+            var oldBandMat = ToyKit.Lit(new Color(0.14f, 0.12f, 0.11f), 0.45f);
+            var handle = ToyKit.Primitive(PrimitiveType.Cylinder, "Handle", hammerRoot);
+            handle.localPosition = new Vector3(-0.22f, -0.02f, 0f);
+            handle.localRotation = Quaternion.Euler(0f, 0f, 90f);
+            handle.localScale = new Vector3(0.085f, 0.42f, 0.085f);
+            handle.GetComponent<Renderer>().sharedMaterial = oldHandleMat;
+            var head = ToyKit.Primitive(PrimitiveType.Cylinder, "Head", hammerRoot);
+            head.localPosition = new Vector3(0.24f, 0.04f, 0f);
+            head.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            head.localScale = new Vector3(0.24f, 0.24f, 0.24f);
+            head.GetComponent<Renderer>().sharedMaterial = oldHeadMat;
+            var band = ToyKit.Primitive(PrimitiveType.Cylinder, "Band", hammerRoot);
+            band.localPosition = new Vector3(0.24f, 0.04f, 0f);
+            band.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            band.localScale = new Vector3(0.255f, 0.04f, 0.255f);
+            band.GetComponent<Renderer>().sharedMaterial = oldBandMat;
+            m_oldHammer = hammerRoot;
+
+            // 黒い封筒を持った使者（#111827 系の暗色。S_MESSENGER のときだけ登場）
+            var darkCoatMat = ToyKit.Lit(new Color(0.067f, 0.094f, 0.153f), 0.22f);
+            var envelopeMat = ToyKit.Lit(new Color(0.08f, 0.10f, 0.16f), 0.35f);
+            var sealMat = ToyKit.Lit(new Color(0.75f, 0.18f, 0.18f), 0.4f);
+            var messenger = new GameObject("Messenger").transform;
+            messenger.SetParent(m_root, false);
+            messenger.localPosition = new Vector3(3.4f, 0f, -1.75f);
+            messenger.localRotation = Quaternion.Euler(0f, -35f, 0f);
+            for (int i = 0; i < 2; i++)
+            {
+                var mb = ToyKit.Primitive(PrimitiveType.Cylinder, "Body" + i, messenger);
+                mb.localScale = new Vector3(0.72f, 0.24f, 0.72f);
+                mb.localPosition = new Vector3(0f, 0.25f + i * 0.50f, 0f);
+                mb.GetComponent<Renderer>().sharedMaterial = darkCoatMat;
+            }
+            var mHead = ToyKit.Primitive(PrimitiveType.Sphere, "Head", messenger);
+            mHead.localPosition = new Vector3(0f, 1.42f, 0f);
+            mHead.localScale = new Vector3(0.84f, 0.80f, 0.84f);
+            mHead.GetComponent<Renderer>().sharedMaterial = darkCoatMat;
+            var env = ToyKit.Primitive(PrimitiveType.Cube, "BlackEnvelope", messenger);
+            env.localPosition = new Vector3(0f, 0.92f, 0.56f);
+            env.localRotation = Quaternion.Euler(-18f, 0f, 0f);
+            env.localScale = new Vector3(0.46f, 0.30f, 0.04f);
+            env.GetComponent<Renderer>().sharedMaterial = envelopeMat;
+            var seal = ToyKit.Primitive(PrimitiveType.Cylinder, "WaxSeal", env);
+            seal.localPosition = new Vector3(0f, 0f, 0.6f);
+            seal.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            seal.localScale = new Vector3(0.18f, 0.4f, 0.26f);
+            seal.GetComponent<Renderer>().sharedMaterial = sealMat;
+            messenger.gameObject.SetActive(false);
+            m_messenger = messenger;
+
+            // 夕暮れの床に伸びるあかだるの長い影（S_EMPTY_ROOM で静かに揺れる）
+            var shadowRoot = new GameObject("AkadaruLongShadow").transform;
+            shadowRoot.SetParent(m_root, false);
+            shadowRoot.localPosition = new Vector3(-0.35f, 0.018f, 0.65f);
+            shadowRoot.localRotation = Quaternion.Euler(0f, 22f, 0f);
+            var floorShadowMat = TitleDressingKit.UnlitTransparent(SoftDotTexture(), new Color(0.06f, 0.04f, 0.05f, 0.48f));
+            var sBody = TitleDressingKit.Quad(shadowRoot, "ShadowBody", Vector3.zero, new Vector3(0.85f, 3.2f, 1f), floorShadowMat);
+            sBody.localPosition = new Vector3(0f, 0f, -1.6f);
+            sBody.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            var sHead = TitleDressingKit.Quad(shadowRoot, "ShadowHead", Vector3.zero, new Vector3(0.95f, 1.1f, 1f), floorShadowMat);
+            sHead.localPosition = new Vector3(0f, 0.002f, -3.15f);
+            sHead.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            shadowRoot.gameObject.SetActive(false);
+            m_longShadow = shadowRoot;
+
+            if (m_doll != null && IsPrologueChapter) m_doll.gameObject.SetActive(false);
         }
 
         //========================================
@@ -860,6 +980,40 @@ namespace Yurube.Story
                 memberVisibility = 1,
             });
 
+            // S_WALL_PAPER：壁の「全国制覇！」の殴り書きの紙
+            RegisterShot(new ShotDefinition
+            {
+                id = "S_WALL_PAPER",
+                target = m_wallPaper != null ? m_wallPaper : m_root,
+                positionOffset = new Vector3(0.15f, -0.10f, -2.85f),
+                lookOffset = new Vector3(0f, -0.05f, 0f),
+                fov = 38f,
+                memberVisibility = 1,
+            });
+
+            // S_OLD_HAMMER：机の上の年季の入った古い槌
+            RegisterShot(new ShotDefinition
+            {
+                id = "S_OLD_HAMMER",
+                target = m_oldHammer != null ? m_oldHammer : m_root,
+                positionOffset = new Vector3(-0.65f, 0.72f, -1.25f),
+                lookOffset = new Vector3(0f, 0.0f, 0f),
+                fov = 34f,
+                memberVisibility = 1,
+            });
+
+            // S_MESSENGER：黒い封筒を持った使者（入口側）
+            RegisterShot(new ShotDefinition
+            {
+                id = "S_MESSENGER",
+                target = m_messenger != null ? m_messenger : m_root,
+                useTargetRotation = true,
+                positionOffset = new Vector3(-0.35f, 1.55f, 2.55f),
+                lookOffset = new Vector3(0f, 0.95f, 0.1f),
+                fov = 38f,
+                memberVisibility = 1,
+            });
+
             // S_DOLL_FAR：窓際の人形（引き気味。0.8秒程度のブレンドで寄る）
             RegisterShot(new ShotDefinition
             {
@@ -883,14 +1037,14 @@ namespace Yurube.Story
                 memberVisibility = 0,
             });
 
-            // S_EMPTY_ROOM：キャラクター非表示の部室
+            // S_EMPTY_ROOM：キャラクター非表示の部室（序章では夕暮れの古い槌と長い影を見せる）
             RegisterShot(new ShotDefinition
             {
                 id = "S_EMPTY_ROOM",
                 target = m_root,
-                positionOffset = new Vector3(0.1f, 2.15f, -5.0f),
-                lookOffset = new Vector3(0f, 0.85f, 2.2f),
-                fov = 44f,
+                positionOffset = new Vector3(-1.35f, 1.65f, -3.2f),
+                lookOffset = new Vector3(0.05f, 0.55f, 1.15f),
+                fov = 42f,
                 sway = true,
                 memberVisibility = -1,
             });
@@ -1005,10 +1159,22 @@ namespace Yurube.Story
 
             StopEmptyRoomSequence();
 
+            if (!m_arenaMode)
+            {
+                if (m_doll != null && !m_epilogueOn)
+                    m_doll.gameObject.SetActive(!IsPrologueChapter);
+                if (m_messenger != null)
+                    m_messenger.gameObject.SetActive(shotId == "S_MESSENGER");
+                if (m_longShadow != null)
+                    m_longShadow.gameObject.SetActive(IsPrologueChapter && shotId == "S_EMPTY_ROOM");
+                SetDarkMood(IsPrologueChapter && shotId == "S_OLD_HAMMER");
+            }
+
             if (shotId == "S_EMPTY_ROOM")
             {
                 ApplyShotDefinition(def, 0f);
-                m_emptyRoomRoutine = StartCoroutine(EmptyRoomToDollRoutine());
+                if (!IsPrologueChapter)
+                    m_emptyRoomRoutine = StartCoroutine(EmptyRoomToDollRoutine());
                 return;
             }
 
@@ -1183,6 +1349,15 @@ namespace Yurube.Story
                     if (Mathf.Abs(z) > 0.01f)
                         m_doll.localRotation = Quaternion.Euler(0f, 0f, Mathf.MoveTowards(z, 0f, Time.unscaledDeltaTime * 16f));
                 }
+            }
+
+            // 夕暮れの長い影（静かに揺れる）
+            if (m_longShadow != null && m_longShadow.gameObject.activeInHierarchy)
+            {
+                float yaw = 22f + Mathf.Sin(m_time * 0.85f) * 2.4f;
+                float scaleZ = 1f + Mathf.Sin(m_time * 0.6f) * 0.03f;
+                m_longShadow.localRotation = Quaternion.Euler(0f, yaw, 0f);
+                m_longShadow.localScale = new Vector3(1f, 1f, scaleZ);
             }
         }
 
@@ -1374,6 +1549,9 @@ namespace Yurube.Story
             m_blendDuration = 0f;
             m_dollShakeStart = -1f;
             if (m_doll != null) m_doll.localRotation = Quaternion.identity;
+            if (m_messenger != null) m_messenger.gameObject.SetActive(false);
+            if (m_longShadow != null) m_longShadow.gameObject.SetActive(false);
+            m_darkMood = false;
             SetRoomMembersVisible(true);
             RestoreRunner();
             m_stageMode = false;
@@ -1410,6 +1588,9 @@ namespace Yurube.Story
             m_blendDuration = 0f;
             m_dollShakeStart = -1f;
             if (m_doll != null) m_doll.localRotation = Quaternion.identity;
+            if (m_messenger != null) m_messenger.gameObject.SetActive(false);
+            if (m_longShadow != null) m_longShadow.gameObject.SetActive(false);
+            m_darkMood = false;
             SetRoomMembersVisible(true);
             RestoreRunner();
             m_stageMode = false;
@@ -1471,7 +1652,14 @@ namespace Yurube.Story
             StopEmptyRoomSequence();
             m_blendDuration = 0f;
             m_dollShakeStart = -1f;
-            if (m_doll != null) m_doll.localRotation = Quaternion.identity;
+            if (m_doll != null)
+            {
+                m_doll.localRotation = Quaternion.identity;
+                m_doll.gameObject.SetActive(!IsPrologueChapter || m_epilogueOn);
+            }
+            if (m_messenger != null) m_messenger.gameObject.SetActive(false);
+            if (m_longShadow != null) m_longShadow.gameObject.SetActive(false);
+            m_darkMood = false;
             SetRoomMembersVisible(true);
             m_stageMode = false;
             m_opening = false;
@@ -1495,9 +1683,9 @@ namespace Yurube.Story
                     break;
                 }
             }
-            if (m_shots.TryGetValue(initialShot, out var def) && def != null)
+            if (m_shots.ContainsKey(initialShot))
             {
-                ApplyShotDefinition(def, 0f);
+                ApplyConversationShot(initialShot);
             }
             else
             {
@@ -1515,8 +1703,9 @@ namespace Yurube.Story
             StopEmptyRoomSequence();
             m_dollShakeStart = -1f;
             if (m_doll != null) m_doll.localRotation = Quaternion.identity;
+            SetDarkMood(false);
 
-            if (afterConversation && wasEmptyRoom && m_shots.TryGetValue("S_DOLL_FAR", out var dollFar) && dollFar != null)
+            if (!IsPrologueChapter && afterConversation && wasEmptyRoom && m_shots.TryGetValue("S_DOLL_FAR", out var dollFar) && dollFar != null)
             {
                 SetRoomMembersVisible(false);
                 ApplyShotDefinition(dollFar, 0f);
@@ -1524,7 +1713,12 @@ namespace Yurube.Story
             else
             {
                 m_blendDuration = 0f;
-                if (!afterConversation) SetRoomMembersVisible(true);
+                if (!afterConversation)
+                {
+                    if (m_messenger != null) m_messenger.gameObject.SetActive(false);
+                    if (m_longShadow != null) m_longShadow.gameObject.SetActive(false);
+                    SetRoomMembersVisible(true);
+                }
                 ApplyShotNow();
             }
         }
@@ -1663,6 +1857,10 @@ namespace Yurube.Story
             m_arenaHammerRollStart = -1f;
             if (m_arenaFadeRoutine != null) { StopCoroutine(m_arenaFadeRoutine); m_arenaFadeRoutine = null; }
             Show();
+            if (m_doll != null) m_doll.gameObject.SetActive(!IsPrologueChapter);
+            if (m_messenger != null) m_messenger.gameObject.SetActive(false);
+            if (m_longShadow != null) m_longShadow.gameObject.SetActive(false);
+            m_darkMood = false;
             m_fadeGroup.alpha = 1f;
             SetCaption(false);
             SetTitle(false);
@@ -1678,30 +1876,27 @@ namespace Yurube.Story
             yield return At(4.0f);
             if (m_skipped) { yield return FinishOpening(); yield break; }
 
-            // 2. 窓と、片目のだるま
-            SetShot(lt => P(1.0f, 2.15f, 1.6f + lt * 0.12f), lt => P(2.3f, 2.05f, 4.8f), 36f);
-            yield return At(8.0f);
+            // 2. 壁の「全国制覇！」の殴り書きの紙と、机の上の年季の入った古い槌
+            SetShot(
+                lt =>
+                {
+                    float u = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(lt / 3.8f));
+                    return Vector3.Lerp(P(-3.15f, 2.60f, 1.95f), P(-0.55f, 1.68f, 0.05f), u);
+                },
+                lt =>
+                {
+                    float u = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(lt / 3.8f));
+                    return Vector3.Lerp(P(-3.30f, 2.68f, 4.82f), P(0.15f, 0.90f, 1.35f), u);
+                },
+                38f);
+            yield return At(8.5f);
             if (m_skipped) { yield return FinishOpening(); yield break; }
 
-            // 3. 回想：片目のだるま（セピア・スロー）
-            SetMemory(true);
-            m_camShake = 0.12f;
-            m_slowMo = StartCoroutine(SlowMo(0.35f, 1.0f));
-            SetShot(lt => P(2.65f, 1.76f, 3.55f - lt * 0.05f), lt => P(2.65f, 1.64f, 4.5f), 28f);
-            yield return At(11.2f);
-            SetMemory(false);
-            if (m_skipped) { yield return FinishOpening(); yield break; }
-
-            // 4. 白板と練習メニュー
-            SetShot(lt => P(-2.4f - lt * 0.05f, 2.2f, 1.8f), lt => P(-5.7f, 2.5f, 0.4f), 38f);
-            yield return At(15.2f);
-            if (m_skipped) { yield return FinishOpening(); yield break; }
-
-            // 5. 部員たち → 暗転 → タイトル
+            // 3. 部員たち → 4. 暗転 → タイトル
             SetCaption(false);
             SetCinema(true);
             SetShot(lt => P(0.1f, 1.85f - lt * 0.03f, -4.4f + lt * 0.12f), lt => P(0f, 0.5f, 2.2f), 43f);
-            yield return At(19.4f);
+            yield return At(12.5f);
             if (m_skipped) { yield return FinishOpening(); yield break; }
 
             yield return FadeTo(0.65f, 0.5f);
@@ -1789,6 +1984,10 @@ namespace Yurube.Story
                         case "runner":
                             BeginRunner(chapter, shot.seconds);
                             SetStageRunner();
+                            break;
+                        case "swing":
+                            BeginSwinger(chapter);
+                            SetStageSwinger();
                             break;
                         case "rival":
                             SetStageRival(chapter);
@@ -2840,6 +3039,50 @@ namespace Yurube.Story
                     lt => runner.position + new Vector3(0f, 1.0f, 0f), 45f);
         }
 
+        // 黙々と素振りをするカット（第1章：あかだる）。中央側から斜め45度でハンマーの軌道と顔を見せる
+        void SetStageSwinger()
+        {
+            Transform swinger = m_runner;
+            if (swinger == null) { SetStageWide(); return; }
+            Vector3 target = swinger.position;
+            Vector3 toCenter = W(0f, 0f, 0f) - target;
+            toCenter.y = 0f;
+            if (toCenter.sqrMagnitude < 0.01f) toCenter = Vector3.forward;
+            toCenter.Normalize();
+            Vector3 side = Vector3.Cross(Vector3.up, toCenter);
+            Vector3 viewDir = (toCenter + side * 0.75f).normalized;
+            Vector3 cameraPos = target + viewDir * 4.6f + Vector3.up * 2.4f;
+            SetShot(lt => cameraPos, lt => target + new Vector3(0f, 0.9f, 0f), 42f);
+        }
+
+        void BeginSwinger(StoryChapter chapter)
+        {
+            RestoreRunner();
+            string id = chapter != null && chapter.cutscene != null && !string.IsNullOrEmpty(chapter.cutscene.runner)
+                ? chapter.cutscene.runner : (chapter != null ? chapter.playerCharacter : null);
+            var player = FindPlayer(id);
+            if (player == null || player.Character == null) return;
+
+            m_runner = player.Character.transform;
+            m_runnerHome = m_runner.position;
+            m_runnerHomeRot = m_runner.rotation;
+            // ステージ中央側へ向けてその場で素振りさせる（初期位置のままなので床の段差でも浮き沈みしない）
+            Vector3 toCenter = W(0f, 0f, 0f) - m_runnerHome;
+            toCenter.y = 0f;
+            if (toCenter.sqrMagnitude > 0.01f) m_runner.rotation = Quaternion.LookRotation(toCenter.normalized);
+
+            m_swingerHammer = player.Character.GetComponentInChildren<Nakahira.DarumaHammer>(true);
+            if (m_swingerHammer != null)
+            {
+                m_swingerHammerWasEnabled = m_swingerHammer.enabled;
+                m_swingerHammerBasePos = m_swingerHammer.transform.localPosition;
+                m_swingerHammerBaseRot = m_swingerHammer.transform.localRotation;
+                m_swingerHammer.enabled = false;
+            }
+            m_runnerStart = m_time;
+            m_swingerActive = true;
+        }
+
         void SetStageRival(StoryChapter chapter)
         {
             var rival = FindPlayer(chapter.cutscene != null ? chapter.cutscene.rival : null);
@@ -2882,17 +3125,54 @@ namespace Yurube.Story
 
         void AnimateStage()
         {
+            if (m_swingerActive && m_runner != null)
+            {
+                // 1.15秒周期で「構え → 鋭く薙ぎ払い → 戻り」を繰り返す素振りアニメーション
+                float elapsed = Mathf.Max(0f, m_time - m_runnerStart);
+                const float cycle = 1.15f;
+                float phase = (elapsed % cycle) / cycle;
+                float yaw;
+                if (phase < 0.25f)
+                {
+                    float u = Mathf.SmoothStep(0f, 1f, phase / 0.25f);
+                    yaw = Mathf.Lerp(90f, 112f, u);
+                }
+                else if (phase < 0.55f)
+                {
+                    float u = (phase - 0.25f) / 0.30f;
+                    yaw = Mathf.Lerp(112f, -110f, Mathf.Pow(u, 1.8f));
+                }
+                else
+                {
+                    float u = Mathf.SmoothStep(0f, 1f, (phase - 0.55f) / 0.45f);
+                    yaw = Mathf.Lerp(-110f, 90f, u);
+                }
+                if (m_swingerHammer != null)
+                {
+                    m_swingerHammer.transform.localPosition = new Vector3(0f, 0.28f, 0f);
+                    m_swingerHammer.transform.localRotation = Quaternion.Euler(0f, yaw, 0f) * Quaternion.Euler(0f, 0f, 90f);
+                }
+                return;
+            }
             if (!m_runnerActive || m_runner == null) return;
-            float u = Mathf.Clamp01((m_time - m_runnerStart) / m_runnerDuration);
-            Vector3 pos = Vector3.Lerp(m_runnerA, m_runnerB, u);
-            pos.y += Mathf.Abs(Mathf.Sin(u * Mathf.PI * 8f)) * 0.06f;
+            float cu = Mathf.Clamp01((m_time - m_runnerStart) / m_runnerDuration);
+            Vector3 pos = Vector3.Lerp(m_runnerA, m_runnerB, cu);
+            pos.y += Mathf.Abs(Mathf.Sin(cu * Mathf.PI * 8f)) * 0.06f;
             m_runner.position = pos;
             m_runner.rotation = Quaternion.LookRotation(Vector3.right);
-            if (u >= 1f) m_runnerActive = false;
+            if (cu >= 1f) m_runnerActive = false;
         }
 
         void RestoreRunner()
         {
+            if (m_swingerHammer != null)
+            {
+                m_swingerHammer.transform.localPosition = m_swingerHammerBasePos;
+                m_swingerHammer.transform.localRotation = m_swingerHammerBaseRot;
+                m_swingerHammer.enabled = m_swingerHammerWasEnabled;
+                m_swingerHammer = null;
+            }
+            m_swingerActive = false;
             if (m_runner != null)
             {
                 m_runner.position = m_runnerHome;
@@ -2940,6 +3220,13 @@ namespace Yurube.Story
             ApplyLook();
         }
 
+        void SetDarkMood(bool on)
+        {
+            if (m_darkMood == on) return;
+            m_darkMood = on;
+            ApplyLook();
+        }
+
         void ApplyLook()
         {
             if (m_volume == null || m_ca == null) return;
@@ -2957,6 +3244,17 @@ namespace Yurube.Story
                 m_vig.intensity.value = 0.45f;
                 m_vig.color.value = new Color(0.25f, 0.15f, 0.08f);
                 m_bloom.intensity.value = 0.8f;
+            }
+            else if (m_darkMood)
+            {
+                // 視線が一瞬だけ暗くなる演出（古い槌のカット）
+                m_ca.saturation.value = -24f;
+                m_ca.contrast.value = 10f;
+                m_ca.postExposure.value = -0.35f;
+                m_ca.colorFilter.value = new Color(0.84f, 0.82f, 0.88f);
+                m_vig.intensity.value = 0.58f;
+                m_vig.color.value = new Color(0.05f, 0.04f, 0.06f);
+                m_bloom.intensity.value = 0.25f;
             }
             else
             {

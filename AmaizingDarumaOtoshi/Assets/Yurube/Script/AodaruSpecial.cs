@@ -57,6 +57,13 @@ namespace Yurube
         // CPU 用(suehara): 疾風連撃を使うか / 斬撃が届く距離
         public bool UsesGaleCombo => m_useGaleCombo;
         public float SlashRange => m_slashRange;
+        // ラボ表示・可視化用
+        public float RemainingSeconds => m_galeUntil >= 0.0f ? Mathf.Max(0.0f, m_galeUntil - Time.time) : 0.0f;
+        public float GaleDuration => m_galeDuration;
+        public float SlashSpeed => m_slashSpeed;
+        public float SlashWidth => m_slashWidth;
+        public float SlashHeight => m_slashHeight;
+        public float SlashDepth => m_slashDepth;
 
         private void Awake()
         {

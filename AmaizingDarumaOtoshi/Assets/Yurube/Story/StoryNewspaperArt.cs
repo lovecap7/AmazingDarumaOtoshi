@@ -7,12 +7,14 @@ namespace Yurube.Story
     public static class StoryNewspaperArt
     {
         static Sprite s_sprite;
+        static Sprite s_prologueSprite;
         static Sprite s_preludeSprite;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         static void Reset()
         {
             s_sprite = null;
+            s_prologueSprite = null;
             s_preludeSprite = null;
         }
 
@@ -21,7 +23,9 @@ namespace Yurube.Story
         public static Sprite Create(string artId)
         {
             if (artId == "prelude") return CreatePreludeArt();
-            if (s_sprite != null) return s_sprite;
+            bool twoEyes = artId == "prologue";
+            if (twoEyes && s_prologueSprite != null) return s_prologueSprite;
+            if (!twoEyes && s_sprite != null) return s_sprite;
 
             const int w = 1180, h = 320;
             var px = new Color[w * h];
@@ -63,9 +67,10 @@ namespace Yurube.Story
             // 頭の上のちょんまげ
             Disc(px, w, h, 330, 276, 27, ink);
             Disc(px, w, h, 330, 276, 21, gold);
-            // 片目（左は黒、右は空）
+            // 目（序章では両目を描く。第1章以降は従来のデザインを維持）
             Disc(px, w, h, 304, 186, 11, ink);
-            Ring(px, w, h, 356, 186, 14, 5, ink);
+            if (twoEyes) Disc(px, w, h, 356, 186, 11, ink);
+            else Ring(px, w, h, 356, 186, 14, 5, ink);
             // 眉
             Ellipse(px, w, h, 304, 211, 20, 4, ink);
             Ellipse(px, w, h, 356, 211, 20, 4, ink);
@@ -116,15 +121,17 @@ namespace Yurube.Story
 
             var tex = new Texture2D(w, h, TextureFormat.RGBA32, false)
             {
-                name = "StoryNewspaperArt",
+                name = twoEyes ? "StoryNewspaperArt_Prologue" : "StoryNewspaperArt",
                 wrapMode = TextureWrapMode.Clamp,
                 filterMode = FilterMode.Bilinear,
             };
             tex.SetPixels(px);
             tex.Apply();
-            s_sprite = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 100f);
-            s_sprite.name = "StoryNewspaperArt";
-            return s_sprite;
+            var created = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 100f);
+            created.name = tex.name;
+            if (twoEyes) s_prologueSprite = created;
+            else s_sprite = created;
+            return created;
         }
 
         // プロローグ用：「8年前 王冠大会 決勝会場」のモノクロ写真風（暗い会場と舞台上の古い槌）
