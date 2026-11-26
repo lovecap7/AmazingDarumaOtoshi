@@ -296,7 +296,7 @@
   - `Scripts/Gimmicks/Ink/InkTrailGimmick.cs`・`Shaders/InkTrail.shader`（墨の筆跡）
   - `Scripts/Gimmicks/Hanabi/NezumiHanabiGimmick.cs`（ねずみ花火）
   - `Editor/BackdropBuilder.Detailed.cs`（新しい背景 Kakizome・HanabiEngawa と、作り込み用の補助）。`BackdropBuilder.cs` は partial にして、定義を2つ足した
-  - `Editor/StageBuilder.cs` に Stage25・26 の定義と、メニュー `Nakagawa/Stages/Build Stages 25-26 Into AllStages` を足した
+  - `Editor/StageBuilder.cs` に Stage25・26 の定義と、メニュー `Nakagawa/Stages/AllStages に Stage25〜26 を作る` を足した
 - **背景の作り込み**: 3D モデルは使わず、ビルダーの中で回転体（器・筆）・角を丸めた箱（硯・座卓）・押し出し（すいか）・管（蚊取り線香）のメッシュと、
   木目・半紙・畳・フェルト・障子などのテクスチャを計算で作る（`Backdrops/Meshes`・`Backdrops/Textures` に保存）。ろうそく・電球は点の光。
 - **墨の筆跡**

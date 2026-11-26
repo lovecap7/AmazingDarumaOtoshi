@@ -488,6 +488,9 @@ namespace Nakagawa.EditorTools
                 return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
             }
 
+            // XZ の平らな格子(水面など。中心ほど細かく、外ほど粗い。BackdropBuilder.StageSurfaces.cs の BuildGrid)
+            public Mesh Grid(string name, float halfSize, float cell, float growth) => Keep(name, () => BuildGrid(halfSize, cell, growth));
+
             // 回転体。profile は (半径, 高さ) を下から上へ。同じ点を2つ続けると、そこで角になる
             public Mesh Lathe(string name, Vector2[] profile, int segments) => Keep(name, () => BuildLathe(profile, segments));
 

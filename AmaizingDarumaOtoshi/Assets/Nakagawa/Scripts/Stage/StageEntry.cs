@@ -16,7 +16,7 @@ namespace Nakagawa
         // このステージを映すカメラの位置・向き
         [SerializeField] Transform m_cameraPoint;
         // このステージの背景(StageBackdrop のプレハブ)。なしでもよい
-        // 変えたら「Nakagawa > Backdrops > Apply Backdrops To Open Scene」で、ステージの子に置かれた背景を作り直す
+        // 変えたら「Nakagawa > Backdrops > 開いているシーンに背景を置き直す」で、ステージの子に置かれた背景を作り直す
         [SerializeField] StageBackdrop m_backdrop;
 
         public StageInfo Info => m_info;

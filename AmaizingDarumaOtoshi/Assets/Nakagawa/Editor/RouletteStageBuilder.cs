@@ -54,7 +54,7 @@ namespace Nakagawa.EditorTools
             "止まったポケットの色で空から物が降る(赤: 積み木の雨 / 黒: 重りの雨で周りが吹き飛ぶ / 0: ジャックポット)。" +
             "止まったポケットは奈落になり(既に奈落なら隣)、回すたびに穴が増えて外周が危険になる。回す間隔もだんだん短くなる。";
 
-        [MenuItem("Nakagawa/Stages/Build Stage20 (Roulette) Into Open AllStages")]
+        [MenuItem("Nakagawa/Stages/開いている AllStages に Stage20(ルーレット)を作る")]
         public static void BuildMenu()
         {
             Debug.Log(Build());

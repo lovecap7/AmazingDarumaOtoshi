@@ -83,9 +83,9 @@ namespace Nakagawa
         [Header("色(耐久が多い順)")]
         [SerializeField] Color[] m_hpColors =
         {
-            new Color(0.80f, 0.88f, 0.92f, 1.0f),   // 白に近い薄い水色
-            new Color(0.56f, 0.62f, 0.68f, 1.0f),   // くすんだ青灰
-            new Color(0.33f, 0.36f, 0.43f, 1.0f),   // 暗い紺灰(真っ黒にはしない)
+            new Color(0.80f, 0.88f, 0.92f, 1.0f),   // 耐久3: 白に近い薄い水色
+            new Color(0.83f, 0.48f, 0.49f, 1.0f),   // 耐久2: 水色と赤の間(少し赤寄り)
+            new Color(0.85f, 0.22f, 0.20f, 1.0f),   // 耐久1: 赤(次に割れたら落ちる)
         };
         [SerializeField] Color m_edgeColor = new Color(0.9f, 0.95f, 0.98f, 1.0f);
         [SerializeField] Color m_warningColor = GimmickPalette.Warning;

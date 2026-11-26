@@ -426,7 +426,7 @@ namespace Nakagawa.EditorTools
         //========================================
 
         // 枠(壁)を鉄板のふち(焦げた黒い鉄。角を丸め、上に少し張り出したへり)にする。何度実行しても同じ結果になる
-        [MenuItem("Nakagawa/Stages/Dress Stage18 Rim (Iron Plate Edge)")]
+        [MenuItem("Nakagawa/Stages/Stage18 の縁を鉄板のふちにする")]
         public static void DressStage18Rim()
         {
             const string kId = "Stage18";
