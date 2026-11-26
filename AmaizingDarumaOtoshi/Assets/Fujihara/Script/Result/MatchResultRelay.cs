@@ -81,6 +81,7 @@ public static class ResultData
         public int score;               // 点数（タイムモード）
         public int team = -1;           // チーム(0 赤〜3 黄)。個人戦は -1
         public int teamScore;           // チーム戦では、チームの点数の合計。個人戦は score と同じ
+        public MatchSetup.Entry setup;  // セレクトで決めたその人の情報（何P・CPU・チーム。だるまの色を決めるのに使う。無ければ null）
     }
 
     public static readonly List<Entry> Ranking = new List<Entry>();   // 1位から順
@@ -124,6 +125,7 @@ public static class ResultData
                 score = p.Score,
                 team = p.Entry.team,
                 teamScore = teamScore,
+                setup = p.Entry,
             };
             var stack = p.Stack;
             if (stack != null)

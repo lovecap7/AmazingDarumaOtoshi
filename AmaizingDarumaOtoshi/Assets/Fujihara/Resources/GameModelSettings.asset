@@ -47,3 +47,4 @@ MonoBehaviour:
   useHammerModel: 1
   cursorHammerModel: {fileID: 919132149155446097, guid: 0c938ca9e2ea039479fdb8caa53f4edb, type: 3}
   resultHeadHeight: 0.85
+  crownModel: {fileID: 919132149155446097, guid: 7e3bc95d7707d5d49bc12dfdd937c068, type: 3}

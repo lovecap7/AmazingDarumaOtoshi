@@ -188,11 +188,28 @@ public class GameModelSettings : ScriptableObject
     public float resultHeadHeight = 0.85f;
 
     // ToyKit.CreateHead の頭を、そのキャラのモデルにする（モデルが無ければそのまま）。差し替えたら true
-    public static bool ApplyHead(ToyKit.Face face, CharacterData character)
+    // setup：その人（何P・CPU・チーム）。あれば試合と同じ色のモデル・鉢巻にする（無ければいつもの木と白の鉢巻）
+    public static bool ApplyHead(ToyKit.Face face, CharacterData character, MatchSetup.Entry setup = null)
     {
         var s = Current;
         if (s == null || !s.useModels || face == null || character == null || character.model == null) return false;
-        ToyKit.AttachHeadModel(face.root, character.model, s.resultHeadHeight, 180f);   // ToyKit の頭は -Z が正面
+        var model = setup != null ? character.ModelFor(CharacterColorOf(setup)) : character.model;
+        var band = HachimakiFor(setup != null ? BandColorOf(setup) : DarumaColor.Wood);
+        ToyKit.AttachHeadModel(face.root, model, s.resultHeadHeight, 180f, band);   // ToyKit の頭は -Z が正面
+        return true;
+    }
+
+    [Header("王冠（リザルトで1位がかぶる）")]
+    [Tooltip("王冠のモデル（Model/Crown/crown_wear.fbx）。だるまの頭と同じ原点・大きさで作ったもの")]
+    public GameObject crownModel;
+
+    // 木の積み木を、その色に染めて置く（リザルトの表彰台など）。差し替えたら true
+    public static bool ApplyWoodBlock(Transform block, Color color)
+    {
+        var s = Current;
+        if (s == null || !s.UseWood || block == null) return false;
+        var mat = ToyKit.UseBlockModel(block, null, s.woodMesh, s.woodMaterial, new Vector3(ToyKit.BlockW, ToyKit.BlockH, ToyKit.BlockD), 0f);
+        if (mat != null) mat.SetColor("_BaseColor", s.WoodTintFor(color));
         return true;
     }
 
