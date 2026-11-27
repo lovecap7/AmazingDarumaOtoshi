@@ -213,6 +213,7 @@ public class ResultTowerScreen : MonoBehaviour
         {
             e.blockColors.Clear();
             int n = Mathf.Clamp(e.score, 0, MaxScoreBlocks);
+            Debug.Log($"[Result] {e.label} score={e.score} teamScore={e.teamScore} → 積み木{n}個");   // 確認用。確認できたら削除してよい
             Color light = Color.Lerp(e.playerColor, Color.white, 0.35f);
             for (int b = 0; b < n; b++) e.blockColors.Add(b % 2 == 0 ? e.playerColor : light);
             e.blocks = n;
@@ -511,7 +512,18 @@ public class ResultTowerScreen : MonoBehaviour
         resultText.fontSharedMaterial = popMat;
         ToyKit.Anchor(resultText.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 40f), new Vector2(1400f, 140f));
         string name = isDraw || winner == null || winner.character == null ? "" : winner.character.displayName + "　　";
-        string stats = isDraw || winner == null ? "" : $"{name}くずした　{winner.knocks}　　とばした　{winner.kos}";
+        //string stats = isDraw || winner == null ? "" : $"{name}くずした　{winner.knocks}　　とばした　{winner.kos}";
+        string stats;
+        if (isDraw || winner == null) stats = "";
+        else if (mode == MatchSetup.MatchMode.Time)
+        {
+            stats = $"{name}ポイント　{winner.score}";   // タイムは試合中の得点を出す
+        }
+        else
+        {
+            stats = $"{name}くずした　{winner.knocks}　　とばした　{winner.kos}";
+        }
+           
         statsText = ToyKit.UIText("Stats", res, font, stats, 38f, ToyKit.Ink);
         ToyKit.Anchor(statsText.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, -55f), new Vector2(1400f, 60f));
 

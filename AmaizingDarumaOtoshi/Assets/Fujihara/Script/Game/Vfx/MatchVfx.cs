@@ -3,7 +3,7 @@ using UnityEngine;
 
 // 試合の演出をまとめて動かす係。ゲームが始まると自動で1つ作られ、シーンをまたいで残る（シーン・プレハブには置かない）。
 // 演出ごとの中身は DustVfx（土埃）・SwingTrailVfx（ハンマーの軌跡）・RallyVfx（打ち返しの衝撃波）・KillExplosionVfx（即死の大爆発）・
-// ExcaliburVfx（だるきんぐの必殺技）。
+// ExcaliburVfx（だるきんぐの必殺技）・AodaruPlasmaVfx（あおだるの必殺技の斬撃）。
 // どれも試合を読むだけで、試合の動き（当たり判定・時間）には影響しない。設定は MatchVfxSettings
 public class MatchVfx : MonoBehaviour
 {
@@ -24,6 +24,7 @@ public class MatchVfx : MonoBehaviour
         go.AddComponent<RallyVfx>();
         go.AddComponent<KillExplosionVfx>();
         go.AddComponent<ExcaliburVfx>();
+        go.AddComponent<AodaruPlasmaVfx>();
     }
 
     // 体（生きている体・幽霊）から、そのプレイヤーを探す（試合が無い・見つからなければ null）

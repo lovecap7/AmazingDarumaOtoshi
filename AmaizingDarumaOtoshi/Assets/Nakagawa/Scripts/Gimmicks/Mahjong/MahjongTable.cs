@@ -21,6 +21,9 @@ namespace Nakagawa
     //                  ねらっている間は、画面上部に「ボタンを押して落とせ！」と出す(人が発動したときだけ)
     //     5. ツモ    : 落としてから5秒後に「○P ツモ！」→ 中央のふたの縁が黄色く点滅 → ふたが開いて穴になり(巨大な牌も物理で動きながら中央へ吸い込まれる)、
     //                  発動した人以外のプレイヤー・積み木・牌が中央へ流される → ふたが閉じ、4辺の縁の内側から積み木がせり上がって補充される
+    //  ・ふたが4枚の台形の板のとき(m_lidPanels)は、中央の島(m_islandSize)を残して、そのまわりの板が下へ開く。
+    //    流れは一点に集めず、穴の一番近い縁へ向かう(少し渦を巻く)。島の上のものは外へ押し出す
+    //  ・中央の島の装飾(m_console)に、各プレイヤーの点数と、洗牌までのカウントダウン(ランプの点いている数)を出す
     //  ・手持ちの牌は、画面下の各自の HUD パネルの上に並べる(MatchHud の IMatchHudPanelExtra)
     // 卓は全周が壁なので、落下はふたが開いている間だけ
     // 開始のカウントダウン中は止まる。ネット対戦ではホストが計算し、クライアントは状態を受け取って見た目だけ合わせる
@@ -41,7 +44,25 @@ namespace Nakagawa
         [SerializeField] Color m_lidEdgeColor = new Color(0.32f, 0.3f, 0.26f, 1.0f);
         [SerializeField] Color m_warningColor = GimmickPalette.Warning;
         // ふたが開くときに下がる深さ(穴の底に床が見えて「床があるのに落ちる」ように見えないよう、深く沈めて開き切ったら隠す)
+        // (m_lidPanels があるときは使わない)
         [SerializeField] float m_lidDrop = 8.0f;
+        // ふたを4枚の台形の板に分けるとき(中央の島のまわりが開く): 各板の、外側の辺にある蝶番(板は蝶番の +Z 側に伸びる)
+        // 開くと、内側の辺が下がって穴の壁に垂れ下がる
+        [SerializeField] Transform[] m_lidPanels;
+        [SerializeField, Range(0.0f, 90.0f)] float m_panelOpenAngle = 87.0f;
+        // 板がこれだけ開いたら(0〜1)、ふたの当たり判定を消して落ち始める
+        [SerializeField, Range(0.0f, 1.0f)] float m_panelFallOpen = 0.3f;
+        // 中央に残る島(開かない。0 なら島なし)。上面は床と同じ高さで、中央の装飾(点数・カウントダウンのランプ)を貼る
+        [SerializeField] Vector2 m_islandSize = Vector2.zero;
+        [SerializeField] Collider m_islandCollider;
+        [SerializeField] Renderer m_console;
+        // カウントダウンのランプの数と色(落としてから洗牌が始まるまでに、順に点く)
+        [SerializeField, Min(1)] int m_lampCount = 8;
+        [SerializeField, ColorUsage(false, true)] Color m_lampCountColor = new Color(2.6f, 1.7f, 0.35f, 1.0f);
+        [SerializeField, ColorUsage(false, true)] Color m_lampWarnColor = new Color(3.2f, 2.7f, 0.4f, 1.0f);
+        [SerializeField, ColorUsage(false, true)] Color m_lampFlowColor = new Color(3.0f, 1.3f, 0.3f, 1.0f);
+        // 点数の表示の明るさ(プレイヤーの色に掛ける)
+        [SerializeField] float m_scoreGlow = 2.2f;
 
         [Header("牌")]
         [SerializeField, Min(0.5f)] float m_dropInterval = 4.0f;
@@ -153,6 +174,17 @@ namespace Nakagawa
         // 中央へ流す強さ(加速度 m/s²)
         [SerializeField] float m_flowAccel = 14.0f;
         [SerializeField] float m_tileFlowAccel = 8.0f;
+        // 流れ方(一点に集めず、穴の一番近い縁へ向かって流れ込むようにする)
+        //  ・穴の近くほど強く(m_flowNearScale)、卓の端では弱い(m_flowFarScale)
+        //  ・反時計回りの渦を少し混ぜる(m_flowSwirl。0 で真っすぐ)
+        //  ・開いた直後は m_flowRampTime 秒かけて強くなる
+        //  ・ねらう先は穴の縁から m_flowEdgeInset だけ内側。島の上のものは m_islandPush の強さで一番近い辺から押し出す
+        [SerializeField] float m_flowNearScale = 1.35f;
+        [SerializeField] float m_flowFarScale = 0.65f;
+        [SerializeField, Range(0.0f, 1.0f)] float m_flowSwirl = 0.3f;
+        [SerializeField, Min(0.0f)] float m_flowRampTime = 0.6f;
+        [SerializeField, Min(0.0f)] float m_flowEdgeInset = 0.8f;
+        [SerializeField] float m_islandPush = 1.2f;
         [SerializeField] TumikiBlock m_tumikiPrefab;
         [SerializeField] TumikiSpawner m_spawner;
         // 補充する積み木の数(盤面の上限まで)と、出てくる場所の壁からの距離
@@ -288,6 +320,8 @@ namespace Nakagawa
         float m_lidOpen;
         MaterialPropertyBlock m_mpb;
         Renderer[] m_lidRenderers;
+        Quaternion[] m_panelRest;
+        MaterialPropertyBlock m_consoleMpb;
         AudioSource m_rumble;
         MeshRenderer m_dropShadow, m_dropRing;
         DarumaMatch m_match;
@@ -299,6 +333,10 @@ namespace Nakagawa
         Vector3 AimCenter => Center + new Vector3(m_aim.x, 0.0f, m_aim.y);
         bool Aiming => m_phase == Phase.Fly || m_phase == Phase.Aim;
         bool LidOpen => m_phase == Phase.Open || m_phase == Phase.Flow || m_phase == Phase.Close;
+        bool HasPanels => m_lidPanels != null && m_lidPanels.Length > 0;
+        bool HasIsland => m_islandSize.x > 0.0f && m_islandSize.y > 0.0f;
+        // 中央の穴に物が落ちる状態か(板のときは、ある程度開いてから)
+        bool HoleOpen => LidOpen && (!HasPanels || m_lidOpen >= m_panelFallOpen);
         float TileRestY => Center.y + MahjongTileArt.HalfHeight;
 
         //========================================
@@ -376,7 +414,13 @@ namespace Nakagawa
         private void Awake()
         {
             m_mpb = new MaterialPropertyBlock();
+            m_consoleMpb = new MaterialPropertyBlock();
             if (m_lid != null) m_lidBase = m_lid.localPosition;
+            if (HasPanels)
+            {
+                m_panelRest = new Quaternion[m_lidPanels.Length];
+                for (int i = 0; i < m_lidPanels.Length; i++) if (m_lidPanels[i] != null) m_panelRest[i] = m_lidPanels[i].localRotation;
+            }
             m_rumble = GimmickSound.CreateLoop(transform, GimmickSound.Rumble);
             m_dropShadow = EffectMeshes.Create("PonShadow", transform, EffectMeshes.Disc, false);
             m_dropRing = EffectMeshes.Create("PonRing", transform, EffectMeshes.Ring, true);
@@ -524,14 +568,14 @@ namespace Nakagawa
             foreach (var g in m_giants)
             {
                 if (g.Body == null || g.Body.isKinematic || g.Gone) continue;
-                Vector3 to = Center - g.Body.position;
-                to.y = 0.0f;
-                if (to.sqrMagnitude < 0.01f) continue;
                 // 卓の上に接地している間だけ強く引く(穴へ落ち始めたら元の強さ)
                 float restY = Center.y + MahjongTileArt.HalfHeight * m_giantScaleNow;
                 bool grounded = g.Body.position.y >= restY - m_giantGroundedTolerance;
                 float accel = m_giantFlowAccel * (grounded ? m_giantGroundedFlowScale : 1.0f);
-                g.Body.AddForce(to.normalized * accel, ForceMode.Acceleration);
+                g.Body.AddForce(FlowAccel(g.Body.position, accel), ForceMode.Acceleration);
+                // 穴へ落ち始めたら、島の角に引っかからないよう島とは当たらないようにする
+                if (m_islandCollider != null && g.Collider != null && g.Body.position.y < Center.y - 0.6f)
+                    Physics.IgnoreCollision(g.Collider, m_islandCollider, true);
             }
         }
 
@@ -600,6 +644,58 @@ namespace Nakagawa
             return Mathf.Abs(local.x) < m_lidSize.x * 0.5f + margin && Mathf.Abs(local.z) < m_lidSize.y * 0.5f + margin;
         }
 
+        // 中央に残る島の上か(local: 卓の中心からの位置)
+        bool InIsland(Vector3 local)
+        {
+            return HasIsland && Mathf.Abs(local.x) < m_islandSize.x * 0.5f && Mathf.Abs(local.z) < m_islandSize.y * 0.5f;
+        }
+
+        // 開いたときに穴になる所か(ふたの範囲から島を除いた所)
+        bool InHole(Vector3 local) => InLid(local) && !InIsland(local);
+
+        // 洗牌の間に、位置 world のものを流す加速度(水平。strength は基本の強さ m/s²)
+        //  ・卓の上: 穴の一番近い縁(の少し内側)へ向かう。四辺の縁に沿って広く流れ込み、角の近くは角へ向かう。反時計回りの渦を少し混ぜる
+        //  ・島の上: 一番近い辺から穴へ押し出す
+        //  ・穴の上(落ちる途中): 穴の帯の真ん中へ少し寄せる(壁や島の縁に引っかからないように)
+        Vector3 FlowAccel(Vector3 world, float strength)
+        {
+            Vector3 l = world - Center;
+            Vector2 p = new Vector2(l.x, l.z);
+            float hx = m_lidSize.x * 0.5f, hz = m_lidSize.y * 0.5f;
+            float ramp = m_phase == Phase.Flow && m_flowRampTime > 0.0f ? Mathf.SmoothStep(0.0f, 1.0f, m_phaseTimer / m_flowRampTime) : 1.0f;
+            Vector2 dir;
+            float scale;
+            if (InIsland(l))
+            {
+                float ex = m_islandSize.x * 0.5f - Mathf.Abs(p.x), ez = m_islandSize.y * 0.5f - Mathf.Abs(p.y);
+                dir = ex < ez ? new Vector2(Mathf.Sign(p.x), 0.0f) : new Vector2(0.0f, Mathf.Sign(p.y));
+                scale = m_islandPush;
+            }
+            else if (Mathf.Abs(p.x) < hx && Mathf.Abs(p.y) < hz)
+            {
+                float ix = HasIsland ? m_islandSize.x * 0.5f : 0.0f, iz = HasIsland ? m_islandSize.y * 0.5f : 0.0f;
+                Vector2 mid = new Vector2((hx + ix) * 0.5f, (hz + iz) * 0.5f);
+                Vector2 to = Mathf.Abs(p.x) / hx > Mathf.Abs(p.y) / hz
+                    ? new Vector2(Mathf.Sign(p.x) * mid.x - p.x, 0.0f)
+                    : new Vector2(0.0f, Mathf.Sign(p.y) * mid.y - p.y);
+                dir = to.sqrMagnitude > 0.0001f ? to.normalized : Vector2.zero;
+                scale = 0.35f;
+            }
+            else
+            {
+                float ax = Mathf.Max(0.0f, hx - m_flowEdgeInset), az = Mathf.Max(0.0f, hz - m_flowEdgeInset);
+                Vector2 target = new Vector2(Mathf.Clamp(p.x, -ax, ax), Mathf.Clamp(p.y, -az, az));
+                Vector2 to = target - p;
+                float dist = to.magnitude;
+                dir = dist > 0.0001f ? to / dist : Vector2.zero;
+                Vector2 tangent = new Vector2(-p.y, p.x);
+                if (tangent.sqrMagnitude > 0.0001f) dir = (dir + tangent.normalized * m_flowSwirl).normalized;
+                float far = Mathf.Max(0.1f, Mathf.Max(m_tableSize.x - m_lidSize.x, m_tableSize.y - m_lidSize.y) * 0.5f);
+                scale = Mathf.Lerp(m_flowNearScale, m_flowFarScale, Mathf.Clamp01(dist / far));
+            }
+            return new Vector3(dir.x, 0.0f, dir.y) * (strength * scale * ramp);
+        }
+
         void UpdateField(float dt)
         {
             for (int i = m_field.Count - 1; i >= 0; i--)
@@ -623,7 +719,7 @@ namespace Nakagawa
                     default:
                         t.Age += dt;
                         StepSliding(t, dt);
-                        if (LidOpen && InLid(t.Position - Center))
+                        if (HoleOpen && InHole(t.Position - Center))
                         {
                             t.State = 1;
                             t.Velocity = new Vector3(t.Velocity.x, 0.0f, t.Velocity.z);
@@ -657,7 +753,7 @@ namespace Nakagawa
             Vector3 next = t.Position + t.Velocity * dt;
             BounceWalls(ref next, ref t.Velocity);
             t.Yaw += t.YawSpeed * dt;
-            bool overHole = LidOpen && InLid(next - Center);
+            bool overHole = HoleOpen && InHole(next - Center);
             float floorY = TileRestY;
             if (!overHole && next.y <= floorY && t.Position.y >= floorY - 0.3f)
             {
@@ -678,9 +774,7 @@ namespace Nakagawa
         {
             if (m_phase == Phase.Flow)
             {
-                Vector3 to = Center - t.Position;
-                to.y = 0.0f;
-                if (to.sqrMagnitude > 0.01f) t.Velocity += to.normalized * (m_tileFlowAccel * dt);
+                t.Velocity += FlowAccel(t.Position, m_tileFlowAccel) * dt;
             }
             else
             {
@@ -943,6 +1037,7 @@ namespace Nakagawa
                     break;
                 case Phase.Open:
                     m_lidOpen = Mathf.Clamp01(m_phaseTimer / m_openTime);
+                    if (HoleOpen && m_lidCollider != null && m_lidCollider.enabled) m_lidCollider.enabled = false;
                     if (m_phaseTimer >= m_openTime) SetPhase(Phase.Flow);
                     break;
                 case Phase.Flow:
@@ -984,7 +1079,8 @@ namespace Nakagawa
             else if (phase != Phase.Aim) HideAimMessage();
             if (phase == Phase.Open)
             {
-                if (m_lidCollider != null) m_lidCollider.enabled = false;
+                // 板に分けたふたは、ある程度開いてから当たり判定を消す(UpdatePhase)
+                if (m_lidCollider != null && !HasPanels) m_lidCollider.enabled = false;
                 // 巨大な牌は物理のまま、穴へ吸い込まれていく(減速を弱める)
                 foreach (var g in m_giants)
                 {
@@ -1334,10 +1430,9 @@ namespace Nakagawa
             foreach (var target in m_targets)
             {
                 if (target is DarumaCharacter c && c == immune) continue;
-                Vector3 to = Center - target.Rigidbody.position;
-                to.y = 0.0f;
-                if (to.sqrMagnitude < 0.04f) continue;
-                target.AddForce(to.normalized * m_flowAccel);
+                Vector3 accel = FlowAccel(target.Rigidbody.position, m_flowAccel);
+                if (accel.sqrMagnitude < 0.0001f) continue;
+                target.AddForce(accel);
             }
         }
 
@@ -1387,7 +1482,18 @@ namespace Nakagawa
 
         void ApplyLid()
         {
-            if (m_lid != null)
+            UpdateConsole();
+            if (HasPanels)
+            {
+                // 4枚の板: 外側の蝶番を軸に、内側の辺から下へ開く(重みで落ちるように、始めはゆっくり、後は速く)
+                float k = m_lidOpen * m_lidOpen * (3.0f - 2.0f * m_lidOpen);
+                for (int i = 0; i < m_lidPanels.Length; i++)
+                {
+                    if (m_lidPanels[i] == null) continue;
+                    m_lidPanels[i].localRotation = m_panelRest[i] * Quaternion.Euler(m_panelOpenAngle * k, 0.0f, 0.0f);
+                }
+            }
+            else if (m_lid != null)
             {
                 // 開くときは速く沈み始める(すぐに穴に見えるように)
                 float k = 1.0f - (1.0f - m_lidOpen) * (1.0f - m_lidOpen);
@@ -1411,6 +1517,76 @@ namespace Nakagawa
                 m_mpb.SetColor(s_baseColorId, edge);
                 r.SetPropertyBlock(m_mpb);
             }
+        }
+
+        static readonly int s_lampLitId = Shader.PropertyToID("_LampLit");
+        static readonly int s_lampColorId = Shader.PropertyToID("_LampColor");
+        static readonly int s_lampChaseId = Shader.PropertyToID("_LampChase");
+        static readonly int s_scoresId = Shader.PropertyToID("_Scores");
+        static readonly int s_seatOnId = Shader.PropertyToID("_SeatOn");
+        static readonly int[] s_seatColorIds =
+        {
+            Shader.PropertyToID("_SeatColor0"), Shader.PropertyToID("_SeatColor1"),
+            Shader.PropertyToID("_SeatColor2"), Shader.PropertyToID("_SeatColor3"),
+        };
+
+        // 中央の装飾(Nakagawa/MahjongConsole): 各プレイヤーの点数と、洗牌のカウントダウンのランプ
+        //  ・巨大な牌が着いてから「ツモ！」が終わるまで(洗牌が始まるまで)に、ランプが1つずつ点く。最後の1つが点くと少しして開く
+        //  ・「ツモ！」の間は点いたランプが黄色く点滅し、吸い込んでいる間は全部点いて明るさが回る
+        void UpdateConsole()
+        {
+            if (m_console == null) return;
+            int n = Mathf.Max(1, m_lampCount);
+            float total = Mathf.Max(0.01f, m_settleTime + m_announceTime);
+            float lit = 0.0f;
+            bool chase = false;
+            Color color = m_lampCountColor;
+            switch (m_phase)
+            {
+                case Phase.Settle:
+                    lit = Mathf.Min(n, Mathf.Floor(m_phaseTimer / total * (n + 1)));
+                    break;
+                case Phase.Announce:
+                {
+                    lit = Mathf.Min(n, Mathf.Floor((m_settleTime + m_phaseTimer) / total * (n + 1)));
+                    float progress = m_announceTime > 0.0f ? Mathf.Clamp01(m_phaseTimer / m_announceTime) : 1.0f;
+                    color = m_lampWarnColor * Mathf.Lerp(0.3f, 1.0f, GimmickPalette.Blink(m_time, Mathf.Lerp(3.0f, 9.0f, progress)));
+                    break;
+                }
+                case Phase.Open:
+                case Phase.Flow:
+                    lit = n;
+                    chase = true;
+                    color = m_lampFlowColor;
+                    break;
+                case Phase.Close:
+                    // 閉じるにつれて消えていく
+                    lit = Mathf.Ceil(m_lidOpen * n);
+                    chase = true;
+                    color = m_lampFlowColor;
+                    break;
+            }
+
+            Vector4 scores = Vector4.zero, on = Vector4.zero;
+            m_console.GetPropertyBlock(m_consoleMpb);
+            var match = DarumaMatch.Current;
+            if (match != null)
+            {
+                foreach (var p in match.Players)
+                {
+                    if (p == null || p.Index < 0 || p.Index > 3) continue;
+                    scores[p.Index] = p.Score;
+                    on[p.Index] = 1.0f;
+                    Color c = p.Color;
+                    m_consoleMpb.SetColor(s_seatColorIds[p.Index], new Color(c.r * m_scoreGlow, c.g * m_scoreGlow, c.b * m_scoreGlow, 1.0f));
+                }
+            }
+            m_consoleMpb.SetFloat(s_lampLitId, lit * 8.0f / n);
+            m_consoleMpb.SetColor(s_lampColorId, color);
+            m_consoleMpb.SetFloat(s_lampChaseId, chase ? 1.0f : 0.0f);
+            m_consoleMpb.SetVector(s_scoresId, scores);
+            m_consoleMpb.SetVector(s_seatOnId, on);
+            m_console.SetPropertyBlock(m_consoleMpb);
         }
 
         void UpdateFieldVisuals()
