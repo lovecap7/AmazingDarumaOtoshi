@@ -515,6 +515,9 @@ namespace Nakagawa.EditorTools
 
             // 点の列に沿った管
             public Mesh Tube(string name, List<Vector3> path, float radius, int sides) => Keep(name, () => BuildTube(path, radius, sides));
+
+            // 自分で組み立てたメッシュ(布団など)を、この背景のメッシュとして保存する
+            public Mesh Custom(string name, Func<Mesh> build) => Keep(name, build);
         }
 
         static Mesh BuildLathe(Vector2[] p, int seg)

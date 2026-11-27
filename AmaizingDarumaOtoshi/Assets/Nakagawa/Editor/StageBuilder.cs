@@ -163,6 +163,7 @@ namespace Nakagawa.EditorTools
 
         // 背景の id(BackdropBuilder の定義)
         const string kChanomaBackdrop = "Chanoma";
+        const string kKotatsuBackdrop = "Kotatsu";
         const string kKitchenBackdrop = "Kitchen";
         const string kDeskBackdrop = "Desk";
         const string kEngawaBackdrop = "Engawa";
@@ -2265,10 +2266,11 @@ namespace Nakagawa.EditorTools
                 }).Backdrop = kIceSeaBackdrop;
 
             var mahjongStage = Add("こたつの全自動卓", 24,
-                "お茶の間のこたつに置いた全自動麻雀卓。全周が縁(壁)の卓の上に、空から4種類の牌が降ってくる。中央の 9×9m はふたで、ふだんは床。",
+                "お茶の間のこたつに置いた全自動麻雀卓。全周が縁(壁)の卓の上に、空から4種類の牌が降ってくる。中央の 9×9m はふたで、ふだんは床。" +
+                "ふたの真ん中の 3×3m は開かない島で、各プレイヤーの点数と、洗牌までのカウントダウンのランプがある。",
                 "牌(東・南・西・北)は触れると取れ、攻撃を受けると手持ちから1枚落とす(やられると全部)。場の牌は積み木に当たると弾かれる。" +
                 "同じ牌3枚(ポン)か4種を1枚ずつそろえると、牌が空に集まって巨大になり、ポンの形で中央のふたの上に落ちてくる(近くの人ははじかれる)。" +
-                "5秒後に「ツモ！」で洗牌が始まり、中央のふたが開いて、発動した人以外のプレイヤーと積み木が中央の穴へ流される。そのあと縁の内側から積み木が補充される。" +
+                "5秒後に「ツモ！」で洗牌が始まり、島のまわりの4枚の板が下へ開いて、発動した人以外のプレイヤーと積み木が穴の近い縁へ流される(島の上の人は外へ押し出される)。そのあと縁の内側から積み木が補充される。" +
                 "牌を持っている人ほど狙われ、あと1枚の人を全員で殴って止めるか、落ちた牌を横取りするかの駆け引きになる。全周が壁なので、落下はふたが開いている間だけ。",
                 c =>
                 {
@@ -2286,9 +2288,10 @@ namespace Nakagawa.EditorTools
                     c.AreaRect(0, 0, 7.5f, 7.5f);
                     c.Spawns(new Vector2(-7, -7), new Vector2(7, -7), new Vector2(-7, 7), new Vector2(7, 7));
                 });
-            mahjongStage.Backdrop = kChanomaBackdrop;
-            // 卓の縁(緑の縁取り + 木目の二重)・各辺の点数表示とプレイヤー表記・点棒入れ
-            mahjongStage.Dress = c => c.DressMahjongTable(26, 26);
+            // 背景は冬のこたつ(卓を大きなこたつの天板の上に置く。BackdropBuilder.Kotatsu.cs)
+            mahjongStage.Backdrop = kKotatsuBackdrop;
+            // 卓の本体(黒い樹脂の縁・四隅の丸い耳・横のトレー・本体)・各辺の点数表示とプレイヤー表記・点棒入れ・中央の穴の中
+            mahjongStage.Dress = c => c.DressMahjongTable(26, 26, 9);
 
             var finalStage = Add("決勝の特設ステージ", 24,
                 "スタジアムの特設ステージ。南北だけ壁があり、東西は崖。左右の広い床(せり上がり塀)が、交互に高台へせり上がっては下がる。",
@@ -2948,7 +2951,8 @@ namespace Nakagawa.EditorTools
             }
 
             // 全自動麻雀卓。遊べる範囲 w×d(全周が壁)の中央に lw×ld のふた(閉じている間は床、開くと穴)
-            public void Mahjong(float cx, float cz, float w, float d, float lw, float ld)
+            // ふたの真ん中の island 四方は開かない島(中央の装飾)。ふたは正方形(lw = ld)として板を作る
+            public void Mahjong(float cx, float cz, float w, float d, float lw, float ld, float island = 3.0f)
             {
                 var felt = LitMaterial("MahjongFelt", new Color(0.33f, 0.42f, 0.36f), 0.15f);
                 var floorBefore = FloorMaterial;
@@ -2971,7 +2975,11 @@ namespace Nakagawa.EditorTools
                 root.transform.position = new Vector3(cx, 0, cz);
                 var table = root.AddComponent<MahjongTable>();
 
-                // ふた(上面が床の高さ。開くと下がる)。動かない床と同じく Rigidbody なし
+                // ふた(上面が床の高さ)。動かない床と同じく Rigidbody なし
+                //  ・当たり判定は lw×ld の箱1つ(見た目なし)。開くと消える
+                //  ・見た目は、中央の島(island 四方。開かない)のまわりの4枚の台形の板。外側の辺の蝶番を軸に、内側の辺から下へ開く
+                //  ・島の上面に中央の装飾(Nakagawa/MahjongConsole。点数とカウントダウンのランプ)
+                //  ・穴の口(島のまわり)に暗がりの板(Nakagawa/HoleDarkness)。開いた穴の中を、深いほど暗く見せる
                 var lid = new GameObject("Lid").transform;
                 lid.SetParent(root.transform, false);
                 var lidBody = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -2979,18 +2987,77 @@ namespace Nakagawa.EditorTools
                 lidBody.transform.SetParent(lid, false);
                 lidBody.transform.localPosition = new Vector3(0, -0.5f, 0);
                 lidBody.transform.localScale = new Vector3(lw, 1.0f, ld);
-                lidBody.GetComponent<Renderer>().sharedMaterial = felt;
+                Object.DestroyImmediate(lidBody.GetComponent<MeshRenderer>());
+                Object.DestroyImmediate(lidBody.GetComponent<MeshFilter>());
+
+                var store = SaveMeshes ? new MeshAssetStore($"{kMeshDir}/{Id}_MahjongLid.asset") : null;
+                float hx = lw * 0.5f, ih = island * 0.5f;
+                // 板(南・東・北・西)。蝶番は外側の辺。板は蝶番の +Z(内側)へ伸びる
+                var panelMesh = MahjongPanelMesh(hx, ih, hx - ih, 0.1f, 0.018f);
+                panelMesh.name = "LidPanel";
+                store?.Add(panelMesh);
+                var panels = new Transform[4];
+                float[] yaws = { 0, -90, 180, 90 };
+                for (int i = 0; i < 4; i++)
+                {
+                    var rot = Quaternion.Euler(0, yaws[i], 0);
+                    var hinge = new GameObject($"PanelHinge{i}").transform;
+                    hinge.SetParent(lid, false);
+                    hinge.localPosition = rot * new Vector3(0, 0, -hx);
+                    hinge.localRotation = rot;
+                    var panel = new GameObject("Panel", typeof(MeshFilter), typeof(MeshRenderer));
+                    panel.transform.SetParent(hinge, false);
+                    panel.GetComponent<MeshFilter>().sharedMesh = panelMesh;
+                    panel.GetComponent<MeshRenderer>().sharedMaterial = felt;
+                    panels[i] = hinge;
+                }
+
+                // 中央の島(穴の底まで届く柱。上面に装飾)
+                var islandSide = LitMaterial("MahjongIslandSide", new Color(0.06f, 0.062f, 0.068f), 0.5f);
+                var islandBody = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                islandBody.name = "Island";
+                islandBody.transform.SetParent(root.transform, false);
+                const float kIslandDepth = 11.0f;
+                islandBody.transform.localPosition = new Vector3(0, -kIslandDepth * 0.5f, 0);
+                islandBody.transform.localScale = new Vector3(island, kIslandDepth, island);
+                islandBody.GetComponent<Renderer>().sharedMaterial = islandSide;
+                var console = GameObject.CreatePrimitive(PrimitiveType.Quad);
+                console.name = "Console";
+                Object.DestroyImmediate(console.GetComponent<Collider>());
+                console.transform.SetParent(root.transform, false);
+                console.transform.localPosition = new Vector3(0, 0.004f, 0);
+                console.transform.localRotation = Quaternion.Euler(90, 0, 0);
+                console.transform.localScale = new Vector3(island, island, 1);
+                var consoleRenderer = console.GetComponent<MeshRenderer>();
+                consoleRenderer.sharedMaterial = ShaderMaterial("MahjongConsole", "Nakagawa/MahjongConsole");
+                consoleRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+
+                // 穴の口の暗がり(ふたの板の下面より上・床のすぐ下)
+                var darkMesh = MahjongRingMesh(hx, ih);
+                darkMesh.name = "HoleDarkness";
+                store?.Add(darkMesh);
+                var dark = new GameObject("HoleDarkness", typeof(MeshFilter), typeof(MeshRenderer));
+                dark.transform.SetParent(root.transform, false);
+                dark.transform.localPosition = new Vector3(0, -0.012f, 0);
+                dark.GetComponent<MeshFilter>().sharedMesh = darkMesh;
+                var darkRenderer = dark.GetComponent<MeshRenderer>();
+                darkRenderer.sharedMaterial = ShaderMaterial("MahjongHoleDarkness", "Nakagawa/HoleDarkness");
+                darkRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                darkRenderer.receiveShadows = false;
+                store?.Save();
+
+                // 穴のまわりの縁取り(床の上。「ツモ！」の間は黄色く点滅する)
                 var edgeMat = LitMaterial("MahjongLidEdge", new Color(0.32f, 0.3f, 0.26f), 0.2f);
                 var edges = new Renderer[4];
                 float ew = 0.12f;
-                Vector3[] pos = { new Vector3(0, 0.005f, ld * 0.5f - ew * 0.5f), new Vector3(0, 0.005f, -ld * 0.5f + ew * 0.5f), new Vector3(lw * 0.5f - ew * 0.5f, 0.005f, 0), new Vector3(-lw * 0.5f + ew * 0.5f, 0.005f, 0) };
-                Vector3[] scl = { new Vector3(lw, 0.01f, ew), new Vector3(lw, 0.01f, ew), new Vector3(ew, 0.01f, ld), new Vector3(ew, 0.01f, ld) };
+                Vector3[] pos = { new Vector3(0, 0.005f, ld * 0.5f + ew * 0.5f), new Vector3(0, 0.005f, -ld * 0.5f - ew * 0.5f), new Vector3(lw * 0.5f + ew * 0.5f, 0.005f, 0), new Vector3(-lw * 0.5f - ew * 0.5f, 0.005f, 0) };
+                Vector3[] scl = { new Vector3(lw + ew * 2, 0.01f, ew), new Vector3(lw + ew * 2, 0.01f, ew), new Vector3(ew, 0.01f, ld), new Vector3(ew, 0.01f, ld) };
                 for (int i = 0; i < 4; i++)
                 {
                     var e = GameObject.CreatePrimitive(PrimitiveType.Cube);
                     Object.DestroyImmediate(e.GetComponent<Collider>());
                     e.name = $"LidEdge{i}";
-                    e.transform.SetParent(lid, false);
+                    e.transform.SetParent(root.transform, false);
                     e.transform.localPosition = pos[i];
                     e.transform.localScale = scl[i];
                     e.GetComponent<Renderer>().sharedMaterial = edgeMat;
@@ -3002,6 +3069,12 @@ namespace Nakagawa.EditorTools
                 so.FindProperty("m_lid").objectReferenceValue = lid;
                 so.FindProperty("m_lidCollider").objectReferenceValue = lidBody.GetComponent<Collider>();
                 so.FindProperty("m_lidSize").vector2Value = new Vector2(lw, ld);
+                var pp = so.FindProperty("m_lidPanels");
+                pp.arraySize = panels.Length;
+                for (int i = 0; i < panels.Length; i++) pp.GetArrayElementAtIndex(i).objectReferenceValue = panels[i];
+                so.FindProperty("m_islandSize").vector2Value = new Vector2(island, island);
+                so.FindProperty("m_islandCollider").objectReferenceValue = islandBody.GetComponent<Collider>();
+                so.FindProperty("m_console").objectReferenceValue = consoleRenderer;
                 var ep = so.FindProperty("m_lidEdges");
                 ep.arraySize = edges.Length;
                 for (int i = 0; i < edges.Length; i++) ep.GetArrayElementAtIndex(i).objectReferenceValue = edges[i];
@@ -3098,6 +3171,85 @@ namespace Nakagawa.EditorTools
                 for (int i = 0; i < feltCircles.Length; i++) circles.GetArrayElementAtIndex(i).vector3Value = feltCircles[i];
                 so.ApplyModifiedPropertiesWithoutUndo();
                 Count("墨の筆跡");
+            }
+
+            // 全自動卓のふたの板1枚(台形の厚い板)。蝶番の辺(外側。長さ outerHalf×2)が z = 0、内側の辺(長さ innerHalf×2)が z = length
+            // 上面は y = 0。隣の板・島との間に gap のすき間をあける(すき間から下の暗がりが見えて、継ぎ目の線になる)
+            static Mesh MahjongPanelMesh(float outerHalf, float innerHalf, float length, float thick, float gap)
+            {
+                float slant = gap * 1.4142f;
+                float oh = outerHalf - slant, ih = innerHalf - slant + gap, l = length - gap;
+                // 上から見て時計回り(内側の左 → 内側の右 → 外側の右 → 外側の左)
+                var top = new[] { new Vector3(-ih, 0, l), new Vector3(ih, 0, l), new Vector3(oh, 0, 0), new Vector3(-oh, 0, 0) };
+                var verts = new List<Vector3>();
+                var normals = new List<Vector3>();
+                var uvs = new List<Vector2>();
+                var tris = new List<int>();
+                void Quad(Vector3 a, Vector3 b, Vector3 c, Vector3 e)
+                {
+                    int s = verts.Count;
+                    Vector3 n = Vector3.Cross(b - a, c - a).normalized;
+                    foreach (var v in new[] { a, b, c, e })
+                    {
+                        verts.Add(v);
+                        normals.Add(n);
+                        uvs.Add(new Vector2(v.x, v.z + v.y));
+                    }
+                    tris.AddRange(new[] { s, s + 1, s + 2, s, s + 2, s + 3 });
+                }
+                Vector3 down = Vector3.down * thick;
+                Quad(top[0], top[1], top[2], top[3]);
+                Quad(top[3] + down, top[2] + down, top[1] + down, top[0] + down);
+                for (int i = 0; i < 4; i++)
+                {
+                    Vector3 p = top[i], q = top[(i + 1) % 4];
+                    Quad(q, p, p + down, q + down);
+                }
+                var mesh = new Mesh();
+                mesh.SetVertices(verts);
+                mesh.SetNormals(normals);
+                mesh.SetUVs(0, uvs);
+                mesh.SetTriangles(tris, 0);
+                mesh.RecalculateBounds();
+                return mesh;
+            }
+
+            // 四角い枠の形の平らな板(外側 outerHalf・内側 innerHalf。上向き)
+            static Mesh MahjongRingMesh(float outerHalf, float innerHalf)
+            {
+                float o = outerHalf, i = innerHalf;
+                var verts = new[]
+                {
+                    new Vector3(-o, 0, -o), new Vector3(o, 0, -o), new Vector3(o, 0, o), new Vector3(-o, 0, o),
+                    new Vector3(-i, 0, -i), new Vector3(i, 0, -i), new Vector3(i, 0, i), new Vector3(-i, 0, i),
+                };
+                var tris = new List<int>();
+                for (int k = 0; k < 4; k++)
+                {
+                    int a = k, b = (k + 1) % 4, c = 4 + (k + 1) % 4, e = 4 + k;
+                    tris.AddRange(new[] { a, e, c, a, c, b });
+                }
+                var mesh = new Mesh { vertices = verts };
+                mesh.SetTriangles(tris, 0);
+                mesh.RecalculateNormals();
+                mesh.RecalculateBounds();
+                return mesh;
+            }
+
+            // 自分で書いたシェーダーのマテリアル(Assets/Nakagawa/Materials/<name>.mat。値はシェーダーの初期値のまま)
+            static Material ShaderMaterial(string name, string shaderName)
+            {
+                string path = $"{kMaterialDir}/{name}.mat";
+                var shader = Shader.Find(shaderName);
+                var mat = Load<Material>(path);
+                if (mat == null)
+                {
+                    EnsureFolder(kMaterialDir);
+                    mat = new Material(shader);
+                    AssetDatabase.CreateAsset(mat, path);
+                }
+                else if (shader != null && mat.shader != shader) mat.shader = shader;
+                return mat;
             }
 
             static Material InkMaterial()
