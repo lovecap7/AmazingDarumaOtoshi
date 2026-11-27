@@ -45,7 +45,7 @@ MonoBehaviour:
   trailInner: 0.45
   trailAlpha: 0.75
   killExplosion: 1
-  minAttackPower: 2
+  minAttackPower: 5
   chargeTime: 1.1
   gatherRadius: 16
   gatherRateStart: 150
@@ -74,3 +74,19 @@ MonoBehaviour:
   excaliburScarTime: 8
   excaliburRockSize: 0.3
   excaliburRockDensity: 1
+  aodaruPlasma: 1
+  aodaruHideOriginal: 1
+  aodaruBolts: 4
+  aodaruForkRate: 26
+  aodaruFlicker: 0.035
+  aodaruGlowWidth: 1
+  aodaruIntensity: 3
+  aodaruSparkRate: 120
+  aodaruDark: 0.8
+  heroCutIn: 1
+  cutInFont: {fileID: 12800000, guid: 45737137357463648abe8a3f0f100e51, type: 3}
+  cutInLetterInterval: 0.1
+  cutInLetterSe: {fileID: 0}
+  cutInNameSe: {fileID: 0}
+  cutInChargeSe: {fileID: 0}
+  cutInSlashSe: {fileID: 0}

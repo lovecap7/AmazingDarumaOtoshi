@@ -265,6 +265,14 @@ namespace Nakagawa.EditorTools
                     Description = "夏の夜の縁側。ステージは縁側に置いた木の箱の上にあり、まわりには蚊取り線香・うちわ・すいかの皿・花火の袋・ろうそくが置いてあり、奥には明かりのともる障子、庭の先には夜空と遠くの打ち上げ花火が見える。",
                     Build = BuildHanabiEngawa,
                 },
+                // 冬のこたつ(BackdropBuilder.Kotatsu.cs。Stage22 こたつの全自動卓)
+                new BackdropDef
+                {
+                    Id = kKotatsuId,
+                    Title = "冬のこたつ",
+                    Description = "冬のお茶の間のこたつ。全自動卓は大きなこたつの天板の上に置いてあり、天板の下から布団が畳へ垂れている。天板の上には、急須と湯呑み(湯気が立つ)・点数を書くメモと鉛筆・テレビのリモコンが置いてある。",
+                    Build = BuildKotatsu,
+                },
                 // ステージの見た目を変えた背景(BackdropBuilder.StageSurfaces.cs)
                 new BackdropDef
                 {

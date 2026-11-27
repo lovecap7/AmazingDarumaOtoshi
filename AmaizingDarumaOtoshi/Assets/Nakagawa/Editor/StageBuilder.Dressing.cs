@@ -46,37 +46,75 @@ namespace Nakagawa.EditorTools
             // Stage22 こたつの全自動卓
             //----------------------------------------
 
-            // 卓の縁を「内側の緑の縁取り + 外側の木目の枠」の二重にし、各辺の中央に点数表示とプレイヤー表記、右寄りに点棒入れを置く
-            // w×d は遊べる範囲(壁の内側)。壁の厚さは 1m(Mahjong と同じ)
-            public void DressMahjongTable(float w, float d)
+            // 卓の本体を、全自動卓(上だけ。支柱と脚はなし)の形で作る。卓はこたつの天板(背景 Kotatsu)の上に置く
+            //  ・縁: 黒い樹脂(元の壁の当たり判定・跳ね返りはそのまま。見た目だけ置き換える)
+            //  ・上の本体: 縁の下から外へ少し張り出した、角の丸い黒い胴。四隅は丸く張り出した耳(上にカップ置きのくぼみ)
+            //  ・横のトレー: 各辺の胴から張り出した、すのこ状の小物入れ
+            //  ・下の本体: 床の下からこたつの天板まで。中央の穴(ふた)のまわりだけの枠にして、穴の中は暗い井戸にする
+            //  ・各辺の中央に点数表示(赤い LED)とプレイヤー表記、右寄りに点棒入れ
+            // 試合のカメラからは、胴や耳の側面はほとんど見えない(横は裏側、手前は HUD の下)。見える上面の形を作り込む
+            // w×d は遊べる範囲(壁の内側)。壁の厚さは 1m(Mahjong と同じ)。lid はふた(穴)の一辺
+            public void DressMahjongTable(float w, float d, float lid)
             {
                 var root = DressRoot();
                 HideWallRenderers(Stage);
 
                 float hx = w * 0.5f, hz = d * 0.5f;
-                const float kGreen = 0.42f;   // 緑の縁取りの幅
                 const float kOuter = 1.0f;    // 壁の厚さ
                 // まとめたシーンでは、壁は見える高さ(1m)と、その上の見えない壁に分けられる。見える高さに合わせる
                 float wall = StageWallSplitter.kVisibleHeight;
+                float ox = hx + kOuter, oz = hz + kOuter;   // 縁の外側
+                const float kShellOut = 1.0f;               // 縁の外へ張り出す胴の幅
+                const float kShellTop = 0.3f, kShellBottom = -2.4f;
+                float bottom = BackdropBuilder.kKotatsuTop + 0.02f;   // こたつの天板の少し上
 
-                var greenMat = BackdropBuilder.StageMaterial("MahjongRail", new Color(0.15f, 0.36f, 0.26f), 0.35f, 0, null, null, true);
-                var woodTex = BackdropBuilder.StageTexture("MahjongWood", 256, (u, v) =>
-                    BackdropBuilder.WoodPattern(u, v, 301, new Color(0.46f, 0.29f, 0.17f), new Color(0.3f, 0.18f, 0.1f)));
-                var woodMat = BackdropBuilder.StageMaterial("MahjongWood", Color.white, 0.62f, 0, woodTex, Vector2.one, true);
+                // 黒い樹脂(縁は壁用の透けるシェーダー、胴はふつうの Lit)。真っ黒にせず、つやで形が分かるようにする
+                var rail = BackdropBuilder.StageMaterial("RexxRail", new Color(0.075f, 0.078f, 0.085f), 0.82f, 0, null, null, true);
+                var shell = BackdropBuilder.StageMaterial("RexxShell", new Color(0.075f, 0.078f, 0.085f), 0.8f);
+                var matte = BackdropBuilder.StageMaterial("RexxMatte", new Color(0.04f, 0.041f, 0.045f), 0.3f);
+                var rubber = BackdropBuilder.StageMaterial("RexxRubber", new Color(0.025f, 0.025f, 0.028f), 0.1f);
+                var slat = BackdropBuilder.StageMaterial("RexxSlat", new Color(0.13f, 0.135f, 0.145f), 0.55f, 0.3f);
+                var well = BackdropBuilder.StageMaterial("RexxWell", new Color(0.05f, 0.052f, 0.058f), 0.25f);
+                var rib = BackdropBuilder.StageMaterial("RexxWellRib", new Color(0.11f, 0.115f, 0.125f), 0.5f, 0.4f);
 
-                // 緑(内側): 南北は角まで、東西は南北の間だけ。木目(外側)も同じ分け方で、重なりを作らない
-                float g = hz + kGreen, o = hz + kOuter;
-                RailPiece(root, "GreenN", new Vector3(0, 0, hz + kGreen * 0.5f), new Vector3((hx + kGreen) * 2, wall - 0.1f, kGreen), 0.16f, greenMat, 2);
-                RailPiece(root, "GreenS", new Vector3(0, 0, -hz - kGreen * 0.5f), new Vector3((hx + kGreen) * 2, wall - 0.1f, kGreen), 0.16f, greenMat, 2);
-                RailPiece(root, "GreenE", new Vector3(hx + kGreen * 0.5f, 0, 0), new Vector3(kGreen, wall - 0.1f, hz * 2), 0.16f, greenMat, 2);
-                RailPiece(root, "GreenW", new Vector3(-hx - kGreen * 0.5f, 0, 0), new Vector3(kGreen, wall - 0.1f, hz * 2), 0.16f, greenMat, 2);
-                float wo = kOuter - kGreen;
-                RailPiece(root, "WoodN", new Vector3(0, 0, (g + o) * 0.5f), new Vector3((hx + kOuter) * 2, wall, wo), 0.12f, woodMat, 6);
-                RailPiece(root, "WoodS", new Vector3(0, 0, -(g + o) * 0.5f), new Vector3((hx + kOuter) * 2, wall, wo), 0.12f, woodMat, 6);
-                RailPiece(root, "WoodE", new Vector3(hx + kGreen + wo * 0.5f, 0, 0), new Vector3(wo, wall, (hz + kGreen) * 2), 0.12f, woodMat, 6);
-                RailPiece(root, "WoodW", new Vector3(-hx - kGreen - wo * 0.5f, 0, 0), new Vector3(wo, wall, (hz + kGreen) * 2), 0.12f, woodMat, 6);
+                // 縁: 南北は角まで、東西は南北の間だけ(重なりを作らない)。角は四隅の耳で隠れる
+                RailPiece(root, "RailN", new Vector3(0, 0, hz + kOuter * 0.5f), new Vector3(ox * 2, wall, kOuter), 0.28f, rail, 4);
+                RailPiece(root, "RailS", new Vector3(0, 0, -hz - kOuter * 0.5f), new Vector3(ox * 2, wall, kOuter), 0.28f, rail, 4);
+                RailPiece(root, "RailE", new Vector3(hx + kOuter * 0.5f, 0, 0), new Vector3(kOuter, wall - 0.012f, hz * 2), 0.28f, rail, 4);
+                RailPiece(root, "RailW", new Vector3(-hx - kOuter * 0.5f, 0, 0), new Vector3(kOuter, wall - 0.012f, hz * 2), 0.28f, rail, 4);
 
-                // 各辺の席(外から卓を見る向き): 南=1P・東=2P・北=3P・西=4P(東南西北の順に反時計回り)
+                // 上の本体(縁の下から外へ張り出す胴)。遊べる範囲(床)の上には出さないよう、内側は壁の下から
+                float inner = hz + 0.05f, outer = ox + kShellOut;
+                float depth = outer - inner, height = kShellTop - kShellBottom, midY = (kShellTop + kShellBottom) * 0.5f;
+                ShellPiece(root, "ShellN", new Vector3(0, midY, (inner + outer) * 0.5f), new Vector3(outer * 2, height, depth), 0.55f, shell);
+                ShellPiece(root, "ShellS", new Vector3(0, midY, -(inner + outer) * 0.5f), new Vector3(outer * 2, height, depth), 0.55f, shell);
+                // 東西は少し低く・少し内側までにして、南北と重なる所で同じ平面の面ができないようにする
+                ShellPiece(root, "ShellE", new Vector3((inner + outer - 0.02f) * 0.5f, midY - 0.006f, 0), new Vector3(depth - 0.02f, height - 0.012f, (oz - 0.2f) * 2), 0.55f, shell);
+                ShellPiece(root, "ShellW", new Vector3(-(inner + outer - 0.02f) * 0.5f, midY - 0.006f, 0), new Vector3(depth - 0.02f, height - 0.012f, (oz - 0.2f) * 2), 0.55f, shell);
+
+                // 下の本体(床の下からこたつの天板まで)。中央の穴のまわりだけの枠
+                float lh = lid * 0.5f + 0.25f, lo = ox + 0.3f;
+                float lowTop = -1.05f, lowH = lowTop - bottom, lowY = (lowTop + bottom) * 0.5f;
+                ShellPiece(root, "BodyN", new Vector3(0, lowY, (lh + lo) * 0.5f), new Vector3(lo * 2, lowH, lo - lh), 0.3f, matte);
+                ShellPiece(root, "BodyS", new Vector3(0, lowY, -(lh + lo) * 0.5f), new Vector3(lo * 2, lowH, lo - lh), 0.3f, matte);
+                ShellPiece(root, "BodyE", new Vector3((lh + lo) * 0.5f, lowY, 0), new Vector3(lo - lh, lowH - 0.01f, lh * 2 - 0.02f), 0.3f, matte);
+                ShellPiece(root, "BodyW", new Vector3(-(lh + lo) * 0.5f, lowY, 0), new Vector3(lo - lh, lowH - 0.01f, lh * 2 - 0.02f), 0.3f, matte);
+
+                // 四隅の耳(丸く張り出した角。上にカップ置きのくぼみ)
+                var podMesh = Keep(BackdropBuilder.NewLathe(new[]
+                {
+                    new Vector2(0, kShellBottom), new Vector2(2.3f, kShellBottom), new Vector2(2.6f, kShellBottom + 0.6f), new Vector2(2.6f, 0.4f),
+                    new Vector2(2.5f, 0.85f), new Vector2(2.25f, 1.06f), new Vector2(1.8f, 1.12f), new Vector2(0.95f, 1.12f), new Vector2(0.95f, 1.12f),
+                    new Vector2(0.88f, 0.72f), new Vector2(0.88f, 0.72f), new Vector2(0, 0.72f),
+                }, 48), "CornerPod");
+                for (int i = 0; i < 4; i++)
+                {
+                    float sx = i % 2 == 0 ? -1 : 1, sz = i < 2 ? -1 : 1;
+                    var pod = MeshObject(root, $"CornerPod_{i}", podMesh, new Vector3(sx * (ox + 1.2f), 0, sz * (oz + 1.2f)), Quaternion.identity, shell);
+                    Primitive(PrimitiveType.Cylinder, pod.transform, "CupMat", new Vector3(0, 0.73f, 0), new Vector3(1.74f, 0.01f, 1.74f), rubber);
+                }
+
+                // 各辺の席(外から卓を見る向き): 南=1P・東=2P・北=3P・西=4P(東南西北の順に反時計回り)。席の外向きは -Z
                 var seats = new[]
                 {
                     (yaw: 0f, edge: new Vector3(0, 0, -hz - kOuter * 0.5f)),
@@ -84,10 +122,10 @@ namespace Nakagawa.EditorTools
                     (yaw: 180f, edge: new Vector3(0, 0, hz + kOuter * 0.5f)),
                     (yaw: 90f, edge: new Vector3(-hx - kOuter * 0.5f, 0, 0)),
                 };
-                var housing = BackdropBuilder.StageMaterial("MahjongPanel", new Color(0.07f, 0.07f, 0.08f), 0.7f);
-                var screen = BackdropBuilder.StageMaterial("MahjongScreen", new Color(0.02f, 0.025f, 0.03f), 0.95f);
-                var segOff = BackdropBuilder.StageMaterial("MahjongSegmentOff", new Color(0.045f, 0.05f, 0.055f), 0.6f);
-                var digit = BackdropBuilder.StageEmissive("MahjongDigit", new Color(0.82f, 0.92f, 1.0f), 1.6f);
+                var housing = BackdropBuilder.StageMaterial("MahjongPanel", new Color(0.05f, 0.052f, 0.058f), 0.85f);
+                var screen = BackdropBuilder.StageMaterial("MahjongScreen", new Color(0.03f, 0.012f, 0.012f), 0.95f);
+                var segOff = BackdropBuilder.StageMaterial("MahjongSegmentOff", new Color(0.07f, 0.035f, 0.035f), 0.6f);
+                var digit = BackdropBuilder.StageEmissive("MahjongDigitRed", new Color(1.0f, 0.2f, 0.14f), 1.5f);
                 for (int i = 0; i < seats.Length; i++)
                 {
                     var (yaw, edge) = seats[i];
@@ -96,21 +134,53 @@ namespace Nakagawa.EditorTools
                     seat.SetParent(root, false);
                     seat.localPosition = edge + new Vector3(0, wall, 0);
                     seat.localRotation = rot;
-                    // 点数表示(縁の上の中央。外側の席から読める向き)
-                    var panel = DressBox(seat, "ScorePanel", new Vector3(0, 0.07f, 0), new Vector3(3.9f, 0.14f, 0.9f), 0.05f, housing);
-                    DressBox(seat, "Screen", new Vector3(0, 0.142f, 0), new Vector3(3.5f, 0.01f, 0.62f), 0.004f, screen);
+                    // 点数表示: 縁の外側の胴の上面(縁と胴の外の端の間)に埋め込んだ、外へ少し傾けた LED の窓
+                    // (本物は胴の正面にあるが、試合のカメラからは胴の側面が見えないので上面に置く)。外側の席から読める向き
+                    var panel = new GameObject("ScorePanel").transform;
+                    panel.SetParent(seat, false);
+                    panel.localPosition = new Vector3(0, kShellTop - wall, -(kOuter * 0.5f + kShellOut * 0.5f));
+                    panel.localRotation = Quaternion.Euler(-12, 0, 0);
+                    DressBox(panel, "Bezel", new Vector3(0, 0.07f, 0), new Vector3(4.3f, 0.3f, 0.86f), 0.08f, housing);
+                    DressBox(panel, "Screen", new Vector3(0, 0.222f, 0), new Vector3(3.9f, 0.01f, 0.62f), 0.004f, screen);
                     var label = BackdropBuilder.StageEmissive($"MahjongSeat{i + 1}", kSeatColors[i], 1.8f);
-                    // 「1P」(プレイヤーの色) と「25000」(白)
-                    float x = -1.5f;
-                    Segments(seat, $"Label", (char)('1' + i), new Vector3(x, 0.15f, 0), label, segOff);
-                    Segments(seat, $"LabelP", 'P', new Vector3(x + 0.3f, 0.15f, 0), label, segOff);
+                    // 「1P」(プレイヤーの色) と「25000」(赤)
+                    float x = -1.6f;
+                    Segments(panel, "Label", (char)('1' + i), new Vector3(x, 0.23f, 0), label, segOff);
+                    Segments(panel, "LabelP", 'P', new Vector3(x + 0.3f, 0.23f, 0), label, segOff);
                     string score = "25000";
-                    for (int k = 0; k < score.Length; k++) Segments(seat, $"Digit{k}", score[k], new Vector3(-0.42f + k * 0.34f, 0.15f, 0), digit, segOff);
-                    _ = panel;
-                    // 点棒入れ(席から見て右寄り。縁の上に置いた木の箱に、点棒を並べる)
-                    TenboTray(seat, new Vector3(6.5f, 0, 0), woodMat);
+                    for (int k = 0; k < score.Length; k++) Segments(panel, $"Digit{k}", score[k], new Vector3(-0.42f + k * 0.34f, 0.23f, 0), digit, segOff);
+
+                    // 点棒入れ: 胴の外側から張り出す黒いトレー。4つの仕切りに、種類ごとの点棒を並べる。
+                    // 席の外向き(-Z)の、席から見て右寄り(点数表示と重ならない所)に置く
+                    TenboCase(seat, new Vector3(5.4f, -wall - 0.75f, -(kOuter * 0.5f + kShellOut + 0.9f)), shell, slat);
                 }
+
+                // 中央の穴の中(洗牌の機械の井戸)。4枚の内壁と、深さの分かる横の桟、暗い底
+                float half = lid * 0.5f;
+                const float kWellTop = -1.02f, kWellBottom = -10.9f;
+                float wellH = kWellTop - kWellBottom, wellY = (kWellTop + kWellBottom) * 0.5f;
+                ShellPiece(root, "WellN", new Vector3(0, wellY, half + 0.1f), new Vector3(lid + 0.4f, wellH, 0.2f), 0.04f, well);
+                ShellPiece(root, "WellS", new Vector3(0, wellY, -half - 0.1f), new Vector3(lid + 0.4f, wellH, 0.2f), 0.04f, well);
+                ShellPiece(root, "WellE", new Vector3(half + 0.1f, wellY - 0.005f, 0), new Vector3(0.2f, wellH - 0.01f, lid), 0.04f, well);
+                ShellPiece(root, "WellW", new Vector3(-half - 0.1f, wellY - 0.005f, 0), new Vector3(0.2f, wellH - 0.01f, lid), 0.04f, well);
+                float[] ribYs = { -2.8f, -5.6f, -8.4f };
+                for (int k = 0; k < ribYs.Length; k++)
+                {
+                    float y = ribYs[k];
+                    ShellPiece(root, $"RibN_{k}", new Vector3(0, y, half - 0.04f), new Vector3(lid - 0.1f, 0.16f, 0.12f), 0.03f, rib);
+                    ShellPiece(root, $"RibS_{k}", new Vector3(0, y, -half + 0.04f), new Vector3(lid - 0.1f, 0.16f, 0.12f), 0.03f, rib);
+                    ShellPiece(root, $"RibE_{k}", new Vector3(half - 0.04f, y - 0.004f, 0), new Vector3(0.12f, 0.16f, lid - 0.36f), 0.03f, rib);
+                    ShellPiece(root, $"RibW_{k}", new Vector3(-half + 0.04f, y - 0.004f, 0), new Vector3(0.12f, 0.16f, lid - 0.36f), 0.03f, rib);
+                }
+                Primitive(PrimitiveType.Cube, root, "WellBottom", new Vector3(0, kWellBottom - 0.1f, 0), new Vector3(lid + 0.4f, 0.2f, lid + 0.4f), AbyssMaterial());
                 SaveDress();
+            }
+
+            // 角を丸めた箱(位置は中心)。卓の胴・井戸の壁など
+            void ShellPiece(Transform parent, string name, Vector3 center, Vector3 size, float bevel, Material mat)
+            {
+                var mesh = Keep(BackdropBuilder.NewRoundedBox(size, bevel, 3, 4.0f), $"{name}_{size.x:0.##}x{size.y:0.##}x{size.z:0.##}");
+                MeshObject(parent, name, mesh, center, Quaternion.identity, mat);
             }
 
             // 縁の部品(下端が床の高さ 0)。texel は木目の繰り返しの長さ(m)
@@ -155,32 +225,51 @@ namespace Nakagawa.EditorTools
                 }
             }
 
-            // 点棒入れ: 浅い木の箱と、中に並べた白い点棒(黒い点)
-            void TenboTray(Transform seat, Vector3 localPos, Material wood)
+            // 点棒入れ: 胴の外側から張り出す黒いトレー(長さ 5.6m・奥行き 1.9m)。仕切りで4つに分け、
+            // 種類ごと(1万点: 点1つ / 5千点: 点2つ / 千点: 点4つ / 百点: 点8つ)の白い点棒を、席から取りやすい向き(奥行きの向き)に並べる
+            void TenboCase(Transform seat, Vector3 localPos, Material shell, Material divider)
             {
-                var tray = new GameObject("TenboTray").transform;
+                var tray = new GameObject("TenboCase").transform;
                 tray.SetParent(seat, false);
                 tray.localPosition = localPos;
-                const float L = 2.2f, D = 0.78f, H = 0.16f, R = 0.05f;
-                DressBox(tray, "Bottom", new Vector3(0, 0.02f, 0), new Vector3(L, 0.04f, D), 0.015f, wood);
-                DressBox(tray, "RimFront", new Vector3(0, H * 0.5f, -D * 0.5f + R * 0.5f), new Vector3(L, H, R), 0.02f, wood);
-                DressBox(tray, "RimBack", new Vector3(0, H * 0.5f, D * 0.5f - R * 0.5f), new Vector3(L, H, R), 0.02f, wood);
-                DressBox(tray, "RimLeft", new Vector3(-L * 0.5f + R * 0.5f, H * 0.5f, 0), new Vector3(R, H, D - R * 2), 0.02f, wood);
-                DressBox(tray, "RimRight", new Vector3(L * 0.5f - R * 0.5f, H * 0.5f, 0), new Vector3(R, H, D - R * 2), 0.02f, wood);
-                var stick = BackdropBuilder.StageMaterial("Tenbo", new Color(0.93f, 0.92f, 0.88f), 0.6f);
+                const float TL = 5.6f, TD = 1.9f, R = 0.16f;
+                DressBox(tray, "Base", new Vector3(0, -0.3f, 0), new Vector3(TL, 0.12f, TD), 0.05f, shell);
+                DressBox(tray, "RimOuter", new Vector3(0, -0.03f, -TD * 0.5f + R * 0.5f), new Vector3(TL, 0.42f, R), 0.07f, shell);
+                DressBox(tray, "RimInner", new Vector3(0, -0.03f, TD * 0.5f - R * 0.5f), new Vector3(TL, 0.42f, R), 0.07f, shell);
+                DressBox(tray, "RimLeft", new Vector3(-TL * 0.5f + R * 0.5f, -0.03f, 0), new Vector3(R, 0.42f, TD - R * 2 - 0.02f), 0.07f, shell);
+                DressBox(tray, "RimRight", new Vector3(TL * 0.5f - R * 0.5f, -0.03f, 0), new Vector3(R, 0.42f, TD - R * 2 - 0.02f), 0.07f, shell);
+
+                var stick = BackdropBuilder.StageMaterial("Tenbo", new Color(0.9f, 0.89f, 0.85f), 0.6f);
                 var dot = BackdropBuilder.StageMaterial("TenboDot", new Color(0.1f, 0.1f, 0.11f), 0.5f);
-                for (int i = 0; i < 6; i++)
+                float inner = TL - R * 2;                  // 仕切りの内側の長さ
+                float cell = inner / 4;
+                int[] dotCounts = { 1, 2, 4, 8 };
+                int[] stickCounts = { 3, 4, 6, 6 };
+                const float kStickLen = TD - R * 2 - 0.2f, kPitch = 0.2f;
+                for (int c = 0; c < 4; c++)
                 {
-                    float z = -0.27f + i * 0.108f;
-                    var s = DressBox(tray, $"Tenbo_{i}", new Vector3(0, 0.075f, z), new Vector3(L - 0.3f, 0.05f, 0.075f), 0.02f, stick);
-                    int dots = i < 2 ? 1 : i < 4 ? 2 : 4;
-                    for (int k = 0; k < dots; k++)
+                    float left = -inner * 0.5f + c * cell;
+                    if (c > 0) DressBox(tray, $"Divider_{c}", new Vector3(left, -0.08f, 0), new Vector3(0.07f, 0.32f, TD - R * 2 - 0.02f), 0.025f, divider);
+                    float start = left + cell * 0.5f - (stickCounts[c] - 1) * kPitch * 0.5f;
+                    for (int s = 0; s < stickCounts[c]; s++)
                     {
-                        float x = (k - (dots - 1) * 0.5f) * 0.12f;
-                        var p = Primitive(PrimitiveType.Cylinder, s.transform, "Dot", Vector3.zero, Vector3.one, dot);
-                        p.transform.localPosition = new Vector3(x, 0.03f, 0);
-                        p.transform.localScale = new Vector3(0.045f, 0.004f, 0.045f);
-                        p.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                        var stickGo = DressBox(tray, $"Tenbo_{c}_{s}", new Vector3(start + s * kPitch, -0.205f, 0), new Vector3(0.13f, 0.07f, kStickLen), 0.03f, stick);
+                        // 細い点棒の影は、こたつの天板の上に粗い点の模様になって出るので落とさない
+                        stickGo.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                        int dots = dotCounts[c];
+                        for (int k = 0; k < dots; k++)
+                        {
+                            // 8つの点は2列に、それ以外は中央に縦に並べる
+                            int row = dots == 8 ? k % 2 : 0, col = dots == 8 ? k / 2 : k;
+                            int perCol = dots == 8 ? 4 : dots;
+                            float z = (col - (perCol - 1) * 0.5f) * 0.16f;
+                            float x = dots == 8 ? (row - 0.5f) * 0.05f : 0;
+                            float size = dots == 1 ? 0.085f : dots == 8 ? 0.035f : 0.05f;
+                            var p = Primitive(PrimitiveType.Cylinder, stickGo.transform, "Dot", Vector3.zero, Vector3.one, dot);
+                            p.transform.localPosition = new Vector3(x, 0.037f, z);
+                            p.transform.localScale = new Vector3(size, 0.003f, size);
+                            p.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                        }
                     }
                 }
             }

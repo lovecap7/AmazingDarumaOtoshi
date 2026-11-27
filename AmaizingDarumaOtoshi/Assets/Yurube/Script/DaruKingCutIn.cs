@@ -55,8 +55,14 @@ namespace Yurube
         GUIStyle m_titleStyle;
         bool m_stylesReady;
 
+        // 差し替え用(Fujihara): ほかのカットインを使うときに入れる。true を返したら、こちらのカットインは出さない
+        public static System.Func<string, GameObject, bool> Override;
+        // 差し替え用(Fujihara): 差し替えたカットインが再生中か(DaruKingSpecial はこれが終わるまで斬らずに待つ)
+        public static System.Func<bool> OverridePlaying;
+
         public static void Show(string specialName, GameObject subject)
         {
+            if (Override != null && Override(specialName, subject)) return;   // 差し替え用(Fujihara)
             if (s_instance == null)
             {
                 var go = new GameObject("DaruKingCutIn");
@@ -65,7 +71,8 @@ namespace Yurube
             s_instance.Play(specialName, subject);
         }
 
-        public static bool IsPlaying => s_instance != null && s_instance.m_active;
+        public static bool IsPlaying => (s_instance != null && s_instance.m_active)
+            || (OverridePlaying != null && OverridePlaying());   // 差し替え用(Fujihara)
 
         private void Awake()
         {

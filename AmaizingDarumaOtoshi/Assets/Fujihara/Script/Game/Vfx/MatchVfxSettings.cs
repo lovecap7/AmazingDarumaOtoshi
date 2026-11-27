@@ -126,6 +126,35 @@ public class MatchVfxSettings : ScriptableObject
     [Tooltip("抉れた跡：岩の並ぶ密度（倍率。大きいほどすき間なく並ぶ）")]
     public float excaliburRockDensity = 0.7f;
 
+    [Header("6. あおだるの必殺技「疾風連撃」の斬撃（稲妻をまとったプラズマの斬撃。色はプレイヤーの色）")]
+    public bool aodaruPlasma = true;
+    [Tooltip("もとの斬撃の見た目（水色の三日月）を隠して、プラズマの見た目だけにする")]
+    public bool aodaruHideOriginal = true;
+    [Tooltip("斬撃にまとわりつく稲妻の本数")]
+    [Range(1, 8)] public int aodaruBolts = 4;
+    [Tooltip("斬撃から外へ飛び出す枝分かれの稲妻の数（1秒あたり）")]
+    public float aodaruForkRate = 26f;
+    [Tooltip("稲妻がバチバチと形を変える間隔（秒）")]
+    public float aodaruFlicker = 0.035f;
+    [Tooltip("光のにじみの太さ（倍率）")]
+    public float aodaruGlowWidth = 1f;
+    [Tooltip("光の明るさ（1 より大きいとブルームでにじむ）")]
+    public float aodaruIntensity = 3f;
+    [Tooltip("火花の数（1秒あたり）")]
+    public float aodaruSparkRate = 120f;
+    [Tooltip("黒い稲妻の濃さ（0 で出さない）。白い床でも稲妻が見えやすくなる")]
+    [Range(0f, 1f)] public float aodaruDark = 0.8f;
+
+    [Header("7. 必殺技カットイン（イメージ：イナズマイレブンの必殺技）")]
+    [Tooltip("だるきんぐの必殺技で、新しいカットイン（だるきんぐが動く・背景が変わる・技名が1文字ずつ出る）を使う。オフで前のカットイン")]
+    public bool heroCutIn = true;
+    [Tooltip("技名の文字（筆文字。Font/YujiSyuku-Regular）")]
+    public Font cutInFont;
+    [Tooltip("技名が1文字ずつ出る間隔（秒）")]
+    public float cutInLetterInterval = 0.1f;
+    [Tooltip("効果音（空ならプログラムで作った仮の音）：1文字ごと・技名がそろったとき・力をためる・斬る")]
+    public AudioClip cutInLetterSe, cutInNameSe, cutInChargeSe, cutInSlashSe;
+
     static MatchVfxSettings s_current;
     public static MatchVfxSettings Current
     {
