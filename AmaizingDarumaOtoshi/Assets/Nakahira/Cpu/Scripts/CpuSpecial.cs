@@ -65,6 +65,13 @@ namespace Nakahira
 
         // みだる(ファンネル):1 発目が向かう一番近い敵
         MatchPlayer m_funnelTarget;
+        // みだる(作戦ボード。suehara):囲む敵・このフレームはその周りを回る・回る向き
+        MatchPlayer m_boardTarget;
+        bool m_boardSteer;
+        Vector3 m_boardMove;
+        // 作戦ボードを出す、一番近い敵までの距離(m) / その敵の周りを回る半径(m)
+        const float kBoardStartRange = 4.0f;
+        const float kBoardCircleRadius = 2.5f;
         // いわだる(隕石):狙う敵(撃ったあとはカウントダウンの間ついていく)
         MatchPlayer m_meteorTarget;
         // へびだる(毒沼):狙う敵(一番段数が少ない敵)
@@ -121,6 +128,8 @@ namespace Nakahira
             // きだる(震脚。suehara): 効き目の間、衝撃波の届く所に敵がいれば跳び続ける(着地のたびに衝撃波が出る)
             m_quakeJump = m_ability is KidaruSpecial quake && quake.UsesQuake && quake.IsActive
                 && c.Self.IsGrounded && EnemyWithin(c, quake.QuakeRadius);
+            // みだる(作戦ボード。suehara): 線を引いている間は、敵の周りを走って囲む
+            SteerBoard(c);
 
             // 暗転返しは時間が止まっている間に撃つので、下の「時間が止まっている間は撃たない」より先に見る
             // (疾風連撃のあおだるは暗転返し・とっさの六腕をしない。suehara)
@@ -161,7 +170,8 @@ namespace Nakahira
             if (!m_rash && m_ability is AkadaruSpecial akadaru && !akadaru.UsesHammerStorm && !FacingTronAim(c, akadaru)) return false;
             // みだる:一番近い敵の方へ向き直ってから撃つ(弾が曲がって追うので、あかだるより甘くてよい)
             // (マシンガンは砲台が勝手に敵を狙うので向き直らない。suehara)
-            if (!m_rash && m_ability is MidaruSpecial midaru && !midaru.UsesMachineGun && !FacingFunnelTarget(c)) return false;
+            // (作戦ボードも向きに関係ないので向き直らない。suehara)
+            if (!m_rash && m_ability is MidaruSpecial midaru && !midaru.UsesMachineGun && !midaru.UsesBoard && !FacingFunnelTarget(c)) return false;
             // 撃てない間(ハンマーを振っているなど)は、撃ちどころが続く間 毎フレーム試す
             if (!m_ability.TryActivate()) return false;
             m_wasFull = false;
@@ -207,6 +217,16 @@ namespace Nakahira
         public void OverrideAim(ref DarumaCommand cmd)
         {
             if (m_quakeJump) cmd.Jump = true;   // きだる(震脚。suehara)
+            if (m_boardSteer)
+            {
+                // みだる(作戦ボード。suehara): 敵の周りを走る(スタミナを使わないのでダッシュし続ける)
+                cmd.Move = new Vector2(m_boardMove.x, m_boardMove.z);
+                cmd.Dash = true;
+                cmd.Jump = false;
+                cmd.Sweep = false;
+                cmd.Shot = false;
+                return;
+            }
             if (!m_aiming) return;
             cmd.Move = new Vector2(m_aimDir.x, m_aimDir.z) * kAimInput;
             cmd.Jump = false;
@@ -250,7 +270,7 @@ namespace Nakahira
                 case AkadaruSpecial aka: return aka.UsesHammerStorm ? StormChance(c, aka) : TronChance(c);   // ハンマーの嵐(suehara) / トロン(ビーム)
                 case AodaruSpecial aoda: return GaleChance(c, aoda);   // 疾風連撃(suehara)
                 case DaruKingSpecial king: return ExcaliburChance(c, king, KingSoloReady(c));   // エクスカリバー
-                case MidaruSpecial mid: return mid.UsesMachineGun ? MachineGunChance(c, mid) : FunnelChance(c);   // マシンガン(suehara) / ファンネル
+                case MidaruSpecial mid: return mid.UsesBoard ? BoardChance(c) : mid.UsesMachineGun ? MachineGunChance(c, mid) : FunnelChance(c);   // 作戦ボード・マシンガン(suehara) / ファンネル
                 case KidaruSpecial kid: return kid.UsesQuake ? EnemyWithin(c, kid.QuakeRadius) : KidaruChance(c, current);   // 震脚(suehara) / 黄金化
                 default:                return true;
             }
@@ -616,6 +636,55 @@ namespace Nakahira
             bool faster = c.Self.MoveSpeed > target.Character.MoveSpeed;
             float ratio = faster ? c.Params.MeteorFastFireRadiusRatio : c.Params.MeteorFireRadiusRatio;
             return target.FlatDistance <= iwa.PredictRadius(c.StackCount) * ratio;
+        }
+
+        // みだる(作戦ボード。suehara):一番近い敵(幽霊・無敵でない)が kBoardStartRange 以内で、間に壁がないとき
+        private bool BoardChance(CpuContext c)
+        {
+            m_boardTarget = null;
+            CpuOpponent nearest = NearestOpponent(c);
+            if (nearest == null || nearest.IsInvincible) return false;
+            if (nearest.FlatDistance > kBoardStartRange) return false;
+            if (CpuShotState.HasWall(c.Position, nearest.Position)) return false;
+            m_boardTarget = nearest.Player;
+            return true;
+        }
+
+        private static CpuOpponent NearestOpponent(CpuContext c)
+        {
+            CpuOpponent nearest = null;
+            foreach (var o in c.Perception.Opponents)
+            {
+                if (o.IsGhost || o.Character == null) continue;
+                if (nearest == null || o.FlatDistance < nearest.FlatDistance) nearest = o;
+            }
+            return nearest;
+        }
+
+        // みだる(作戦ボード。suehara):線を引いている間、囲む敵の周りを kBoardCircleRadius で回る向きを決める
+        // (いつも同じ向きに回るので、何周しても囲いの中に数えられる)
+        private void SteerBoard(CpuContext c)
+        {
+            m_boardSteer = false;
+            if (!(m_ability is MidaruSpecial board) || !board.IsDrawingBoard) return;
+            CpuOpponent o = m_boardTarget != null ? c.Perception.Find(m_boardTarget) : null;
+            if (o == null || o.IsGhost || o.Character == null)
+            {
+                o = NearestOpponent(c);
+                m_boardTarget = o != null ? o.Player : null;
+            }
+            if (o == null) return;
+            Vector3 away = c.Position - o.Position;
+            away.y = 0.0f;
+            float d = away.magnitude;
+            Vector3 radial = d > 0.01f ? away / d : Vector3.right;
+            Vector3 tangent = Vector3.Cross(Vector3.up, radial);
+            // 半径より遠ければ寄り、近ければ離れながら、横へ回る
+            Vector3 move = tangent + radial * Mathf.Clamp((kBoardCircleRadius - d) / kBoardCircleRadius, -1.0f, 1.0f) * 1.5f;
+            move.y = 0.0f;
+            if (move.sqrMagnitude < 0.0001f) return;
+            m_boardMove = move.normalized;
+            m_boardSteer = true;
         }
 
         // みだる(マシンガン。suehara):一番近い敵が、撃った弾が届く目安の距離以内で、間に壁がないとき(積み木 0 個でも撃てる)

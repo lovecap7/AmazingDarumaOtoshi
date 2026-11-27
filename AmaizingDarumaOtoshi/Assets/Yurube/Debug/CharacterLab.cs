@@ -492,6 +492,7 @@ namespace Yurube.Lab
             DestroyAllOf<AkadaruHammerStorm>();
             DestroyAllOf<AodaruGaleSlash>();
             DestroyAllOf<MidaruMachineGun>();
+            DestroyAllOf<MidaruTacticsBoard>();   // 作戦ボード(suehara)
             DestroyAllOf<MidaruBullet>();
             DestroyAllOf<KidaruQuake>();
             DestroyAllOf<HebiPoisonSwamp>();

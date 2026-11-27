@@ -9,6 +9,7 @@ namespace Yurube
     // あかだるのトロンと同じく、積み木が1個以上あるときにボタンを押すと
     // その場で自分の積み木を撃ち、撃った一発が
     // 「積んでいる積み木の数(撃つ前の数)」に分裂して近くの敵へホーミングする。
+    // (suehara: 今は「作戦ボード」(MidaruTacticsBoard)を出す。下の m_useBoard を切るとマシンガン / ファンネルに戻せる)
     [RequireComponent(typeof(DarumaCharacter))]
     public class MidaruSpecial : MonoBehaviour, ISpecialAbility, INetSpecial
     {
@@ -51,23 +52,41 @@ namespace Yurube
         [SerializeField] float m_machineGunTurnSpeed = 140.0f;
         [SerializeField] Color m_machineGunCutInColor = new Color(0.3f, 0.85f, 0.4f);
 
+        [Header("作戦ボード(suehara)。オンならファンネル・マシンガンの代わりにこちらを出す")]
+        [Tooltip("オン: 一定時間、歩いた跡に線を引き、時間になると線が閉じて囲いの中の敵が即死する(線を引く間はダッシュでスタミナを使わない)")]
+        [SerializeField] bool m_useBoard = true;
+        [Tooltip("技名(カットインに出す)")]
+        [SerializeField] string m_boardName = "作戦ボード";
+        [Tooltip("線を引く時間(秒)。この時間がたつと囲いが閉じる")]
+        [SerializeField] float m_boardDrawTime = 4.0f;
+        [SerializeField] Color m_boardCutInColor = new Color(0.3f, 0.85f, 0.4f);
+
         DarumaCharacter m_character;
         SpecialGauge m_gauge;
         MidaruMachineGun m_gun;
         float m_gunActiveUntil = -1.0f;
+        MidaruTacticsBoard m_board;
 
         // 必殺技ゲージ用(中平): 発動してから分裂弾が追いかけ終わるまで(この間はゲージが溜まらない)
         float m_activeUntil = -1.0f;
-        public bool IsActive => Time.time < m_activeUntil || (m_gun != null && m_gun.IsFiring);
+        public bool IsActive => Time.time < m_activeUntil || (m_gun != null && m_gun.IsFiring) || IsDrawingBoard;
         // CPU 用(suehara): マシンガンを使うか / 撃った弾が届く目安の距離
-        public bool UsesMachineGun => m_useMachineGun;
+        public bool UsesMachineGun => !m_useBoard && m_useMachineGun;
         public float MachineGunRange => 10.0f;
+        // CPU 用(suehara): 作戦ボードを使うか / 線を引いている最中か
+        public bool UsesBoard => m_useBoard;
+        public bool IsDrawingBoard => m_board != null && m_board.IsDrawing;
         // ラボ表示用
-        public float RemainingSeconds => (m_gun != null && m_gun.IsFiring)
+        public float RemainingSeconds => IsDrawingBoard ? m_board.RemainingSeconds
+            : (m_gun != null && m_gun.IsFiring)
             ? Mathf.Max(0.0f, m_gunActiveUntil - Time.time)
             : (Time.time < m_activeUntil ? Mathf.Max(0.0f, m_activeUntil - Time.time) : 0.0f);
         public float MachineGunDuration => m_machineGunDuration;
         public MidaruMachineGun ActiveGun => m_gun;
+        // ラボ表示用(suehara): 今の必殺技の名前と、効いている時間
+        public string ActiveSpecialName => m_useBoard ? m_boardName : m_useMachineGun ? m_machineGunName : m_cutInName;
+        public float ActiveSpecialDuration => m_useBoard ? m_boardDrawTime : m_machineGunDuration + 0.25f;
+        public MidaruTacticsBoard ActiveBoard => m_board;
 
         private void Awake()
         {
@@ -97,6 +116,7 @@ namespace Yurube
         // ラボのボタンからも呼べる。発動できたら true
         public bool TryActivate()
         {
+            if (m_useBoard) return TryActivateBoard();   // 作戦ボード(suehara)
             if (m_useMachineGun) return TryActivateMachineGun();
             if (m_gauge == null || !m_gauge.IsFull) return false;
             if (m_character == null || m_character.Stack == null || m_character.Stack.Count == 0) return false;
@@ -137,6 +157,31 @@ namespace Yurube
         }
 
         //========================================
+        // 作戦ボード(suehara)
+        //========================================
+
+        bool TryActivateBoard()
+        {
+            if (m_gauge == null || !m_gauge.IsFull) return false;
+            if (m_character == null || !m_character.CanBeAffected) return false;
+            if (IsActive) return false;
+
+            m_gauge.Consume();
+            // ネット対戦用(suehara): クライアントでも線の見た目を出す(即死はホストだけ)
+            SpecialNet.Send(m_character, this, kNetBoard, null);
+            PlayBoard();
+
+            if (m_logSpecial) Debug.Log($"[みだる] 必殺技『{m_boardName}』発動", this);
+            return true;
+        }
+
+        void PlayBoard()
+        {
+            m_board = MidaruTacticsBoard.Begin(m_character, m_boardDrawTime);
+            SpecialCutIn.Show(m_boardName, m_boardCutInColor, null, m_character, null, m_character.Stack != null ? m_character.Stack.Count : 0);
+        }
+
+        //========================================
         // マシンガン(suehara)
         //========================================
 
@@ -173,9 +218,15 @@ namespace Yurube
 
         const int kNetActivate = 0;
         const int kNetMachineGun = 1;
+        const int kNetBoard = 2;   // 作戦ボード(suehara)
 
         public void NetReceive(int ev, float[] v, TumikiBlock[] blocks)
         {
+            if (ev == kNetBoard)
+            {
+                if (!IsDrawingBoard) PlayBoard();
+                return;
+            }
             if (ev == kNetMachineGun)
             {
                 if (v.Length >= 5 && m_gun == null) PlayMachineGun(new Vector3(v[0], v[1], v[2]), new Vector3(v[3], 0.0f, v[4]));

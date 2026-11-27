@@ -293,12 +293,15 @@ namespace Yurube.Lab
                 if (mi.IsActive)
                 {
                     float rem = mi.RemainingSeconds;
-                    GUILayout.Label($"マシンガン 稼働中: 残り {rem:0.0}s", m_guideStyle);
-                    DrawProgressBar(rem / Mathf.Max(0.1f, mi.MachineGunDuration + 0.25f), new Color(0.35f, 0.88f, 0.45f));
+                    // suehara: 作戦ボードも出せるように、技名と時間はみだる側から取る
+                    GUILayout.Label($"{mi.ActiveSpecialName} {(mi.UsesBoard ? "線を引いている" : "稼働中")}: 残り {rem:0.0}s", m_guideStyle);
+                    DrawProgressBar(rem / Mathf.Max(0.1f, mi.ActiveSpecialDuration), new Color(0.35f, 0.88f, 0.45f));
                 }
                 else
                 {
-                    GUILayout.Label("マシンガン: 自動追尾の固定砲台を設置（6.0秒・積み木不要）", m_label);
+                    GUILayout.Label(mi.UsesBoard
+                        ? $"作戦ボード: 歩いた跡に線を引き、{mi.ActiveSpecialDuration:0.0}秒で閉じた囲いの中の敵を即死"
+                        : "マシンガン: 自動追尾の固定砲台を設置（6.0秒・積み木不要）", m_label);
                 }
                 return;
             }

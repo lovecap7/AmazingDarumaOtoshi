@@ -166,6 +166,8 @@ namespace Nakahira
         // ダッシュ(suehara): 走っているか / 残りのスタミナ(0〜1)
         public bool IsDashing => m_dashStamina.IsDashing;
         public float StaminaRatio => m_dashStamina.Ratio;
+        // ダッシュ(suehara): true の間はスタミナを使わずに走れる(みだるの作戦ボードで線を引いている間)
+        public bool FreeDash { get; set; }
         // ジャンプのスタミナの効率(レベル用 2026-11-24。きだるのレベルで上がる)。2 ならジャンプの消費が半分(ダッシュ・ブリンク・回復には効かない)
         public float StaminaEfficiency { get => m_dashStamina.Efficiency; set => m_dashStamina.Efficiency = value; }
         // ダッシュ(suehara): ジャンプでスタミナを使うか(ローカルの人の操作だけ。CPU・ネット対戦・デモは使わない)
@@ -399,6 +401,7 @@ namespace Nakahira
         {
             DashParams param = DashParams.Instance;
             bool wantDash = m_dashHeld && !MovementLocked && moveDir.sqrMagnitude > 0.01f;
+            if (FreeDash && wantDash) return param.SpeedMultiplier;   // スタミナを減らさない(suehara)
             bool dashing = m_dashStamina.Tick(wantDash, m_isGrounded, dt, param);
             // ゲージは初めてスタミナが減ったときに作る(走らないキャラクターには作らない)
             if (m_staminaGauge == null && m_dashStamina.Ratio < 1.0f) m_staminaGauge = DashStaminaGauge.Create(this, m_dashStamina);
