@@ -246,6 +246,23 @@ namespace Yurube
             return true;
         }
 
+        // デバッグ用(Fujihara): そのプレイヤーのレベルを delta だけ上げ下げする(LT で -1・RT で +1。SpecialGaugeDebugButton から呼ぶ)。実績には数えない
+        //  積んだ数も、そのレベルになる最小の数にそろえる(そのあと積めば、ふつうに続きから上がる)
+        public static bool DebugAddLevel(MatchPlayer p, int delta)
+        {
+            if (s_instance == null || p == null || delta == 0) return false;
+            s_instance.WatchMatch();
+            if (!Active || s_instance.PlayerOf(p.Character) != p) return false;
+            var s = s_instance.StateOf(p);
+            int level = Mathf.Clamp(s.level + delta, 1, LevelParams.MaxLevel);
+            if (level == s.level) return false;
+            int[] need = LevelParams.Instance.stackedToLevel;
+            s.stacked = level >= 2 && need != null && need.Length >= level - 1 ? need[level - 2] : 0;
+            s.level = level;
+            if (delta > 0) LevelUp?.Invoke(p, s.level);
+            return true;
+        }
+
         static LevelPerk Perk(MatchPlayer p) => p != null && p.CharacterData != null ? p.CharacterData.levelPerk : LevelPerk.None;
         static LevelPerk PerkOf(CharacterData data) => data != null ? data.levelPerk : LevelPerk.None;
 

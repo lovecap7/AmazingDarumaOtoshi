@@ -6,7 +6,7 @@ namespace Yurube
 {
     // デバッグ用: 試合中、ゲームパッドの LB を押した人の必殺ゲージを満タンにする(エディタと Development Build だけ)
     //  ・押したゲームパッドが割り当てられているプレイヤーだけが満タンになる(CPU・ほかの人は変わらない)
-    //  ・LT を押すと、押した人のレベルが最大(Lv5)になる(suehara)。ネット対戦のクライアントでは効かない
+    //  ・LT を押すと押した人のレベルが1つ下がり、RT を押すと1つ上がる(Fujihara。前は LT で最大(Lv5)になっていた(suehara))。ネット対戦のクライアントでは効かない
     // シーンに置かなくても、起動時に自動で付く(試合中だけ働く)
     public class SpecialGaugeDebugButton : MonoBehaviour
     {
@@ -31,9 +31,11 @@ namespace Yurube
             foreach (var p in match.Players)
             {
                 if (p == null || p.IsCpu || p.Character == null) continue;
-                // LT: 押した人のレベルを最大(Lv5)にする(suehara)
-                if (Pressed(p, pad => pad.leftTrigger.wasPressedThisFrame) && DarumaLevel.DebugSetMaxLevel(p))
-                    Debug.Log($"[デバッグ] {p.Label} のレベルを最大(Lv{LevelParams.MaxLevel})にした(LT)");
+                // LT: 押した人のレベルを1つ下げる / RT: 1つ上げる(Fujihara。前は LT で最大(Lv5)にしていた(suehara))
+                if (Pressed(p, pad => pad.leftTrigger.wasPressedThisFrame) && DarumaLevel.DebugAddLevel(p, -1))
+                    Debug.Log($"[デバッグ] {p.Label} のレベルを1つ下げた → Lv{DarumaLevel.LevelOf(p)}(LT)");
+                if (Pressed(p, pad => pad.rightTrigger.wasPressedThisFrame) && DarumaLevel.DebugAddLevel(p, 1))
+                    Debug.Log($"[デバッグ] {p.Label} のレベルを1つ上げた → Lv{DarumaLevel.LevelOf(p)}(RT)");
                 if (!PressedLB(p)) continue;
 
                 var gauge = p.Character.GetComponent<SpecialGauge>();

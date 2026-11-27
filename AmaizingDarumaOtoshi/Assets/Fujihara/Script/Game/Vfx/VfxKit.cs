@@ -75,6 +75,52 @@ public static class VfxKit
         }
     }
 
+    static Texture2D s_beam;
+
+    // 光の線（LineRenderer 用）：線の向き（横）はそのまま、太さの向き（縦）は真ん中が明るく両側へぼける
+    public static Texture2D Beam
+    {
+        get
+        {
+            if (s_beam != null) return s_beam;
+            const int w = 4, h = 64;
+            s_beam = new Texture2D(w, h, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, name = "VfxBeam" };
+            var px = new Color[w * h];
+            for (int y = 0; y < h; y++)
+            {
+                float v = (y + 0.5f) / h * 2f - 1f;
+                float a = Mathf.Exp(-v * v * 5f);
+                for (int x = 0; x < w; x++) px[y * w + x] = new Color(1f, 1f, 1f, a);
+            }
+            s_beam.SetPixels(px);
+            s_beam.Apply();
+            return s_beam;
+        }
+    }
+
+    static Texture2D s_band;
+
+    // 太い帯（LineRenderer 用）：太さの向きは、真ん中から 6 割くらいまで濃く、そこから外へやわらかく消える（影・黒い縁どり用）
+    public static Texture2D Band
+    {
+        get
+        {
+            if (s_band != null) return s_band;
+            const int w = 4, h = 64;
+            s_band = new Texture2D(w, h, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, name = "VfxBand" };
+            var px = new Color[w * h];
+            for (int y = 0; y < h; y++)
+            {
+                float v = Mathf.Abs((y + 0.5f) / h * 2f - 1f);
+                float a = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.55f, 1f, v));
+                for (int x = 0; x < w; x++) px[y * w + x] = new Color(1f, 1f, 1f, a);
+            }
+            s_band.SetPixels(px);
+            s_band.Apply();
+            return s_band;
+        }
+    }
+
     // 細い輪（衝撃波）
     public static Texture2D Ring
     {
