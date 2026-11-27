@@ -298,7 +298,7 @@ namespace Yurube.Achievements
                 new AchievementDefinition("story_chapter3", "二つで足りる王",
                     "最終章をクリア。全国制覇、そして――。",
                     AchievementCategory.Story, "最終章をクリアする（だるま新聞まで見る）", AchievementMetric.StoryChapterCleared, 1,
-                    AchievementRarity.Gold, mode: AchievementMode.Story, storyChapter: "chapter3"),
+                    AchievementRarity.Gold, mode: AchievementMode.Story, storyChapter: "final"),
             };
             return list;
         }

@@ -522,10 +522,14 @@ namespace Yurube.Achievements
             // すべて見せた扱いにして、更新直後に昔の実績がまとめて流れないようにする
             public List<string> notified = new List<string>();
             public int notifyVersion;
+            // ストーリー章ID移行の版。1 から旧 chapter3（旧最終章）を final として保存する
+            public int storyChapterVersion;
         }
 
         // 保存形式の版。1 から「リザルトで見せたか」を持つ
         const int NotifyVersion = 1;
+        // ストーリー章IDの版。1 から旧 chapter3 → final 移行済み
+        const int StoryChapterVersion = 1;
 
         public static void Save()
         {
@@ -539,6 +543,7 @@ namespace Yurube.Achievements
                 if (data.IsNotified) blob.notified.Add(data.Id);
             }
             blob.notifyVersion = NotifyVersion;
+            blob.storyChapterVersion = StoryChapterVersion;
             foreach (var pair in s_counters)
             {
                 blob.counters.Add((int)pair.Key + "=" + pair.Value);
@@ -565,6 +570,7 @@ namespace Yurube.Achievements
         {
             Initialize();
             ResetState();
+            bool needsSave = false;
             string json = PlayerPrefs.GetString(s_storageKey, "");
             if (!string.IsNullOrEmpty(json))
             {
@@ -612,6 +618,13 @@ namespace Yurube.Achievements
                         {
                             if (!string.IsNullOrEmpty(chapter)) s_clearedStoryChapters.Add(chapter);
                         }
+                    }
+                    // 旧セーブ（storyChapterVersion == 0）の chapter3 は旧最終章のため、1回だけ final へ移行する
+                    if (blob.storyChapterVersion <= 0)
+                    {
+                        if (s_clearedStoryChapters.Remove("chapter3"))
+                            s_clearedStoryChapters.Add("final");
+                        needsSave = true;
                     }
                     if (blob.characters != null)
                     {
@@ -665,6 +678,7 @@ namespace Yurube.Achievements
                 }
             }
             RefreshAll();
+            if (needsSave) Save();
         }
 
         static AchievementData FindInList(string id)
@@ -831,6 +845,7 @@ namespace Yurube.Achievements
             // デバッグの全解除。リザルトで大量に流れないよう、見せた扱いにしておく
             foreach (var data in s_all) blob.notified.Add(data.Id);
             blob.notifyVersion = NotifyVersion;
+            blob.storyChapterVersion = StoryChapterVersion;
 
             PlayerPrefs.SetString(key, JsonUtility.ToJson(blob));
             PlayerPrefs.Save();

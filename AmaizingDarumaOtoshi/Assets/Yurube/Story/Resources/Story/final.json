@@ -1,0 +1,165 @@
+{
+  "id": "final",
+  "order": 5,
+  "requiredChapter": "chapter4",
+  "title": "最終章「二つで足りる王」",
+  "subtitle": "二つで足りる王",
+  "hiddenTitle": "最終章「？？？」",
+  "stageId": "DebugStage47",
+  "sceneName": "AllStages",
+  "playerCharacter": "akadaru",
+  "clearKey": "Story.Clear.final",
+  "rules": {
+    "mode": "Stock",
+    "stocks": 3,
+    "timeLimit": 0,
+    "cpuSpecial": false,
+    "awakening": false,
+    "gaugeFromStart": true,
+    "cpuBlockLimit": 2
+  },
+  "cpu": [
+    { "character": "daruking", "level": 3, "stocks": 2 }
+  ],
+  "speakers": [
+    { "id": "akadaru", "name": "あかだる", "color": "#E8544B" },
+    { "id": "aodaru", "name": "あおだる", "color": "#4B8BE8" },
+    { "id": "midaru", "name": "みだる", "color": "#4BA85A" },
+    { "id": "kidaru", "name": "きだる", "color": "#E8C64B" },
+    { "id": "iwadaru", "name": "いわだる", "color": "#80786B" },
+    { "id": "hebidaru", "name": "へびだる", "color": "#6BBF45" },
+    { "id": "daruking", "name": "だるきんぐ", "color": "#8C59B3" },
+    { "id": "darumaotoshi", "name": "だるまおとし", "color": "#4A4A52" }
+  ],
+  "cutscene": {
+    "type": "final",
+    "caption": "王座決定戦",
+    "rival": "daruking",
+    "shots": [
+      { "view": "wide", "seconds": 3.0, "caption": "王座決定戦" },
+      { "view": "faceoff", "seconds": 3.4, "caption": "王座決定戦" }
+    ]
+  },
+  "before": [
+    { "speaker": "", "direction": true, "shot": "S_FINAL_FACEOFF", "text": "決勝戦の熱気が残る舞台の上。優勝者あかだると、大会主催者にして絶対王者だるきんぐが1対1で向かい合う。" },
+    { "speaker": "daruking", "text": "騒がしい。余の前であるぞ" },
+    { "speaker": "akadaru", "text": "……お前が、だるきんぐ" },
+    { "speaker": "daruking", "text": "ほう。その古い槌、見覚えがある" },
+    { "speaker": "akadaru", "text": "！" },
+    { "speaker": "daruking", "text": "8年前、客席にいた少年であるな。顔を見て、すぐに気づいた。……だが、何も知らぬふりをした。そのほうが、貴様を観察できる" },
+    { "speaker": "akadaru", "text": "……ふざけるな。父さんを舞台から消しておいて、よくそんな口が利けるな！" },
+    { "speaker": "kidaru", "shot": "S_AUDIENCE_KIDARU", "text": "あかせんぱーい！ ぼくたち、ここにいますー！" },
+    { "speaker": "aodaru", "shot": "S_AUDIENCE_AO", "text": "……一人じゃないぞ、あか" },
+    { "speaker": "akadaru", "shot": "S_FINAL_FACEOFF", "text": "……みんな" },
+    { "speaker": "daruking", "text": "群れる弱者どもめ。王冠は二つあれば足りる。余には、それ以上は要らぬ。……さあ、参れ" }
+  ],
+  "tutorial": [],
+  "matchStart": [],
+  "matchStartNotice": "王座決定戦、開始！",
+  "startLines": [
+    { "speaker": "daruking", "text": "余に挑むか。二つで足りる" },
+    { "speaker": "midaru", "text": "だるきんぐは、積み木を2個までしか積めません。ですが一撃の威力が桁違いです。打ち返しで隙を突きましょう！" }
+  ],
+  "opponentZeroStackLines": [
+    { "speaker": "daruking", "text": "余の……二つが……！" }
+  ],
+  "specialEvent": {
+    "enabled": true,
+    "trigger": "lowStock",
+    "stockThreshold": 1,
+    "timeFallback": false,
+    "timeSeconds": 90,
+    "pause": true,
+    "prompt": "[L／Y]で必殺技！",
+    "promptSeconds": 10,
+    "replayAssist": true,
+    "lines": [
+      { "speaker": "akadaru", "text": "みんなが積んでくれた想いを乗せる――一撃入魂ぃ！！" }
+    ]
+  },
+  "defeat": [
+    { "speaker": "daruking", "text": "二つで足りる" },
+    { "speaker": "akadaru", "text": "……まだだ。みんなが積んでくれたんだ、もう一度！" }
+  ],
+  "after": [
+    { "speaker": "daruking", "shot": "S_FINAL_FACEOFF", "text": "……見事。王に勝った者には、望むものを与える。それが、この大会の規則である" },
+    { "speaker": "daruking", "text": "何を望む。金か、地位か、それとも、余の座か" },
+    { "speaker": "", "direction": true, "text": "（あかだるの手が、父の槌を握ったまま震えている）" },
+    {
+      "choice": {
+        "id": "final_ending_choice",
+        "speaker": "akadaru",
+        "options": [
+          {
+            "text": "欲しいものは、もう手に入れた",
+            "branchId": "true_end"
+          },
+          {
+            "text": "お前を、ここで落とす",
+            "branchId": "bad_end"
+          }
+        ]
+      }
+    }
+  ],
+  "branches": [
+    {
+      "id": "true_end",
+      "lines": [
+        { "speaker": "akadaru", "shot": "S_FINAL_FACEOFF", "text": "……いらない。オレは、もう、欲しいものを持ってる" },
+        { "speaker": "", "direction": true, "shot": "S_AUDIENCE_TRIO", "cue": "audience_stand", "text": "客席で、きだる・あおだる・みだるが立ち上がる。" },
+        { "speaker": "daruking", "shot": "S_FINAL_FACEOFF", "text": "何だと。……余に、情けをかけるというのか" },
+        { "speaker": "akadaru", "text": "情けじゃない。……オレは、仲間と戦って、この競技がまた好きになっちまったんだ。望むのは一つだけ――8年前の父さんの試合の記録を元に戻し、正々堂々たる大会にすることだ！" },
+        { "speaker": "daruking", "text": "ふざけるな！ 余が、貴様ごときに……！ 余は絶対の王者だ！ 誰にも負けぬ！！" },
+        { "speaker": "", "direction": true, "shot": "S_FINAL_PARRY", "cue": "king_sword_throw", "text": "誇りを傷つけられただるきんぐが逆上し、王座の剣を抜き放ち、あかだるへ向けて全力で投擲する。" },
+        { "speaker": "midaru", "shot": "S_AUDIENCE_MIDARU", "text": "危ないっ、あかだる先輩！！" },
+        { "speaker": "akadaru", "shot": "S_FINAL_PARRY", "text": "……父さん。一撃入魂！！" },
+        { "speaker": "", "direction": true, "shot": "S_FINAL_PARRY", "cue": "parry_shatter", "se": "parry", "text": "あかだるが父の槌を振り抜き、飛来した王の剣を見事に打ち返す［パリィ］！ 弾き返された衝撃がだるきんぐの王座と盾を砕き、王は自らの技に弾かれて崩れ落ちる。" },
+        { "speaker": "daruking", "shot": "S_FINAL_KING_EXIT", "text": "……なぜ、貴様は、崩れぬ……" },
+        { "speaker": "", "direction": true, "shot": "S_FINAL_KING_EXIT", "cue": "king_exit", "text": "王は静かに目を閉じ、表舞台から完全に退場する。" },
+        { "speaker": "", "direction": true, "shot": "S_FINAL_PARRY", "text": "あかだるは、一度も自分の意思で手を下すことなく、自らの誇りを守り抜いた。" },
+        { "speaker": "akadaru", "text": "……終わったよ、父さん" },
+        { "speaker": "", "direction": true, "shot": "S_ROOM_TRUE_WIDE", "cue": "switch_to_room_true", "text": "数日後――七転高校・部室。絶対的な主催者だっただるきんぐが表舞台を去ったことで、大会運営組織に巨大な空白が生じていた。" },
+        { "speaker": "midaru", "shot": "S_MI", "text": "データ上、だるきんぐ一派が退いたことで運営委員会に巨大な空白が生じています。このままでは来年の王冠大会が開催できない確率が89%です（眼鏡をクイッ）" },
+        { "speaker": "kidaru", "shot": "S_KIDARU", "text": "ええっ、そんなの寂しすぎます！ せっかくみんなと仲良くなれたのに……！" },
+        { "speaker": "akadaru", "shot": "S_AKA", "text": "……心配すんな。だるきんぐがいなくなって空いたその穴は――オレたちが埋める！" },
+        { "speaker": "aodaru", "shot": "S_AO", "text": "……あかだる、お前が？" },
+        { "speaker": "akadaru", "shot": "S_AKA", "text": "ああ！ 父さんが愛した『アメイジングだるまおとし』を、ここで終わらせるわけにはいかねえ。オレたちが新しい運営の柱になって、誰でも笑って積み上げられる最高の大会に作り変えてやる！" },
+        { "speaker": "midaru", "shot": "S_MI", "text": "……ふふ、非論理的ですが、最高に熱い決断です。私が運営参謀として、だるきんぐ一族と父上の公式記録の復元・管理を引き受けましょう" },
+        { "speaker": "aodaru", "shot": "S_AO", "text": "……俺も走る。新しい大会の審判と秩序を守るためにな" },
+        { "speaker": "kidaru", "shot": "S_KIDARU", "text": "じゃあぼくは、会場の名物おにぎり担当をやりますっ！ みんなで積んで、また遊びましょう！" },
+        { "speaker": "iwadaru", "shot": "S_ROOM_TRUE_IWA", "text": "ガハハ！ 面白い、巌高校も手伝ってやるぞ！" },
+        { "speaker": "hebidaru", "shot": "S_ROOM_TRUE_HEBI", "text": "やれやれ、仕方ないな。ボクも少しだけ手を貸してあげるよ" },
+        { "speaker": "akadaru", "shot": "S_ROOM_TRUE_WIDE", "text": "おうっ！ 任せておけ――新生『アメイジングだるまおとし』の開幕だ！！" },
+        { "speaker": "", "direction": true, "shot": "S_ROOM_TRUE_WALL", "cue": "unlock_daruking", "text": "部室の壁には父の槌が大切に飾られ、その横に「新生王冠大会 開幕！」の横断幕が掲げられている。" }
+      ]
+    },
+    {
+      "id": "bad_end",
+      "lines": [
+        { "speaker": "akadaru", "shot": "S_FINAL_FACEOFF", "text": "……お前を、ここで落とす" },
+        { "speaker": "kidaru", "shot": "S_AUDIENCE_KIDARU", "text": "あかせんぱい、だめです！" },
+        { "speaker": "aodaru", "shot": "S_AUDIENCE_AO", "text": "……止まれ、あか！" },
+        { "speaker": "midaru", "shot": "S_AUDIENCE_MIDARU", "text": "想定外です……やめてください、あかだる先輩！" },
+        { "speaker": "iwadaru", "shot": "S_FINAL_WIDE", "text": "……オレ様が、煽りすぎたか" },
+        { "speaker": "hebidaru", "shot": "S_FINAL_WIDE", "text": "……ほら、曲がっちゃったね" },
+        { "speaker": "", "direction": true, "cue": "bad_strike_blackout", "se": "heavy_hammer", "portrait": "none", "text": "あかだるの槌が振り下ろされる。重い槌音だけが響き、画面が暗転する。" },
+        { "speaker": "", "direction": true, "shot": "S_BAD_CORRUPT", "cue": "bad_corrupt_start", "portrait": "none", "text": "暗闇の中、あかだるの赤い頭が黒ずんでいき、積み木の欠片が全身にまとわりつく。" },
+        { "speaker": "darumaotoshi", "shot": "S_BAD_CORRUPT", "portrait": "none", "text": "……積んだら、落とす" },
+        { "speaker": "darumaotoshi", "shot": "S_BAD_CORRUPT", "portrait": "none", "text": "だるまおとしは、すべてを、落とす" },
+        { "speaker": "", "direction": true, "shot": "S_BAD_COLLAPSE", "cue": "bad_arena_collapse", "se": "collapse", "portrait": "none", "text": "闘技場の積み木が次々と崩れていく。仲間の呼びかける声が、一つずつ遠のいていく。" },
+        { "speaker": "kidaru", "shot": "S_BAD_COLLAPSE", "portrait": "none", "text": "……あか、せん……ぱい……" },
+        { "speaker": "", "direction": true, "shot": "S_BAD_SHADOW_PILE", "cue": "bad_shadow_pile", "se": "silence", "portrait": "none", "text": "静寂。崩れた積み木の山の上に、一人立つ黒い影。空いた穴を埋める者はどこにもいない。" },
+        { "speaker": "darumaotoshi", "cue": "bad_ending_card", "portrait": "none", "text": "……まだ、積み上がってる奴がいるな。全部、落としてやる" }
+      ]
+    }
+  ],
+  "newspaper": {
+    "header": "だるま新聞",
+    "headline": "前王者退場、新生王冠大会へ！ 空いた主催者の穴を埋めたのは新王者あかだる――「また、みんなで遊びたい」",
+    "body": "王冠大会の主催者だった前王者だるきんぐが表舞台を去った。大会運営に生じた空白を、全国優勝者のあかだるを中心とする七転高校だるま落とし部が埋めることになり、新生王冠大会の開催が決まった。あかだるは『また、みんなで遊びたい』と語った。",
+    "image": "",
+    "art": "prologue",
+    "caption": "新生王冠大会 開幕 七転高校だるま落とし部"
+  }
+}

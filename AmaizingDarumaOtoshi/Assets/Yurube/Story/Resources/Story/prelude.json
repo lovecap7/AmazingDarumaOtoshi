@@ -18,6 +18,24 @@
     { "id": "akadaru_kid", "name": "幼きあかだる", "color": "#B91C1C" },
     { "id": "daruking", "name": "だるきんぐ", "color": "#8C59B3" }
   ],
+  "vfxAnchors": [
+    {
+      "name": "king_blocks",
+      "useScreenPos": false,
+      "offset": { "x": 0.0, "y": 0.0, "z": 0.0 },
+      "screenX": 0.64,
+      "screenY": 0.56,
+      "screenDepth": 6.0
+    },
+    {
+      "name": "stage_center",
+      "useScreenPos": false,
+      "offset": { "x": 0.0, "y": 0.0, "z": 0.0 },
+      "screenX": 0.50,
+      "screenY": 0.48,
+      "screenDepth": 4.5
+    }
+  ],
   "before": [
     {
       "speaker": "",
@@ -37,6 +55,17 @@
       "shot": "S_ARENA_FAR",
       "cue": "tower_collapse",
       "se": "silence,collapse",
+      "vfxCues": [
+        {
+          "action": "play",
+          "key": "fx_block_collapse_s",
+          "timing": "start",
+          "delay": 0.5,
+          "anchor": "king_blocks",
+          "tint": "#BFB8AD",
+          "scale": 1.15
+        }
+      ],
       "text": "父の放った積み木が連鎖し、王のたった二つの積み木が崩れていく。会場が一瞬、静まり返る。"
     },
     {
@@ -51,6 +80,17 @@
       "cue": "blackout",
       "se": "murmur,metal_hit",
       "portrait": "none",
+      "vfxCues": [
+        {
+          "action": "fade_in",
+          "key": "fx_fade",
+          "timing": "start",
+          "delay": 0.0,
+          "color": "#000000",
+          "duration": 0.4,
+          "hold": true
+        }
+      ],
       "text": "会場の照明が一斉に落ちる。観客席はどよめくが、暗闇で舞台の上に何が起きたのか誰にも見えない。鋭い金属音。少年の叫び声だけが響く。"
     },
     {
@@ -66,6 +106,26 @@
       "shot": "S_HAMMER_FLOOR",
       "cue": "lights_on_hammer",
       "se": "murmur",
+      "vfxCues": [
+        {
+          "action": "fade_out",
+          "key": "fx_fade",
+          "timing": "start",
+          "delay": 0.0,
+          "color": "#000000",
+          "duration": 1.2,
+          "hold": true
+        },
+        {
+          "action": "play",
+          "key": "fx_dust_puff_small",
+          "timing": "start",
+          "delay": 0.6,
+          "anchor": "stage_center",
+          "tint": "#BFB8AD",
+          "scale": 1.1
+        }
+      ],
       "text": "明かりが戻ったとき、舞台の上には床を転がる一本の古い槌だけが残っている。観客席のざわめきの中、少年だけが立ち尽くす。"
     }
   ],

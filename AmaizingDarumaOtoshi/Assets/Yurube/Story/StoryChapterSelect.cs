@@ -140,15 +140,24 @@ namespace Yurube.Story
                 m_blocks.Add(image);
                 m_outlines.Add(outline);
 
-                // 鍵アイコン代わりのロック目印（未解放時のみ表示）
-                var lockBadge = ToyKit.UIRounded("LockBadge", block, new Color(0.18f, 0.14f, 0.12f, 0.95f), 10f);
+                // じっせき（AchievementBook）の未解除アイコンに合わせた錠前タイル（未解放時のみ表示）
+                float lockTileSize = Mathf.Clamp(blockHeight - 16f, 34f, 56f);
+                var lockBadge = ToyKit.UIRounded("LockBadge", block, new Color(0.74f, 0.74f, 0.76f, 1f), 14f);
                 lockBadge.anchorMin = lockBadge.anchorMax = new Vector2(0f, 0.5f);
                 lockBadge.pivot = new Vector2(0f, 0.5f);
                 lockBadge.anchoredPosition = new Vector2(24f, 0f);
-                lockBadge.sizeDelta = new Vector2(72f, Mathf.Min(48f, blockHeight - 18f));
-                var lockText = ToyKit.UIText("LockText", lockBadge, m_font, "鍵", 24f, new Color(1f, 0.85f, 0.35f));
-                lockText.fontStyle = FontStyles.Bold;
-                ToyKit.Stretch(lockText.rectTransform);
+                lockBadge.sizeDelta = new Vector2(lockTileSize, lockTileSize);
+                var lockSprite = Yurube.Achievements.AchievementVisuals.LockIcon();
+                if (lockSprite != null)
+                {
+                    var lockRect = ToyKit.UIImage("LockIcon", lockBadge,
+                        new Color(ToyKit.Ink.r, ToyKit.Ink.g, ToyKit.Ink.b, 0.6f), lockSprite);
+                    var lockImage = lockRect.GetComponent<Image>();
+                    lockImage.type = Image.Type.Simple;
+                    lockImage.preserveAspect = true;
+                    float glyphSize = lockTileSize * 0.62f;
+                    ToyKit.Anchor(lockRect, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(glyphSize, glyphSize));
+                }
                 m_lockBadges.Add(lockBadge);
 
                 float fontSize = Mathf.Clamp(blockHeight * 0.50f, 24f, 36f);
@@ -263,16 +272,18 @@ namespace Yurube.Story
             if (m_chapters == null || m_chapters.Count == 0) return;
 
             // 上の段（序章側）へは index を下げる、下の段（最終章側）へは上げる
-            if (MenuInput.Up()) Move(-1);
-            else if (MenuInput.Down()) Move(1);
+            // 長押しで連続移動し、端ではいったん止まって押し直したときだけ反対の端へ回る（MainMenu と同じ）
+            if (MenuInput.UpRepeat() && MenuInput.StepRepeat(ref m_index, m_chapters.Count, MenuInput.Dir.Up, -1))
+            {
+                MenuSounds.Cursor();
+                Refresh();
+            }
+            else if (MenuInput.DownRepeat() && MenuInput.StepRepeat(ref m_index, m_chapters.Count, MenuInput.Dir.Down, 1))
+            {
+                MenuSounds.Cursor();
+                Refresh();
+            }
             else if (MenuInput.Submit()) StartSelected();
-        }
-
-        void Move(int delta)
-        {
-            if (m_chapters.Count == 0) return;
-            m_index = (m_index + delta + m_chapters.Count) % m_chapters.Count;
-            Refresh();
         }
 
         // 段に出す名前。未実装の章は「？？？」、未解放の章は伏せ字にする
@@ -316,13 +327,16 @@ namespace Yurube.Story
                 m_outlines[i].enabled = true;
 
                 bool showLock = placeholder || !unlocked;
+                float lockWidth = 0f;
                 if (i < m_lockBadges.Count && m_lockBadges[i] != null)
                 {
                     m_lockBadges[i].gameObject.SetActive(showLock);
                     m_lockBadges[i].localScale = Vector3.one;
+                    lockWidth = m_lockBadges[i].sizeDelta.x;
                 }
-                m_titles[i].rectTransform.anchoredPosition = new Vector2(showLock ? 112f : 32f, 0f);
-                m_titles[i].rectTransform.sizeDelta = new Vector2(showLock ? 560f : 640f, m_titles[i].rectTransform.sizeDelta.y);
+                float titleX = showLock ? (24f + lockWidth + 18f) : 32f;
+                m_titles[i].rectTransform.anchoredPosition = new Vector2(titleX, 0f);
+                m_titles[i].rectTransform.sizeDelta = new Vector2(showLock ? (672f - titleX) : 640f, m_titles[i].rectTransform.sizeDelta.y);
 
                 m_titles[i].color = unlocked ? Color.white : new Color(0.78f, 0.75f, 0.72f);
                 m_states[i].color = unlocked ? new Color(1f, 0.96f, 0.85f) : new Color(0.68f, 0.65f, 0.62f);

@@ -47,10 +47,24 @@ public static class StoryProgressMenu
         Debug.Log("[Story] 第2章をクリア済みにしました");
     }
 
-    [MenuItem("Yurube/ストーリー/最終章をクリア済みにする")]
+    [MenuItem("Yurube/ストーリー/第3章をクリア済みにする")]
     static void ClearChapter3()
     {
         StoryProgress.MarkCleared("chapter3");
+        Debug.Log("[Story] 第3章をクリア済みにしました");
+    }
+
+    [MenuItem("Yurube/ストーリー/第4章をクリア済みにする")]
+    static void ClearChapter4()
+    {
+        StoryProgress.MarkCleared("chapter4");
+        Debug.Log("[Story] 第4章をクリア済みにしました");
+    }
+
+    [MenuItem("Yurube/ストーリー/最終章をクリア済みにする")]
+    static void ClearFinal()
+    {
+        StoryProgress.MarkCleared(StoryLauncher.FinalId);
         Debug.Log("[Story] 最終章をクリア済みにしました");
     }
 

@@ -42,6 +42,8 @@ namespace Yurube.Story
         bool m_stageMode;
         bool m_venueMode;
         bool m_finalMode;
+        bool m_ch4FinalMode;
+        bool m_nightRoomMode;
         float m_matchStartTime;
         float m_nextIncomingCheck;
         bool m_incomingBlock;
@@ -60,6 +62,10 @@ namespace Yurube.Story
 
         readonly HashSet<DarumaCharacter> m_hookedTauntBodies = new HashSet<DarumaCharacter>();
         DarumaCharacter m_hookedPlayerBody;
+        DarumaCharacter m_hookedZeroStackBody;
+        int m_opponentPrevStack;
+        string m_finalEndingBranch;
+        bool m_darukingUnlockBannerShown;
 
         bool IsPrologueGaugeTutorial => m_chapter != null && m_chapter.rules != null && m_chapter.rules.awakening;
         float GaugeTimeHintSeconds
@@ -133,6 +139,8 @@ namespace Yurube.Story
             m_venueMode = m_chapter.cutscene != null && m_chapter.cutscene.type == "venue";
             m_stageMode = m_chapter.cutscene != null && m_chapter.cutscene.type == "stage";
             m_finalMode = m_chapter.cutscene != null && m_chapter.cutscene.type == "final";
+            m_ch4FinalMode = m_chapter.cutscene != null && m_chapter.cutscene.type == "ch4_final";
+            m_nightRoomMode = m_chapter.cutscene != null && m_chapter.cutscene.type == "night_room";
             m_chainOpponentHitUntil = -1f;
 
             PauseMenu.StoryMode = true;
@@ -151,6 +159,8 @@ namespace Yurube.Story
 
             m_dialogue = DialogueRunner.Create();
             m_dialogue.StoryLineStarted += OnStoryLineStarted;
+            m_dialogue.StoryLineTextCompleted += OnStoryLineTextCompleted;
+            m_dialogue.DialogueSkipped += OnDialogueSkipped;
             m_dialogue.ChoiceSelected += OnDialogueChoiceSelected;
             m_movie = StoryMovie.Create(m_chapter);
             // シーンが明けた瞬間にチュートリアルステージが見えないよう、黒いムービー画面で覆っておく
@@ -179,6 +189,7 @@ namespace Yurube.Story
             KidaruPassive.ExtraAdded -= OnYellowExtra;
             DarumaCharacter.AnyPickedUp -= OnStoryBlockPickedUp;
             UnhookPlayerFirstAttack();
+            UnhookOpponentZeroStack();
             m_hookedTauntBodies.Clear();
             DarumaHammer.Hit -= OnHammerHit;
             DarumaHammer.ShotFired -= OnCpuShot;
@@ -190,9 +201,12 @@ namespace Yurube.Story
             if (m_dialogue != null)
             {
                 m_dialogue.StoryLineStarted -= OnStoryLineStarted;
+                m_dialogue.StoryLineTextCompleted -= OnStoryLineTextCompleted;
+                m_dialogue.DialogueSkipped -= OnDialogueSkipped;
                 m_dialogue.ChoiceSelected -= OnDialogueChoiceSelected;
             }
             if (m_movie != null) Destroy(m_movie.gameObject);
+            PreludeSfx.StopAll();
 
             // ポーズメニューからタイトルへ戻った等：ストーリーを中断し、次の試合に影響を残さない
             if (!m_leavingForRetry && StorySession.IsRunning)
@@ -352,18 +366,16 @@ namespace Yurube.Story
             SpecialGaugeHUD.Visible = true;
             SpecialInput.StoryLocked = false;
 
-            // 初回だけ、試合を止めて掛け合い（約3秒ずつ）。リトライは台詞なしの補助だけ
-            if (!replay)
+            // 初回だけ、掛け合いがある場合は試合を止めて再生（約3秒ずつ）。リトライや台詞なし設定は補助だけ
+            bool hasLines = ev.lines != null && ev.lines.Count > 0;
+            if (!replay && hasLines)
             {
                 if (ev.pause) SetStoryPaused(true);
                 yield return new WaitForSecondsRealtime(0.35f);
-                if (ev.lines != null)
+                foreach (var line in ev.lines)
                 {
-                    foreach (var line in ev.lines)
-                    {
-                        if (line == null) continue;
-                        yield return m_dialogue.PlaySmall(line.speaker, line.text, m_chapter, 3.0f);
-                    }
+                    if (line == null) continue;
+                    yield return m_dialogue.PlaySmall(line.speaker, line.text, m_chapter, 3.0f);
                 }
                 if (ev.pause) SetStoryPaused(false);
             }
@@ -395,8 +407,8 @@ namespace Yurube.Story
 
             m_dialogue.HideObjective();
             if (!replay) StorySession.LastStandPlayed = true;
-            Debug.Log(replay
-                ? "[Story] 必殺技イベント（リトライ補助）: ゲージ満タン＋プロンプト"
+            Debug.Log(replay || !hasLines
+                ? "[Story] 必殺技イベント（補助のみ）: ゲージ満タン＋プロンプト" + (used ? "（使用）" : "（時間切れ）")
                 : "[Story] 必殺技イベント: ストック1で掛け合い→プロンプト" + (used ? "（使用）" : "（時間切れ）"));
             m_lastStandRunning = false;
         }
@@ -555,6 +567,7 @@ namespace Yurube.Story
 
             HookTaunts();
             HookPlayerFirstAttack();
+            HookOpponentZeroStack();
             ApplyCpuBlockLimit(CpuBlockLimit);
 
             // 会話（前）：フェーダーが明けて、止められるようになってから
@@ -572,13 +585,14 @@ namespace Yurube.Story
                 if (m_stageMode) yield return m_movie.PlayStageIntro(m_chapter);
                 else if (m_venueMode) yield return m_movie.PlayVenueIntro(m_chapter);
                 else if (m_finalMode) yield return m_movie.PlayFinalIntro(m_chapter);
+                else if (m_ch4FinalMode) yield return m_movie.PlayCh4FinalIntro(m_chapter);
+                else if (m_nightRoomMode) yield return m_movie.PlayNightRoomIntro(m_chapter);
                 else yield return m_movie.PlayOpening();
                 // 章クリア済みの再プレイで B を押したら、カットシーンだけでなく会話（前）も飛ばす
                 bool skipBefore = StoryProgress.IsCleared(m_chapter.id) && m_movie.WasSkipped;
                 if (!skipBefore)
                 {
-                    if (m_finalMode) yield return PlayFinalBefore();
-                    else yield return m_dialogue.PlayBig(m_chapter, m_chapter.before);
+                    yield return m_dialogue.PlayBig(m_chapter, m_chapter.before);
                     m_movie.EndConversation(false);
                 }
                 StorySession.MarkIntroPlayed();
@@ -786,6 +800,46 @@ namespace Yurube.Story
             }
             ApplyCpuBlockLimit(CpuBlockLimit);
             HookCpuTaunt(p);
+            HookOpponentZeroStack();
+        }
+
+        // 対戦相手（最終章のだるきんぐ等）が積み木をすべて失ったときの初回掛け合いを監視する
+        void HookOpponentZeroStack()
+        {
+            if (m_chapter == null || m_chapter.opponentZeroStackLines == null || m_chapter.opponentZeroStackLines.Count == 0) return;
+            if (m_match == null) return;
+            string targetId = m_chapter.cpu != null && m_chapter.cpu.Count > 0 ? m_chapter.cpu[0].character : null;
+            MatchPlayer target = !string.IsNullOrEmpty(targetId) ? FindCpu(targetId) : null;
+            var body = target != null ? target.Character : null;
+            if (body == null || body.Stack == null || body == m_hookedZeroStackBody) return;
+
+            UnhookOpponentZeroStack();
+            m_hookedZeroStackBody = body;
+            m_opponentPrevStack = body.Stack.Count;
+            body.Stack.Changed += OnOpponentStackChanged;
+        }
+
+        void UnhookOpponentZeroStack()
+        {
+            if (m_hookedZeroStackBody != null && m_hookedZeroStackBody.Stack != null)
+                m_hookedZeroStackBody.Stack.Changed -= OnOpponentStackChanged;
+            m_hookedZeroStackBody = null;
+            m_opponentPrevStack = 0;
+        }
+
+        void OnOpponentStackChanged()
+        {
+            if (m_hookedZeroStackBody == null || m_hookedZeroStackBody.Stack == null) return;
+            int current = m_hookedZeroStackBody.Stack.Count;
+            bool droppedToZero = m_opponentPrevStack > 0 && current == 0;
+            m_opponentPrevStack = current;
+
+            if (!droppedToZero || m_finishedHandled || !m_matchRunning) return;
+            if (m_chapter == null || m_chapter.opponentZeroStackLines == null || m_chapter.opponentZeroStackLines.Count == 0) return;
+            string key = m_chapter.id + ".opponentZeroStack";
+            if (StorySession.HasEvent(key)) return;
+            StorySession.MarkEvent(key);
+            StartCoroutine(PlayLines(m_chapter.opponentZeroStackLines));
         }
 
         void HookPlayerFirstAttack()
@@ -952,8 +1006,19 @@ namespace Yurube.Story
 
         void OnStoryLineStarted(StoryLine line)
         {
-            // 会話の1行ごとにショットIDの切り替えや話者へのカメラ寄せを行う
+            // 会話の1行ごとにショットIDの切り替えや話者へのカメラ寄せ、演出効果音の再生を行う
             if (m_movie != null) m_movie.OnDialogueLine(line);
+            if (line != null && !string.IsNullOrEmpty(line.se)) PreludeSfx.Play(line.se, this);
+        }
+
+        void OnStoryLineTextCompleted(StoryLine line)
+        {
+            if (m_movie != null) m_movie.OnDialogueLineTextCompleted(line);
+        }
+
+        void OnDialogueSkipped()
+        {
+            if (m_movie != null) m_movie.OnDialogueSkipped();
         }
 
         void OnDialogueChoiceSelected(StoryChoiceResult result)
@@ -1194,38 +1259,6 @@ namespace Yurube.Story
         }
 
         //========================================
-        // 最終章：控室 → 決勝の舞台の会話（前）
-        //========================================
-
-        // 章データの before を scene（room / stage）で分け、場面に合わせて背景を切り替える
-        IEnumerator PlayFinalBefore()
-        {
-            var roomLines = new List<StoryLine>();
-            var stageLines = new List<StoryLine>();
-            if (m_chapter.before != null)
-            {
-                foreach (var line in m_chapter.before)
-                {
-                    if (line == null) continue;
-                    if (line.scene == "stage") stageLines.Add(line);
-                    else roomLines.Add(line);
-                }
-            }
-
-            if (roomLines.Count > 0)
-            {
-                m_movie.ShowFinalConversation(false);
-                yield return m_dialogue.PlayBig(m_chapter, roomLines);
-            }
-            if (stageLines.Count > 0)
-            {
-                if (roomLines.Count > 0) yield return m_movie.SwitchFinalScene("stage", 0.4f);
-                else m_movie.ShowFinalConversation(true);
-                yield return m_dialogue.PlayBig(m_chapter, stageLines);
-            }
-        }
-
-        //========================================
         // やられたとき
         //========================================
 
@@ -1380,42 +1413,81 @@ namespace Yurube.Story
             m_dialogue.SetDimAlpha(0.3f);
             m_movie.SetBlack();
             if (m_finalMode) m_movie.ShowFinalConversation(true, true);
+            else if (m_ch4FinalMode) m_movie.ShowCh4FinalConversation(true);
             else if (m_stageMode) m_movie.ShowStageConversation(true);
             else if (m_venueMode) m_movie.ShowVenueConversation(true);
+            else if (m_nightRoomMode) m_movie.ShowVenueConversation(true, sunset: true, hideHebidaru: true);
             else m_movie.ShowConversation(true);
             yield return m_movie.FadeIn(0.6f);
-            yield return m_dialogue.PlayBig(m_chapter, m_chapter.after, OnAfterLine);
+            m_finalEndingBranch = null;
+            m_darukingUnlockBannerShown = false;
+            yield return m_dialogue.PlayBig(m_chapter, m_chapter.after, OnAfterLine, OnAfterChoice, OnBeforeAfterLine);
+            PreludeSfx.StopAll();
             m_movie.EndConversation(true);
-            // 横断幕が掲げられたのを少し見せる
-            if (!string.IsNullOrEmpty(m_chapter.bannerText)) yield return new WaitForSecondsRealtime(1.4f);
 
-            // だるま新聞
-            yield return m_dialogue.PlayNewspaper(m_chapter.newspaper);
-
-            // 新聞まで見終わったら、章クリアの実績とセーブを記録する。
-            // このあとのエピローグを途中で終了しても、進行が失われないようにする
-            AchievementManager.ReportStoryCleared(m_chapter.id);
-            string newlyUnlocked = StoryProgress.MarkCleared(m_chapter.id);
-            if (!string.IsNullOrEmpty(newlyUnlocked))
-                StorySession.PendingUnlockChapterId = newlyUnlocked;
-            if (AchievementManager.PendingCount > 0)
+            bool isFinalChapter = m_chapter.id == StoryLauncher.FinalId;
+            if (isFinalChapter)
             {
-                var clearCanvas = ToyKit.CreateOverlayCanvas("StoryClearAchievements", 45);
-                var clearPresenter = AchievementResultPresenter.Create(clearCanvas, PresentationSettings.DefaultFont);
-                yield return clearPresenter.Play();
-                Destroy(clearCanvas.gameObject);
+                bool isTrueEnd = m_finalEndingBranch == "true_end";
+                if (isTrueEnd)
+                {
+                    // トゥルーエンド：初回のみだるきんぐ解放＆通知（会話中にBスキップされた場合も漏らさない）
+                    if (!m_darukingUnlockBannerShown && StoryProgress.UnlockDaruKing())
+                    {
+                        m_darukingUnlockBannerShown = true;
+                        yield return m_dialogue.PlayUnlockBanner("だるきんぐが使えるようになった！", 3.0f);
+                    }
+
+                    // だるま新聞
+                    yield return m_dialogue.PlayNewspaper(m_chapter.newspaper);
+
+                    // クリア保存 → トゥルーエンド限定で実績 story_chapter3 解除
+                    string newlyUnlockedFinal = StoryProgress.MarkCleared(m_chapter.id);
+                    if (!string.IsNullOrEmpty(newlyUnlockedFinal))
+                        StorySession.PendingUnlockChapterId = newlyUnlockedFinal;
+                    AchievementManager.ReportStoryCleared(m_chapter.id);
+                    if (AchievementManager.PendingCount > 0)
+                    {
+                        var clearCanvas = ToyKit.CreateOverlayCanvas("StoryClearAchievements", 45);
+                        var clearPresenter = AchievementResultPresenter.Create(clearCanvas, PresentationSettings.DefaultFont);
+                        yield return clearPresenter.Play();
+                        Destroy(clearCanvas.gameObject);
+                    }
+                }
+                else
+                {
+                    // バッドエンド：だるま新聞・キャラ解放・story_chapter3 解除は行わず、章クリアのみ保存する
+                    string newlyUnlockedBad = StoryProgress.MarkCleared(m_chapter.id);
+                    if (!string.IsNullOrEmpty(newlyUnlockedBad))
+                        StorySession.PendingUnlockChapterId = newlyUnlockedBad;
+                }
             }
-
-            // エピローグ（最終章。データがあるときだけ）
-            if (m_chapter.epilogue != null && m_chapter.epilogue.enabled)
+            else
             {
-                yield return m_movie.PlayEpilogue(m_chapter, m_dialogue);
+                // 横断幕が掲げられたのを少し見せる
+                if (!string.IsNullOrEmpty(m_chapter.bannerText)) yield return new WaitForSecondsRealtime(1.4f);
+
+                // だるま新聞
+                yield return m_dialogue.PlayNewspaper(m_chapter.newspaper);
+
+                // 新聞まで見終わったら、章クリアの実績とセーブを記録する
+                AchievementManager.ReportStoryCleared(m_chapter.id);
+                string newlyUnlocked = StoryProgress.MarkCleared(m_chapter.id);
+                if (!string.IsNullOrEmpty(newlyUnlocked))
+                    StorySession.PendingUnlockChapterId = newlyUnlocked;
+                if (AchievementManager.PendingCount > 0)
+                {
+                    var clearCanvas = ToyKit.CreateOverlayCanvas("StoryClearAchievements", 45);
+                    var clearPresenter = AchievementResultPresenter.Create(clearCanvas, PresentationSettings.DefaultFont);
+                    yield return clearPresenter.Play();
+                    Destroy(clearCanvas.gameObject);
+                }
             }
 
             // メニューへ切り替わるまで映像画面（黒）を残す（HUD付きの対戦画面を一瞬見せない）
             m_dialogue.HideHint();
             m_movie.HideHint();
-            if (m_finalMode) m_movie.ShowBlackCover();
+            if (m_finalMode || m_ch4FinalMode) m_movie.ShowBlackCover();
             else m_movie.SetBlack();
 
             StorySession.End();
@@ -1425,10 +1497,51 @@ namespace Yurube.Story
             Fader.Load(MenuSceneName);
         }
 
-        // 会話（後）の最後のト書きに合わせて、横断幕を掲げる
+        // 最終章の2択決定時：エンディング到達を即座に保存する
+        void OnAfterChoice(StoryChoiceResult result)
+        {
+            if (m_chapter == null || m_chapter.id != StoryLauncher.FinalId) return;
+            if (result.ChoiceId != "final_ending_choice") return;
+            m_finalEndingBranch = result.BranchId;
+            bool isTrue = result.BranchId == "true_end";
+            StoryProgress.MarkEndingReached(isTrue);
+        }
+
+        // 最終章の勝利後会話で、行表示前に挟む場面転換・暗転メッセージ演出
+        IEnumerator OnBeforeAfterLine(StoryLine line)
+        {
+            if (!m_finalMode || line == null || string.IsNullOrEmpty(line.cue)) yield break;
+
+            if (line.cue == "switch_to_room_true")
+            {
+                m_dialogue.SetBigVisible(false);
+                yield return m_movie.TransitionToTrueRoom("数日後 ― 七転高校 部室");
+                m_dialogue.SetBigVisible(true);
+            }
+            else if (line.cue == "bad_ending_card")
+            {
+                m_dialogue.SetBigVisible(false);
+                m_movie.OnDialogueLine(new StoryLine { cue = "bad_blackout_only" });
+                // エンドロールの代替：黒背景白文字の表示（3.0秒）→ 暗転と槌を引きずる音（2.2秒）
+                yield return m_dialogue.PlayDarkMessageCard("アメイジングだるま落としは、終わった", 3.0f, PreludeSfx.HammerDrag, 2.2f);
+                m_dialogue.SetBigVisible(true);
+            }
+        }
+
+        // 会話（後）の行表示時：横断幕や、最終章トゥルーエンドの初回だるきんぐ解放バナーを出す
         void OnAfterLine(int index, StoryLine line)
         {
-            if (m_chapter == null || string.IsNullOrEmpty(m_chapter.bannerText)) return;
+            if (m_chapter == null) return;
+            if (m_finalMode && line != null && line.cue == "unlock_daruking")
+            {
+                if (!m_darukingUnlockBannerShown && StoryProgress.UnlockDaruKing())
+                {
+                    m_darukingUnlockBannerShown = true;
+                    m_dialogue.ShowUnlockBanner("だるきんぐが使えるようになった！", 3.2f);
+                }
+                return;
+            }
+            if (string.IsNullOrEmpty(m_chapter.bannerText)) return;
             if (m_chapter.after == null || m_chapter.after.Count == 0) return;
             if (index != m_chapter.after.Count - 1) return;
             m_movie.ShowBanner(m_chapter.bannerText, m_chapter.bannerSeconds);

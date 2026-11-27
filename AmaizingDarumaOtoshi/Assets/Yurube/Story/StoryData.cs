@@ -4,6 +4,52 @@ using UnityEngine;
 
 namespace Yurube.Story
 {
+    // 汎用VFX演出キュー1件分（JSON の vfxCues に複数指定できる）。
+    // ワールド空間エフェクト・画面効果（fx_fade / fx_vignette / fx_flash）・停止を統一書式で扱う。
+    [Serializable]
+    public class StoryVfxCue
+    {
+        // "play"（通常再生・既定）/ "fade_in"（暗転）/ "fade_out"（明転）/ "stop" / "stop_all"
+        public string action = "play";
+        // エフェクトキー（例: "fx_block_collapse_s" / "fx_fade"。"vfx:" プレフィックス付きも許容）
+        public string key;
+        // 発火タイミング："start"（行の表示開始時・既定）/ "end"（文字送り完了時）
+        public string timing = "start";
+        // 発火までの遅延（秒）
+        public float delay;
+        // ワールド空間の位置アンカー名（例: "king_blocks" / "stage_center"）
+        public string anchor;
+        // 3Dアンカー基準からの微調整オフセット
+        public Vector3 offset;
+        // true のとき、正規化画面座標（左下 0,0 〜 右上 1,1）でカメラ前方に配置する（静止画背景向け）
+        public bool useScreenPos;
+        public float screenX = 0.5f;
+        public float screenY = 0.5f;
+        public float screenDepth = 6.0f;
+        // 乗算カラー（"#RRGGBB"。空なら白/既定。8年前の場面は "#BFB8AD" のように彩度を落とす）
+        public string tint;
+        // サイズ倍率（0以下なら 1.0）
+        public float scale = 1f;
+        // 画面効果のフェード時間（秒。0以下なら既定）
+        public float duration;
+        // true のとき、画面効果（暗転・明転）の最終状態を保持する
+        public bool hold;
+        // 画面効果の色（"#RRGGBB"。空なら既定色）
+        public string color;
+    }
+
+    // 章単位の名前付き位置アンカー上書き定義（JSON の vfxAnchors で背景差し替え・微調整に対応）
+    [Serializable]
+    public class StoryVfxAnchor
+    {
+        public string name;
+        public bool useScreenPos;
+        public Vector3 offset;
+        public float screenX = 0.5f;
+        public float screenY = 0.5f;
+        public float screenDepth = 6.0f;
+    }
+
     // ストーリーモードの台本データ（JSON）。
     // Assets/Yurube/Story/Resources/Story/<章ID>.json を読み込む。コードを変えずに台詞を足せる。
     //  ・speaker が空、または direction=true の行はト書き（小さめの字で出す／イベントだけ起こす）
@@ -30,6 +76,8 @@ namespace Yurube.Story
         public string se;
         // 演出キュー（例：tower_collapse / blackout / keep_blackout / lights_on_hammer）。空なら何もしない
         public string cue;
+        // 汎用VFX演出キュー一覧（発火タイミング・遅延・位置・色・大きさをJSONで調整可能）
+        public List<StoryVfxCue> vfxCues = new List<StoryVfxCue>();
         // 2択の選択肢（会話の途中に差し込む汎用ブロック）。null または options が空なら通常の行として扱う
         public StoryChoice choice;
 
@@ -50,6 +98,7 @@ namespace Yurube.Story
         public string shot;
         public string se;
         public string cue;
+        public List<StoryVfxCue> vfxCues = new List<StoryVfxCue>();
 
         public StoryLine ToStoryLine()
         {
@@ -65,6 +114,7 @@ namespace Yurube.Story
                 shot = shot,
                 se = se,
                 cue = cue,
+                vfxCues = vfxCues != null ? new List<StoryVfxCue>(vfxCues) : new List<StoryVfxCue>(),
             };
         }
     }
@@ -85,6 +135,14 @@ namespace Yurube.Story
         public string id;           // 選択の識別子（例：ch1_taunt）
         public string speaker;      // 選択後に表示する話者ID（空なら章の playerCharacter）
         public List<StoryChoiceOption> options = new List<StoryChoiceOption>();
+    }
+
+    // 2択の選択結果で分岐する台詞ブロック（最終章のトゥルー／バッド分岐など）
+    [Serializable]
+    public class StoryBranch
+    {
+        public string id;
+        public List<StoryLine> lines = new List<StoryLine>();
     }
 
     // 選択結果（呼び出し元へコールバック等で渡す用。セーブはしない）
@@ -217,28 +275,12 @@ namespace Yurube.Story
         public string subBody;
     }
 
-    // 対戦中に「そのキャラが脱落したとき」の台詞（最終章）
+    // 対戦中に「そのキャラが脱落したとき」の台詞（他章の互換用）
     [Serializable]
     public class StoryOutLine
     {
         public string character;    // 脱落したキャラID（例：iwadaru）
         public List<StoryLine> lines = new List<StoryLine>();
-    }
-
-    // エピローグ（新聞のあとの短いカットシーン。最終章）
-    //  ・shots の view でカットを並べる（notebook / roster / doll / logo）
-    //  ・lines は scene にカット名を書くと、そのカットのあいだに出る
-    [Serializable]
-    public class StoryEpilogue
-    {
-        public bool enabled;
-        public string caption;              // 場所テロップ（例：全国制覇の夜 ― 部室）
-        public List<StoryShot> shots = new List<StoryShot>();
-        public List<StoryLine> lines = new List<StoryLine>();
-        // 黒板の部員名簿に書く文字（空なら名簿を出さない）
-        public string rosterText;
-        // 小槌の音のときに出す文字（空なら「コツン」）
-        public string knockText = "コツン";
     }
 
     // 章1つ分
@@ -264,6 +306,8 @@ namespace Yurube.Story
         public StoryRules rules = new StoryRules();
         public List<StoryCpu> cpu = new List<StoryCpu>();
         public List<StorySpeaker> speakers = new List<StorySpeaker>();
+        // 章ごとのVFX位置アンカー定義（3Dオフセット微調整・静止画向け正規化座標切替）
+        public List<StoryVfxAnchor> vfxAnchors = new List<StoryVfxAnchor>();
         public List<StoryLine> before = new List<StoryLine>();
         public List<StoryLine> after = new List<StoryLine>();
         public List<StoryLine> defeat = new List<StoryLine>();
@@ -297,15 +341,37 @@ namespace Yurube.Story
         public List<StoryLine> startLines = new List<StoryLine>();
         // そのキャラが脱落したときの台詞（最終章。初回だけ・キャラごとに1回）
         public List<StoryOutLine> outLines = new List<StoryOutLine>();
-        // 残り2人になったときの掛け合い（最終章）。lastTwoCharacter が最後の相手のキャラID
+        // 残り2人になったときの掛け合い（他章の互換用）。lastTwoCharacter が最後の相手のキャラID
         public string lastTwoCharacter;
         public List<StoryLine> lastTwoLines = new List<StoryLine>();
+        // 対戦相手が積み木をすべて失ったときの初回掛け合い（最終章など）
+        public List<StoryLine> opponentZeroStackLines = new List<StoryLine>();
+        // 2択の branchId でジャンプする分岐先台詞ブロック一覧（最終章のエンディング分岐など）
+        public List<StoryBranch> branches = new List<StoryBranch>();
         // 勝利後、会話（後）の最後のト書きに合わせて掲げる横断幕（空なら出さない）
         public string bannerText;
         public float bannerSeconds = 3.6f;
-        // 新聞のあとの短いカットシーン（最終章）
-        public StoryEpilogue epilogue = new StoryEpilogue();
         public StoryNewspaper newspaper = new StoryNewspaper();
+
+        public StoryBranch FindBranch(string branchId)
+        {
+            if (string.IsNullOrEmpty(branchId) || branches == null) return null;
+            for (int i = 0; i < branches.Count; i++)
+            {
+                if (branches[i] != null && branches[i].id == branchId) return branches[i];
+            }
+            return null;
+        }
+
+        public StoryVfxAnchor FindVfxAnchor(string anchorName)
+        {
+            if (string.IsNullOrEmpty(anchorName) || vfxAnchors == null) return null;
+            for (int i = 0; i < vfxAnchors.Count; i++)
+            {
+                if (vfxAnchors[i] != null && vfxAnchors[i].name == anchorName) return vfxAnchors[i];
+            }
+            return null;
+        }
     }
 
     // 章データの読み込みと、話者・色の取り出し

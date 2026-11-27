@@ -1,0 +1,165 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 66bf98408d22460aaea072ce1d568435, type: 3}
+  m_Name: StoryVfxCatalog
+  m_EditorClassIdentifier: Assembly-CSharp::Yurube.Story.Vfx.StoryVfxCatalog
+  m_entries:
+  - key: fx_fade
+    label: "\u6697\u8EE2\u30FB\u660E\u8EE2\uFF08\u30D7\u30ED\u30ED\u30FC\u30B05\u30FB\u7B2C3\u7AE0\u544A\u767D\u30FB\u6700\u7D42\u7AE0\u5834\u9762\u8EE2\u63DB\uFF09"
+    priority: 1
+    category: 2
+    prefab: {fileID: 0}
+    looping: 0
+    defaultScale: 1
+    defaultTint: {r: 0, g: 0, b: 0, a: 1}
+    useUnscaledTime: 1
+    previewOrbitMotion: 0
+  - key: fx_vignette
+    label: "\u8996\u754C\u5468\u7E01\u304C\u4E00\u77AC\u6697\u304F\u306A\u308B\uFF08\u5E8F\u7AE0\uFF09"
+    priority: 1
+    category: 2
+    prefab: {fileID: 0}
+    looping: 0
+    defaultScale: 1
+    defaultTint: {r: 0.03, g: 0.02, b: 0.06, a: 1}
+    useUnscaledTime: 1
+    previewOrbitMotion: 0
+  - key: fx_block_collapse_s
+    label: "2\u301C3\u500B\u306E\u7A4D\u307F\u6728\u5D29\u58CA\uFF0B\u5C11\u91CF\u306E\u7802\u57C3\uFF08\u30D7\u30ED\u30ED\u30FC\u30B03\uFF09"
+    priority: 1
+    category: 0
+    prefab: {fileID: 5764415250703221081, guid: 9017bf992d433644780084d95ef0277f, type: 3}
+    looping: 0
+    defaultScale: 1
+    defaultTint: {r: 1, g: 1, b: 1, a: 1}
+    useUnscaledTime: 1
+    previewOrbitMotion: 0
+  - key: fx_dust_puff_small
+    label: "\u5E8A\u306E\u5C0F\u3055\u306A\u57C3\u304C\u3075\u308F\u3063\u3068\u4E0A\u304C\u3063\u3066\u6D88\u3048\u308B\uFF08\u30D7\u30ED\u30ED\u30FC\u30B07\uFF09"
+    priority: 1
+    category: 0
+    prefab: {fileID: 9069531622515905084, guid: cf901aaa3f27974449c7b6313345c338, type: 3}
+    looping: 0
+    defaultScale: 1
+    defaultTint: {r: 1, g: 1, b: 1, a: 1}
+    useUnscaledTime: 1
+    previewOrbitMotion: 0
+  - key: fx_confetti
+    label: "\u4E03\u8272\u306E\u7D19\u5439\u96EA\u304C\u4E0A\u304B\u3089\u964D\u308B\uFF08\u7B2C4\u7AE0\u512A\u52DD\u30FB\u6700\u7D42\u7AE0\u958B\u5E55\uFF09"
+    priority: 1
+    category: 0
+    prefab: {fileID: 6285877540996826485, guid: 4cfd0192bcee06c438ca46a528ecf716, type: 3}
+    looping: 1
+    defaultScale: 1
+    defaultTint: {r: 1, g: 1, b: 1, a: 1}
+    useUnscaledTime: 1
+    previewOrbitMotion: 0
+  - key: fx_block_collapse_l
+    label: "\u5927\u304D\u306A\u5854\u30FB\u821E\u53F0\u306E\u5D29\u58CA\uFF08\u591A\u6570\u306E\u6B20\u7247\uFF0B\u5927\u304D\u306A\u7802\u57C3\uFF09"
+    priority: 2
+    category: 0
+    prefab: {fileID: 7249129972588067554, guid: ffe0ec3ee40fa81448002bbce5175ceb, type: 3}
+    looping: 0
+    defaultScale: 1
+    defaultTint: {r: 1, g: 1, b: 1, a: 1}
+    useUnscaledTime: 1
+    previewOrbitMotion: 0
+  - key: fx_throne_shatter
+    label: "\u738B\u5EA7\u3068\u76FE\u304C\u7815\u3051\u308B\uFF08\u91D1\u8272\u91D1\u5C5E\u30FB\u77F3\u6B20\u7247\uFF0B\u57C3\uFF0B\u5149\u306E\u7C92\uFF09"
+    priority: 2
+    category: 0
+    prefab: {fileID: 4536729099872834041, guid: 48d032034313f4a4f85842e96445c08c, type: 3}
+    looping: 0
+    defaultScale: 1
+    defaultTint: {r: 1, g: 1, b: 1, a: 1}
+    useUnscaledTime: 1
+    previewOrbitMotion: 0
+  - key: fx_parry_impact
+    label: "\u30D1\u30EA\u30A3\u885D\u6483\uFF08\u5E83\u304C\u308B\u30EA\u30F3\u30B0\uFF0B\u706B\u82B1\uFF0B\u77ED\u3044\u4E2D\u5FC3\u5149\uFF09"
+    priority: 2
+    category: 0
+    prefab: {fileID: 4335643982351739817, guid: a58fa62afb7aec64fa77ddd6660d7cc4, type: 3}
+    looping: 0
+    defaultScale: 1
+    defaultTint: {r: 1, g: 1, b: 1, a: 1}
+    useUnscaledTime: 1
+    previewOrbitMotion: 0
+  - key: fx_sword_trail
+    label: "\u738B\u306E\u5263\u6295\u64F2\u306E\u8FFD\u5F93\u8ECC\u8DE1\uFF08\u91D1\u767D\u30C8\u30EC\u30A4\u30EB\uFF0B\u5149\u306E\u7C92\uFF09"
+    priority: 2
+    category: 0
+    prefab: {fileID: 4723621305016390005, guid: 1bc620b7b2707e34fb3ab2fda4a3d5ce, type: 3}
+    looping: 1
+    defaultScale: 1
+    defaultTint: {r: 1, g: 1, b: 1, a: 1}
+    useUnscaledTime: 1
+    previewOrbitMotion: 1
+  - key: fx_darkness_aura
+    label: "\u95C7\u843D\u3061\u30AA\u30FC\u30E9\uFF08\u9ED2\u7D2B\u306E\u3082\u3084\uFF0B\u6697\u3044\u7C92\u5B50\u30FB\u5F37\u3055\u53EF\u5909\u30FB\u62BD\u8C61\u8868\u73FE\uFF09"
+    priority: 2
+    category: 0
+    prefab: {fileID: 8931647740359693033, guid: 95412fa875324084998117688f2c5d52, type: 3}
+    looping: 1
+    defaultScale: 1
+    defaultTint: {r: 1, g: 1, b: 1, a: 1}
+    useUnscaledTime: 1
+    previewOrbitMotion: 0
+  - key: fx_shard_swirl
+    label: "\u4E03\u8272\u306E\u7A4D\u307F\u6728\u6B20\u7247\u304C\u5BFE\u8C61\u306E\u5468\u56F2\u3092\u87BA\u65CB\u72B6\u306B\u65CB\u56DE"
+    priority: 2
+    category: 0
+    prefab: {fileID: 1162148532415354338, guid: 2acc53b5d7d2a694e8f916d5d64b19ed, type: 3}
+    looping: 1
+    defaultScale: 1
+    defaultTint: {r: 1, g: 1, b: 1, a: 1}
+    useUnscaledTime: 1
+    previewOrbitMotion: 0
+  - key: fx_arena_collapse
+    label: "\u95D8\u6280\u5834\u306E\u7A4D\u307F\u6728\u304C\u5E83\u7BC4\u56F2\u3067\u6642\u9593\u5DEE\u5D29\u843D\uFF0B\u6697\u3044\u7159"
+    priority: 2
+    category: 0
+    prefab: {fileID: 3506396307112982749, guid: c8e35399f4a0a8143a27c93779303c60, type: 3}
+    looping: 0
+    defaultScale: 1
+    defaultTint: {r: 1, g: 1, b: 1, a: 1}
+    useUnscaledTime: 1
+    previewOrbitMotion: 0
+  - key: fx_sparkle_burst
+    label: "\u91D1\u8272\u306E\u304D\u3089\u3081\u304D\uFF08\u3060\u308B\u304D\u3093\u3050\u89E3\u653E\u901A\u77E5\u307E\u308F\u308A\u30FBUI\u524D\u9762\uFF09"
+    priority: 2
+    category: 1
+    prefab: {fileID: 3786468026885997445, guid: f341cf0f8bbab8d4fbe49c49c39a4044, type: 3}
+    looping: 0
+    defaultScale: 1
+    defaultTint: {r: 1, g: 1, b: 1, a: 1}
+    useUnscaledTime: 1
+    previewOrbitMotion: 0
+  - key: fx_flash
+    label: "\u30D1\u30EA\u30A3\u885D\u6483\u306E\u5358\u767A\u767D\u9583\u5149\uFF080.12\u79D2\u4EE5\u4E0A\u30D5\u30A7\u30FC\u30C9\u30FB\u9023\u767A\u9632\u6B62\uFF09"
+    priority: 3
+    category: 2
+    prefab: {fileID: 0}
+    looping: 0
+    defaultScale: 1
+    defaultTint: {r: 1, g: 0.98, b: 0.92, a: 1}
+    useUnscaledTime: 1
+    previewOrbitMotion: 0
+  - key: fx_dust_motes
+    label: "\u5149\u306E\u4E2D\u3092\u3086\u3063\u304F\u308A\u821E\u3046\u3054\u304F\u5F31\u3044\u57C3\uFF08\u5E8F\u7AE0\u30FB\u7B2C3\u7AE0\u90E8\u5BA4\uFF09"
+    priority: 3
+    category: 0
+    prefab: {fileID: 2344068726853279050, guid: 0424664958caf924fbab0be7779fa29a, type: 3}
+    looping: 1
+    defaultScale: 1
+    defaultTint: {r: 1, g: 1, b: 1, a: 1}
+    useUnscaledTime: 1
+    previewOrbitMotion: 0

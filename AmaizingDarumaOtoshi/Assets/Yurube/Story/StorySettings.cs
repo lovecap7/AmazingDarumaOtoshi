@@ -75,6 +75,10 @@ namespace Yurube.Story
         [Tooltip("CPUの積み木の上限を上書きする（0 なら章データ）")]
         [SerializeField, Min(0)] int m_overrideCpuBlockLimit;
 
+        [Header("演出エフェクト（VFX）")]
+        [Tooltip("ストーリーカットシーン用エフェクトのカタログ（Yurube/ストーリーエフェクト/一括生成 で自動設定）")]
+        [SerializeField] Yurube.Story.Vfx.StoryVfxCatalog m_vfxCatalog;
+
         public float CharsPerSecond => Mathf.Max(1f, m_charsPerSecond);
         public float SmallSeconds => Mathf.Max(0.5f, m_smallSeconds);
         public float DimAlpha => Mathf.Clamp(m_dimAlpha, 0f, 0.9f);
@@ -105,6 +109,7 @@ namespace Yurube.Story
         public int OverrideStocks => Mathf.Max(0, m_overrideStocks);
         public int OverrideCpuLevel => Mathf.Max(0, m_overrideCpuLevel);
         public int OverrideCpuBlockLimit => Mathf.Max(0, m_overrideCpuBlockLimit);
+        public Yurube.Story.Vfx.StoryVfxCatalog VfxCatalog => m_vfxCatalog;
 
         static StorySettings s_instance;
 

@@ -13,21 +13,26 @@ namespace Yurube.Achievements
     {
         // 報酬キャラクターの CharacterData.id（セレクトの一覧と同じ名前）
         public const string RewardCharacterId = "darumaotoshi";
+        // ストーリー最終章（トゥルーエンド）の報酬キャラクター
+        public const string DaruKingCharacterId = "daruking";
 
         public static string RewardCharacterName => "だるまおとし";
 
         // 報酬キャラクターが解放済みか（全実績解除）
         public static bool IsRewardUnlocked => AchievementManager.AllUnlocked;
+        // だるきんぐが解放済みか（最終章トゥルーエンド到達）
+        public static bool IsDaruKingUnlocked => Yurube.Story.StoryProgress.IsDaruKingUnlocked();
 
         public static int UnlockedCount => AchievementManager.UnlockedCount;
         public static int TotalCount => AchievementManager.All.Count;
 
-        // そのキャラクターがいま選べるか。報酬キャラだけ、全実績解除まで選べない
+        // そのキャラクターがいま選べるか。報酬キャラはそれぞれの解放条件を満たすまで選べない
         public static bool IsAvailable(CharacterData character)
         {
             if (character == null) return false;
-            if (character.id != RewardCharacterId) return true;
-            return IsRewardUnlocked;
+            if (character.id == RewardCharacterId) return IsRewardUnlocked;
+            if (character.id == DaruKingCharacterId) return IsDaruKingUnlocked;
+            return true;
         }
 
         // 選べるキャラクターだけの一覧（キャラクターセレクト用）

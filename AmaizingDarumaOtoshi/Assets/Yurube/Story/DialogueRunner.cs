@@ -59,6 +59,14 @@ namespace Yurube.Story
         RectTransform m_choiceRoot;
         CanvasGroup m_choiceGroup;
         readonly List<ChoiceButton> m_choiceButtons = new List<ChoiceButton>();
+        RectTransform m_unlockBanner;
+        CanvasGroup m_unlockBannerGroup;
+        TextMeshProUGUI m_unlockBannerText;
+        Coroutine m_unlockBannerRoutine;
+        GameObject m_darkCardRoot;
+        CanvasGroup m_darkCardGroup;
+        CanvasGroup m_darkCardTextGroup;
+        TextMeshProUGUI m_darkCardText;
         bool m_skipped;
         bool m_smallShowing;
         bool m_bigShowing;
@@ -80,6 +88,10 @@ namespace Yurube.Story
         public event Action<string> LineStarted;
         // 1行を表示し始めた（行データ全体。ショットIDなどを使ったカメラ切り替え用）
         public event Action<StoryLine> StoryLineStarted;
+        // 1行の文字送りが完了した（timing="end" の演出キュー発火用）
+        public event Action<StoryLine> StoryLineTextCompleted;
+        // Bスキップで会話を飛ばした（演出キューのキャンセル・暗転整合用）
+        public event Action DialogueSkipped;
         // 2択の選択肢を決定した（最終章のエンディング分岐などで使用）
         public event Action<StoryChoiceResult> ChoiceSelected;
 
@@ -153,6 +165,8 @@ namespace Yurube.Story
             BuildNews();
             BuildObjective();
             BuildKo();
+            BuildUnlockBanner();
+            BuildDarkCard();
 
             // 右下の操作説明（暗い帯を敷いて、明るい会話ウィンドウの上でも読めるようにする）
             var hintPlate = ToyKit.UIRounded("HintPlate", m_root, new Color(0.05f, 0.04f, 0.03f, 0.78f), 16f);
@@ -233,6 +247,58 @@ namespace Yurube.Story
 
             m_koGroup.alpha = 0f;
             m_koPanel.gameObject.SetActive(false);
+        }
+
+        // キャラ解放などの画面表示バナー（例：「だるきんぐが使えるようになった！」）
+        void BuildUnlockBanner()
+        {
+            var panel = ToyKit.UIRounded("UnlockBanner", m_root, new Color(0.14f, 0.08f, 0.22f, 0.96f), 26f);
+            ToyKit.Anchor(panel, new Vector2(0.5f, 0.5f), new Vector2(0f, 180f), new Vector2(1140f, 126f));
+            var outline = panel.gameObject.AddComponent<Outline>();
+            outline.effectColor = new Color(1f, 0.84f, 0.26f, 1f);
+            outline.effectDistance = new Vector2(4f, -4f);
+            m_unlockBanner = panel;
+            m_unlockBannerGroup = panel.gameObject.AddComponent<CanvasGroup>();
+            m_unlockBannerGroup.blocksRaycasts = false;
+            m_unlockBannerGroup.interactable = false;
+
+            m_unlockBannerText = ToyKit.UIText("Text", panel, m_font, "", 44f, new Color(1f, 0.95f, 0.78f));
+            m_unlockBannerText.fontStyle = FontStyles.Bold;
+            m_unlockBannerText.enableAutoSizing = true;
+            m_unlockBannerText.fontSizeMin = 24f;
+            m_unlockBannerText.fontSizeMax = 44f;
+            ToyKit.Stretch(m_unlockBannerText.rectTransform);
+            m_unlockBannerText.rectTransform.offsetMin = new Vector2(30f, 10f);
+            m_unlockBannerText.rectTransform.offsetMax = new Vector2(-30f, -10f);
+
+            m_unlockBannerGroup.alpha = 0f;
+            panel.gameObject.SetActive(false);
+        }
+
+        // バッドエンド用の黒背景白文字画面表示（例：「アメイジングだるま落としは、終わった」）
+        void BuildDarkCard()
+        {
+            var bg = ToyKit.UIImage("DarkCard", m_root, Color.black);
+            ToyKit.Stretch(bg);
+            m_darkCardRoot = bg.gameObject;
+            m_darkCardGroup = m_darkCardRoot.AddComponent<CanvasGroup>();
+            m_darkCardGroup.blocksRaycasts = false;
+            m_darkCardGroup.interactable = false;
+
+            var textGo = new GameObject("DarkCardTextWrap", typeof(RectTransform)).GetComponent<RectTransform>();
+            textGo.SetParent(bg, false);
+            ToyKit.Stretch(textGo);
+            m_darkCardTextGroup = textGo.gameObject.AddComponent<CanvasGroup>();
+            m_darkCardText = ToyKit.UIText("Text", textGo, m_font, "", 56f, Color.white);
+            m_darkCardText.fontStyle = FontStyles.Bold;
+            m_darkCardText.enableAutoSizing = true;
+            m_darkCardText.fontSizeMin = 28f;
+            m_darkCardText.fontSizeMax = 56f;
+            ToyKit.Anchor(m_darkCardText.rectTransform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1500f, 220f));
+
+            m_darkCardGroup.alpha = 0f;
+            m_darkCardTextGroup.alpha = 0f;
+            m_darkCardRoot.SetActive(false);
         }
 
         void BuildBig()
@@ -542,9 +608,11 @@ namespace Yurube.Story
 
         // onLine: 行を出し始めたときに呼ぶ（章ごとの演出を台詞に合わせるため。省略可）
         // onChoice: 2択の選択肢を選んだときに呼ぶ（最終章の分岐など。省略可）
+        // onBeforeLine: 行を表示する前に挟む非同期演出（場面転換・暗転テロップ・専用演出など。省略可）
         public IEnumerator PlayBig(StoryChapter chapter, IList<StoryLine> lines,
                                    Action<int, StoryLine> onLine = null,
-                                   Action<StoryChoiceResult> onChoice = null)
+                                   Action<StoryChoiceResult> onChoice = null,
+                                   Func<StoryLine, IEnumerator> onBeforeLine = null)
         {
             if (lines == null || lines.Count == 0) yield break;
             Build();
@@ -568,11 +636,13 @@ namespace Yurube.Story
             yield return Fade(m_dim, 0f, m_dimAlpha, 0.2f);
             yield return FadeGroup(m_bigGroup, 0f, 1f, 0.15f);
 
+            IList<StoryLine> currentLines = lines;
             int index = 0;
             bool firstPrepared = first != null;
             StoryLine lastDialogueLine = first;
-            foreach (var line in lines)
+            while (currentLines != null && index < currentLines.Count)
             {
+                var line = currentLines[index];
                 if (line == null) { index++; continue; }
                 if (line.HasChoice)
                 {
@@ -586,16 +656,38 @@ namespace Yurube.Story
                             m_bigText.maxVisibleCharacters = m_bigText.textInfo.characterCount;
                         }
                     }
-                    yield return RunChoice(chapter, line.choice, onChoice);
+                    string nextBranchId = null;
+                    yield return RunChoice(chapter, line.choice, onChoice, id => nextBranchId = id);
                     firstPrepared = false;
                     lastDialogueLine = null;
-                    index++;
                     if (m_skipped) break;
+
+                    // 選んだ branchId に一致する分岐ブロックがあれば、そこへ切り替えて再生する
+                    // （第1章〜第3章など branches が未定義の章は従来どおり元のリストの続きへ）
+                    var branch = chapter != null ? chapter.FindBranch(nextBranchId) : null;
+                    if (branch != null && branch.lines != null && branch.lines.Count > 0)
+                    {
+                        currentLines = branch.lines;
+                        index = 0;
+                        continue;
+                    }
+                    index++;
                     continue;
                 }
 
                 lastDialogueLine = line;
                 if (m_skipped) { index++; continue; }
+
+                if (onBeforeLine != null)
+                {
+                    var pre = onBeforeLine(line);
+                    if (pre != null)
+                    {
+                        yield return pre;
+                        firstPrepared = false;
+                        if (m_skipped) break;
+                    }
+                }
 
                 yield return ShowLine(chapter, line, big: true, index, onLine, firstPrepared);
                 firstPrepared = false;
@@ -611,14 +703,99 @@ namespace Yurube.Story
             UpdateHint(HintText);
             m_hintGroup.alpha = 0f;
             m_hintGroup.gameObject.SetActive(false);
-            yield return FadeGroup(m_bigGroup, 1f, 0f, 0.15f);
+            yield return FadeGroup(m_bigGroup, m_bigGroup.alpha, 0f, 0.15f);
             yield return Fade(m_dim, m_dim.color.a, 0f, 0.2f);
             m_bigPanel.gameObject.SetActive(false);
             m_bigShowing = false;
             SpecialGaugeHUD.Suppressed = gaugeWasSuppressed;
         }
 
-        IEnumerator RunChoice(StoryChapter chapter, StoryChoice choice, Action<StoryChoiceResult> onChoice)
+        // 会話中の場面転換などで、大きいウィンドウとヒントを一時的に隠す／戻す
+        public void SetBigVisible(bool visible)
+        {
+            if (m_bigGroup != null) m_bigGroup.alpha = visible ? 1f : 0f;
+            if (m_bigPanel != null) m_bigPanel.gameObject.SetActive(visible);
+            if (m_hintGroup != null)
+            {
+                m_hintGroup.alpha = visible ? 1f : 0f;
+                m_hintGroup.gameObject.SetActive(visible);
+            }
+            if (m_dim != null)
+            {
+                var c = m_dim.color;
+                c.a = visible ? m_dimAlpha : 0f;
+                m_dim.color = c;
+            }
+        }
+
+        // キャラ解放の簡易バナーを表示する（例：「だるきんぐが使えるようになった！」）
+        public void ShowUnlockBanner(string text, float seconds = 3.2f)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+            Build();
+            if (m_unlockBannerRoutine != null) StopCoroutine(m_unlockBannerRoutine);
+            m_unlockBannerRoutine = StartCoroutine(UnlockBannerRoutine(text, Mathf.Max(1.0f, seconds)));
+        }
+
+        public IEnumerator PlayUnlockBanner(string text, float seconds = 3.0f)
+        {
+            if (string.IsNullOrEmpty(text)) yield break;
+            Build();
+            if (m_unlockBannerRoutine != null) StopCoroutine(m_unlockBannerRoutine);
+            yield return UnlockBannerRoutine(text, Mathf.Max(1.0f, seconds));
+        }
+
+        IEnumerator UnlockBannerRoutine(string text, float seconds)
+        {
+            m_unlockBannerText.text = text;
+            m_unlockBanner.gameObject.SetActive(true);
+            m_unlockBanner.SetAsLastSibling();
+            m_unlockBanner.localScale = Vector3.one * 0.92f;
+            PreludeSfx.Play(PreludeSfx.Unlock, this);
+
+            float t = 0f;
+            while (t < 0.25f)
+            {
+                t += Time.unscaledDeltaTime;
+                float u = Mathf.Clamp01(t / 0.25f);
+                m_unlockBannerGroup.alpha = u;
+                m_unlockBanner.localScale = Vector3.one * Mathf.Lerp(0.92f, 1f, ToyKit.EaseOutBack(u));
+                yield return null;
+            }
+            m_unlockBannerGroup.alpha = 1f;
+            m_unlockBanner.localScale = Vector3.one;
+
+            yield return new WaitForSecondsRealtime(seconds);
+
+            yield return FadeGroup(m_unlockBannerGroup, 1f, 0f, 0.3f);
+            m_unlockBanner.gameObject.SetActive(false);
+            m_unlockBannerRoutine = null;
+        }
+
+        // バッドエンド用：黒背景に白文字のメッセージを表示し、その後の暗転＋SEを再生する
+        public IEnumerator PlayDarkMessageCard(string text, float holdSeconds, string afterSe = null, float afterDarkSeconds = 0f)
+        {
+            Build();
+            m_darkCardRoot.SetActive(true);
+            m_darkCardRoot.transform.SetAsLastSibling();
+            m_darkCardText.text = text ?? "";
+            m_darkCardGroup.alpha = 1f;
+            m_darkCardTextGroup.alpha = 0f;
+
+            yield return FadeGroup(m_darkCardTextGroup, 0f, 1f, 0.65f);
+            float end = Time.unscaledTime + Mathf.Max(0.8f, holdSeconds);
+            while (Time.unscaledTime < end) yield return null;
+            yield return FadeGroup(m_darkCardTextGroup, 1f, 0f, 0.65f);
+
+            if (!string.IsNullOrEmpty(afterSe)) PreludeSfx.Play(afterSe, this);
+            if (afterDarkSeconds > 0f)
+                yield return new WaitForSecondsRealtime(afterDarkSeconds);
+
+            m_darkCardGroup.alpha = 0f;
+            m_darkCardRoot.SetActive(false);
+        }
+
+        IEnumerator RunChoice(StoryChapter chapter, StoryChoice choice, Action<StoryChoiceResult> onChoice, Action<string> onBranchResolved = null)
         {
             if (choice == null || choice.options == null || choice.options.Count == 0) yield break;
 
@@ -698,6 +875,7 @@ namespace Yurube.Story
             string branchId = chosen != null ? chosen.branchId : "";
             var result = new StoryChoiceResult(choice.id, selected, branchId, chosenText);
             LastChoiceResult = result;
+            onBranchResolved?.Invoke(branchId);
             onChoice?.Invoke(result);
             ChoiceSelected?.Invoke(result);
 
@@ -776,14 +954,15 @@ namespace Yurube.Story
                 if (m_portrait != null)
                     ToyKit.Anchor(m_portrait.rectTransform, new Vector2(0f, 0.5f), new Vector2(140f, 20f), new Vector2(210f, 210f));
                 if (m_bigPlate != null)
-                    ToyKit.Anchor(m_bigPlate, new Vector2(0f, 1f), new Vector2(300f, -46f), new Vector2(340f, 62f));
+                    ToyKit.Anchor(m_bigPlate, new Vector2(0f, 1f), new Vector2(hidePortrait ? 226f : 300f, -46f), new Vector2(340f, 62f));
                 if (m_bigText != null)
                 {
                     var textRect = m_bigText.rectTransform;
                     textRect.anchorMin = textRect.anchorMax = new Vector2(0f, 1f);
                     textRect.pivot = new Vector2(0f, 1f);
-                    textRect.anchoredPosition = new Vector2(300f, -100f);
-                    textRect.sizeDelta = new Vector2(1120f, 190f);
+                    float left = hidePortrait ? 60f : 300f;
+                    textRect.anchoredPosition = new Vector2(left, -100f);
+                    textRect.sizeDelta = new Vector2(1460f - left - 40f, 190f);
                 }
                 if (m_choiceRoot != null)
                     ToyKit.Anchor(m_choiceRoot, new Vector2(0.5f, 0f), new Vector2(220f, 642f), m_choiceRoot.sizeDelta);
@@ -1062,20 +1241,21 @@ namespace Yurube.Story
             float shown = 0f;
             while (shown < total)
             {
-                if (SkipPressed()) { m_skipped = true; text.maxVisibleCharacters = total; yield break; }
+                if (SkipPressed()) { m_skipped = true; text.maxVisibleCharacters = total; DialogueSkipped?.Invoke(); yield break; }
                 if (AdvancePressed()) break;   // 全文表示（この押下では次へ進まない）
                 shown += m_charsPerSecond * Time.unscaledDeltaTime;
                 text.maxVisibleCharacters = Mathf.Clamp(Mathf.FloorToInt(shown), 0, total);
                 yield return null;
             }
             text.maxVisibleCharacters = total;
+            StoryLineTextCompleted?.Invoke(line);
 
             // 表示し終わったら次へ（入力待ち。全文表示に使った押下とは別の押下を待つ）
             if (big)
             {
                 while (true)
                 {
-                    if (SkipPressed()) { m_skipped = true; yield break; }
+                    if (SkipPressed()) { m_skipped = true; DialogueSkipped?.Invoke(); yield break; }
                     if (AdvancePressed()) break;
                     yield return null;
                 }

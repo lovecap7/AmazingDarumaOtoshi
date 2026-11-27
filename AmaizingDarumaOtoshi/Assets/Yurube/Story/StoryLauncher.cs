@@ -14,6 +14,7 @@ namespace Yurube.Story
     {
         public const string PreludeId = "prelude";
         public const string PrologueId = "prologue";
+        public const string FinalId = "final";
 
         // 序章を最初から始める
         public static void StartPrologue() => Start(PrologueId);

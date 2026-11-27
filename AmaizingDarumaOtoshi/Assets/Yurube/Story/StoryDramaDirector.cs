@@ -50,8 +50,17 @@ namespace Yurube.Story
             if (s_current == this) s_current = null;
             PreludeSfx.StopAll();
             if (m_hasPrevFog) RenderSettings.fog = m_prevFog;
-            if (m_dialogue != null) m_dialogue.StoryLineStarted -= OnStoryLineStarted;
-            if (m_movie != null) Destroy(m_movie.gameObject);
+            if (m_dialogue != null)
+            {
+                m_dialogue.StoryLineStarted -= OnStoryLineStarted;
+                m_dialogue.StoryLineTextCompleted -= OnStoryLineTextCompleted;
+                m_dialogue.DialogueSkipped -= OnDialogueSkipped;
+            }
+            if (m_movie != null)
+            {
+                m_movie.CleanupVfxAfterDialogue(clearImmediate: true);
+                Destroy(m_movie.gameObject);
+            }
             if (m_dialogue != null) Destroy(m_dialogue.gameObject);
         }
 
@@ -61,10 +70,22 @@ namespace Yurube.Story
             if (line != null && !string.IsNullOrEmpty(line.se)) PreludeSfx.Play(line.se, this);
         }
 
+        void OnStoryLineTextCompleted(StoryLine line)
+        {
+            if (m_movie != null) m_movie.OnDialogueLineTextCompleted(line);
+        }
+
+        void OnDialogueSkipped()
+        {
+            if (m_movie != null) m_movie.OnDialogueSkipped();
+        }
+
         IEnumerator Run()
         {
             m_dialogue = DialogueRunner.Create();
             m_dialogue.StoryLineStarted += OnStoryLineStarted;
+            m_dialogue.StoryLineTextCompleted += OnStoryLineTextCompleted;
+            m_dialogue.DialogueSkipped += OnDialogueSkipped;
 
             m_movie = StoryMovie.Create(m_chapter);
             m_movie.SetBlack();
@@ -85,6 +106,11 @@ namespace Yurube.Story
 
             PreludeSfx.StopAll();
             m_dialogue.SetDimAlpha(0.55f);
+            // 会話の終了・スキップ後に暗転や保留中エフェクトが残らないよう整理してから新聞へ遷移する
+            if (m_dialogue.WasSkipped)
+            {
+                m_movie.CleanupVfxAfterDialogue(clearImmediate: true);
+            }
             yield return m_movie.FadeToBlack(0.35f);
             m_movie.HideViewKeepBlack();
 

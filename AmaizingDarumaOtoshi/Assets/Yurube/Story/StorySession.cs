@@ -9,10 +9,59 @@ namespace Yurube.Story
         const string KeyPrefix = "Story.Clear.";
         const string UnlockKeyPrefix = "Story.Unlock.";
         const string UnlockSeenKeyPrefix = "Story.UnlockSeen.";
+        // 最終章のエンディング到達フラグ（隠しストーリー解放判定用）
+        public const string EndingTrueKey = "Story.Ending.True";
+        public const string EndingBadKey = "Story.Ending.Bad";
+        // トゥルーエンド報酬：だるきんぐ解放フラグ
+        public const string DaruKingUnlockKey = "Story.UnlockChar.daruking";
+        // 旧 chapter3（旧最終章）→ final への1回限りの移行済みフラグ
+        const string MigrationKeyV3Chapter3 = "Story.Migration.v3Chapter3ToFinal";
+
+        static bool s_migrated;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetMigrationCache() => s_migrated = false;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        static void BootstrapMigration() => EnsureMigrated();
+
+        // 旧最終章（旧 chapter3）のセーブを1回だけ final へ移行する。
+        //  ・旧最終章クリア済み → Story.Clear.final / Story.Unlock.final / Story.UnlockSeen.final を立てる
+        //  ・旧最終章未クリア → final は立てず、新第3章クリアまでロックのまま
+        //  ・旧 chapter3 側のキーはすべて消し、新第3章は未クリア扱い（第2章クリア済みなら requiredChapter で解放）
+        public static void EnsureMigrated()
+        {
+            if (s_migrated) return;
+            s_migrated = true;
+
+            if (PlayerPrefs.GetInt(MigrationKeyV3Chapter3, 0) == 1) return;
+
+            string oldClearKey = KeyPrefix + "chapter3";
+            string oldUnlockKey = UnlockKeyPrefix + "chapter3";
+            string oldUnlockSeenKey = UnlockSeenKeyPrefix + "chapter3";
+
+            bool oldFinalCleared = PlayerPrefs.GetInt(oldClearKey, 0) == 1;
+            if (oldFinalCleared)
+            {
+                PlayerPrefs.SetInt(KeyPrefix + StoryLauncher.FinalId, 1);
+                PlayerPrefs.SetInt(UnlockKeyPrefix + StoryLauncher.FinalId, 1);
+                PlayerPrefs.SetInt(UnlockSeenKeyPrefix + StoryLauncher.FinalId, 1);
+            }
+
+            PlayerPrefs.DeleteKey(oldClearKey);
+            PlayerPrefs.DeleteKey(oldUnlockKey);
+            PlayerPrefs.DeleteKey(oldUnlockSeenKey);
+            PlayerPrefs.SetInt(MigrationKeyV3Chapter3, 1);
+            PlayerPrefs.Save();
+
+            if (oldFinalCleared)
+                Debug.Log("[Story] 旧最終章（chapter3）のクリア記録を final へ移行しました");
+        }
 
         // 章をクリア済みか
         public static bool IsCleared(string chapterId)
         {
+            EnsureMigrated();
             if (string.IsNullOrEmpty(chapterId)) return false;
             return PlayerPrefs.GetInt(KeyPrefix + chapterId, 0) == 1;
         }
@@ -20,6 +69,7 @@ namespace Yurube.Story
         // 章が遊べるか（解放済みまたはクリア済みとして保存されているか、または解放条件の章をクリア済みか）
         public static bool IsUnlocked(StoryChapter chapter)
         {
+            EnsureMigrated();
             if (chapter == null) return false;
             if (PlayerPrefs.GetInt(UnlockKeyPrefix + chapter.id, 0) == 1) return true;
             if (IsCleared(chapter.id)) return true;
@@ -28,6 +78,7 @@ namespace Yurube.Story
 
         public static bool IsUnlocked(string chapterId)
         {
+            EnsureMigrated();
             if (string.IsNullOrEmpty(chapterId)) return false;
             if (PlayerPrefs.GetInt(UnlockKeyPrefix + chapterId, 0) == 1) return true;
             var chapter = StoryData.Load(chapterId);
@@ -37,6 +88,7 @@ namespace Yurube.Story
         // 章の解放を保存する
         public static void MarkUnlocked(string chapterId)
         {
+            EnsureMigrated();
             if (string.IsNullOrEmpty(chapterId)) return;
             PlayerPrefs.SetInt(UnlockKeyPrefix + chapterId, 1);
             PlayerPrefs.Save();
@@ -45,12 +97,14 @@ namespace Yurube.Story
         // 解放演出を再生済みか
         public static bool HasSeenUnlockAnim(string chapterId)
         {
+            EnsureMigrated();
             if (string.IsNullOrEmpty(chapterId)) return true;
             return PlayerPrefs.GetInt(UnlockSeenKeyPrefix + chapterId, 0) == 1;
         }
 
         public static void MarkUnlockAnimSeen(string chapterId)
         {
+            EnsureMigrated();
             if (string.IsNullOrEmpty(chapterId)) return;
             PlayerPrefs.SetInt(UnlockSeenKeyPrefix + chapterId, 1);
             PlayerPrefs.Save();
@@ -60,6 +114,7 @@ namespace Yurube.Story
         // 戻り値：このクリアで初めて解放された次の章ID（なければ null）
         public static string MarkCleared(string chapterId)
         {
+            EnsureMigrated();
             if (string.IsNullOrEmpty(chapterId)) return null;
             string newlyUnlockedId = null;
 
@@ -90,6 +145,7 @@ namespace Yurube.Story
         // 全章クリア済みか（最終章クリア判定用）
         public static bool IsAllCleared()
         {
+            EnsureMigrated();
             var all = StoryData.LoadAll();
             if (all.Count == 0) return false;
             foreach (var c in all)
@@ -103,7 +159,8 @@ namespace Yurube.Story
         // メニューの初期カーソルを「ものがたり」にする判定に使う。全章クリア後は false。
         public static bool HasStoryInProgress()
         {
-            const int PlannedChapterSlots = 5;   // プロローグ＋序章＋第1章＋第2章＋最終章
+            EnsureMigrated();
+            const int PlannedChapterSlots = 7;   // プロローグ＋序章＋第1章＋第2章＋第3章＋第4章＋最終章
             int chapterCount = 0;
             bool anyCleared = false;
             bool anyUncleared = false;
@@ -122,6 +179,7 @@ namespace Yurube.Story
         // 全章を解放する（デバッグ用）
         public static void UnlockAll()
         {
+            EnsureMigrated();
             foreach (var chapter in StoryData.LoadAll())
             {
                 if (chapter == null) continue;
@@ -132,13 +190,57 @@ namespace Yurube.Story
             Debug.Log("[Story] 全章を解放しました（デバッグ）");
         }
 
+        // エンディング到達の記録（トゥルー／バッド。どちらも到達済みなら両方 1）
+        public static bool IsTrueEndingReached()
+        {
+            EnsureMigrated();
+            return PlayerPrefs.GetInt(EndingTrueKey, 0) == 1;
+        }
+
+        public static bool IsBadEndingReached()
+        {
+            EnsureMigrated();
+            return PlayerPrefs.GetInt(EndingBadKey, 0) == 1;
+        }
+
+        public static void MarkEndingReached(bool isTrueEnding)
+        {
+            EnsureMigrated();
+            string key = isTrueEnding ? EndingTrueKey : EndingBadKey;
+            PlayerPrefs.SetInt(key, 1);
+            PlayerPrefs.Save();
+            Debug.Log("[Story] エンディング到達を保存: " + key);
+        }
+
+        // だるきんぐがプレイアブルとして解放済みか（トゥルーエンド到達で解放）
+        public static bool IsDaruKingUnlocked()
+        {
+            EnsureMigrated();
+            return PlayerPrefs.GetInt(DaruKingUnlockKey, 0) == 1 || PlayerPrefs.GetInt(EndingTrueKey, 0) == 1;
+        }
+
+        // だるきんぐを解放して保存する。今回初めて解放したときだけ true（再プレイ時の通知重複を防ぐ）
+        public static bool UnlockDaruKing()
+        {
+            EnsureMigrated();
+            if (PlayerPrefs.GetInt(DaruKingUnlockKey, 0) == 1) return false;
+            PlayerPrefs.SetInt(DaruKingUnlockKey, 1);
+            PlayerPrefs.Save();
+            Debug.Log("[Story] キャラクター解放を保存: daruking");
+            return true;
+        }
+
         // 全章のセーブを初期化する（デバッグ用。序章のみ解放に戻る）
         public static void ResetAll()
         {
+            EnsureMigrated();
             foreach (var chapter in StoryData.LoadAll())
             {
                 if (chapter != null) Clear(chapter.id);
             }
+            PlayerPrefs.DeleteKey(EndingTrueKey);
+            PlayerPrefs.DeleteKey(EndingBadKey);
+            PlayerPrefs.DeleteKey(DaruKingUnlockKey);
             PlayerPrefs.Save();
             Debug.Log("[Story] 章の進行を初期化しました（デバッグ）");
         }
@@ -146,6 +248,7 @@ namespace Yurube.Story
         // 記録を消す（デバッグ用）
         public static void Clear(string chapterId)
         {
+            EnsureMigrated();
             if (string.IsNullOrEmpty(chapterId)) return;
             PlayerPrefs.DeleteKey(KeyPrefix + chapterId);
             PlayerPrefs.DeleteKey(UnlockKeyPrefix + chapterId);

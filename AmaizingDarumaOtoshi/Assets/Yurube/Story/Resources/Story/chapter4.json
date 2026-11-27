@@ -1,0 +1,88 @@
+{
+  "id": "chapter4",
+  "order": 4,
+  "requiredChapter": "chapter3",
+  "title": "第4章「頂の決勝戦」",
+  "subtitle": "頂の決勝戦",
+  "stageId": "DebugStage47",
+  "sceneName": "AllStages",
+  "playerCharacter": "akadaru",
+  "clearKey": "Story.Clear.chapter4",
+  "rules": {
+    "mode": "Stock",
+    "stocks": 3,
+    "timeLimit": 0,
+    "cpuSpecial": false,
+    "awakening": false,
+    "gaugeFromStart": true,
+    "cpuBlockLimit": 0
+  },
+  "cpu": [
+    { "character": "iwadaru", "level": 3, "stocks": 2 },
+    { "character": "hebidaru", "level": 3, "stocks": 2 },
+    { "character": "aodaru", "level": 2, "stocks": 2, "displayName": "他校選手" }
+  ],
+  "speakers": [
+    { "id": "akadaru", "name": "あかだる", "color": "#E8544B" },
+    { "id": "aodaru", "name": "あおだる", "color": "#4B8BE8" },
+    { "id": "midaru", "name": "みだる", "color": "#4BA85A" },
+    { "id": "kidaru", "name": "きだる", "color": "#E8C64B" },
+    { "id": "iwadaru", "name": "いわだる", "color": "#80786B" },
+    { "id": "hebidaru", "name": "へびだる", "color": "#6BBF45" },
+    { "id": "daruking", "name": "だるきんぐ", "color": "#8C59B3" }
+  ],
+  "cutscene": {
+    "type": "ch4_final",
+    "caption": "全国大会 決勝",
+    "rival": "iwadaru",
+    "shots": [
+      { "view": "wide", "seconds": 3.0, "caption": "全国大会 決勝" },
+      { "view": "vip_daruking", "seconds": 3.0, "caption": "全国大会 決勝" },
+      { "view": "rivals", "seconds": 3.4, "caption": "全国大会 決勝" }
+    ]
+  },
+  "before": [
+    { "speaker": "", "direction": true, "shot": "S_FINAL_WIDE", "text": "全国大会決勝の舞台。観客席にはきだる・あおだる・みだる。最上段の貴賓席には主催者だるきんぐが座っている。" },
+    { "speaker": "iwadaru", "text": "ガハハ！ 約束通り、敗者復活から這い上がったぞ、七転の主将！" },
+    { "speaker": "hebidaru", "text": "ボクもいるよ。……この決勝を制した者だけが、貴賓席の『王』と一騎打ちする権利を得る" },
+    { "speaker": "akadaru", "text": "ああ。お前たちを倒して優勝し、必ずあの男の目の前に立つ！" },
+    { "speaker": "daruking", "shot": "S_DARUKING_VIP", "text": "ほう……勝ち上がって見せよ、若き挑戦者どもよ" },
+    { "speaker": "midaru", "shot": "S_AUDIENCE_MIDARU", "text": "いわだるの突進とへびだるの曲がる弾の同時対処です。落ち着いて打ち返しと連鎖を使いましょう！" }
+  ],
+  "tutorial": [],
+  "matchStart": [],
+  "matchStartNotice": "全国大会 決勝、開始！",
+  "specialEvent": {
+    "enabled": true,
+    "trigger": "lowStock",
+    "stockThreshold": 1,
+    "timeFallback": false,
+    "timeSeconds": 90,
+    "pause": false,
+    "prompt": "[L／Y]で必殺技！",
+    "promptSeconds": 10,
+    "replayAssist": true,
+    "lines": []
+  },
+  "defeat": [
+    { "speaker": "iwadaru", "text": "ガハハ！ 決勝の壁は厚いぞ！" },
+    { "speaker": "akadaru", "text": "……まだだ、ここで終わるか！" }
+  ],
+  "after": [
+    { "speaker": "iwadaru", "text": "ぐぬぅ……また壁を越えたか！ ……オレ様の煽りはここまでだ。あとはお前が決めろ！" },
+    { "speaker": "hebidaru", "text": "……見事だよ、あかだる。ボクは客席で見届けるよ。キミが何を選ぶのかをね" },
+    { "speaker": "", "direction": true, "shot": "S_FINAL_WIDE", "se": "cheer", "text": "あかだるが決勝戦を制し、全国優勝が決定！ 会場に大歓声が響き渡る。" },
+    { "speaker": "kidaru", "shot": "S_AUDIENCE_KIDARU", "text": "やったーー！！ あかせんぱい、全国制覇ですーー！！" },
+    { "speaker": "", "direction": true, "shot": "S_DARUKING_DESCEND", "cue": "daruking_descend", "se": "cheer_fade", "text": "歓声の中、貴賓席の扉が開き、主催者だるきんぐが静かに階段を降りて舞台へ立つ。会場の空気が一変する。" },
+    { "speaker": "daruking", "shot": "S_DARUKING_STAGE", "text": "見事だ、七転高校主将あかだる。全国優勝の栄誉と、余への挑戦権を認めよう" },
+    { "speaker": "akadaru", "text": "……やっと、ここまで来たぞ、だるきんぐ……！" }
+  ],
+  "newspaper": {
+    "header": "だるま新聞",
+    "headline": "七転高校あかだる、悲願の全国優勝！ いよいよ主催者だるきんぐとの王座決定戦へ！",
+    "body": "全国大会決勝。七転高校だるま落とし部の主将あかだるが、敗者復活から勝ち上がった巌高校と蛇ノ目学園を下し、全国制覇を成し遂げた。優勝者には、主催者だるきんぐとの王座決定戦への挑戦権が与えられる。",
+    "image": "",
+    "art": "prologue",
+    "caption": "全国大会 決勝 七転高校だるま落とし部"
+  }
+}

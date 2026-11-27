@@ -16,7 +16,20 @@ MonoBehaviour:
   m_smallSeconds: 3
   m_dimAlpha: 0.62
   m_awakeningSeconds: 90
+  m_gaugeTimeHintSeconds: 15
   m_tutorialCpuBlockLimit: 0
+  m_dollFarBlendSeconds: 0.8
+  m_dollShakeSeconds: 0.5
+  m_unlockAnimSeconds: 1.4
+  m_roomMemberStacks:
+  - id: kidaru
+    stackCount: 3
+  - id: midaru
+    stackCount: 3
+  - id: akadaru
+    stackCount: 3
+  - id: aodaru
+    stackCount: 3
   m_reflectAssistSeconds: 6
   m_reflectAssistSpeed: 18
   m_chainHintSeconds: 30
@@ -28,3 +41,4 @@ MonoBehaviour:
   m_overrideStocks: 0
   m_overrideCpuLevel: 0
   m_overrideCpuBlockLimit: 0
+  m_vfxCatalog: {fileID: 11400000, guid: 1d183a77f4463cb4d84f987b4a404685, type: 2}
